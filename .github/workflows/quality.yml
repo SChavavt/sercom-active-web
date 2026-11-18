@@ -25,3 +25,5 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: npm run build
+      # Compila los dos modos (producción y vista previa) y revisa reglas y enlaces en ambas salidas.
+      - run: npm run verify

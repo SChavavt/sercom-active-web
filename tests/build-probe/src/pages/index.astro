@@ -1,0 +1,41 @@
+---
+// Sonda de compilación: NO es una página del sitio. La compila tests/build-output.test.mjs en una carpeta
+// temporal, con la configuración real, para comprobar qué datos llegan a la salida en cada modo.
+// Imprime todos los datos públicos y carga un script de navegador con los módulos aptos para el navegador.
+import { searchText } from '../../../../src/lib/search.mjs';
+import { contactLinks } from '../../../../src/lib/contact.mjs';
+import { brands, categories, featuredProducts, mode, products } from '../../../../src/lib/site-data.mjs';
+---
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sonda de compilación</title>
+  </head>
+  <body data-mode={mode} data-env-file={import.meta.env.PUBLIC_PROBE_ENV_FILE ?? 'sin-leer'}>
+    <ul id="categorias">{categories.map(category => <li data-category={category.id}>{category.name}: {category.summary} ({category.productCount})</li>)}</ul>
+    <ul id="marcas">{brands.map(brand => <li data-brand={brand.id}>{brand.name}</li>)}</ul>
+    <ul id="productos">
+      {products.map(product => (
+        <li data-product={product.id} data-search={searchText(product)}>
+          {product.brandName} {product.code} {product.name}. {product.summary} {product.characteristics.join(' / ')}
+          {product.variants.map(variant => <span data-variant={variant.code}>{variant.label}</span>)}
+        </li>
+      ))}
+    </ul>
+    <p id="destacados">{featuredProducts(4).map(product => product.code).join(' ')}</p>
+    <a id="cotizar" href={contactLinks.general().whatsapp}>Cotizar</a>
+    <script type="application/json" id="datos" set:html={JSON.stringify({ categories, brands, products })} />
+    <script>
+      import { withPageLink } from '../../../../src/lib/contact-core.mjs';
+      import { matchesSearchText, SEARCH_PARAM } from '../../../../src/lib/search.mjs';
+
+      const query = new URLSearchParams(location.search).get(SEARCH_PARAM);
+      for (const item of document.querySelectorAll('[data-search]')) {
+        item.toggleAttribute('hidden', !matchesSearchText(item.getAttribute('data-search'), query));
+      }
+      const link = document.getElementById('cotizar');
+      if (link instanceof HTMLAnchorElement) link.href = withPageLink(link.href, location.origin + location.pathname);
+    </script>
+  </body>
+</html>
