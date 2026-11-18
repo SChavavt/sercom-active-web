@@ -1,0 +1,163 @@
+// Formas públicas de los datos del sitio (lo que las páginas pueden imprimir).
+// Las produce `src/lib/site-data-core.mjs`; las páginas las reciben desde `src/lib/site-data.mjs`.
+// Ninguna incluye aprobación, fuente, estado editorial ni datos del registro de investigación.
+
+/** `production`: solo lo aprobado. `preview`: además categorías en borrador y productos de ejemplo. */
+export type SiteMode = 'production' | 'preview';
+
+/** Enlace al sitio del fabricante de una marca. */
+export interface ManufacturerLink {
+  /** Siempre «Sitio del fabricante». */
+  readonly label: string;
+  readonly url: string;
+}
+
+export interface PublicCategory {
+  readonly id: string;
+  /** Nombre completo, por ejemplo «Protección de manos». */
+  readonly name: string;
+  /** Nombre corto para menús y mosaicos, por ejemplo «Manos». */
+  readonly shortName: string;
+  /** Línea orientativa de subcategorías; cadena vacía si no hay. */
+  readonly summary: string;
+  /** `true` cuando la categoría sigue en borrador (solo se ve en la vista previa). */
+  readonly isDraft: boolean;
+  /** Productos públicos de la categoría en el modo actual. */
+  readonly productCount: number;
+  /** `/categorias/{id}/` */
+  readonly url: string;
+}
+
+export interface PublicBrand {
+  readonly id: string;
+  readonly name: string;
+  /** `supplier`: proveedor (hoy Espomega); no tiene productos propios. */
+  readonly kind: 'brand' | 'supplier';
+  /** Cero o un enlace. */
+  readonly manufacturerLinks: readonly ManufacturerLink[];
+  /** Productos públicos de la marca en el modo actual (los ejemplos no cuentan: no tienen marca real). */
+  readonly productCount: number;
+  /** `/marcas/{id}/` */
+  readonly url: string;
+}
+
+export interface PublicVariant {
+  readonly id: string;
+  readonly label: string;
+  /** Código del fabricante para la variante. */
+  readonly code: string;
+}
+
+export interface PublicImage {
+  readonly url: string;
+  readonly alt: string;
+}
+
+export interface PublicDocument {
+  readonly label: string;
+  readonly url: string;
+}
+
+/** Forma única para dibujar un producto, sea una ficha aprobada o un ejemplo de la vista previa. */
+export interface PublicProduct {
+  readonly id: string;
+  /** `/productos/{id}/` */
+  readonly url: string;
+  readonly name: string;
+  /** `null` en los ejemplos: no pertenecen a una marca real y no tienen página de marca. */
+  readonly brandId: string | null;
+  /** Nombre visible de la marca; «Marca de ejemplo» en los ejemplos. */
+  readonly brandName: string;
+  /** Modelo o código exacto del fabricante. */
+  readonly code: string;
+  readonly categoryIds: readonly string[];
+  /** Nombres de las categorías, en el mismo orden que `categoryIds`. */
+  readonly categoryNames: readonly string[];
+  readonly summary: string;
+  readonly characteristics: readonly string[];
+  readonly saleUnit: string;
+  readonly variants: readonly PublicVariant[];
+  /** `null` cuando no hay fotografía (todos los ejemplos): la página muestra el icono de la categoría. */
+  readonly image: PublicImage | null;
+  readonly documents: readonly PublicDocument[];
+  /** `true` solo en los ejemplos de la vista previa: la página debe mostrar la etiqueta «Ejemplo». */
+  readonly isExample: boolean;
+}
+
+/** Identificadores para `getStaticPaths()` en el modo actual. */
+export interface SitePaths {
+  readonly categoryIds: readonly string[];
+  readonly brandIds: readonly string[];
+  readonly productIds: readonly string[];
+}
+
+export interface SiteData {
+  readonly mode: SiteMode;
+  readonly isPreview: boolean;
+  readonly categories: readonly PublicCategory[];
+  readonly brands: readonly PublicBrand[];
+  readonly products: readonly PublicProduct[];
+  readonly paths: SitePaths;
+  getCategory(id: string): PublicCategory | undefined;
+  getBrand(id: string): PublicBrand | undefined;
+  getProduct(id: string): PublicProduct | undefined;
+  /** Productos de una categoría, en el orden del catálogo. Lista vacía si no existe o no es pública. */
+  productsByCategory(id: string): PublicProduct[];
+  /** Productos de una marca, en el orden del catálogo. Lista vacía si no existe. */
+  productsByBrand(id: string): PublicProduct[];
+  /** Selección variada para la portada: recorre las categorías por turnos. Por defecto, hasta ocho. */
+  featuredProducts(limit?: number): PublicProduct[];
+}
+
+/** Datos que recibe `createSiteData`. Se validan al construir; por eso llegan sin tipo estricto. */
+export interface SiteSources {
+  mode: SiteMode;
+  /** Contenido de `src/data/catalog.json`. */
+  catalog: unknown;
+  /** Contenido de `src/data/brands.json`. */
+  brands: unknown;
+  /** Contenido de `src/data/preview/example-products.json`. Se ignora en modo producción. */
+  exampleProducts?: unknown;
+}
+
+/** Registro de `src/data/brands.json`. */
+export interface BrandRecord {
+  id: string;
+  name: string;
+  kind: 'brand' | 'supplier';
+  manufacturerLinks: { label: string; url: string }[];
+}
+
+/** Registro de `src/data/preview/example-products.json`. No es una ficha del catálogo. */
+export interface ExampleProductRecord {
+  id: string;
+  name: string;
+  brandName: string;
+  code: string;
+  categoryIds: string[];
+  saleUnit: string;
+  summary: string;
+  characteristics: string[];
+  variants: { id: string; label: string; code: string }[];
+}
+
+/** Campos de un producto que usa la búsqueda. */
+export type SearchableProduct = Pick<PublicProduct, 'name' | 'brandName' | 'code' | 'categoryNames'> & {
+  readonly variants: readonly Pick<PublicVariant, 'code'>[];
+};
+
+/** Rutas del sitio. Todas terminan en diagonal. */
+export interface SiteRoutes {
+  readonly home: string;
+  readonly catalog: string;
+  readonly brands: string;
+  readonly quoteList: string;
+  readonly specialRequest: string;
+  readonly contact: string;
+  readonly privacy: string;
+  category(id: string): string;
+  brand(id: string): string;
+  product(id: string): string;
+  /** `/catalogo/?q=...`; sin consulta devuelve `/catalogo/`. */
+  search(query?: string | null): string;
+}
