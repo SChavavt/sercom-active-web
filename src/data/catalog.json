@@ -1,16 +1,16 @@
 {
   "schemaVersion": 1,
   "categories": [
-    { "id": "manos", "name": "Protección de manos", "status": "draft" },
-    { "id": "ojos-y-cara", "name": "Protección de ojos y cara", "status": "draft" },
-    { "id": "cabeza", "name": "Protección de cabeza", "status": "draft" },
-    { "id": "respiratoria", "name": "Protección respiratoria", "status": "draft" },
-    { "id": "auditiva", "name": "Protección auditiva", "status": "draft" },
-    { "id": "alturas", "name": "Trabajo en alturas", "status": "draft" },
-    { "id": "ropa", "name": "Ropa y protección corporal", "status": "draft" },
-    { "id": "calzado", "name": "Calzado industrial", "status": "draft" },
-    { "id": "vial-y-senalizacion", "name": "Vial y señalización", "status": "draft" },
-    { "id": "soldadura", "name": "Soldadura", "status": "draft" }
+    { "id": "manos", "name": "Protección de manos", "shortName": "Manos", "summary": "Guantes recubiertos, de cuero, desechables, anticorte, para químicos y mangas", "status": "draft" },
+    { "id": "ojos-y-cara", "name": "Protección de ojos y cara", "shortName": "Ojos y cara", "summary": "Lentes, goggles y caretas", "status": "draft" },
+    { "id": "cabeza", "name": "Protección de cabeza", "shortName": "Cabeza", "summary": "Cascos, suspensiones y accesorios", "status": "draft" },
+    { "id": "respiratoria", "name": "Protección respiratoria", "shortName": "Respiratoria", "summary": "Respiradores, cartuchos y filtros", "status": "draft" },
+    { "id": "auditiva", "name": "Protección auditiva", "shortName": "Auditiva", "summary": "Tapones y orejeras", "status": "draft" },
+    { "id": "alturas", "name": "Trabajo en alturas", "shortName": "Alturas", "summary": "Arneses, eslingas, retráctiles, anclajes y líneas de vida", "status": "draft" },
+    { "id": "ropa", "name": "Ropa y protección corporal", "shortName": "Ropa", "summary": "Overoles, impermeables, alta visibilidad y prendas especializadas", "status": "draft" },
+    { "id": "calzado", "name": "Calzado industrial", "shortName": "Calzado", "summary": "Botas y calzado de seguridad", "status": "draft" },
+    { "id": "vial-y-senalizacion", "name": "Vial y señalización", "shortName": "Vial y señalización", "summary": "Conos, barreras, cintas y señales", "status": "draft" },
+    { "id": "soldadura", "name": "Soldadura", "shortName": "Soldadura", "summary": "Protección para soldar", "status": "draft" }
   ],
   "products": []
 }

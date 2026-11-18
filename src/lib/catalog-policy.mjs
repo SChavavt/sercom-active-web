@@ -6,9 +6,16 @@ const isHttps = value => {
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; }
   catch { return false; }
 };
-const excluded = value => /\bgisa\b|guantes?\s+internacionales?/.test(normalize(value));
+/** Indica si un texto menciona la marca excluida del alcance. */
+export const mentionsExcludedBrand = value => /\bgisa\b|guantes?\s+internacionales?/.test(normalize(value));
+const excluded = mentionsExcludedBrand;
 const forbidden = /^(price|prices|precio|precios|cost|costs|costo|costos|stock|inventory|inventario)$/;
 const productKeys = new Set(['id', 'brandId', 'model', 'name', 'categoryIds', 'status', 'description', 'characteristics', 'saleUnit', 'variants', 'image', 'source', 'approval', 'documents']);
+const categoryKeys = new Set(['id', 'name', 'shortName', 'summary', 'status']);
+// Los ejemplos de la vista previa viven en src/data/preview y nunca entran al catálogo: sus marcas quedan reservadas.
+const exampleCode = value => /^ej-\d/i.test(String(value ?? '').trim());
+const reservedForExamples = p => /^ejemplo(?:-|$)/.test(String(p.id ?? '')) || /\bde ejemplo\b/.test(normalize(p.name))
+  || exampleCode(p.model) || (Array.isArray(p.variants) && p.variants.some(v => exampleCode(v?.manufacturerCode)));
 
 function inspectFields(value, path, errors) {
   if (!value || typeof value !== 'object') return;
@@ -29,6 +36,10 @@ export function validateCatalog(catalog, registry) {
   const categories = new Map();
   for (const c of catalog.categories) {
     if (!c || !isId(c.id) || !isText(c.name) || !['draft', 'approved'].includes(c.status)) errors.push('Categoría inválida.');
+    if (c && typeof c === 'object') {
+      for (const key of Object.keys(c)) if (!categoryKeys.has(key)) errors.push(`Categoría ${c.id}: campo no definido (${key}).`);
+      for (const key of ['shortName', 'summary']) if (key in c && !isText(c[key])) errors.push(`Categoría ${c.id}: ${key} debe ser un texto no vacío.`);
+    }
     if (categories.has(c?.id)) errors.push(`Categoría duplicada: ${c?.id}.`);
     categories.set(c?.id, c);
   }
@@ -43,6 +54,7 @@ export function validateCatalog(catalog, registry) {
     const brand = brands.get(p.brandId);
     if (!brand) errors.push(`${path}: la marca no está en el alcance permitido; un proveedor no es una marca.`);
     if ([p.id, p.brandId, p.model, p.name, brand?.name].some(excluded)) errors.push(`${path}: marca excluida.`);
+    if (reservedForExamples(p)) errors.push(`${path}: identificador, código o nombre reservado para los ejemplos de vista previa.`);
     const modelKey = `${normalize(p.brandId)}:${normalize(p.model)}`;
     if (!isText(p.model) || models.has(modelKey)) errors.push(`${path}: modelo vacío o duplicado en la misma marca.`);
     models.add(modelKey);

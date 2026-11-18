@@ -1,0 +1,187 @@
+[
+  {
+    "id": "ejemplo-guante-recubierto",
+    "name": "Guante de ejemplo recubierto",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-1001",
+    "categoryIds": ["manos"],
+    "saleUnit": "par",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "talla-7", "label": "Talla 7", "code": "EJ-1001-7" },
+      { "id": "talla-8", "label": "Talla 8", "code": "EJ-1001-8" },
+      { "id": "talla-9", "label": "Talla 9", "code": "EJ-1001-9" },
+      { "id": "talla-10", "label": "Talla 10", "code": "EJ-1001-10" }
+    ]
+  },
+  {
+    "id": "ejemplo-lente-de-seguridad",
+    "name": "Lente de seguridad de ejemplo",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-2001",
+    "categoryIds": ["ojos-y-cara"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "mica-clara", "label": "Mica clara", "code": "EJ-2001-CL" },
+      { "id": "mica-gris", "label": "Mica gris", "code": "EJ-2001-GR" }
+    ]
+  },
+  {
+    "id": "ejemplo-casco-tipo-cachucha",
+    "name": "Casco de ejemplo tipo cachucha",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-3001",
+    "categoryIds": ["cabeza"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "blanco", "label": "Blanco", "code": "EJ-3001-BL" },
+      { "id": "amarillo", "label": "Amarillo", "code": "EJ-3001-AM" },
+      { "id": "azul", "label": "Azul", "code": "EJ-3001-AZ" }
+    ]
+  },
+  {
+    "id": "ejemplo-respirador-de-media-cara",
+    "name": "Respirador de ejemplo de media cara",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-4001",
+    "categoryIds": ["respiratoria"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "mediano", "label": "Mediano", "code": "EJ-4001-M" },
+      { "id": "grande", "label": "Grande", "code": "EJ-4001-G" }
+    ]
+  },
+  {
+    "id": "ejemplo-orejera",
+    "name": "Orejera de ejemplo",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-5001",
+    "categoryIds": ["auditiva"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unica", "label": "Única", "code": "EJ-5001-U" }
+    ]
+  },
+  {
+    "id": "ejemplo-arnes-de-cuerpo-completo",
+    "name": "Arnés de ejemplo de cuerpo completo",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-6001",
+    "categoryIds": ["alturas"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unitalla", "label": "Unitalla", "code": "EJ-6001-UNI" },
+      { "id": "extragrande", "label": "Extragrande", "code": "EJ-6001-XG" }
+    ]
+  },
+  {
+    "id": "ejemplo-overol",
+    "name": "Overol de ejemplo",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-7001",
+    "categoryIds": ["ropa"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "m", "label": "M", "code": "EJ-7001-M" },
+      { "id": "g", "label": "G", "code": "EJ-7001-G" },
+      { "id": "xg", "label": "XG", "code": "EJ-7001-XG" }
+    ]
+  },
+  {
+    "id": "ejemplo-bota-con-casquillo",
+    "name": "Bota de ejemplo con casquillo",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-8001",
+    "categoryIds": ["calzado"],
+    "saleUnit": "par",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "talla-25", "label": "Talla 25", "code": "EJ-8001-25" },
+      { "id": "talla-26", "label": "Talla 26", "code": "EJ-8001-26" },
+      { "id": "talla-27", "label": "Talla 27", "code": "EJ-8001-27" },
+      { "id": "talla-28", "label": "Talla 28", "code": "EJ-8001-28" },
+      { "id": "talla-29", "label": "Talla 29", "code": "EJ-8001-29" },
+      { "id": "talla-30", "label": "Talla 30", "code": "EJ-8001-30" }
+    ]
+  },
+  {
+    "id": "ejemplo-cono-de-71-cm",
+    "name": "Cono de ejemplo de 71 cm",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-9001",
+    "categoryIds": ["vial-y-senalizacion"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unica", "label": "Única", "code": "EJ-9001-U" }
+    ]
+  },
+  {
+    "id": "ejemplo-careta-para-soldar",
+    "name": "Careta de ejemplo para soldar",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-1101",
+    "categoryIds": ["soldadura"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unica", "label": "Única", "code": "EJ-1101-U" }
+    ]
+  }
+]
