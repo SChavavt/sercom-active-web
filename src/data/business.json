@@ -1,0 +1,22 @@
+{
+  "name": "Sercom Active",
+  "locationLabel": "Atención comercial en Puebla",
+  "contactName": "Yosmara del Rocío Torres Pérez",
+  "email": "ventas.puebla@sercomactive.com",
+  "whatsappDisplay": "+52 1 221 400 2219",
+  "whatsappDigits": "5212214002219",
+  "whatsappTested": false,
+  "hoursText": "Lunes a viernes de 9:00 a 18:00. Sábado y domingo cerrado.",
+  "timezone": "America/Mexico_City",
+  "weeklyHours": [
+    { "day": "monday", "opens": "09:00", "closes": "18:00" },
+    { "day": "tuesday", "opens": "09:00", "closes": "18:00" },
+    { "day": "wednesday", "opens": "09:00", "closes": "18:00" },
+    { "day": "thursday", "opens": "09:00", "closes": "18:00" },
+    { "day": "friday", "opens": "09:00", "closes": "18:00" },
+    { "day": "saturday", "closed": true },
+    { "day": "sunday", "closed": true }
+  ],
+  "address": "C. 31-A Nte. 1024, Villa San Alejandro, 72090 Heroica Puebla de Zaragoza, Pue., México",
+  "inPersonAttentionConfirmed": false
+}

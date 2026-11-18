@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    { "id": "manos", "name": "Protección de manos", "status": "draft" },
+    { "id": "ojos-y-cara", "name": "Protección de ojos y cara", "status": "draft" },
+    { "id": "cabeza", "name": "Protección de cabeza", "status": "draft" },
+    { "id": "respiratoria", "name": "Protección respiratoria", "status": "draft" },
+    { "id": "auditiva", "name": "Protección auditiva", "status": "draft" },
+    { "id": "alturas", "name": "Trabajo en alturas", "status": "draft" },
+    { "id": "ropa", "name": "Ropa y protección corporal", "status": "draft" },
+    { "id": "calzado", "name": "Calzado industrial", "status": "draft" },
+    { "id": "vial-y-senalizacion", "name": "Vial y señalización", "status": "draft" },
+    { "id": "soldadura", "name": "Soldadura", "status": "draft" }
+  ],
+  "products": []
+}
