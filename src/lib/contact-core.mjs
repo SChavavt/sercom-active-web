@@ -1,9 +1,10 @@
 // @ts-check
 // Enlaces de contacto y plantillas de mensaje, sin datos del negocio: todo llega como argumento.
-// Apto para el navegador y para node:test: sin importaciones.
+// Apto para el navegador y para node:test: solo importa `text.mjs` (la limpieza del texto del visitante).
 // Las páginas usan `contact.mjs` al compilar; un <script> de navegador solo necesita de aquí
 // `withPageLink` y `withRequestDescription`, que completan un enlace ya construido.
 /** @import { Contact, ContactLinkPair, ContactLinks, ContactMessages, ContactSettings, ContactSubjects, EmailParts, ProductReference } from '../types/contact.ts' */
+import { cleanQuery } from './text.mjs';
 
 const LINK_LABEL = 'Enlace';
 const DESCRIPTION_LABEL = 'Descripción o uso';
@@ -125,12 +126,14 @@ function addLinkLine(text, url) {
  * Para el navegador y la compilación: la descripción tal como entra en la línea «Descripción o uso» de una
  * solicitud especial (una sola línea, sin espacios sobrantes, hasta 200 caracteres). Cadena vacía si no hay
  * texto útil. Sirve para mostrar en la página exactamente lo que se agregó al borrador.
+ * La limpia `cleanQuery`, la misma función que la búsqueda del catálogo (`displayQuery`): sin el carácter de
+ * reemplazo, controles, caracteres de dirección, invisibles ni mitades sueltas de un par sustituto.
  * Cuenta caracteres completos (puntos de código), no unidades de UTF-16: el recorte nunca parte un emoji.
  * @param {unknown} description
  * @returns {string}
  */
 export function requestDescription(description) {
-  return Array.from(clean(description)).slice(0, MAX_DESCRIPTION_LENGTH).join('').trim();
+  return Array.from(cleanQuery(description)).slice(0, MAX_DESCRIPTION_LENGTH).join('').trim();
 }
 
 /**

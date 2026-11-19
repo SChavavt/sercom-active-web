@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterProducts, matchesQuery, matchesSearchText, queryTokens, SEARCH_PARAM, searchText } from '../src/lib/search.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
-import { normalizeCode, normalizeText } from '../src/lib/text.mjs';
+import { cleanQuery, normalizeCode, normalizeText } from '../src/lib/text.mjs';
 import { loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
@@ -135,4 +135,58 @@ test('searchText y matchesSearchText dan en el navegador el mismo resultado que 
   }
   assert.equal(matchesSearchText(null, 'guante'), false);
   assert.equal(matchesSearchText(undefined, ''), true);
+});
+
+// --- Texto de una búsqueda que llega de la dirección o del campo (A-04) --------------------------------------
+// Cada clase de carácter que se quita, escrita con su punto de código para que se vea en la prueba.
+const REMOVED = {
+  'carácter de reemplazo': ['�'],
+  'controles (Cc)': ['\u0000', '\u0001', '\u0007', '\u0008', '\u001B', '\u001F', '\u007F', '\u0080', '\u0085', '\u009F'],
+  'controles de dirección': ['؜', '‎', '‏', '‪', '‫', '‬', '‭', '‮', '⁦', '⁧', '⁨', '⁩'],
+  invisibles: ['​', '⁠', '﻿'],
+  'mitades sueltas de un par sustituto': ['\uD800', '\uD83E', '\uDBFF', '\uDC00', '\uDCA5', '\uDFFF'],
+};
+
+test('cleanQuery quita cada carácter de control, de dirección o invisible, al inicio, en medio y al final', () => {
+  for (const [kind, characters] of Object.entries(REMOVED)) {
+    for (const character of characters) {
+      const code = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} (${kind})`;
+      assert.equal(cleanQuery(`${character}guante`), 'guante', code);
+      assert.equal(cleanQuery(`guante${character}`), 'guante', code);
+      // En medio deja un espacio: no une dos palabras ni deja una mitad pegada a otra.
+      assert.equal(cleanQuery(`guante${character}rojo`), 'guante rojo', code);
+      assert.equal(cleanQuery(`casco ${character} blanco`), 'casco blanco', code);
+      assert.equal(cleanQuery(character), '', code);
+      assert.equal(cleanQuery(`${character}${character} ${character}`), '', code);
+    }
+  }
+  // Mezclados con texto real.
+  assert.equal(cleanQuery('‮guante \u0001bota​ azul‮'), 'guante bota azul');
+  assert.equal(cleanQuery('guante ‮otreibua'), 'guante otreibua');
+  assert.equal(cleanQuery('⁦guante⁩ ⁧bota⁩'), 'guante bota');
+});
+
+test('cleanQuery deja una consulta hecha solo de caracteres quitados vacía', () => {
+  // Separados por espacios: dos mitades seguidas («\uDBFF\uDC00») forman un par completo, que es un carácter real.
+  const all = Object.values(REMOVED).flat().join(' ');
+  assert.equal(cleanQuery(all), '');
+  assert.equal(cleanQuery(` \t\n${all}\r\n `), '');
+  for (const value of ['', '   ', null, undefined]) assert.equal(cleanQuery(value), '', String(value));
+});
+
+test('cleanQuery conserva las letras, cifras y marcas de cualquier escritura, los emojis y las uniones U+200C y U+200D', () => {
+  for (const text of [
+    'قفاز حماية',                 // árabe
+    'כפפה מגן',                   // hebreo
+    'नमस्ते दस्ताने',              // devanagari, con marcas combinantes
+    'می‌خواهم',              // persa, con la no-unión U+200C
+    '👷🏽‍♀️ guante',         // emoji compuesto con U+200D y un selector de variante
+    '🧤🦺🥾',                      // pares sustitutos completos
+    'café Señalización 37-175',
+    '<img src=x onerror=alert(1)> & "comillas" 100%',
+  ]) assert.equal(cleanQuery(text), text, text);
+  // Lo demás sigue igual que antes: espacios recortados y uno solo entre palabras.
+  assert.equal(cleanQuery('  Protección   de\tMANOS \n'), 'Protección de MANOS');
+  assert.equal(cleanQuery('x'.repeat(500)), 'x'.repeat(500));
+  assert.equal(cleanQuery(37175), '37175');
 });

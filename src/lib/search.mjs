@@ -6,7 +6,7 @@
 //   - al compilar: `data-search={searchText(product)}` en cada tarjeta;
 //   - en el navegador: `matchesSearchText(card.dataset.search, input.value)` para mostrar u ocultar la tarjeta.
 /** @import { SearchableProduct } from '../types/site.ts' */
-import { normalizeCode, normalizeText } from './text.mjs';
+import { cleanQuery, normalizeCode, normalizeText } from './text.mjs';
 
 /** Nombre del parámetro de la URL que lleva la consulta: `/catalogo/?q=...`. */
 export const SEARCH_PARAM = 'q';
@@ -79,15 +79,17 @@ export function filterProducts(products, query) {
 }
 
 /**
- * Consulta tal como se muestra en la página: sin espacios al inicio o al final y con un solo espacio
- * entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
+ * Consulta tal como se muestra en la página (`cleanQuery`): sin espacios al inicio o al final y con un solo
+ * espacio entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
  * Quita el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
- * (`?q=%E0%A4%A` → «�%A»): nunca se muestra, y una consulta que no tiene otra cosa queda vacía.
+ * (`?q=%E0%A4%A` → «�%A»), los controles, los de dirección (U+202E invertiría las palabras del sitio que
+ * siguen al término), los invisibles y las mitades sueltas de un par sustituto (`encodeURIComponent` no
+ * las acepta). Una consulta que no tiene otra cosa queda vacía.
  * @param {unknown} query
  * @returns {string}
  */
 export function displayQuery(query) {
-  return String(query ?? '').replace(/\uFFFD/g, ' ').replace(/\s+/g, ' ').trim();
+  return cleanQuery(query);
 }
 
 /**
@@ -100,16 +102,30 @@ export function isActiveQuery(query) {
 }
 
 /**
+ * Línea de resultados del catálogo en tres partes: la frase hasta la comilla de apertura, el término y el
+ * cierre. Sin búsqueda, toda la línea va en `lead` y las otras dos partes están vacías. Unidas dan
+ * exactamente `resultSummary`. En el navegador el término se escribe aparte, dentro de un <bdi>, para que su
+ * dirección (árabe, hebreo) no reordene las palabras del sitio: siempre con nodos de texto, nunca como HTML.
+ * @param {number} count Productos visibles.
+ * @param {unknown} [query]
+ * @returns {{ lead: string, term: string, end: string }}
+ */
+export function resultSummaryParts(count, query = '') {
+  const total = Math.max(0, Math.trunc(Number(count)) || 0);
+  if (!isActiveQuery(query)) return { lead: `${total} ${total === 1 ? 'producto' : 'productos'}`, term: '', end: '' };
+  return { lead: `${total} ${total === 1 ? 'resultado' : 'resultados'} para “`, term: displayQuery(query), end: '”' };
+}
+
+/**
  * Línea de resultados del catálogo, en español y con el plural correcto:
  *   sin búsqueda → «10 productos» (singular «1 producto»);
  *   con búsqueda → «3 resultados para “guante”» (singular «1 resultado para “guante”»).
- * Devuelve texto plano: en el navegador se escribe con `textContent`, nunca como HTML.
+ * Devuelve texto plano: en el navegador se escribe con nodos de texto (`resultSummaryParts`), nunca como HTML.
  * @param {number} count Productos visibles.
  * @param {unknown} [query]
  * @returns {string}
  */
 export function resultSummary(count, query = '') {
-  const total = Math.max(0, Math.trunc(Number(count)) || 0);
-  if (!isActiveQuery(query)) return `${total} ${total === 1 ? 'producto' : 'productos'}`;
-  return `${total} ${total === 1 ? 'resultado' : 'resultados'} para “${displayQuery(query)}”`;
+  const { lead, term, end } = resultSummaryParts(count, query);
+  return `${lead}${term}${end}`;
 }

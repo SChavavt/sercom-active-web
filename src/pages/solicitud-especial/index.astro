@@ -57,7 +57,7 @@ const items = [
       <ActionRow class="solicitud__mail span-4 span-md-12" href={request.mailto} icon="mail">Enviar mi solicitud por correo</ActionRow>
       <div class="solicitud__notes cell span-8 span-md-12">
         <div data-search-note hidden>
-          <Note icon="search">Agregamos tu búsqueda “<span data-search-term></span>” al borrador.</Note>
+          <Note icon="search">Agregamos tu búsqueda “<bdi data-search-term></bdi>” al borrador.</Note>
         </div>
         <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
       </div>
@@ -92,9 +92,11 @@ const items = [
     import { requestDescription, withRequestDescription } from '../../lib/contact-core.mjs';
     import { SEARCH_PARAM } from '../../lib/search.mjs';
 
-    // Una secuencia % mal formada llega como el carácter de reemplazo (U+FFFD): se quita para no mostrarlo.
+    // requestDescription limpia la búsqueda como el catálogo (cleanQuery): sin el carácter de reemplazo de una
+    // secuencia % mal formada, controles, caracteres de dirección ni invisibles. Si no queda nada, la página es
+    // la de siempre.
     const query = new URLSearchParams(window.location.search).get(SEARCH_PARAM);
-    const description = requestDescription(query?.replace(/�/g, ' '));
+    const description = requestDescription(query);
     if (description) {
       const links = document.querySelectorAll<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"], [data-solicitud] a[href^="mailto:"]');
       for (const link of links) link.setAttribute('href', withRequestDescription(link.getAttribute('href'), description));

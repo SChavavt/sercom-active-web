@@ -44,7 +44,7 @@ const { total } = Astro.props;
 
 <script>
   import { routes } from '../lib/routes.mjs';
-  import { SEARCH_PARAM, displayQuery, isActiveQuery, matchesSearchText, resultSummary } from '../lib/search.mjs';
+  import { SEARCH_PARAM, displayQuery, isActiveQuery, matchesSearchText, resultSummaryParts } from '../lib/search.mjs';
 
   const form = document.querySelector<HTMLFormElement>('[data-catalog-search]');
   const input = form?.querySelector<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`);
@@ -59,6 +59,21 @@ const { total } = Astro.props;
   const headerInputs = [...document.querySelectorAll<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`)].filter(field => field !== input);
   const items = [...document.querySelectorAll<HTMLElement>('[data-catalog-grid] [data-search]')];
 
+  /**
+   * Escribe la línea de resultados con nodos de texto, nunca como HTML. El término va en un <bdi>: su dirección
+   * (árabe, hebreo) no reordena las palabras del sitio. Se lee igual que `resultSummary`.
+   */
+  function writeSummary(line: HTMLElement, visible: number, query: string) {
+    const { lead, term, end } = resultSummaryParts(visible, query);
+    if (!term) {
+      line.textContent = lead;
+      return;
+    }
+    const isolated = document.createElement('bdi');
+    isolated.textContent = term;
+    line.replaceChildren(lead, isolated, end);
+  }
+
   /** Filtra las tarjetas y deja la página (conteo, celda de relleno, estado vacío, enlaces) de acuerdo. */
   function apply(query: string, updateUrl: boolean) {
     const active = isActiveQuery(query);
@@ -72,14 +87,15 @@ const { total } = Astro.props;
     if (fill) for (const perRow of [4, 3, 2]) fill.dataset[`fill${perRow}`] = String((perRow - (visible % perRow)) % perRow);
     if (grid) grid.hidden = visible === 0;
     if (empty) empty.hidden = visible > 0;
-    if (count) count.textContent = resultSummary(visible, query);
+    if (count) writeSummary(count, visible, query);
     if (clear) clear.hidden = !active;
     if (request) request.href = active ? `${requestBase}?${SEARCH_PARAM}=${encodeURIComponent(displayQuery(query))}` : requestBase;
     if (updateUrl) history.replaceState(history.state, '', routes.search(active ? displayQuery(query) : ''));
   }
 
   if (form && input) {
-    // Tal como se muestra (displayQuery): una secuencia % mal formada no llega al campo como «�».
+    // Tal como se muestra (displayQuery): una secuencia % mal formada no llega al campo como «�», ni un carácter
+    // de control o de dirección; una consulta que no tiene otra cosa es como no tener búsqueda.
     const initial = displayQuery(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
     if (initial) {
       input.value = initial;

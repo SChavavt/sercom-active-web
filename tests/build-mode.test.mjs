@@ -433,7 +433,7 @@ test('los módulos para el navegador no importan datos ni usan APIs de Node o de
     'src/lib/text.mjs': [],
     'src/lib/search.mjs': ['./text.mjs'],
     'src/lib/routes.mjs': ['./search.mjs'],
-    'src/lib/contact-core.mjs': [],
+    'src/lib/contact-core.mjs': ['./text.mjs'],
   };
   for (const [path, imports] of Object.entries(allowed)) {
     const code = sources.get(path);
