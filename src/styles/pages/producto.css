@@ -155,7 +155,7 @@
   .producto__chips[data-fill-4="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chips[data-fill-4="2"] .producto__chip-fill { display: block; grid-column: span 2; }
   .producto__chips[data-fill-4="3"] .producto__chip-fill { display: block; grid-column: span 3; }
-  /* Letra agrandada (E-06): una variante larga («Extragrande») se parte con guion dentro de su celda en lugar de
+  /* Letra agrandada: una variante larga («Extragrande») se parte con guion dentro de su celda en lugar de
      salirse de la pantalla (celular) o de quedar cortada por la celda vecina (tableta). Solo con la raíz de más de
      16 px: es el interruptor de la letra agrandada de responsive.css 6.9 sobre el contenedor lamina (layout.css). */
   @container lamina (width < calc((1rem - 16px) * 400)) {

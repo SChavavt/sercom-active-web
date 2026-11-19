@@ -58,7 +58,7 @@
 .catalog-search__submit:hover { background: var(--blue-700); }
 .catalog-search__submit:active { background: var(--blue-800); }
 .catalog-search__submit:focus-visible { outline-offset: -3px; }
-/* Letra agrandada (E-05, E-06): en computadora «Buscar» (3.35rem) más su relleno no cabe en una columna de la
+/* Letra agrandada: en computadora «Buscar» (3.35rem) más su relleno no cabe en una columna de la
    lámina, y la línea de resultados tampoco cabe en sus tres columnas junto a «Limpiar búsqueda» (se encima con el
    enlace y la consulta se corta). La fila toma entonces el arreglo de la tableta: campo en 9 columnas, «Buscar» en
    3 y la línea de resultados en una fila propia. Con la letra normal la condición no se cumple desde 1100 px

@@ -466,7 +466,7 @@
    mínimo y sus etiquetas pueden partirse: con la letra normal, también con el espaciado de texto de WCAG 1.4.12, el
    dibujo no cambia en nada. La barra fija está fuera de la lámina y es su propio contenedor (`barra`). */
 @container lamina (width < calc((1rem - 16px) * 400)) {
-  .utility__place { white-space: normal; }                   /* E-01: la franja crece y la cabecera fija la sigue */
+  .utility__place { white-space: normal; }                   /* la franja crece y la cabecera fija la sigue */
   .utility__place::before { flex: none; }
   .masthead__cta { white-space: normal; text-align: center; }  /* «Cotizar mi lista» en dos renglones */
   .masthead__wa { padding-inline: var(--s-1); }
@@ -482,7 +482,7 @@
     .masthead__btn { min-width: 64px; }
   }
   @container barra (width < calc((1rem - 16px) * 400)) {
-    .dock__link { white-space: normal; }                     /* E-03: la etiqueta en dos renglones; la barra crece */
+    .dock__link { white-space: normal; }                     /* la etiqueta en dos renglones; la barra crece */
   }
 }
 /* Botones Buscar y Menú del celular: sin lugar para sus etiquetas junto al logotipo (142 px de celda), la etiqueta
@@ -506,7 +506,7 @@
   }
 }
 
-/* Pie (E-04): la columna de contacto debe tener lugar para la parte más ancha del correo, «sercomactive.com» (7.68rem
+/* Pie: la columna de contacto debe tener lugar para la parte más ancha del correo, «sercomactive.com» (7.68rem
    con la letra del pie de computadora, 7.17rem con la de tableta) más su icono; los enlaces, para su palabra más
    larga. Si no lo tiene, las columnas se reacomodan en dos filas: en computadora, cuatro celdas de 6 columnas; en
    tableta, enlaces y categorías lado a lado y contacto a todo lo ancho. Sin categorías (producción) las tres celdas
@@ -536,7 +536,7 @@
   @container lamina (width < calc(64px + 9.7rem)) { .footer__links { columns: 1; } }
 }
 
-/* Celdas de marca (E-05): cuatro por fila desde 700 px y dos en el celular, mientras el nombre más largo
+/* Celdas de marca: cuatro por fila desde 700 px y dos en el celular, mientras el nombre más largo
    («Espomega», 5.69rem con la letra de tableta y celular, 6.32rem en computadora más su flecha) cabe en la celda.
    Si no cabe, la mitad de celdas por fila: dos (y la celda de relleno solo con un número impar, como en el celular)
    o una (sin relleno). */
@@ -565,7 +565,7 @@
   }
 }
 
-/* Mosaicos de la portada (E-05): si la palabra más larga de un nombre («Señalización»: 6.05rem en tableta, 6.43rem de
+/* Mosaicos de la portada: si la palabra más larga de un nombre («Señalización»: 6.05rem en tableta, 6.43rem de
    1100 a 1359 px, 6.81rem desde 1360) no cabe en el mosaico, se parte con guion (la página es es-MX) y, como último
    recurso, donde no quepa; los mosaicos de una fila conservan el mismo alto. El celular ya lo hace siempre (6.3). */
 @media (min-width: 700px) and (max-width: 1099px) {
@@ -585,14 +585,14 @@
 }
 
 /* Celular más angosto que 20rem (con la letra normal no lo hay desde 320 px; con 200 % lo es hasta 640 px): la
-   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla (E-05). */
+   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla. */
 @media (max-width: 699px) {
   @container lamina (width < 20rem) {
     .faq__q .t-h3 { hyphens: auto; }
   }
 }
 /* La categoría de una tarjeta de producto («Vial y señalización», en mayúsculas espaciadas) se parte con guion y, en
-   último caso, donde no quepa, en lugar de salirse de la tarjeta (E-06; en el celular y en las cuatro columnas de
+   último caso, donde no quepa, en lugar de salirse de la tarjeta (en el celular y en las cuatro columnas de
    computadora). Solo con la letra agrandada (el interruptor de arriba). */
 @container lamina (width < calc((1rem - 16px) * 400)) {
   .product__cat { hyphens: auto; overflow-wrap: break-word; }
@@ -606,7 +606,7 @@
   .product__action--quote { padding-left: var(--pad); }
 }
 
-/* Panel Categorías de computadora (E-06): seis categorías por fila mientras la palabra más larga («señalización»,
+/* Panel Categorías de computadora: seis categorías por fila mientras la palabra más larga («señalización»,
    5.51rem) cabe en su celda junto al icono; si no, dos por fila y «Ver todo el catálogo» a todo lo ancho, como en
    tableta, en lugar de partir los nombres letra por letra. */
 @media (min-width: 1100px) {
@@ -616,7 +616,7 @@
   }
 }
 
-/* Pasos de la portada (E-06): con la letra agrandada una palabra larga del paso («disponibilidad») se parte con guion
+/* Pasos de la portada: con la letra agrandada una palabra larga del paso («disponibilidad») se parte con guion
    dentro de su celda en lugar de quedar cortada por la celda vecina (tableta y computadora, tres pasos por fila). */
 @media (min-width: 700px) {
   @container lamina (width < calc((1rem - 16px) * 400)) {
@@ -624,7 +624,7 @@
   }
 }
 
-/* Filas de datos (contacto, producto) de tableta y computadora (E-06): la clave va en una columna de 148 px y la más
+/* Filas de datos (contacto, producto) de tableta y computadora: la clave va en una columna de 148 px y la más
    larga, «WhatsApp», mide 5.44rem: cabe hasta una raíz de 27 px (cerca de 170 %). Con más, la clave va arriba y el
    valor debajo, como en el celular, en lugar de encimarse con el valor. Con la letra normal no se cumple nunca. */
 @media (min-width: 700px) {
