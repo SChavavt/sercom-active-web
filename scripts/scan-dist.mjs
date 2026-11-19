@@ -83,6 +83,12 @@ function visibleText(html) {
 const INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)\b[^>]*>/gi;
 /** Texto visible con las etiquetas en línea retiradas sin dejar espacio. */
 const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).replace(INLINE_TAG, '').replace(/<[^>]+>/g, ' '))));
+// Etiquetas dentro del texto de un script («t.innerHTML="Solicitud <b>enviada</b>"»). El nombre debe ir seguido de un
+// espacio, «/» o «>», y la etiqueta no puede contener «<», para no confundirlas con comparaciones («i<a.length»).
+const SCRIPT_INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)(?=[\s/>])[^<>]*>/gi;
+const SCRIPT_TAG = /<\/?[a-z][\w-]*(?=[\s/>])[^<>]*>/gi;
+/** El marcado que escribe un script, leído como texto: las etiquetas en línea se retiran sin dejar espacio y las demás separan palabras. */
+const withoutMarkup = text => text.replace(SCRIPT_INLINE_TAG, '').replace(SCRIPT_TAG, ' ');
 const inlineScripts = html => [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]).join('\n');
 const inlineStyles = html => [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(match => match[1]).join('\n');
 /**
@@ -132,10 +138,11 @@ const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) 
 // Ámbitos (`scope`). Salvo `raw`, todos están en forma comparable (`fold`: NFKC, sin caracteres invisibles y sin
 // acentos), así que un patrón escrito sin acentos también encuentra el texto acentuado o descompuesto.
 //   text    texto visible de cada página HTML, sin las frases permitidas
-//   joined  texto visible de cada página HTML con las etiquetas en línea retiradas sin dejar espacio
+//   joined  texto visible de cada página HTML con las etiquetas en línea retiradas sin dejar espacio, sin las frases permitidas
 //   words   lo que una persona podría llegar a leer: el texto visible, los demás atributos (data-*, enlaces con su
 //           %XX decodificado), los <script> en línea, las cadenas `content:` del CSS y el contenido de JS/JSON
-//           (un script puede escribir texto en la página), sin las frases permitidas
+//           (un script puede escribir texto en la página; el marcado que escribe se lee también sin sus etiquetas),
+//           sin las frases permitidas
 //   raw     contenido tal cual de cada archivo de texto
 //   norm    contenido de cada archivo de texto con entidades y %XX decodificados
 // `level` puede ser una función del modo: los ejemplos nunca deben llevar normas ni certificaciones.
@@ -146,31 +153,58 @@ const EXCLUDED_BRAND = /\bgisa\b|guantes?[\s._+-]*internacional(?:es)?/i;
 const EXCLUDED_LETTERS = /\bg[\s._-]i[\s._-]s[\s._-]a\b/i;
 // Dentro de un identificador de código: «gisaLogo», «logoGisa», «GISA_URL». Distingue mayúsculas a propósito.
 const EXCLUDED_IN_IDENTIFIER = /(?<![A-Za-z0-9])(?:gisa|Gisa|GISA)(?=[A-Z0-9_$])|(?<=[a-z0-9_$])(?:Gisa|GISA)(?![a-z])/;
-// Sobre texto sin acentos. Un «no», «aún» o «todavía» cerca invierte el sentido: «tu mensaje no se ha enviado».
+// Sobre texto sin acentos. Un «no», «nada» o «nunca» antes invierte el sentido: «tu mensaje no se ha enviado».
+const CONFIRMATION_NOUN = '(?:solicitud|mensaje|cotizacion|lista|pedido|correo|requerimiento|formulario)(?:es|s)?';
+const PARTICIPLE = '(?:enviad|recibid|registrad)[oa]s?';
+const NEGATED = '(?<!\\b(?:no|nada|nadie|nunca)\\s+)';
 const FALSE_CONFIRMATION = new RegExp([
-  /recibimos (?:tu|su)\b|\bhemos recibido\b|\bya recibimos\b/,
-  /\b(?:solicitud|mensaje|cotizacion|lista|pedido|correo|requerimiento|formulario)(?:es|s)?\s+(?:(?!(?:no|aun|todavia|nunca|sin|antes)\b)\S+\s+){0,3}(?:enviad|recibid|registrad)[oa]s?\b/,
-  /(?<!\bno\s+)\b(?:se|fue|fueron|ha sido|han sido)\s+(?:ha\s+|han\s+)?(?:enviad|recibid|registrad)[oa]s?\b/,
+  // En primera persona: «Hemos enviado tu solicitud», «Ya enviamos tu mensaje», «Registramos tu pedido».
+  new RegExp(`${NEGATED}\\b(?:recibimos|enviamos|registramos) (?:tu|su|tus|sus)\\b|\\bhemos (?:recibido|enviado|registrado)\\b|\\bya (?:recibimos|enviamos|registramos)\\b`),
+  // El sustantivo con un auxiliar: «Tu solicitud fue enviada», «Tu lista se ha enviado», «Tu solicitud quedó enviada».
+  new RegExp(`\\b${CONFIRMATION_NOUN}\\s+(?:(?:ya|fue|fueron|ha|han|sido|se|quedo|quedaron|esta|estan|sera|seran|correctamente|exitosamente)\\s+){1,3}${PARTICIPLE}\\b`),
+  // El sustantivo seguido del participio («Solicitud enviada», «Tu mensaje enviado»), salvo cuando un artículo o una
+  // preposición lo hacen un adjetivo dentro de otra frase («al correo registrado», «la lista enviada por ti»).
+  new RegExp(`(?<!\\b(?:al|del|el|la|los|las|un|una|unos|unas|en|con|por|para|cada|este|esta|ese|esa|otro|otra)\\s+)\\b${CONFIRMATION_NOUN}\\s+${PARTICIPLE}\\b`),
+  new RegExp(`${NEGATED}\\b(?:se|fue|fueron|ha sido|han sido)\\s+(?:ha\\s+|han\\s+)?${PARTICIPLE}\\b|${NEGATED}\\b(?:ya\\s+)?se (?:envio|enviaron|recibio|recibieron|registro|registraron)\\b`),
   /\benviad[oa]s? (?:con exito|correctamente)\b|\benvio exitoso\b|\b(?:recibid|registrad)[oa]s? correctamente\b|\bmensaje enviado\b/,
   /¡\s*(?:listo|enviad[oa]|recibid[oa]|hecho)\s*!/,
   /gracias por (?:tu|su) (?:solicitud|mensaje|compra|cotizacion|pedido|lista|correo)/,
   /\bfolio\b|numero de seguimiento/,
-  /\bte (?:responderemos|contactaremos|escribiremos|llamaremos)\b|\bnos pondremos en contacto\b|\b(?:en breve|pronto) (?:te|le) (?:respondemos|contactamos|escribimos|llamamos|respondera|contactara)\b/,
+  /\b(?:te|le) (?:responderemos|contactaremos|escribiremos|llamaremos|respondemos|contactamos|escribimos|llamamos|respondera|contactara|escribira|llamara)\b|\bnos (?:pondremos en contacto|comunicaremos)\b/,
+].map(part => part.source).join('|'), 'i');
+// Precios: símbolo o código de moneda junto a una cifra, la palabra de un precio seguida de una cifra y vocabulario
+// de oferta. Un «$» pegado a una letra, a otro «$» o a «=» es código («$2», «x=$1»), no un precio.
+const PRICE_WORD = '\\b(?:precio|costo|importe|monto|tarifa)s?';
+const PUBLIC_PRICE = new RegExp([
+  /(?:(?<![\w$=])\$|€|£|\bMXN|\bUSD|\bEUR|\bM\.N\.)\s?\d[\d.,]*(?:\s?(?:pesos|MXN|USD|M\.N\.))?/,
+  /\d[\d.,]*\s?(?:(?:pesos|dolares|dolar|euros?|dlls?|MXN|USD|EUR)\b|M\.N\b\.?|[€£])/,
+  // «350 MN» sin puntos, salvo en un modelo, una talla o un tipo («Modelo 3 MN»).
+  /(?<!\b(?:modelo|talla|tipo|clase|serie|nivel|numero|calibre|no\.?)\s+)\b\d[\d.,]*\s?MN\b/,
+  // «Precio: 350», «Precio por caja de 12: 350», «Costo: $350».
+  new RegExp(`${PRICE_WORD}(?:\\s+[a-z0-9]+){0,4}\\s*:\\s*\\$?\\s?\\d`),
+  // «Precio 350», «Precio unitario 350.00»; no «Precios y cotización 2026».
+  new RegExp(`${PRICE_WORD}(?:\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)[a-z]+){0,2}\\s+\\$?\\s?\\d`),
+  /\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/,
 ].map(part => part.source).join('|'), 'i');
 const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 
 export const RULES = [
-  rule('R-RULE-01', 'FAIL', 'words',
-    /(?:\$|€|£|MXN|USD|EUR|M\.N\.)\s?\d[\d.,]*(?:\s?(?:pesos|MXN|USD|M\.N\.))?|\d[\d.,]*\s?(?:(?:pesos|MXN|USD|EUR)\b|M\.?N\b|[€£])|\bprecios?(?:\s+[a-z]+){0,2}\s*:?\s*\$?\s?\d|\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/i,
+  rule('R-RULE-01', 'FAIL', 'words', PUBLIC_PRICE,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «350 M.N.», «＄1,200»), la palabra «precio» seguida de una cifra y vocabulario de oferta, en el texto, en los atributos, en los scripts, en JSON y en las cadenas `content:` del CSS.'),
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos, o sin ellos cuando no hay una conjunción o preposición entre la palabra y la cifra) y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS.'),
+  rule('R-RULE-01', 'FAIL', 'joined', PUBLIC_PRICE,
+    'precio o descuento partido por etiquetas en línea',
+    'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
   rule('R-RULE-01', 'FAIL', 'raw',
-    /"(?:price|precio|lowPrice|highPrice|priceCurrency|costo?s?)"\s*:|itemprop=["']?price|schema\.org\/(?:Offer|AggregateOffer)/i,
+    /"(?:price|precio|lowPrice|highPrice|priceCurrency|costo?s?|importes?|montos?|tarifas?)"\s*:|itemprop=["']?price|schema\.org\/(?:Offer|AggregateOffer)/i,
     'precio en datos estructurados',
     'Tampoco se publican precios en datos para buscadores (JSON-LD, microdatos) ni en archivos JSON.'),
   rule('R-RULE-02', 'FAIL', 'words', /\bgratis\b|\bgratuit[oa]s?\b/i,
     'producto marcado como gratuito',
     'Omitir el precio no convierte un producto en gratuito.'),
+  rule('R-RULE-02', 'FAIL', 'joined', /\bgratis\b|\bgratuit[oa]s?\b/i,
+    'gratuito partido por etiquetas en línea',
+    'También cuando una etiqueta en línea parte la palabra («gra<b>tis</b>»).'),
   rule('R-RULE-03', 'FAIL', 'norm', /\btest-(?:001|brand|category)\b|\bsintetic[oa] de prueba\b/i,
     'dato sintético de las pruebas automáticas',
     'Los datos de tests/ son sintéticos y nunca se usan en la web, en ningún modo.'),
@@ -217,7 +251,10 @@ export const RULES = [
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
   rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones, folios o plazos de respuesta. Busca en el texto (también partido por etiquetas), en los atributos y en las cadenas que escribe un script.'),
+    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve»). Busca en el texto, en los atributos y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
+  rule('R-RULE-10', 'FAIL', 'joined', FALSE_CONFIRMATION,
+    'confirmación falsa partida por etiquetas en línea',
+    'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Solicitud envi<span>ada</span>».'),
   rule('R-RULE-10', 'FAIL', 'norm', FALSE_CONFIRMATION,
     'confirmación falsa en el contenido de un archivo',
     'La misma revisión sobre el archivo completo (comentarios incluidos), con entidades y %XX decodificados.'),
@@ -586,28 +623,31 @@ export async function scanDist(directory, options = {}) {
     const norm = normalizeContent(raw);
     const shown = isHtml ? visibleText(raw) : '';
     const text = isHtml ? withoutAllowed(oneLine(fold(shown))) : '';
-    const joined = isHtml ? joinedText(raw) : '';
+    const joined = isHtml ? withoutAllowed(joinedText(raw)) : '';
     let readable;
     if (isHtml) {
       const markup = withoutScripts(raw);
       const otherAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
       const styles = [inlineStyles(raw), ...attributesOf(markup).filter(([name]) => /^style$/i.test(name)).map(([, value]) => `x{${value}}`)].join('\n');
-      readable = [text, ...otherAttributes, scriptText(inlineScripts(raw)), cssContent(styles)].join('\n');
+      const scripts = scriptText(inlineScripts(raw));
+      readable = [text, ...otherAttributes, scripts, withoutMarkup(scripts), cssContent(styles)].join('\n');
     } else if (extension === '.css') {
       readable = `${raw}\n${cssContent(raw)}`;
     } else {
-      readable = scriptText(raw);
+      const scripts = scriptText(raw);
+      readable = `${scripts}\n${withoutMarkup(scripts)}`;
       if (extension === '.svg' || extension === '.xml') readable += `\n${visibleText(raw)}`;
     }
     const words = isHtml ? withoutAllowed(oneLine(fold(readable))) : withoutAllowed(fold(readable));
     const scopes = { text, joined, words, norm, raw };
 
+    // Un mismo hallazgo (regla y texto encontrado) se informa una sola vez aunque lo encuentren varios ámbitos.
+    const seen = new Set();
     for (const { id, level, scope, pattern, title } of rules) {
       if ((scope === 'text' || scope === 'joined') && !isHtml) continue;
       const haystack = scopes[scope];
-      const seen = new Set();
       for (const match of haystack.matchAll(globalPattern(pattern))) {
-        const key = match[0].toLowerCase();
+        const key = `${id}\u0000${oneLine(fold(match[0])).toLowerCase()}`;
         if (seen.has(key)) continue;
         seen.add(key);
         add(typeof level === 'function' ? level(options) : level, id, file, `${title}: «${oneLine(match[0])}» … ${context(haystack, match.index, match[0].length)}`);

@@ -134,6 +134,23 @@ test('R-RULE-01: precios sin símbolo antes de la cifra, en JS, JSON, CSS y atri
   }
 });
 
+test('R-RULE-01 y R-RULE-02: costos, importes y otras monedas, precios partidos por etiquetas o escritos como marcado desde un script', async () => {
+  await assertEachFails('R-RULE-01', [
+    '<p>Costo: 350</p>', '<p>Importe: 350</p>', '<p>Monto total: 1,200.00</p>', '<p>Tarifa por pieza: 35</p>', '<p>350 dólares</p>', '<p>350 euros</p>', '<p>Precio 350</p>',
+    '<p>Precio por caja de 12: 350</p>', '<p>Precio: <b>350</b></p>', '<p><sup>$</sup>350</p>', '<p>Pro<b>moción</b></p>', '<p>Des<span>cuento</span> por volumen</p>',
+  ]);
+  await assertEachFails('R-RULE-02', ['<p>Muestra gra<b>tis</b></p>']);
+  for (const [path, content] of [['_astro/app.js', 'el.innerHTML="Precio: <b>350</b>";'], ['_astro/app.js', 'el.innerHTML="<span>$</span>350";'],
+    ['_astro/app.js', "el.innerHTML='<b>Costo:</b> 350';"], ['datos.json', '{"importe":350}'], ['datos.json', '{"monto":350}'], ['datos.json', '{"tarifa":"350"}']]) {
+    assert.ok(failedIds(await scan({ [path]: content })).includes('R-RULE-01'), content);
+  }
+  // Un año junto a «precios», un modelo con «MN» o el código de un script no son precios.
+  await assertNoneFails(['<h2>Precios y cotización 2026</h2>', '<p>Modelo 3 MN</p>', '<p>Precio: a cotizar</p>', '<p>Precios sujetos a cotización en 2026</p>']);
+  for (const content of ['const x=$(1);const y=$2;', 'const r=/^\\$\\d+$/;', 'a=b.replace(c,"$1");d=`${e}`;f="$"+g;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+});
+
 test('R-RULE-07: «oficial», «autorizado» y afirmaciones de representación', async () => {
   await assertEachFails('R-RULE-07', [
     '<a href="https://www.ansell.com/mx/es/industrial">Sitio oficial</a>', '<p>Distribuidor autorizado</p>', '<p>Marca oficialmente representada</p>',
@@ -173,6 +190,26 @@ test('R-RULE-10: otras formas de confirmación, partidas por etiquetas o escrita
     '<p>Tu mensaje no se ha enviado todavía: revísalo en tu aplicación.</p>', '<p>Tu solicitud aún no ha sido enviada.</p>', '<p>Recibes tu cotización por WhatsApp o correo</p>',
     '<p>Agregamos tu búsqueda al borrador.</p>', '<p>Listo para cotizar</p>', '<p>Enviar mi solicitud por correo</p>',
   ]);
+});
+
+test('R-RULE-10: confirmaciones en primera persona, partidas dentro de una palabra o escritas como marcado desde un script', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>Hemos enviado tu solicitud</p>', '<p>Ya enviamos tu mensaje</p>', '<p>Enviamos tu cotización a Sercom</p>', '<p>Registramos tu pedido</p>',
+    '<p>Un asesor te contactará pronto</p>', '<p>Te respondemos en breve</p>', '<p>Tu solicitud se envió correctamente</p>', '<p>Solicitud de cotización enviada</p>',
+    '<p>Solicitud envi<span>ada</span></p>', '<p>Men<b>saje</b> enviado</p>', '<p>Tu solicitud quedó enviada</p>', '<p>Solicitud\n<b>enviada</b></p>',
+    '<script>t.innerHTML="Solicitud <b>enviada</b>";</script>',
+  ]);
+  for (const content of ['t.innerHTML="Solicitud <b>enviada</b>";', "t.innerHTML='Mensaje <strong>enviado</strong>';", 't.innerHTML="Solicitud "+"<b>enviada</b>";',
+    't.innerHTML=`<p>Gracias por tu <em>solicitud</em></p>`;', 'toast("Te <b>respondemos</b> en breve")']) {
+    assert.ok(failedIds(await scan({ '_astro/app.js': content })).includes('R-RULE-10'), content);
+  }
+  // Frases legítimas: un participio usado como adjetivo, o una negación con «nada».
+  await assertNoneFails([
+    '<p>Consulta la lista de marcas registradas en cada ficha.</p>', '<p>Escribe al correo registrado del negocio.</p>', '<p>Nada ha sido enviado aún.</p>',
+    '<p>Tu lista se envía por WhatsApp cuando tú lo decides.</p>', '<p>Nada se envía hasta que tú lo envíes desde tu aplicación.</p>', '<p>Revisa tu mensaje antes de enviarlo.</p>',
+    '<p>Los datos no se envían a ningún servidor.</p>', '<p>El mensaje queda sin enviar hasta que lo confirmes.</p>', '<p>No se ha enviado nada todavía.</p>', '<p>Tu mensaje no se envió.</p>',
+  ]);
+  for (const content of ['if(a<b&&c>d)x="Mensaje";', 'for(let i=0;i<a.length;i++)y=`${i}`;']) assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
 });
 
 test('R-RULE-29: paleta anterior y tema oscuro', async () => {
