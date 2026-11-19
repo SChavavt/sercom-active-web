@@ -276,6 +276,15 @@ export function createContact(settings) {
       const question = label ? `¿Me puedes compartir la ficha técnica de ${label}?` : '¿Me puedes compartir una ficha técnica?';
       return addLinkLine(`${hello} ${question}`, product?.url);
     },
+    // Producto retirado (R-STATE-04): pide una alternativa; la línea «Enlace» sigue la regla de los demás mensajes.
+    retired: product => addLinkLine(lines(
+      `${hello} Busco una alternativa a un producto que ya no está en el catálogo de ${business}.`,
+      field('Producto', productLabel(product)),
+      field('Para qué lo uso'),
+      field('Cantidad y unidad'),
+      field(DELIVERY_LABEL),
+      field('Fecha requerida'),
+    ), product?.url),
   };
 
   /** @param {string} title @param {string} detail */
@@ -289,6 +298,7 @@ export function createContact(settings) {
     brand: brandName => (clean(brandName) ? `Consulta sobre la marca ${clean(brandName)}` : 'Consulta sobre una marca'),
     category: categoryName => (clean(categoryName) ? `Consulta sobre ${clean(categoryName)}` : 'Consulta sobre una categoría'),
     datasheet: product => withDetail('Ficha técnica', codeLabel(product)),
+    retired: product => withDetail('Consulta de alternativas', codeLabel(product)),
   };
 
   /**
@@ -306,6 +316,7 @@ export function createContact(settings) {
     brand: brandName => pair(subjects.brand(brandName), messages.brand(brandName)),
     category: categoryName => pair(subjects.category(categoryName), messages.category(categoryName)),
     datasheet: product => pair(subjects.datasheet(product), messages.datasheet(product)),
+    retired: product => pair(subjects.retired(product), messages.retired(product)),
   };
 
   return Object.freeze({

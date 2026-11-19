@@ -164,6 +164,43 @@ test('mensaje para pedir una ficha técnica, con y sin enlace', () => {
   ));
 });
 
+test('mensaje para consultar alternativas a un producto retirado, con y sin enlace', () => {
+  const retired = { brandName: 'Marca de ejemplo', code: 'EJ-1002', name: 'Producto de ejemplo retirado' };
+  const retiredUrl = 'https://sitio.example/productos/ejemplo-producto-retirado/';
+  assert.equal(messages.retired(retired), text(
+    'Hola, Yosmara. Busco una alternativa a un producto que ya no está en el catálogo de Sercom Active.',
+    'Producto: Marca de ejemplo EJ-1002 (Producto de ejemplo retirado)',
+    'Para qué lo uso: ',
+    'Cantidad y unidad: ',
+    'Entrega en (ciudad o código postal): ',
+    'Fecha requerida: ',
+  ));
+  assert.equal(messages.retired({ ...retired, url: retiredUrl }), text(
+    'Hola, Yosmara. Busco una alternativa a un producto que ya no está en el catálogo de Sercom Active.',
+    'Producto: Marca de ejemplo EJ-1002 (Producto de ejemplo retirado)',
+    'Para qué lo uso: ',
+    'Cantidad y unidad: ',
+    `Enlace: ${retiredUrl}`,
+    'Entrega en (ciudad o código postal): ',
+    'Fecha requerida: ',
+  ));
+  assert.equal(subjects.retired(retired), 'Consulta de alternativas: Marca de ejemplo EJ-1002');
+  assert.equal(subjects.retired({ code: 'M-1' }), 'Consulta de alternativas: M-1');
+  assert.equal(subjects.retired({ brandName: 'Marca' }), 'Consulta de alternativas: Marca');
+  assert.equal(subjects.retired({ name: 'Guante' }), 'Consulta de alternativas');
+  assert.equal(subjects.retired({}), 'Consulta de alternativas');
+  // Sin dirección del sitio, la página la agrega al hacer clic con withPageLink: el resultado es el mismo mensaje.
+  const built = contactLinks.retired(retired);
+  const complete = contactLinks.retired({ ...retired, url: retiredUrl });
+  assert.equal(withPageLink(built.whatsapp, retiredUrl), complete.whatsapp);
+  assert.equal(withPageLink(built.mailto, retiredUrl), complete.mailto);
+  // El saludo, el negocio, el número y el correo salen de los datos que recibe createContact.
+  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
+  assert.equal(other.messages.retired(retired).split('\n')[0], 'Hola, Persona. Busco una alternativa a un producto que ya no está en el catálogo de Negocio de prueba.');
+  assert.match(other.contactLinks.retired(retired).whatsapp, /^https:\/\/wa\.me\/5215500000000\?text=/);
+  assert.match(other.contactLinks.retired(retired).mailto, /^mailto:prueba@example\.invalid\?subject=Consulta%20de%20alternativas%3A%20/);
+});
+
 test('asuntos de correo', () => {
   assert.equal(subjects.general(), 'Solicitud de cotización');
   assert.equal(subjects.product(product), 'Solicitud de cotización: Marca de ejemplo EJ-1001');
@@ -172,6 +209,7 @@ test('asuntos de correo', () => {
   assert.equal(subjects.brand('MCR Safety'), 'Consulta sobre la marca MCR Safety');
   assert.equal(subjects.category('Protección de manos'), 'Consulta sobre Protección de manos');
   assert.equal(subjects.datasheet(product), 'Ficha técnica: Marca de ejemplo EJ-1001');
+  assert.equal(subjects.retired(product), 'Consulta de alternativas: Marca de ejemplo EJ-1001');
 });
 
 test('las partes que faltan se omiten con limpieza: nunca «undefined», «null» ni paréntesis vacíos', () => {
@@ -198,6 +236,7 @@ test('las partes que faltan se omiten con limpieza: nunca «undefined», «null�
     messages.brand(undefined), messages.brand(null), messages.category(undefined), messages.category(null),
     subjects.brand(undefined), subjects.category(null),
     ...incomplete.flatMap(value => [messages.product(value), messages.datasheet(value), subjects.product(value), subjects.datasheet(value)]),
+    ...incomplete.flatMap(value => [messages.retired(value), subjects.retired(value), ...Object.values(contactLinks.retired(value))]),
     ...incomplete.flatMap(value => Object.values(contactLinks.product(value))),
     ...incomplete.flatMap(value => Object.values(contactLinks.datasheet(value))),
     ...Object.values(contactLinks.brand(undefined)), ...Object.values(contactLinks.category(null)), ...Object.values(contactLinks.specialRequest()),
@@ -219,6 +258,7 @@ test('contactLinks entrega el mismo mensaje por WhatsApp y por correo', () => {
     brand: [contactLinks.brand('3M'), subjects.brand('3M'), messages.brand('3M')],
     category: [contactLinks.category('Calzado industrial'), subjects.category('Calzado industrial'), messages.category('Calzado industrial')],
     datasheet: [contactLinks.datasheet(product), subjects.datasheet(product), messages.datasheet(product)],
+    retired: [contactLinks.retired({ ...product, url: pageUrl }), subjects.retired(product), messages.retired({ ...product, url: pageUrl })],
   };
   assert.deepEqual(Object.keys(contactLinks).sort(), Object.keys(pairs).sort());
   assert.deepEqual(Object.keys(messages).sort(), Object.keys(pairs).sort());
