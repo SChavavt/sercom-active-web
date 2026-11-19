@@ -225,6 +225,23 @@ function failOn(errors) {
 }
 
 /**
+ * Una dirección /productos/{id}/ es de un producto o de un retirado, nunca de los dos, ni de dos retirados.
+ * Con datos validados no se llega a romperla: `validateCatalog` no repite ids entre las fichas, el espacio de nombres
+ * «ejemplo-» separa las fichas reales de los ejemplos y `validateExampleProducts` no repite ids entre ejemplos. Es la
+ * última defensa de `createSiteData` antes de generar dos páginas en la misma dirección.
+ * @param {readonly { id: string }[]} products Los productos listados (reales y de ejemplo).
+ * @param {readonly { id: string }[]} retiredProducts Los retirados (reales y de ejemplo).
+ * @throws {Error} si un id se repite.
+ */
+export function assertDistinctProductIds(products, retiredProducts) {
+  const productIds = new Set(products.map(product => product.id));
+  const retiredIds = new Set(retiredProducts.map(product => product.id));
+  if (retiredIds.size !== retiredProducts.length || retiredProducts.some(product => productIds.has(product.id))) {
+    throw new Error('Hay identificadores repetidos entre los productos y los retirados.');
+  }
+}
+
+/**
  * Construye los datos públicos del sitio para un modo de compilación.
  *
  * - Los productos reales entran únicamente por `getPublishedProducts`, que valida el catálogo completo
@@ -338,11 +355,8 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
       };
     }),
   ];
+  assertDistinctProductIds(products, retiredProducts);
   const retiredById = new Map(retiredProducts.map(product => [product.id, product]));
-  // Una dirección es de un producto o de un retirado, nunca de los dos.
-  if (retiredById.size !== retiredProducts.length || retiredProducts.some(product => productById.has(product.id))) {
-    throw new Error('Hay identificadores repetidos entre los productos y los retirados.');
-  }
 
   /** @param {string} id */
   const productsByCategory = id => products.filter(product => product.categoryIds.includes(id));

@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getPublishedProducts, getRetiredProducts, isPublicRetired, validateCatalog } from '../src/lib/catalog-policy.mjs';
-import { createSiteData, validateExampleProducts } from '../src/lib/site-data-core.mjs';
+import { assertDistinctProductIds, createSiteData, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { matchesQuery } from '../src/lib/search.mjs';
 import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 
@@ -101,6 +101,19 @@ test('un identificador nunca es a la vez un producto y un retirado, y las marcas
   const context = { categoryIds: catalog.categories.map(category => category.id), brands };
   assert.match(validateExampleProducts([...listedExamples, retiredExample({ id: listedExamples[0].id })], context).join('\n'), /no repetirse/);
   assert.match(validateExampleProducts([...listedExamples, retiredExample({ code: listedExamples[0].code })], context).join('\n'), /EJ-0000 y no repetirse/);
+});
+
+test('assertDistinctProductIds: la última defensa contra dos páginas en la misma dirección', () => {
+  // Con datos validados no se llega aquí (lo impiden las pruebas anteriores); la guardia se prueba sola.
+  const products = [{ id: 'test-002' }, { id: 'ejemplo-guante-recubierto' }];
+  assert.doesNotThrow(() => assertDistinctProductIds(products, [{ id: 'test-001' }, { id: 'ejemplo-producto-retirado' }]));
+  assert.doesNotThrow(() => assertDistinctProductIds(products, []));
+  assert.doesNotThrow(() => assertDistinctProductIds([], [{ id: 'test-001' }]));
+  // Un retirado con el id de un producto listado, real o de ejemplo.
+  assert.throws(() => assertDistinctProductIds(products, [{ id: 'test-002' }]), /repetidos entre los productos y los retirados/);
+  assert.throws(() => assertDistinctProductIds(products, [{ id: 'test-001' }, { id: 'ejemplo-guante-recubierto' }]), /repetidos entre los productos y los retirados/);
+  // Dos retirados con el mismo id.
+  assert.throws(() => assertDistinctProductIds(products, [{ id: 'test-001' }, { id: 'test-001' }]), /repetidos entre los productos y los retirados/);
 });
 
 test('producción: el retirado con aprobación tiene registro propio y ningún listado, conteo o búsqueda lo incluye', () => {
