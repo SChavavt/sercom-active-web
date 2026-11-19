@@ -45,8 +45,10 @@
 .utility__group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-5); min-width: 0; }
 .utility__item { display: flex; align-items: center; gap: var(--s-2); white-space: nowrap; }
 .utility__item + .utility__item::before { content: ""; width: var(--line); height: 14px; margin-right: calc(var(--s-5) - var(--s-2)); background: var(--rule); }
-.utility__place { color: var(--ink); font-size: var(--label-sm); }
-.utility__place::before { content: ""; width: 8px; height: 8px; background: var(--blue); }
+/* «Atención comercial en Puebla» puede pasar a un segundo renglón (texto agrandado en un celular): la franja crece y
+   la cabecera fija sigue su alto real (--utility-shift). Con el texto normal cabe en uno y no cambia. */
+.utility__place { color: var(--ink); font-size: var(--label-sm); white-space: normal; }
+.utility__place::before { content: ""; flex: none; width: 8px; height: 8px; background: var(--blue); }
 .utility__link { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--ink); text-decoration: none; }
 .utility__link:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .utility .icon { color: var(--blue); }
