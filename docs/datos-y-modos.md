@@ -248,7 +248,7 @@ La orden de compilación del alojamiento (`buildCommand` de `vercel.json`, la mi
 Astro escribe en `dist/_astro/` archivos que hoy ninguna página de producción carga, porque producción no tiene productos:
 
 - la hoja de estilo de la página de producto (`_id_.<huella>.css`), con las reglas del aviso de producto retirado;
-- el script de la búsqueda del catálogo (`CatalogSearch.astro_astro_type_script_index_0_lang.<huella>.js`) y el módulo de búsqueda que solo él importa (`search.<huella>.js`);
+- el script de la búsqueda del catálogo (`CatalogSearch.astro_astro_type_script_index_0_lang.<huella>.js`) y el módulo de búsqueda (`search.<huella>.js`), que en la salida solo carga ese script;
 - el script que agrega la línea «Enlace» a los borradores (`PageLinkScript.astro_astro_type_script_index_0_lang.<huella>.js`, sección 4).
 
 Se aceptan tal cual: se usan en cuanto se publica el primer producto (su ficha, sus tarjetas y la búsqueda de `/catalogo/`). `contact-core.<huella>.js` y `text.<huella>.js` sí se cargan hoy, desde el script de `/solicitud-especial/`.
