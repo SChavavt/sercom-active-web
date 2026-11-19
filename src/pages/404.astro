@@ -1,13 +1,40 @@
 ---
-// Página no encontrada (versión simple). Se muestra en cualquier dirección: todos los enlaces son absolutos.
+// Página no encontrada. El servidor la entrega para cualquier dirección desconocida, a cualquier
+// profundidad (/no-existe/, /a/b/c/): todos los enlaces y recursos son absolutos desde la raíz.
+// Una fila: el número 404 en el estilo de los pasos (decorativo, oculto a los lectores de pantalla) en
+// 4 columnas y, en 8, el antetítulo, el H1, la explicación y dos filas de acción. Debajo, la placa de
+// categorías si hay categorías públicas (vista previa) o, si no hay (producción hoy), las tres entradas.
+// Textos: brief de páginas «atencion», sección 5.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ActionRow from '../components/ActionRow.astro';
-import PageHeader from '../components/PageHeader.astro';
-import { routes } from '../lib/site-data.mjs';
+import CategoryPlate from '../components/CategoryPlate.astro';
+import EntryCard from '../components/EntryCard.astro';
+import { helpEntries } from '../lib/ayuda.ts';
+import { categories, routes } from '../lib/site-data.mjs';
+import '../styles/pages/atencion.css';
+
+const hasCategories = categories.length > 0;
 ---
-<BaseLayout title="Página no encontrada" description="La página que buscas no existe. Regresa al inicio de Sercom Active.">
-  <PageHeader title="No encontramos esta página." eyebrow="Error 404">
-    <ActionRow href={routes.home} primary>Volver al inicio</ActionRow>
-    <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
-  </PageHeader>
+<BaseLayout title="Página no encontrada" description="La página que buscas no existe o cambió de dirección.">
+  <section class="section" aria-labelledby="titulo">
+    <div class="grid12">
+      <p class="nf__num cell span-4 span-sm-12" aria-hidden="true">404</p>
+      <div class="nf__main span-8 span-sm-12">
+        <div class="nf__body cell">
+          <p class="eyebrow label">Error 404</p>
+          <h1 class="nf__title t-title" id="titulo">No encontramos esta página.</h1>
+          <p class="nf__text t-lead">Puede que la dirección haya cambiado o que el enlace esté incompleto.</p>
+        </div>
+        <ActionRow href={routes.home} primary>Volver al inicio</ActionRow>
+        <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
+      </div>
+    </div>
+    {hasCategories ? (
+      <CategoryPlate categories={categories} />
+    ) : (
+      <div class="grid12">
+        {helpEntries.map(entry => <EntryCard href={entry.href} icon={entry.icon} title={entry.title} kicker={entry.kicker} text={entry.text} headingLevel={2} />)}
+      </div>
+    )}
+  </section>
 </BaseLayout>

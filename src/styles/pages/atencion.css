@@ -103,3 +103,33 @@
   .privacidad__key { padding-top: var(--s-6); font-size: 1.125rem; }
   .privacidad__value { padding-bottom: var(--s-6); }
 }
+
+/* --- 404: el número en el estilo de los pasos, el mensaje y dos filas de acción --- */
+.nf__num {
+  padding: var(--s-7) var(--pad);
+  font-family: var(--font-heading);
+  font-size: 9rem;
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  letter-spacing: var(--type-h1-tracking);
+  line-height: 0.9;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+.nf__main { display: flex; flex-direction: column; gap: var(--line); }
+.nf__body { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-5); min-height: 248px; padding: var(--s-7) var(--pad) var(--s-8); }
+.nf__title { margin-top: auto; max-width: 22ch; }
+.nf__text { max-width: 52ch; color: var(--grey-700); }
+
+@media (max-width: 1359px) {
+  .nf__num { font-size: 8rem; }
+}
+@media (max-width: 1099px) {
+  .nf__num { font-size: 5.5rem; }
+  .nf__body { min-height: 0; padding: var(--s-8) var(--pad) var(--s-7); }
+}
+@media (max-width: 699px) {
+  .nf__num { padding: var(--s-6) var(--pad) 0; font-size: 4rem; }
+  .nf__body { padding: var(--s-4) var(--pad) var(--s-7); gap: var(--s-4); }
+  .nf__num + .nf__main { margin-top: calc(-1 * var(--line)); }   /* número y mensaje forman una sola celda */
+}
