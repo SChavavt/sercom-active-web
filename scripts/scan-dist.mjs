@@ -94,6 +94,7 @@ const unescapeScript = code => code
   .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
   .replace(/\\u([0-9a-f]{4})/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
   .replace(/\\x([0-9a-f]{2})/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
+  .replace(/\\\//g, '/')
   .replace(/\\[nrtv]/g, ' ');
 const scriptText = code => unescapeScript(code
   .replace(/(\.replace(?:All)?\(\s*(?:\/(?:\\.|[^/\\\n])+\/[a-z]*|[\w$.]+)\s*,\s*)(["'`])(?:\\.|(?!\2)[^\\\n])*\2/g, '$1$2$2'))
@@ -276,7 +277,7 @@ export const CHECKS = [
   ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» tiene «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03).'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
-  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api.whatsapp.com, whatsapp://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. Los números con forma de teléfono del texto visible se listan (WARN).'],
+  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()), y ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
@@ -333,55 +334,108 @@ function registryLeaks(registry, brands) {
 const shorten = (text, length = 90) => (text.length > length ? `${text.slice(0, length)}…` : text);
 const URL_REST = `[^\\s"'<>\`)\\\\]*`;
 const WHATSAPP_LINK = new RegExp(`(?<![\\w.-])(?:(?:https?:)?//)?(?:www\\.)?wa\\.me(?![\\w.-])(${URL_REST})`, 'gi');
-const WHATSAPP_OTHER = new RegExp(`(?<![\\w.-])(?:(?:https?:)?//)?(?:api|web)\\.whatsapp\\.com(?![\\w.-])(${URL_REST})|\\bwhatsapp://(${URL_REST})`, 'gi');
+// Otras formas de abrir WhatsApp: api., web. o chat.whatsapp.com, whatsapp.com, el acortador wa.link, whatsapp:// y un intent:// de Android.
+const WHATSAPP_OTHER = new RegExp(`(?<![\\w.-])(?:(?:https?:)?//)?(?:[\\w-]+\\.)*(?:whatsapp\\.com|wa\\.link)(?![\\w.-])(${URL_REST})|\\bwhatsapp://(${URL_REST})|\\bwhatsapp:(send${URL_REST})|\\bintent://${URL_REST}(scheme=whatsapp${URL_REST})`, 'gi');
 const MAILTO = new RegExp(`\\bmailto:(${URL_REST})`, 'gi');
-const TEL = new RegExp(`\\btel:(${URL_REST})`, 'gi');
+// El número de un enlace de teléfono puede llevar espacios entre grupos de cifras («tel:+52 1 221 400 2219»).
+const PHONE_LINK = new RegExp(`\\b(tel|sms):((?:[^\\s"'<>\`\\\\]|\\s(?=[\\d(+]))*)`, 'gi');
 // Forma de correo. «logo@2x.png» o «paquete@5.2.8» tienen forma parecida, pero no son direcciones.
 const EMAIL_SHAPE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b(?<!\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|otf|css|m?js|map|json))/gi;
+// Comentario de licencia («/*! (c) autor <dev@example.org> */»): el correo de un autor no es un destino de contacto.
+const LICENSE_COMMENT = /\/\*![\s\S]*?\*\//g;
 /** Principio de una dirección que un script completa («`https://wa.me/${número}`», `a[href^="mailto:"]`): no es un destino. */
-const isPrefix = rest => rest === '' || rest === '/' || /^\/?[$`{'"+]/.test(rest);
+const isPrefix = rest => rest === '' || rest === '/' || /^\/?[$`{]/.test(rest);
+// Un número de teléfono escrito en un enlace: cifras, «+», espacios, puntos, guiones y paréntesis.
+const PHONE_SHAPE = /^\+?[\d\s().-]+$/;
 
 /**
  * R-RULE-24: destinos de WhatsApp, correo y teléfono escritos en cualquier parte de un archivo (enlaces, otros
  * atributos, scripts, JSON) que no son los de business.json. También rechaza un correo con copia (to, cc, bcc).
- * @param {string} source Contenido del archivo con entidades y escapes de cadena decodificados.
- * @param {{ joinedPieces?: boolean }} [options] `joinedPieces`: el texto viene de `scriptText`, con las piezas de las
- *   cadenas unidas («"https://wa.me/"+"52155…"»); una dirección sin número o sin destinatario es entonces código.
+ *
+ * Fuera de los scripts (atributos, texto, JSON, CSS) un destino se lee tal cual: un `tel:` con letras o un marcador
+ * sin sustituir («mailto:{correo}») fallan. Un «mailto:» o «tel:» sin nada detrás solo se acepta en el texto suelto,
+ * donde puede ser una etiqueta («Tel: 221…») o un selector de CSS (`a[href^="mailto:"]`); en el valor de un atributo
+ * (`attribute: true`) falla. Solo en el código de un script (`script: true`) un destino incompleto puede ser el
+ * principio que el script completa.
+ * @param {string} source Contenido con entidades y escapes de cadena decodificados.
+ * @param {{ script?: boolean, attribute?: boolean, joinedPieces?: boolean, nestedOnly?: boolean }} [options]
+ *   `joinedPieces`: el texto viene de `scriptText`, con las piezas de las cadenas unidas («"https://wa.me/"+"52155…"»);
+ *   una dirección sin número o sin destinatario es entonces código.
+ *   `nestedOnly`: el texto es el anterior con su %XX decodificado; solo se buscan destinos (no correos sueltos), para
+ *   encontrar los que van dentro de otra dirección («https://l.example.com/?u=https%3A%2F%2Fwa.me%2F…»).
  */
-function contactProblems(source, { digits, email, knownNumbers }, { joinedPieces = false } = {}) {
+function contactProblems(source, { digits, email, knownNumbers }, { script = false, attribute = false, joinedPieces = false, nestedOnly = false } = {}) {
   const problems = new Set();
+  const incomplete = rest => (script ? isPrefix(rest) : !attribute && rest === '');
   for (const match of source.matchAll(WHATSAPP_LINK)) {
     const rest = match[1];
-    if (isPrefix(rest)) continue;
+    if (incomplete(rest)) continue;
     const path = rest.split(/[?#]/)[0];
     // En el texto con las piezas unidas, «`https://wa.me/${número}?text=`» queda sin número: es código, no un destino.
-    if (joinedPieces && (path === '' || path === '/')) continue;
+    if (script && joinedPieces && (path === '' || path === '/')) continue;
     if (decodePercent(path) !== `/${digits}`) problems.add(`número de WhatsApp distinto del confirmado: ${shorten(match[0])}`);
   }
   for (const match of source.matchAll(WHATSAPP_OTHER)) {
-    if (isPrefix(match[1] ?? match[2] ?? '')) continue;
+    if (incomplete(match[1] ?? match[2] ?? match[3] ?? match[4] ?? '')) continue;
     problems.add(`enlace de WhatsApp que no tiene la forma confirmada (https://wa.me/${digits}): ${shorten(match[0])}`);
   }
   for (const match of source.matchAll(MAILTO)) {
     const value = match[1];
-    if (isPrefix(value)) continue;
+    if (incomplete(value)) continue;
     const queryStart = value.indexOf('?');
-    if (joinedPieces && queryStart === 0) continue;
+    if (script && joinedPieces && queryStart === 0) continue;
     const addresses = decodePercent(queryStart === -1 ? value : value.slice(0, queryStart)).split(',').map(address => address.trim().toLowerCase());
-    if (addresses.some(address => address !== email)) problems.add(`correo distinto del confirmado: ${shorten(match[0])}`);
+    if (addresses.some(address => address !== email)) problems.add(`correo distinto del confirmado o vacío: ${shorten(match[0])}`);
     const query = queryStart === -1 ? '' : value.slice(queryStart + 1);
     for (const key of query.split('&').map(param => decodePercent(param.split('=')[0]).trim().toLowerCase())) {
       if (['to', 'cc', 'bcc'].includes(key)) problems.add(`el borrador de correo también iría a otra dirección (${key}=): ${shorten(match[0])}`);
     }
   }
-  for (const match of source.matchAll(TEL)) {
-    const number = decodePercent(match[1]).replace(/\D/g, '');
-    if (number && !knownNumbers.has(number)) problems.add(`teléfono distinto del confirmado: ${shorten(match[0])}`);
+  for (const match of source.matchAll(PHONE_LINK)) {
+    const value = match[2];
+    if (incomplete(value)) continue;
+    const written = decodePercent(value.split(/[?;]/)[0]).trim();
+    const number = written.replace(/\D/g, '');
+    if (!PHONE_SHAPE.test(written) || !knownNumbers.has(number)) problems.add(`teléfono distinto del confirmado, vacío o con letras: ${shorten(match[0])}`);
   }
-  for (const match of source.matchAll(EMAIL_SHAPE)) {
-    if (match[0].toLowerCase() !== email) problems.add(`correo distinto del confirmado: ${match[0]}`);
+  if (!nestedOnly) {
+    for (const match of source.matchAll(EMAIL_SHAPE)) {
+      if (match[0].toLowerCase() !== email) problems.add(`correo distinto del confirmado: ${match[0]}`);
+    }
   }
   return [...problems];
+}
+
+/** Revisa un texto y, si cambia al decodificar su %XX, también los destinos que lleva dentro. */
+function contactProblemsDecoded(source, contact, options = {}) {
+  const clean = source.replace(/\p{Cf}/gu, '');
+  const decoded = decodePercent(clean);
+  return [...contactProblems(clean, contact, options), ...(decoded === clean ? [] : contactProblems(decoded, contact, { ...options, nestedOnly: true }))];
+}
+
+// Un <script> con código: sin type, o de tipo módulo o JavaScript. Los de datos (JSON-LD, application/json) se leen como texto.
+const isCodeScript = tag => /^(?:|module|(?:text|application)\/(?:java|ecma)script)$/i.test((attribute(tag, 'type') ?? '').trim());
+
+/**
+ * Partes de un archivo para R-RULE-24: lo que se lee tal cual (`plain`), el código de los scripts (`code`) y los
+ * valores de los atributos que son un enlace de correo, de teléfono o de SMS (`links`).
+ * @param {string} raw Contenido del archivo.
+ * @param {string} extension
+ */
+function contactSources(raw, extension) {
+  const decoded = decodeEntities(raw);
+  if (extension === '.js' || extension === '.mjs') return { plain: '', code: decoded.replace(LICENSE_COMMENT, ' '), links: [] };
+  const links = /^\.(?:html?|svg|xml)$/.test(extension)
+    ? attributesOf(withoutScripts(raw)).map(([, value]) => value.trim()).filter(value => /^(?:mailto|tel|sms):/i.test(value))
+    : [];
+  if (!/^\.html?$/.test(extension)) return { plain: decoded.replace(LICENSE_COMMENT, ' '), code: '', links };
+  const code = [];
+  const plain = decoded.replace(/(<script\b[^>]*>)([\s\S]*?)<\/script>/gi, (whole, tag, content) => {
+    if (!isCodeScript(tag)) return whole;
+    code.push(content.replace(LICENSE_COMMENT, ' '));
+    return `${tag}</script>`;
+  });
+  return { plain, code: code.join('\n'), links };
 }
 
 const OLD_PALETTE = [[0x0e, 0x2a, 0x3d], [0x00, 0xa6, 0xe5]];
@@ -567,9 +621,12 @@ export async function scanDist(directory, options = {}) {
     if (!preview && oneLine(norm).toLowerCase().includes(noticeNeedle)) add('FAIL', 'R-RULE-03', file, 'aviso de vista previa en una compilación de producción');
     // R-RULE-24: destinos de contacto en cualquier parte del archivo (atributos, scripts, JSON).
     const contact = { digits, email, knownNumbers };
+    const { plain, code, links } = contactSources(raw, extension);
     for (const problem of new Set([
-      ...contactProblems(unescapeScript(decoded).replace(/\p{Cf}/gu, ''), contact),
-      ...contactProblems(scriptText(decoded).replace(/\p{Cf}/gu, ''), contact, { joinedPieces: true }),
+      ...links.flatMap(link => contactProblemsDecoded(unescapeScript(link), contact, { attribute: true })),
+      ...contactProblemsDecoded(unescapeScript(plain), contact),
+      ...contactProblemsDecoded(unescapeScript(code), contact, { script: true }),
+      ...contactProblemsDecoded(scriptText(code), contact, { script: true, joinedPieces: true }),
     ])) add('FAIL', 'R-RULE-24', file, problem);
     // R-RULE-29: colores casi iguales a la paleta anterior.
     for (const color of new Set(nearPaletteColors(raw))) add('FAIL', 'R-RULE-29', file, `color casi igual a la paleta anterior: «${color}»`);

@@ -395,6 +395,33 @@ test('R-RULE-24: destinos de contacto en cualquier atributo, script o archivo, y
   ]);
 });
 
+test('R-RULE-24: un enlace de correo o de teléfono vacío o sin sustituir, y destinos escondidos en otra dirección', async () => {
+  const EMAIL = data.business.email;
+  const DIGITS = data.business.whatsappDigits;
+  await assertEachFails('R-RULE-24', [
+    '<a href="mailto:">Correo</a>', '<a href="mailto:%20">Correo</a>', '<a href="mailto:?subject=Hola">Correo</a>', '<a href="mailto:{correo}">Correo</a>', '<a href="mailto:${correo}">Correo</a>',
+    '<a href="tel:">Llamar</a>', '<a href="tel:+">Llamar</a>', '<a href="tel:abc">Llamar</a>', '<a href="tel:{tel}">Llamar</a>', '<a href="tel:${tel}">Llamar</a>', `<a href="tel:+${DIGITS}abc">Llamar</a>`,
+    '<a href="https://wa.me/">WhatsApp</a>', '<a href="https://wa.me/{numero}">WhatsApp</a>', '<a href="sms:+525511223344">SMS</a>',
+    '<a href="https://l.example.com/?u=https%3A%2F%2Fwa.me%2F5215555555555">WhatsApp</a>', '<a href="https://l.example.com/?u=mailto%3Aotro%40example.com">Correo</a>',
+    '<a href="https://chat.whatsapp.com/AbCdEf">Grupo</a>', '<a href="https://whatsapp.com/send?phone=5215555555555">WhatsApp</a>', '<a href="https://wa.link/abc123">WhatsApp</a>',
+    '<a href="intent://send/5215555555555#Intent;scheme=whatsapp;end">WhatsApp</a>', '<p data-u="https:\\/\\/wa.me\\/5215555555555">x</p>',
+    '<script type="application/ld+json">{"contactPoint":{"url":"https:\\/\\/wa.me\\/5215555555555"}}</script>',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 'location.href="https:\\/\\/wa.me\\/5215555555555";'], ['datos.json', '{"u":"https:\\/\\/wa.me\\/5215555555555"}'],
+    ['datos.json', '{"correo":"mailto:{correo}"}'], ['datos.json', '{"tel":"tel:{tel}"}'], ['_astro/sitio.css', 'a[href^="tel:+"]{x:1}'], ['_astro/app.js', 'location.href="https%3A%2F%2Fwa.me%2F5215555555555";']]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-24'], content);
+  }
+  // Lo que sí es legítimo: los enlaces confirmados, el código que los completa y un comentario de licencia con correo.
+  await assertNoneFails([`<a href="tel:+${DIGITS}">Llamar</a>`, `<a href="tel:+52 1 221 400 2219">Llamar</a>`, `<a href="mailto:${EMAIL}?subject=Hola&amp;body=Hola%2C%20Yosmara.">Correo</a>`,
+    `<script>document.querySelectorAll('a[href^="mailto:"], a[href^="tel:"]');const u=\`https://wa.me/\${d}?text=\${encodeURIComponent(t)}\`;</script>`]);
+  for (const content of ['/*! (c) autor <dev@example.org> MIT */const a=1;', 'const u=`https://wa.me/${d}?text=${encodeURIComponent(t)}`;', 'const t=`tel:${n}`;a.href="mailto:"+e;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  // Una etiqueta «Tel:» o «WhatsApp:» del texto y un selector de CSS no son enlaces.
+  await assertNoneFails(['<p>Tel: 221 400 2219</p>', '<p>WhatsApp: 221 400 2219</p>', '<style>a[href^="mailto:"]::before{content:"✉"}</style>']);
+  assert.deepEqual(failures(await scan({ '_astro/sitio.css': 'a[href^="mailto:"],a[href^="tel:"]{text-decoration:none}' })), []);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
