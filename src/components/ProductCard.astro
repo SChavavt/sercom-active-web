@@ -5,12 +5,14 @@
 //   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product.
 // Abrir WhatsApp no es un envío: ninguna página muestra confirmaciones.
 // Mientras el sitio no tenga dirección pública (SITE_URL), el mensaje se arma sin la línea «Enlace» y el
-// script de abajo la agrega al hacer clic, con la dirección de la ficha en el sitio donde se está viendo.
+// script compartido PageLinkScript la agrega al hacer clic, con la dirección de la ficha en el sitio donde se
+// está viendo (la ficha de producto usa el mismo script para sus enlaces).
 import type { PublicProduct } from '../types/site.ts';
 import { absoluteUrl, contactLinks } from '../lib/contact.mjs';
 import { EXAMPLE_TAG } from '../lib/site-data.mjs';
 import { categoryIcon } from '../lib/icons.ts';
 import Icon from './Icon.astro';
+import PageLinkScript from './PageLinkScript.astro';
 import Tag from './Tag.astro';
 
 interface Props {
@@ -48,15 +50,4 @@ const categoryId = product.categoryIds[0];
   </div>
 </article>
 
-<script>
-  // Agrega la línea «Enlace» con la dirección de la ficha al abrir WhatsApp, cuando la compilación no la
-  // conocía. Mejora progresiva: sin JavaScript el mensaje sale igual, solo que sin el enlace.
-  import { withPageLink } from '../lib/contact-core.mjs';
-
-  document.addEventListener('click', event => {
-    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-page-link]') : null;
-    if (!link?.dataset.pageLink) return;
-    link.href = withPageLink(link.href, new URL(link.dataset.pageLink, window.location.href).href);
-    delete link.dataset.pageLink;
-  });
-</script>
+<PageLinkScript />
