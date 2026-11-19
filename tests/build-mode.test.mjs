@@ -204,6 +204,9 @@ test('ningún <script> de navegador importa los módulos de datos', () => {
   for (const [path, code] of sources) {
     if (!path.endsWith('.astro')) continue;
     const template = code.replace(/^---\r?\n[\s\S]*?\r?\n---/, '');
+    // Cada <script> de la plantilla pasa por la revisión: si la expresión dejara de reconocerlos, la prueba falla.
+    const opened = (template.match(/<script\b/gi) ?? []).length;
+    assert.equal([...template.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].length, opened, `${path}: hay un <script> que la revisión no reconoce`);
     for (const match of template.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
       scripts += 1;
       for (const specifier of importsOf(match[2])) assert.doesNotMatch(specifier, buildOnly, `${path}: un <script> importa ${specifier}`);
@@ -213,7 +216,8 @@ test('ningún <script> de navegador importa los módulos de datos', () => {
   // La comprobación sí reconoce una importación indebida.
   const misuse = "<script>\n  import { products } from '../lib/site-data.mjs';\n</script>";
   assert.match(importsOf(misuse.replace(/<\/?script>/g, ''))[0], buildOnly);
-  assert.ok(scripts >= 0);
+  // El sitio tiene scripts de navegador (la plantilla base y el encabezado, al menos): la revisión no puede pasar sin ver ninguno.
+  assert.ok(scripts > 0, 'la revisión no encontró ningún <script> en las plantillas');
 });
 
 test('la vista previa nunca se compila en la carpeta dist/ del proyecto', async () => {
