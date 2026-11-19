@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { CHECKS, RULES, scanDist } from '../scripts/scan-dist.mjs';
+import { CHECKS, RULES, SOON_EXPRESSIONS, scanDist } from '../scripts/scan-dist.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 import { loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
 
@@ -1357,8 +1357,106 @@ test('R-RULE-10: «estaremos …ando» y «vamos a …» se leen como la forma s
     '<p>Les damos la bienvenida.</p>', '<p>Damos respuesta a tus dudas por WhatsApp.</p>', '<p>Te damos el precio en 24 horas</p>',
   ]);
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
-  assert.match(printed, /las dos perífrasis de futuro en primera persona[^\n]*se leen como la forma simple del mismo verbo y la misma persona/);
+  // Desde la ronda de cierre son tres: también «ir a estar» con gerundio.
+  assert.match(printed, /Las tres perífrasis de futuro en primera persona[^\n]*se leen como la forma simple del mismo verbo y la misma persona/);
   assert.match(printed, /«Me pondré en contacto» como «Nos pondremos en contacto»/);
+});
+
+test('R-RULE-10: las promesas en la voz del sitio, el singular con un plazo, más plazos, «recibe», la respuesta nombrada y cuatro fórmulas', async () => {
+  // El sitio habla por la persona de ventas en primera persona del singular. Ninguna versión detectaba estas promesas.
+  const promises = [
+    // 1. Verbos del singular con un plazo después o antes; «contacto» y «llamo», solo con «te», «le» o «les» delante.
+    'Te cotizo hoy mismo.', 'Te cotizo en 24 horas.', 'Hoy mismo te cotizo.', 'Te cotizaré a la brevedad.', 'Envíame tu lista y te cotizo hoy mismo.',
+    'Envíame tu lista y te cotizo en 24 horas.', 'Te atiendo de inmediato.', 'Te atiendo hoy mismo.', 'Te atenderé a la brevedad.',
+    'Te contacto a la brevedad.', 'Te contacto hoy mismo.', 'Te llamo hoy mismo.', 'Te llamo en breve.',
+    // 2. Plazos sin cifra que la regla no conocía, después o antes de un verbo que conoce.
+    'Te respondo a la mayor brevedad posible.', 'Te respondo a la mayor brevedad.', 'Te respondo cuanto antes.', 'Te respondo ahorita.', 'Ahorita te respondo.',
+    'Ahorita te voy a responder.', 'Te respondo ahora mismo.', 'Te respondo inmediatamente.', 'Te respondo al instante.', 'Te respondo el mismo día.', 'Respondo el mismo día.',
+    'Respondemos el mismo día.', 'Cotizamos el mismo día.', 'Te respondo en el transcurso del día.', 'Te respondo en minutos.', 'Te respondo en cuestión de minutos.',
+    'Te envío tu cotización el mismo día.', 'Recibirás tu cotización el mismo día.',
+    // 3. El imperativo de «recibir» con un plazo.
+    'Recibe tu cotización en 24 horas.', 'Recibe tu cotización el mismo día.', 'Recibe tu cotización hoy mismo.', 'Reciba su cotización en 24 horas.',
+    // 4. La respuesta nombrada con su plazo, sin verbo, y la cotización con un plazo en horas o días.
+    'Respuesta inmediata.', 'Respuesta en 24 horas.', 'Respuesta el mismo día.', 'Respuesta en minutos.', 'Respuesta en menos de 1 hora.', 'Tiempo de respuesta: 24 horas.',
+    'Tiempo de respuesta de 24 horas.', 'Cotización en 24 horas.', 'Tu cotización en 24 horas.', 'Cotizaciones en 24 hrs.', 'Cotización en 1 día hábil.', 'Cotización el mismo día.',
+    // 5. «pronta», «rápida» o «inmediata» antes de «respuesta» es su propio plazo; «ir a estar» con gerundio es la tercera
+    // perífrasis; «estaremos en contacto» y «me pongo en contacto» con «contigo», «con usted» o «con ustedes».
+    'Te daremos pronta respuesta.', 'Daremos pronta respuesta a tu solicitud.', 'Te daré pronta respuesta.', 'Te doy respuesta hoy mismo.',
+    'Te vamos a estar contactando.', 'Te vamos a estar contactando a la brevedad.', 'Te voy a estar escribiendo en breve.', 'Estaremos en contacto contigo.',
+    'Estaré en contacto contigo.', 'Me pongo en contacto contigo hoy mismo.', 'Me pongo en contacto contigo.', 'Nos ponemos en contacto contigo.',
+  ];
+  await assertEachFails('R-RULE-10', promises.map(text => `<p>${text}</p>`));
+  for (const text of ['Te cotizo en 24 horas.', 'Respuesta inmediata.', 'Te daremos pronta respuesta.', 'Me pongo en contacto contigo.']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
+  }
+  // Otras formas que salen de las mismas reglas: el futuro y las perífrasis de contactar, llamar y dar en singular.
+  await assertEachFails('R-RULE-10', ['<p>Te contactaré a la brevedad.</p>', '<p>Te voy a llamar pronto.</p>', '<p>Te voy a dar respuesta en breve.</p>',
+    '<p>Me pongo en contacto con usted.</p>', '<p>Vamos a estar en contacto contigo.</p>', '<p>Damos respuesta inmediata.</p>']);
+  // «Solicita tu cotización en 24 horas.» falla: la cotización con un plazo en horas no se distingue de «Tu cotización en
+  // 24 horas.» (el texto lo permite; se escribe sin el plazo).
+  await assertEachFails('R-RULE-10', ['<p>Solicita tu cotización en 24 horas.</p>']);
+  // Siguen limpias: llamadas a la acción, horarios, el sustantivo «contacto», una negación en la misma frase.
+  await assertNoneFails([
+    'Envíame tu lista y te cotizo.', 'Te cotizo por WhatsApp.', 'Te cotizo la lista completa.', 'Cotizo de lunes a viernes de 9:00 a 18:00.', 'Atiendo de lunes a viernes de 9:00 a 18:00.',
+    'Te atiendo por WhatsApp.', 'Te atiendo en horario de atención.', 'Mi contacto directo es WhatsApp.', 'Contacto: WhatsApp y correo.', 'Respondo mensajes por la mañana.',
+    'Recibe asesoría para elegir la talla.', 'Recibe atención de lunes a viernes de 9:00 a 18:00.', 'Solicita tu cotización hoy mismo.', 'Pide tu cotización hoy mismo.',
+    'Arma tu cotización en minutos.', 'Arma tu lista en 5 minutos.', 'Cotización sin costo.', 'Tu cotización se prepara según lo que necesitas.',
+    'La cotización tiene vigencia de 15 días.', 'Sin respuesta inmediata.', 'No hay respuesta automática.', 'No prometo una respuesta inmediata.',
+    'La respuesta llega en horario de atención.', 'Respuesta por WhatsApp o correo.', 'Respuesta en horario de atención.', 'Estamos en contacto con los fabricantes.',
+    'Nos ponemos en contacto con el fabricante cuando hace falta una ficha.', 'El mismo día puedes enviar tu lista por WhatsApp.', 'Ahorita no tenemos productos publicados.',
+    'Cuanto antes envíes tu lista, mejor.', 'Si lo necesitas cuanto antes, escríbeme por WhatsApp.', 'Envíame tu lista cuanto antes y te cotizo.',
+    'Te respondo dudas al momento de cotizar.', 'Te llamo por tu nombre en el mensaje.', 'Llamo a esto calibre.',
+  ].map(text => `<p>${text}</p>`));
+  // Límites escritos en --rules: pasan. «mañana» también es «por la mañana», «al momento» y «rápido» no son un plazo
+  // para la regla, «marcar» también es marcar una prenda, «lo» y «la» como objeto formal y el presente continuo no se
+  // reconocen.
+  await assertNoneFails(['Te respondo mañana.', 'Te respondo al momento.', 'Te respondo rápido.', 'Respuesta rápida por WhatsApp.', 'Atención inmediata por WhatsApp.',
+    'Te marcamos a la brevedad.', 'Lo estaremos contactando.', 'Te estamos contactando en breve.'].map(text => `<p>${text}</p>`));
+});
+
+test('R-RULE-10: --rules nombra cada plazo del patrón, y sus ejemplos y límites hacen lo que dice', async () => {
+  const doc = RULES.find(rule => rule.id === 'R-RULE-10' && rule.scope === 'words').doc;
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.ok(printed.includes(doc), '--rules imprime el texto de la regla');
+  // Los plazos sin cifra del texto son los de la lista con la que se arma el patrón, en el mismo orden.
+  const listed = [...doc.match(/un plazo sin cifra: ([^.]*)\./)[1].matchAll(/«([^»]+)»/g)].map(match => match[1]);
+  assert.deepEqual(listed, SOON_EXPRESSIONS);
+  // Las que el texto anterior no nombraba están en la lista.
+  for (const expression of ['muy pronto', 'en unos minutos', 'en pocos minutos', 'en menos de', 'enseguida', 'en seguida', 'lo más pronto posible', 'a la mayor brevedad', 'cuanto antes',
+    'ahorita', 'ahora mismo', 'inmediatamente', 'al instante', 'el mismo día', 'en el transcurso del día', 'en minutos', 'en cuestión de minutos']) {
+    assert.ok(SOON_EXPRESSIONS.includes(expression), expression);
+  }
+  // Y el patrón reconoce cada una, después y antes de un verbo, y como plazo de la respuesta nombrada.
+  for (const expression of SOON_EXPRESSIONS) {
+    for (const text of [`Te respondo ${expression}.`, `${expression[0].toUpperCase()}${expression.slice(1)} te respondo.`, `Respuesta ${expression}.`]) {
+      assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${text}</p>`) })), ['R-RULE-10'], text);
+    }
+  }
+  assert.deepEqual(failures(await scan({ 'pagina/index.html': page('<p>Te respondo por WhatsApp.</p>') })), []);
+  // Los límites que nombra el texto no fallan, y los ejemplos de frases legítimas tampoco.
+  const limits = ['Te respondo mañana', 'Te respondo al momento', 'Te respondo rápido', 'Respuesta rápida por WhatsApp', 'Atención inmediata por WhatsApp', 'Pronta respuesta',
+    'Te marcamos a la brevedad', 'Lo estaremos contactando', 'Recíbela en 24 horas', 'Te estamos contactando en breve', 'Te iremos respondiendo', 'Les vamos a responder',
+    'Les responderemos', 'Responderemos a la brevedad', 'Escribimos en 24 horas', 'Cotizaremos en 24 horas', 'Si no encuentras tu talla, escríbeme: respuesta en 24 horas'];
+  const legitimate = ['Te respondo dudas sobre tallas por WhatsApp', 'Escríbeme por WhatsApp y te respondo', 'Envíame tu lista y te cotizo', 'Envíame tu lista cuanto antes y te cotizo',
+    'Cotizo de lunes a viernes de 9:00 a 18:00', 'Te atiendo en horario de atención', 'Mando la ficha técnica si el fabricante la publica', 'Recibe asesoría para elegir la talla',
+    'Solicita tu cotización hoy mismo', 'Arma tu cotización en minutos', 'Respuesta en horario de atención', 'El mismo día puedes enviar tu lista por WhatsApp',
+    'Voy a responder aquí las preguntas frecuentes', 'Te voy a pedir la talla', 'Mi contacto directo es WhatsApp', 'Llamo a esto calibre', 'Nos ponemos en contacto con el fabricante',
+    'Estamos en contacto con los fabricantes', 'Sin respuesta inmediata', 'No prometo una respuesta inmediata'];
+  for (const text of [...limits, ...legitimate]) {
+    assert.ok(doc.includes(`«${text}»`), `el texto nombra «${text}»`);
+    assert.deepEqual(failures(await scan({ 'pagina/index.html': page(`<p>${text}.</p>`) })), [], text);
+  }
+  // Los ejemplos de promesas del texto fallan.
+  const promises = ['Te respondemos', 'Te contestaremos', 'Te mandaremos', 'Le escribirá', 'Les daremos respuesta', 'Te daremos pronta respuesta', 'Daremos pronta respuesta a tu solicitud',
+    'Te daré pronta respuesta', 'Estaremos en contacto contigo', 'Me pongo en contacto contigo', 'Recibirás tu cotización en 24 horas', 'Recibe tu cotización el mismo día',
+    'Te cotizamos en 24 hrs', 'Respondemos el mismo día', 'Daremos respuesta a tu solicitud en 24 horas', 'En 24 horas cotizaremos tu lista', 'Te respondo a la brevedad',
+    'Te cotizo hoy mismo', 'Te atiendo de inmediato', 'Te contacto a la brevedad', 'Te llamo en breve', 'Te doy respuesta hoy mismo', 'Ahorita te respondo', 'Te vamos a estar contactando',
+    'Te voy a estar escribiendo en breve', 'Respuesta inmediata', 'Respuesta en 24 horas', 'Respuesta el mismo día', 'Respuesta en minutos', 'Tiempo de respuesta: 24 horas',
+    'Tiempo de respuesta de 24 horas', 'Cotización en 24 horas', 'Tu cotización en 1 día hábil', 'Cotización el mismo día', 'A la brevedad responderemos', 'Solicita tu cotización en 24 horas'];
+  for (const text of promises) {
+    assert.ok(doc.includes(`«${text}»`), `el texto nombra «${text}»`);
+    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${text}.</p>`) })), ['R-RULE-10'], text);
+  }
 });
 
 test('cada regla está documentada y conserva su identificador', () => {
