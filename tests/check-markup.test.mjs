@@ -48,8 +48,10 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
     + '</div></header>';
 }
 const dock = (marks = {}) => `<nav class="dock" aria-label="Acciones rápidas"><a class="dock__link" href="/cotizar/"${marks['dock:/cotizar/'] ? ` aria-current="${marks['dock:/cotizar/']}"` : ''}><span>Cotizar mi lista</span></a><a class="dock__link dock__link--wa" href="https://wa.me/5212214002219"><span>WhatsApp</span></a></nav>`;
+// El pie por omisión no lleva enlaces: las pruebas del pie lo sustituyen con `withFooter`.
+const EMPTY_FOOTER = '<footer class="site-footer"><p class="label">Sercom Active</p></footer>';
 const page = (options = {}, body = '<h1>Página</h1>') => `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>Prueba</title></head><body><a class="skip-link" href="#contenido">Saltar al contenido</a>`
-  + `<div class="sheet">${header(options)}<main id="contenido" tabindex="-1">${body}</main></div>${dock(options.marks)}</body></html>`;
+  + `<div class="sheet">${header(options)}<main id="contenido" tabindex="-1">${body}</main>${EMPTY_FOOTER}</div>${dock(options.marks)}</body></html>`;
 const STYLE = '.masthead__nav{display:flex}.masthead__search{display:flex}.masthead__search-input{flex:1}.masthead__search-btn{width:44px}.masthead__nav-link{padding:0 12px}@media (max-width:1099px){.masthead__nav,.masthead__search{position:absolute;display:none}html:not(.js) .masthead__nav{display:flex}}';
 
 /** Revisa un sitio temporal (una portada correcta más `files`) con solo las comprobaciones indicadas. */
@@ -232,6 +234,160 @@ test('U-05: una marca que falta, sobra o lleva otro valor falla', async () => {
   assert.equal((await check({ 'categorias/manos/index.html': page({ categories: false, marks: {} }) }, { ids: ['U-05'] })).length, 2);
   const withoutDock = page({ marks: { 'nav:/contacto/': 'page' } }).replace(/<nav class="dock"[\s\S]*?<\/nav>/, '');
   assert.equal((await check({ 'contacto/index.html': withoutDock }, { ids: ['U-05'] })).length, 1);
+});
+
+// ---------------------------------------------------------------------------------------------------
+// Contenido: celdas de relleno, dirección de correo, ruta de navegación y marcas de la página actual
+// ---------------------------------------------------------------------------------------------------
+
+const ADDRESS = 'ventas.puebla@sercomactive.com';
+const EMAIL = '<span class="email"><span class="email__part">ventas.puebla@</span><wbr><span class="email__part">sercomactive.com</span></span>';
+const crumbs = items => `<nav class="crumbs label" aria-label="Ruta de navegación"><ol class="crumbs__list">${items.join('')}</ol></nav>`;
+const crumb = (label, href) => `<li class="crumbs__item"><a class="crumbs__link" href="${href}">${label}</a><span class="crumbs__sep" aria-hidden="true">/</span></li>`;
+const crumbHere = label => `<li class="crumbs__item"><span aria-current="page">${label}</span></li>`;
+const BRAND_MARK = '<span class="brand__mark" aria-hidden="true"></span>';
+const brandCell = (href, name, extra = '', inside = '') => `<li class="span-3"><a class="brand cell-link" href="${href}"${extra}>${inside}<span>${name}</span><svg class="icon"></svg></a></li>`;
+const brandCells = cells => `<ul class="brands grid12">${cells.join('')}<li class="span-3"><a class="brand brand--all cell-link" href="/marcas/"><span>Ver todas las marcas</span></a></li><li class="brands__fill span-3" aria-hidden="true"></li></ul>`;
+const FOOTER_MARK = '<span class="footer__mark" aria-hidden="true"></span>';
+const FOOTER_LINKS = [['/catalogo/', 'Catálogo'], ['/marcas/', 'Marcas'], ['/contacto/', 'Contacto'], ['/privacidad/', 'Privacidad']];
+/** Pie con el enlace a `route` marcado como lo escribe SiteFooter; `change` altera ese pie para romper la regla. */
+const footer = (route, change = html => html) => change('<footer class="site-footer"><a class="footer__logo" href="/"><img src="/logo.svg" width="194" height="73" alt="Sercom Active"></a><ul>'
+  + FOOTER_LINKS.map(([href, label]) => `<li><a href="${href}"${href === route ? ` aria-current="page">${FOOTER_MARK}` : '>'}${label}</a></li>`).join('')
+  + `</ul><a href="mailto:${ADDRESS}">${EMAIL}</a></footer>`);
+/** Una página completa con pie. */
+const withFooter = (route, body, change) => page({}, body).replace(EMPTY_FOOTER, footer(route, change));
+
+test('U-04: una celda de relleno vacía, oculta y sin foco pasa; con contenido, visible para el lector o enfocable falla', async () => {
+  const grid = fill => `<ul class="grid12"><li class="cell span-3">Uno</li>${fill}</ul>`;
+  const good = ['<li class="grid-fill" aria-hidden="true" data-hide="lg md" style="--fill-lg:9"></li>', '<li class="brands__fill span-3" aria-hidden="true"></li>',
+    '<div class="catalog-grid__fill" aria-hidden="true"></div>', '<li class="producto__more-fill" aria-hidden="true"></li>', '<li class="producto__chip-fill" aria-hidden="true"></li>'];
+  assert.deepEqual(await check({ 'catalogo/index.html': page({}, grid(good.join(''))) }, { ids: ['U-04'] }), []);
+  const bad = [
+    ['<li class="grid-fill"></li>', /aria-hidden/],
+    ['<li class="grid-fill" aria-hidden="false"></li>', /aria-hidden/],
+    ['<li class="brands__fill" aria-hidden="true">Ver más</li>', /contenido/],
+    ['<div class="catalog-grid__fill" aria-hidden="true"><span></span></div>', /contenido/],
+    ['<li class="producto__more-fill" aria-hidden="true" tabindex="0"></li>', /foco/],
+    ['<a class="producto__chip-fill" aria-hidden="true" href="/catalogo/"></a>', /foco/],
+  ];
+  for (const [fill, expected] of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, grid(fill)) }, { ids: ['U-04'] });
+    assert.equal(problems.length, 1, fill);
+    assert.match(problems[0].message, expected, fill);
+    assert.equal(problems[0].file, 'catalogo/index.html');
+  }
+});
+
+test('U-11: la dirección en dos partes pasa; entera, partida en otro punto o distinta de la del enlace falla', async () => {
+  const good = [
+    `<a href="mailto:${ADDRESS}">${EMAIL}</a>`,
+    `<a class="data__value" href="mailto:${ADDRESS}?subject=Cotizaci%C3%B3n&amp;body=Hola"><svg class="icon"></svg>${EMAIL}</a>`,
+    // Una acción que no muestra la dirección no entra en la regla.
+    `<a class="action" href="mailto:${ADDRESS}?subject=Hola"><span>Escribir por correo</span></a>`,
+  ];
+  assert.deepEqual(await check({ 'contacto/index.html': page({}, good.join('')) }, { ids: ['U-11'] }), []);
+  // La barra de servicio de la cabecera imprime la dirección en un solo renglón: queda fuera de la regla.
+  const inHeader = page().replace('<li class="utility__item">Puebla, México</li>', `<li class="utility__item"><a href="mailto:${ADDRESS}">${ADDRESS}</a></li>`);
+  assert.match(inHeader, /<header[\s\S]*mailto:[\s\S]*<\/header>/);
+  assert.deepEqual(await check({ 'contacto/index.html': inHeader }, { ids: ['U-11'] }), []);
+  const bad = [
+    `<a href="mailto:${ADDRESS}">${ADDRESS}</a>`,
+    `<a href="mailto:${ADDRESS}"><span class="email">${ADDRESS}</span></a>`,
+    '<a href="mailto:ventas.puebla@sercomactive.com"><span class="email"><span class="email__part">ventas.puebla@sercom</span><wbr><span class="email__part">active.com</span></span></a>',
+    '<a href="mailto:ventas.puebla@sercomactive.com"><span class="email"><span class="email__part">ventas.puebla@</span><span class="email__part">sercomactive.com</span></span></a>',
+    '<a href="mailto:ventas.puebla@sercomactive.com"><span class="email"><span class="email__part">ventas.</span><wbr><span class="email__part">puebla@</span><wbr><span class="email__part">sercomactive.com</span></span></a>',
+    `<a href="mailto:otra@sercomactive.com">${EMAIL}</a>`,
+  ];
+  for (const link of bad) {
+    const problems = await check({ 'contacto/index.html': page({}, link) }, { ids: ['U-11'] });
+    assert.equal(problems.length, 1, link);
+    assert.match(problems[0].message, /dos partes/, link);
+  }
+});
+
+test('F-3: la ruta con diagonales ocultas al final de cada elemento pasa; escritas como texto, visibles para el lector o mal puestas falla', async () => {
+  const good = {
+    'catalogo/index.html': page({}, crumbs([crumb('Inicio', '/'), crumbHere('Catálogo')])),
+    'productos/respirador/index.html': page({}, crumbs([crumb('Inicio', '/'), crumb('Catálogo', '/catalogo/'), crumb('Protección respiratoria', '/categorias/respiratoria/'), crumbHere('Respirador N95/KN95 de ejemplo')])),
+    // Una página sin ruta (la portada) no tiene nada que revisar.
+    'contacto/index.html': page(),
+  };
+  assert.deepEqual(await check(good, { ids: ['F-3'] }), []);
+  const here = crumbHere('Catálogo');
+  const bad = [
+    [crumbs(['<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a></li>', here]), /0 diagonales/],
+    [crumbs(['<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a> / </li>', here]), /como texto/],
+    [crumbs(['<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a></li> / ', here]), /como texto/],
+    [crumbs(['<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a><span class="crumbs__sep">/</span></li>', here]), /aria-hidden/],
+    [crumbs(['<li class="crumbs__item"><span class="crumbs__sep" aria-hidden="true">/</span><a class="crumbs__link" href="/">Inicio</a></li>', here]), /al final/],
+    [crumbs(['<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a><span class="crumbs__sep" aria-hidden="true">›</span></li>', here]), /no es una diagonal/],
+    [crumbs([crumb('Inicio', '/'), '<li class="crumbs__item"><span aria-current="page">Catálogo</span><span class="crumbs__sep" aria-hidden="true">/</span></li>']), /último y lleva una diagonal/],
+    [crumbs([crumb('Inicio', '/'), '<li class="crumbs__item"><span>Catálogo</span></li>']), /no marca la página actual/],
+    [crumbs([crumb('Inicio', '/').replace('<a class', '<a aria-current="page" class'), here]), /no es el último/],
+    [crumbs([here]), /1 elementos/],
+  ];
+  for (const [trail, expected] of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, trail) }, { ids: ['F-3'] });
+    assert.ok(problems.length >= 1, trail);
+    assert.ok(problems.some(problem => expected.test(problem.message)), `${trail}\n${problems.map(problem => problem.message).join('\n')}`);
+  }
+});
+
+test('F-9a: en la página de una marca solo su celda lleva aria-current y el cuadro; en otra página, ninguna', async () => {
+  const cells = (ansell = brandCell('/marcas/ansell/', 'Ansell', ' aria-current="page"', BRAND_MARK), other = brandCell('/marcas/3m/', '3M')) => brandCells([ansell, other]);
+  const good = {
+    'marcas/ansell/index.html': page({}, cells()),
+    // El índice de marcas y la portada listan las marcas sin señalar ninguna.
+    'marcas/index.html': page({}, brandCells([brandCell('/marcas/ansell/', 'Ansell'), brandCell('/marcas/3m/', '3M')])),
+    // Una página de marca con productos no lleva las celdas: no hay nada que revisar.
+    'marcas/3m/index.html': page(),
+  };
+  assert.deepEqual(await check(good, { ids: ['F-9a'] }), []);
+  const bad = [
+    [cells(brandCell('/marcas/ansell/', 'Ansell', '', BRAND_MARK)), /no lleva aria-current="page"/],
+    [cells(brandCell('/marcas/ansell/', 'Ansell', ' aria-current="true"', BRAND_MARK)), /no lleva aria-current="page"/],
+    [cells(brandCell('/marcas/ansell/', 'Ansell', ' aria-current="page"')), /no empieza con el cuadro/],
+    [cells(brandCell('/marcas/ansell/', 'Ansell', ' aria-current="page"', '<span class="brand__mark"></span>')), /aria-hidden/],
+    [cells(undefined, brandCell('/marcas/3m/', '3M', ' aria-current="page"')), /«3M» lleva aria-current/],
+    [cells(undefined, brandCell('/marcas/3m/', '3M', '', BRAND_MARK)), /«3M» lleva el cuadro/],
+    [brandCells([brandCell('/marcas/3m/', '3M')]), /0 celdas de marca llevan a esta página/],
+    [`${cells()}<p>${BRAND_MARK}</p>`, /fuera de una celda/],
+  ];
+  for (const [body, expected] of bad) {
+    const problems = await check({ 'marcas/ansell/index.html': page({}, body) }, { ids: ['F-9a'] });
+    assert.ok(problems.some(problem => expected.test(problem.message)), `${body}\n${problems.map(problem => problem.message).join('\n')}`);
+  }
+  // Fuera de la página de la marca, la celda marcada falla.
+  const elsewhere = await check({ 'marcas/index.html': page({}, cells()) }, { ids: ['F-9a'] });
+  assert.equal(elsewhere.length, 2);
+  assert.deepEqual(elsewhere.map(problem => problem.file), ['marcas/index.html', 'marcas/index.html']);
+});
+
+test('F-9b: en el pie solo el enlace a la página actual lleva aria-current y el cuadro', async () => {
+  const good = {
+    'index.html': withFooter('/', '<h1>Portada</h1>'),
+    'contacto/index.html': withFooter('/contacto/', '<h1>Contacto</h1>'),
+    'privacidad/index.html': withFooter('/privacidad/', '<h1>Privacidad</h1>'),
+    '404.html': withFooter('/404.html', '<h1>No encontramos esta página</h1>'),
+  };
+  assert.deepEqual(await check(good, { ids: ['F-9b'] }), []);
+  const base = { 'index.html': withFooter('/', '<h1>Portada</h1>') };
+  const bad = [
+    [html => html.replace(' aria-current="page"', ''), /no lleva aria-current="page"/],
+    [html => html.replace(FOOTER_MARK, ''), /no empieza con el cuadro/],
+    [html => html.replace(FOOTER_MARK, '<span class="footer__mark"></span>'), /aria-hidden/],
+    [html => html.replace('<a href="/marcas/">', '<a href="/marcas/" aria-current="page">'), /«Marcas» lleva aria-current/],
+    [html => html.replace('<a href="/marcas/">', `<a href="/marcas/">${FOOTER_MARK}`), /«Marcas» lleva el cuadro/],
+    [html => html.replace('</ul>', `</ul><p>${FOOTER_MARK}</p>`), /fuera de un enlace/],
+  ];
+  for (const [change, expected] of bad) {
+    const problems = await check({ ...base, 'contacto/index.html': withFooter('/contacto/', '<h1>Contacto</h1>', change) }, { ids: ['F-9b'] });
+    assert.ok(problems.length >= 1 && problems.every(problem => problem.file === 'contacto/index.html'), String(change));
+    assert.ok(problems.some(problem => expected.test(problem.message)), `${change}\n${problems.map(problem => problem.message).join('\n')}`);
+  }
+  // Una página sin el pie del sitio falla: todas lo llevan.
+  const without = await check({ ...base, 'contacto/index.html': page().replace(EMPTY_FOOTER, '') }, { ids: ['F-9b'] });
+  assert.deepEqual(without.map(problem => problem.message), ['la página no tiene el pie del sitio (<footer class="site-footer">)']);
 });
 
 // ---------------------------------------------------------------------------------------------------

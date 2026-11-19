@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera y de la barra fija que se leen en el
-// HTML y en las hojas de estilo, sin navegador.
+// Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
+// (celdas de relleno de las retículas, dirección de correo, ruta de navegación y marcas de la página actual) que se
+// leen en el HTML y en las hojas de estilo, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -349,6 +350,12 @@ export function expectedLocation(route) {
   return {};
 }
 
+// Celdas que solo completan en blanco la última fila de una retícula (docs/diseno.md).
+const FILL_CLASSES = ['grid-fill', 'brands__fill', 'catalog-grid__fill', 'producto__more-fill', 'producto__chip-fill'];
+const FOCUSABLE = ['a', 'button', 'input', 'select', 'textarea', 'summary'];
+/** El primer hijo de `element` si lleva la clase `name`; si no, `null`. */
+const leadingMark = (element, name) => (element.children[0] && hasClass(element.children[0], name) ? element.children[0] : null);
+
 /** @type {Check[]} */
 export const CHECKS = [
   {
@@ -443,6 +450,133 @@ export const CHECKS = [
         if (!submit) problems.push('la búsqueda de la cabecera no tiene su botón (button type="submit")');
         else if (!hasClass(submit, 'masthead__search-btn')) problems.push(`el botón ${describe(submit)} no lleva la clase masthead__search-btn`);
       }
+      return problems;
+    },
+  },
+  {
+    id: 'U-04',
+    title: 'Las celdas de relleno de las retículas están vacías, ocultas a las tecnologías de apoyo (aria-hidden="true") y no reciben foco',
+    page(page) {
+      const problems = [];
+      for (const element of page.elements) {
+        if (!classesOf(element).some(name => FILL_CLASSES.includes(name))) continue;
+        if (element.attributes.get('aria-hidden') !== 'true') problems.push(`la celda de relleno ${describe(element)} no lleva aria-hidden="true"`);
+        if (element.children.length || textOf(element)) problems.push(`la celda de relleno ${describe(element)} tiene contenido`);
+        if (FOCUSABLE.includes(element.name) || element.attributes.has('tabindex') || element.attributes.has('href')) problems.push(`la celda de relleno ${describe(element)} puede recibir foco`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'U-11',
+    title: 'Fuera de la cabecera, la dirección de correo que se muestra va en dos partes (EmailAddress) y solo puede partirse después de «@»',
+    page(page) {
+      const problems = [];
+      for (const link of page.elements) {
+        const href = link.attributes.get('href') ?? '';
+        if (link.name !== 'a' || !/^mailto:/i.test(href) || closest(link, node => node.name === 'header')) continue;
+        // Un enlace de correo que no muestra la dirección (una acción «Escribir por correo») no entra en esta regla.
+        if (!textOf(link).includes('@')) continue;
+        let address = href.slice('mailto:'.length).split('?')[0];
+        try { address = decodeURIComponent(address); } catch { /* se compara tal cual */ }
+        const at = address.lastIndexOf('@') + 1;
+        const email = allElements(link).find(element => hasClass(element, 'email'));
+        const [user, breakPoint, domain] = email?.children ?? [];
+        const whole = email && email.children.length === 3 && !email.text.join('').trim()
+          && hasClass(user, 'email__part') && breakPoint.name === 'wbr' && hasClass(domain, 'email__part')
+          && !user.children.length && !domain.children.length
+          && user.text.join('') === address.slice(0, at) && domain.text.join('') === address.slice(at);
+        if (!whole) problems.push(`el enlace a ${address} muestra la dirección sin las dos partes de EmailAddress (span.email > span.email__part + <wbr> + span.email__part): podría partirse a mitad del dominio`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'F-3',
+    title: 'En la ruta de navegación cada diagonal es un elemento oculto a las tecnologías de apoyo al final de su elemento, y el último elemento es la página actual',
+    page(page) {
+      const problems = [];
+      for (const nav of page.elements) {
+        if (nav.name !== 'nav' || !hasClass(nav, 'crumbs')) continue;
+        const inNav = allElements(nav);
+        const items = inNav.filter(element => element.name === 'li' && hasClass(element, 'crumbs__item'));
+        if (items.length < 2) problems.push(`la ruta tiene ${items.length} elementos; lleva al menos la portada y la página actual`);
+        items.forEach((item, index) => {
+          const inItem = allElements(item);
+          const separators = inItem.filter(element => hasClass(element, 'crumbs__sep'));
+          const current = inItem.filter(element => element.attributes.has('aria-current'));
+          const label = `el elemento ${index + 1} de la ruta`;
+          if (index === items.length - 1) {
+            if (separators.length) problems.push(`${label} es el último y lleva una diagonal`);
+            if (current.length !== 1 || current[0].attributes.get('aria-current') !== 'page') problems.push(`${label} es el último y no marca la página actual (aria-current="page")`);
+            return;
+          }
+          if (current.length) problems.push(`${label} lleva aria-current y no es el último`);
+          if (separators.length !== 1) { problems.push(`${label} lleva ${separators.length} diagonales (span.crumbs__sep); lleva una`); return; }
+          const [separator] = separators;
+          if (separator.attributes.get('aria-hidden') !== 'true') problems.push(`la diagonal de ${label} no lleva aria-hidden="true": un lector de pantalla la lee`);
+          if (textOf(separator) !== '/') problems.push(`el separador de ${label} no es una diagonal`);
+          if (item.children[item.children.length - 1] !== separator) problems.push(`la diagonal de ${label} no va al final de su elemento: podría empezar un renglón`);
+        });
+        // Una diagonal escrita como texto (o generada entre elementos) la lee la tecnología de apoyo.
+        const loose = [nav, ...inNav].some(element => !hasClass(element, 'crumbs__sep') && element.text.some(text => text.trim() === '/'));
+        if (loose) problems.push('la ruta tiene una diagonal escrita como texto, fuera de span.crumbs__sep');
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'F-9a',
+    title: 'En la página de una marca, su celda de «Marcas que manejamos» lleva aria-current="page" y el cuadro que la señala; ninguna otra celda los lleva',
+    page(page) {
+      const problems = [];
+      const cells = page.elements.filter(element => element.name === 'a' && hasClass(element, 'brand'));
+      const brandPrefix = prefix(routes.brand);
+      const onBrandPage = page.route.startsWith(brandPrefix) && page.route.length > brandPrefix.length;
+      const own = cells.filter(cell => cell.attributes.get('href') === page.route);
+      if (onBrandPage && cells.length && own.length !== 1) problems.push(`${own.length} celdas de marca llevan a esta página; debe haber exactamente una`);
+      for (const cell of cells) {
+        const value = cell.attributes.get('aria-current') ?? null;
+        const mark = leadingMark(cell, 'brand__mark');
+        const name = textOf(cell);
+        if (onBrandPage && own.includes(cell)) {
+          if (value !== 'page') problems.push(`la celda de la marca actual («${name}») no lleva aria-current="page"`);
+          if (!mark) problems.push(`la celda de la marca actual («${name}») no empieza con el cuadro que la señala (span.brand__mark)`);
+          else if (mark.attributes.get('aria-hidden') !== 'true') problems.push(`el cuadro de la marca actual («${name}») no lleva aria-hidden="true"`);
+        } else {
+          if (value !== null) problems.push(`la celda «${name}» lleva aria-current="${value}" y no es la de esta página`);
+          if (allElements(cell).some(element => hasClass(element, 'brand__mark'))) problems.push(`la celda «${name}» lleva el cuadro de marca actual y no es la de esta página`);
+        }
+      }
+      const marks = page.elements.filter(element => hasClass(element, 'brand__mark'));
+      if (marks.some(mark => !cells.includes(mark.parent))) problems.push('hay un cuadro de marca actual (.brand__mark) fuera de una celda de marca');
+      return problems;
+    },
+  },
+  {
+    id: 'F-9b',
+    title: 'En el pie, el enlace a la página actual lleva aria-current="page" y el cuadro que lo señala; ningún otro enlace del pie los lleva',
+    page(page) {
+      const footer = page.elements.find(element => element.name === 'footer' && hasClass(element, 'site-footer'));
+      if (!footer) return ['la página no tiene el pie del sitio (<footer class="site-footer">)'];
+      const problems = [];
+      const inFooter = allElements(footer);
+      // El logotipo lleva a la portada, pero no es un enlace de las listas del pie.
+      const links = inFooter.filter(element => element.name === 'a' && !hasClass(element, 'footer__logo'));
+      for (const link of links) {
+        const value = link.attributes.get('aria-current') ?? null;
+        const mark = leadingMark(link, 'footer__mark');
+        const label = textOf(link);
+        if (link.attributes.get('href') === page.route) {
+          if (value !== 'page') problems.push(`el enlace del pie a esta página («${label}») no lleva aria-current="page"`);
+          if (!mark) problems.push(`el enlace del pie a esta página («${label}») no empieza con el cuadro que lo señala (span.footer__mark)`);
+          else if (mark.attributes.get('aria-hidden') !== 'true') problems.push(`el cuadro del enlace del pie «${label}» no lleva aria-hidden="true"`);
+        } else {
+          if (value !== null) problems.push(`el enlace del pie «${label}» lleva aria-current="${value}" y no lleva a esta página`);
+          if (allElements(link).some(element => hasClass(element, 'footer__mark'))) problems.push(`el enlace del pie «${label}» lleva el cuadro de página actual y no lleva a esta página`);
+        }
+      }
+      if (inFooter.some(element => hasClass(element, 'footer__mark') && !links.includes(element.parent))) problems.push('hay un cuadro de página actual (.footer__mark) fuera de un enlace del pie');
       return problems;
     },
   },
