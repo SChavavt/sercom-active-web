@@ -275,21 +275,33 @@ const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).
  * veces: tal cual, como el texto que es, y además como marcado, igual que el de cualquier otro elemento. Así el aviso
  * real envuelto en uno de ellos («<noscript><aside…><strong>Sitio en preparación</strong> · …») sigue en la página,
  * como lo encontraba el escáner antes de las dos lecturas, sin perder lo que la lectura tal cual encuentra.
- * Límite: de las entidades con nombre solo se decodifican las de NAMED_ENTITIES; un aviso cuyas propias palabras se
- * escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce.
+ * Límites:
+ *   - la segunda lectura llega hasta ocho niveles de esos elementos uno dentro de otro (MAX_RAW_TEXT_DEPTH; ninguna
+ *     envoltura real pasa de tres). Más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado:
+ *     así una página con miles de ellos anidados se lee en un tiempo proporcional a su tamaño, sin agotar la pila;
+ *   - ningún atributo cuenta, tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva. Se
+ *     acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11);
+ *   - de las entidades con nombre solo se decodifican las de NAMED_ENTITIES; un aviso cuyas propias palabras se
+ *     escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce.
  */
 function allElementText(html) {
-  return comparableText(elementTextPieces(html, []));
+  return comparableText(elementTextPieces(html, [], 0));
 }
-/** Las piezas de `allElementText`, añadidas a `pieces`. */
-function elementTextPieces(html, pieces) {
+// Niveles de elementos de texto crudo, uno dentro de otro, cuyo contenido `allElementText` vuelve a leer como marcado.
+const MAX_RAW_TEXT_DEPTH = 8;
+/**
+ * Las piezas de `allElementText`, añadidas a `pieces`. El contenido de cada elemento de texto crudo se añade tal cual y
+ * se vuelve a leer como marcado mientras `depth` (los niveles ya vueltos a leer) no llega a MAX_RAW_TEXT_DEPTH; más
+ * hondo cuenta solo como el texto que es. La llamada recursiva nunca pasa de esa profundidad.
+ */
+function elementTextPieces(html, pieces, depth) {
   for (const token of htmlTokens(html)) {
     if (token.type !== 'text') pieces.push(INLINE_ELEMENT.test(token.name) ? '' : ' ');
     else if (!token.raw) pieces.push(token.text);
     else if (CODE_ELEMENT.test(token.name)) pieces.push(' ');
     else {
       pieces.push(token.text, ' ');
-      elementTextPieces(token.text, pieces);
+      if (depth < MAX_RAW_TEXT_DEPTH) elementTextPieces(token.text, pieces, depth + 1);
       pieces.push(' ');
     }
   }
@@ -833,7 +845,7 @@ const PRODUCTION_RULES = [
 
 // Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
 const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS o una entidad con nombre poco común en el style («display:var(--x,none)», «display:none&semi;»), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
-const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan. De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…): un aviso cuyas propias palabras se escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce; escribirlo así es ocultarlo a propósito';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta, hasta ocho niveles de esos elementos uno dentro de otro (ninguna envoltura real pasa de tres); más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado, y así una página con miles de ellos anidados se revisa sin detener el escáner; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan: tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva; se acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11). De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…): un aviso cuyas propias palabras se escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce; escribirlo así es ocultarlo a propósito';
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [

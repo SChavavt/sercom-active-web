@@ -427,6 +427,50 @@ test('R-PUB-03 y R-RULE-12: un comentario, un script, un estilo o un atributo co
   }
 });
 
+test('R-PUB-03 y R-RULE-12: miles de contenedores de texto crudo anidados no detienen el escáner', async () => {
+  // Cada nivel se vuelve a leer como marcado hasta ocho niveles; más hondo, su contenido es solo texto. Sin ese límite,
+  // veinte mil <xmp> sin cerrar (unos 100 KB) terminaban el escáner con «Maximum call stack size exceeded».
+  for (const [tag, count] of [['xmp', 20000], ['noscript', 5000], ['textarea', 5000]]) {
+    const started = performance.now();
+    const result = await scan(launchedSite(`${`<${tag}>`.repeat(count)}hola`), { launch: true, inPerson: true });
+    assert.deepEqual(failures(result), [], `${count} <${tag}> anidados`);
+    assert.ok(performance.now() - started < 10000, `${count} <${tag}> anidados: ${Math.round(performance.now() - started)} ms`);
+  }
+});
+
+test('R-PUB-03 y R-RULE-12: el aviso envuelto en tres niveles de contenedores sigue en la página; más hondo que ocho, cuenta su texto', async () => {
+  const wrap = (tags, inner) => `${tags.map(tag => `<${tag}>`).join('')}${inner}${[...tags].reverse().map(tag => `</${tag}>`).join('')}`;
+  // Tres niveles (más de lo que lleva una envoltura real) y ocho, el límite: el aviso con sus etiquetas se encuentra.
+  for (const tags of [['noscript', 'xmp', 'noembed'], ['noscript', 'xmp', 'noembed', 'noframes', 'iframe', 'textarea', 'title', 'xmp']]) {
+    const body = wrap(tags, DEVELOPMENT_NOTICE_HTML);
+    assert.deepEqual(failedIds(await scan(launchedSite(body), { launch: true, inPerson: true })), ['R-PUB-03'], body);
+    assert.deepEqual(failedIds(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${body}`) }, { preview: true, inPerson: true })), ['R-RULE-12'], body);
+  }
+  // Más hondo, el contenido cuenta solo como el texto que es: el aviso escrito sin etiquetas se sigue encontrando.
+  const deep = `${'<xmp>'.repeat(12)}${DEVELOPMENT_NOTICE}`;
+  assert.deepEqual(failedIds(await scan(launchedSite(deep), { launch: true, inPerson: true })), ['R-PUB-03']);
+  const docs = id => CHECKS.filter(([check]) => check === id).map(([, doc]) => doc).join('\n');
+  for (const id of ['R-RULE-12', 'R-PUB-03']) {
+    assert.match(docs(id), /hasta ocho niveles de esos elementos uno dentro de otro[^\n]*más hondo, su contenido cuenta solo como el texto que es/, id);
+  }
+});
+
+test('R-PUB-03 y R-RULE-12: un atributo no es texto de la página, tampoco el srcdoc de un <iframe> (límite escrito)', async () => {
+  // El navegador dibuja el documento de srcdoc, pero ningún atributo cuenta: es un límite, aceptado porque sin
+  // --in-person cualquier <iframe> ya falla (R-RULE-11).
+  const body = `<iframe srcdoc="${DEVELOPMENT_NOTICE_HTML.replaceAll('"', '&quot;')}" title="Aviso"></iframe>`;
+  assert.deepEqual(failures(await scan(launchedSite(body), { launch: true, inPerson: true })), []);
+  assert.deepEqual(failedIds(await scan(launchedSite(body), { launch: true })), ['R-RULE-11']);
+  const docs = id => CHECKS.filter(([check]) => check === id).map(([, doc]) => doc).join('\n');
+  for (const id of ['R-RULE-12', 'R-PUB-03']) {
+    assert.match(docs(id), /tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva[^\n]*sin --in-person cualquier <iframe> ya falla \(R-RULE-11\)/, id);
+  }
+  const source = await readText('scripts/scan-dist.mjs');
+  const comment = source.slice(source.lastIndexOf('/**', source.indexOf('function allElementText(')), source.indexOf('function allElementText('));
+  assert.match(comment, /srcdoc/);
+  assert.match(comment, /ocho niveles/);
+});
+
 // I-10: más formas de no mostrar un aviso exigido. Con cada una, el único aviso de la página no cuenta como mostrado.
 const unshownNotices = notice => ({
   '<details> cerrado (todo menos su <summary>)': `<details><summary>Más</summary><aside><p>${notice}</p></aside></details>`,
