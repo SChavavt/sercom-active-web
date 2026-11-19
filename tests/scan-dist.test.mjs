@@ -871,6 +871,22 @@ test('R-RULE-01: un porcentaje, una talla, una serie o un modelo después de «p
   await assertEachFails('R-RULE-01', ['<p>Precio con IVA 350</p>', '<p>Precio para mayoristas 300</p>', '<p>Precio de mayoreo 300</p>']);
 });
 
+test('R-RULE-01: una cifra más IVA, «c/u» después de una cifra con dos decimales y «precio» con una palabra y «de»', async () => {
+  // Las de la revisión final, que pasaban, y otras escrituras de lo mismo.
+  await assertEachFails('R-RULE-01', [
+    '<p>Casco 350 + IVA</p>', '<p>Guante de nitrilo 25.50 + IVA</p>', '<p>Casco 350 más IVA</p>', '<p>Casco 350 mas IVA</p>', '<p>Casco 350+IVA</p>', '<p>Casco 1,200.00 + iva</p>',
+    '<p>Guante 25.50 c/u</p>', '<p>Lentes 1,250.50 c/u</p>', '<p>Guante 25,50 c/u</p>', '<p>Casco 350 <b>+ IVA</b></p>', '<div data-msg="Casco 350 + IVA"></div>',
+    // La revisión de la ronda 1 lo detectaba (decisión 2).
+    '<p>Precio unitario de 120</p>', '<p>Costo aproximado de 350</p>',
+  ]);
+  for (const content of ['el.textContent="Guante 25.50 + IVA";', 'toast("Lentes 25.50 c/u");']) assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-01'], content);
+  // Un porcentaje con IVA sigue como estaba, y «c/u» después de un entero puede ser una cantidad.
+  await assertNoneFails([
+    '<p>Precio con IVA 16%</p>', '<p>IVA 16%</p>', '<p>16% + IVA</p>', '<p>Cotización con IVA desglosado</p>', '<p>12 pares c/u</p>', '<p>25 c/u</p>', '<p>Guante de nitrilo 25 c/u</p>',
+    '<p>Caja con 12 pares c/u</p>', '<p>Precio unitario de 2026 en adelante: a cotizar</p>', '<p>Precio sugerido de 12 pares: a cotizar</p>', '<p>Precio por talla de 9 a 11</p>',
+  ]);
+});
+
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
   await assertEachFails('R-RULE-10', [
     '<p>Mensaje de WhatsApp enviado</p>', '<p>Tu lista de productos enviada</p>', '<p>Solicitud por WhatsApp enviada</p>', '<p>¡Tu solicitud a Sercom enviada!</p>',
