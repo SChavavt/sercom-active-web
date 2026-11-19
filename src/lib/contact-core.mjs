@@ -14,11 +14,19 @@ const COMMON_FIRST_WORDS = ['Protección', 'Trabajo', 'Ropa', 'Calzado', 'Vial',
 const MAX_DESCRIPTION_LENGTH = 200;
 
 /**
+ * Quita las mitades sueltas de un par sustituto de UTF-16 (por ejemplo, un emoji partido): `encodeURIComponent`
+ * lanza URIError con ellas y el enlace no se podría construir.
+ * @param {string} text
+ * @returns {string}
+ */
+const wellFormed = text => text.replace(/\p{Cs}/gu, '');
+
+/**
  * Texto de una sola línea y sin espacios sobrantes. Un valor ausente es una cadena vacía, nunca «undefined» ni «null».
  * @param {unknown} value
  * @returns {string}
  */
-const clean = value => (value === undefined || value === null ? '' : String(value).replace(/\s+/g, ' ').trim());
+const clean = value => (value === undefined || value === null ? '' : wellFormed(String(value)).replace(/\s+/g, ' ').trim());
 
 /** Línea «Etiqueta: valor». Sin valor queda lista para que el cliente la complete. */
 const field = (/** @type {string} */ label, value = '') => `${label}: ${value}`;
@@ -30,7 +38,7 @@ const field = (/** @type {string} */ label, value = '') => `${label}: ${value}`;
  * @returns {string}
  */
 export function buildWhatsappUrl(digits, text) {
-  const message = text === undefined || text === null ? '' : String(text);
+  const message = text === undefined || text === null ? '' : wellFormed(String(text));
   return message ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}` : `https://wa.me/${digits}`;
 }
 
@@ -42,7 +50,7 @@ export function buildWhatsappUrl(digits, text) {
  */
 export function buildMailtoUrl(email, parts = {}) {
   const subject = clean(parts?.subject);
-  const body = parts?.body === undefined || parts?.body === null ? '' : String(parts.body).replace(/\r\n|\r|\n/g, '\r\n');
+  const body = parts?.body === undefined || parts?.body === null ? '' : wellFormed(String(parts.body)).replace(/\r\n|\r|\n/g, '\r\n');
   const params = [];
   if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
   if (body) params.push(`body=${encodeURIComponent(body)}`);
@@ -117,11 +125,12 @@ function addLinkLine(text, url) {
  * Para el navegador y la compilación: la descripción tal como entra en la línea «Descripción o uso» de una
  * solicitud especial (una sola línea, sin espacios sobrantes, hasta 200 caracteres). Cadena vacía si no hay
  * texto útil. Sirve para mostrar en la página exactamente lo que se agregó al borrador.
+ * Cuenta caracteres completos (puntos de código), no unidades de UTF-16: el recorte nunca parte un emoji.
  * @param {unknown} description
  * @returns {string}
  */
 export function requestDescription(description) {
-  return clean(description).slice(0, MAX_DESCRIPTION_LENGTH).trim();
+  return Array.from(clean(description)).slice(0, MAX_DESCRIPTION_LENGTH).join('').trim();
 }
 
 /**
