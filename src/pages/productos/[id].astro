@@ -4,12 +4,14 @@
 //   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
 //      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
 //      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular),
-//      filas de datos (marca, código, unidad de venta), resumen, «Características», «Variantes»,
-//      «Documentación», el aviso de disponibilidad y las dos acciones de cotizar. Un bloque sin datos no se
-//      imprime. En tableta y celular las dos partes se apilan, la imagen primero y baja.
+//      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
+//      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
+//      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
+//      dos partes se apilan, la imagen primero y baja.
 //   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
 //   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
-// Paso 2: «Agregar a mi cotización» irá bajo las dos acciones; hoy no se imprime nada para él.
+// Paso 2: «Agregar a mi cotización» irá bajo las dos acciones de cotizar, antes del aviso de disponibilidad;
+// hoy no se imprime nada para él.
 // Las variantes son información, no controles (la elección de variante llega en el paso 2).
 // Textos: brief 6.4 y brief de la ficha. Estilos: src/styles/pages/producto.css.
 import type { GetStaticPaths } from 'astro';
@@ -122,6 +124,13 @@ const moreOdd = more.items.length % 2 === 1;
 
       {product.summary && <div class="producto__summary cell"><p>{product.summary}</p></div>}
 
+      <div class="producto__actions">
+        <ActionRow href={quote.whatsapp} primary icon="whatsapp" data-page-link={pageLink}>Cotizar este producto</ActionRow>
+        <ActionRow href={quote.mailto} icon="mail" data-page-link={pageLink}>Cotizar por correo</ActionRow>
+      </div>
+
+      <Note class="producto__note">Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</Note>
+
       {product.characteristics.length > 0 && (
         <section class="producto__part" aria-labelledby="caracteristicas-title">
           <h2 class="producto__part-title t-h3" id="caracteristicas-title">Características</h2>
@@ -175,13 +184,6 @@ const moreOdd = more.items.length % 2 === 1;
           )}
         </ul>
       </section>
-
-      <Note class="producto__note">Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</Note>
-
-      <div class="producto__actions">
-        <ActionRow href={quote.whatsapp} primary icon="whatsapp" data-page-link={pageLink}>Cotizar este producto</ActionRow>
-        <ActionRow href={quote.mailto} icon="mail" data-page-link={pageLink}>Cotizar por correo</ActionRow>
-      </div>
     </div>
   </section>
 
