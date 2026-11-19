@@ -22,7 +22,7 @@ El propietario aprobó cuatro pasos el 18 de noviembre de 2026, con la indicaci�
 
 ## Paso 4. Publicación y QR
 
-**Entrega.** Alojamiento creado en una cuenta del propietario o de Sercom (propuesta: Cloudflare Pages en su plan gratuito); dirección estable de producción; retiro de `noindex`, del `robots.txt` bloqueante y del aviso de sitio en preparación; `SITE_URL`, sitemap y metadatos para compartir; el QR en SVG y PNG, una guía breve y la hoja de seguimiento comercial que pide el plan. La lista completa está en [`publicacion.md`](publicacion.md#4-lista-de-lanzamiento).
+**Entrega.** Alojamiento creado en una cuenta del propietario o de Sercom (propuesta: Cloudflare Pages en su plan gratuito); dirección estable de producción; retiro en producción de `noindex`, del `robots.txt` bloqueante y del aviso de sitio en preparación, después de decidir qué pasa con la vista previa, que comparte los dos primeros; `SITE_URL`, sitemap y metadatos para compartir; el QR en SVG y PNG, una guía breve y la hoja de seguimiento comercial que pide el plan. La lista completa está en [`publicacion.md`](publicacion.md#4-lista-de-lanzamiento).
 
 **Se acepta cuando** las confirmaciones del negocio que bloquean la publicación están resueltas, el escáner pasa con `--launch`, los contactos se probaron en un teléfono real, el sitio se revisó en computadora, tableta y celular, está documentado cómo volver a una versión anterior y el QR impreso en tamaño real abre el sitio en varios teléfonos.
 
@@ -45,7 +45,7 @@ Notas anteriores usan las «entregas» 0 a 5 de la versión anterior de este doc
 
 ## Lo que el negocio todavía debe aportar
 
-La lista al día, con lo que bloquea cada punto, está en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio). En resumen:
+La lista al día, con quién responde y lo que bloquea cada punto, está en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio). En resumen:
 
 - La revisión del paso 1 y la aprobación de todos los textos del sitio por el contacto comercial, incluido el aviso de privacidad.
 - La prueba del número de WhatsApp en un teléfono real.

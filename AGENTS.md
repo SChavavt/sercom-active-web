@@ -32,7 +32,7 @@ Las consultas de proveedores son trabajos separados de las visitas del cliente. 
 
 ## Desarrollo
 
-Usar npm y Node.js 24; mantener el lockfile. Antes de proponer cualquier cambio de datos o de código, ejecutar `npm run check`, `npm test` y `npm run verify`; los tres deben pasar. Las pruebas deben cubrir riesgos del flujo, no replicar detalles del diseño. Las comprobaciones no reemplazan la revisión visual y funcional en el navegador.
+Usar npm y Node.js 24; mantener el lockfile. Antes de proponer cualquier cambio de datos o de código, ejecutar `npm run check`, `npm test` y `npm run verify`; los tres deben pasar. Las pruebas deben cubrir riesgos del flujo, no replicar detalles del diseño. Varias fijan los datos de hoy (19 marcas, ningún producto real, categorías en borrador, el contacto, las órdenes de `verify` y `vercel.json`): qué pruebas cambian con cada cambio de datos está en `docs/datos-y-modos.md` (6.2). Las comprobaciones no reemplazan la revisión visual y funcional en el navegador.
 
 Ningún control que no haga nada: todo lo que se ve funciona, y lo que corresponde a un paso posterior no se dibuja. Sin JavaScript cada página sigue siendo usable. Un script del navegador no importa `site-data.mjs`, `contact.mjs` ni archivos `.json`.
 
@@ -42,7 +42,7 @@ El contacto abre WhatsApp o correo; abrir una aplicación no prueba que el mensa
 
 No modificar `sercomactive.com` ni otros repositorios o proyectos del usuario. El permiso actual cubre preparar el repositorio y planear la infraestructura. No comprar dominio, contratar planes ni crear cuentas para obtener cuotas. Mantener un estado revisable antes de la publicación comercial. Generar el QR definitivo solo con una URL pública estable probada.
 
-El sitio está en desarrollo: cada página lleva `noindex`, `robots.txt` bloquea el rastreo y producción muestra el aviso de sitio en preparación. `noindex` no restringe el acceso. Al preparar el lanzamiento se revisa el contenido comercial, se prueban los contactos, se define la URL y se retiran deliberadamente los bloqueos y el aviso (`docs/publicacion.md`).
+El sitio está en desarrollo: cada página lleva `noindex`, `robots.txt` bloquea el rastreo y producción muestra el aviso de sitio en preparación. `noindex` no restringe el acceso. Al preparar el lanzamiento se revisa el contenido comercial, se prueban los contactos, se define la URL y se retiran deliberadamente de producción los bloqueos y el aviso; el `noindex` y el `robots.txt` son comunes a las dos compilaciones, así que antes hay que decidir qué pasa con ellos en la vista previa (`docs/publicacion.md`).
 
 El repositorio es público por decisión del propietario. El plan y la investigación se incorporaron con su confirmación; no agregar secretos, documentos de clientes ni datos comerciales confidenciales.
 

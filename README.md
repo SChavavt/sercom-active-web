@@ -38,7 +38,7 @@ Se necesita Node.js 24 y npm. Las versiones están fijadas en `package-lock.json
 | `npm test` | Ejecuta las pruebas automáticas. |
 | `npm run build` | Genera la versión de producción en `dist/`. |
 | `npm run build:preview` | Genera la vista previa con ejemplos en `dist-preview/`. |
-| `npm run preview` | Sirve localmente `dist/` ya generada. |
+| `npm run preview` | Sirve localmente `dist/` ya generada. Solo corre uno a la vez; se detiene con Ctrl+C o, si quedó en segundo plano (al ejecutarlo sin terminal), con `npx astro preview stop`. |
 | `npm run verify` | Genera las dos versiones y revisa en ambas las reglas del sitio, los enlaces y el marcado. |
 | `npm run scan:dist`, `npm run check:links`, `npm run check:markup` | Cada revisión por separado sobre `dist/`. |
 
@@ -46,7 +46,7 @@ Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verif
 
 ## Las dos versiones del sitio
 
-Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. **Producción** (`npm run build`) es la que se publicará: solo muestra categorías y productos aprobados, hoy ninguno, y hasta el lanzamiento lleva en cada página el aviso «Sitio en preparación · Versión inicial para revisión». **Vista previa** (`npm run build:preview` o `npm run dev`) sirve para revisar el diseño: muestra las diez categorías y productos de ejemplo, con su propio aviso y la etiqueta «Ejemplo»; nunca se publica ni es la dirección del QR. La vista previa nunca aparece en buscadores, y producción tampoco hasta el lanzamiento. Guía completa: [`docs/datos-y-modos.md`](docs/datos-y-modos.md).
+Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. **Producción** (`npm run build`) es la que se publicará: solo muestra categorías y productos aprobados, hoy ninguno, y hasta el lanzamiento lleva en cada página el aviso «Sitio en preparación · Versión inicial para revisión». **Vista previa** (`npm run build:preview` o `npm run dev`) sirve para revisar el diseño: muestra las diez categorías y productos de ejemplo, con su propio aviso y la etiqueta «Ejemplo»; nunca se publica ni es la dirección del QR. Hoy ninguna de las dos se deja indexar por buscadores como Google; producción lo hará a partir del lanzamiento. Que la vista previa siga sin indexarse después del lanzamiento requiere un ajuste técnico que todavía está pendiente ([`docs/publicacion.md`](docs/publicacion.md#4-lista-de-lanzamiento)). Guía completa: [`docs/datos-y-modos.md`](docs/datos-y-modos.md).
 
 ## Archivos principales
 
