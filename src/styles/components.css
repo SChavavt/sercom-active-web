@@ -331,6 +331,7 @@
   height: 56px;
   background: var(--blue);
   color: var(--white);
+  pointer-events: none;                 /* decorativa: el clic pasa al enlace de la tarjeta que está debajo */
   transition: background-color var(--ease);
 }
 .entry__go .icon { transition: transform var(--ease); }
