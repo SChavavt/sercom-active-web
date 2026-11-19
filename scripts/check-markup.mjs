@@ -6,8 +6,8 @@
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
-//   --preview   la compilación es la vista previa de diseño: hay productos y categorías, así que la cabecera debe
-//               tener el campo de búsqueda con su botón Buscar y la entrada «Categorías»
+//   --preview   la compilación es la vista previa de diseño: hay productos, así que la cabecera debe tener el campo
+//               de búsqueda (#buscador) con su botón Buscar
 //
 // Cada comprobación vive en CHECKS con su identificador (el del hallazgo de la revisión que la originó). Una
 // comprobación recibe cada página ya leída (árbol de elementos, ruta publicada) y cada hoja de estilo, y devuelve

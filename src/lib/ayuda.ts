@@ -2,8 +2,9 @@
 // SOLO PARA COMPILACIÓN (frontmatter de archivos .astro).
 //   - `faqs`: las cinco preguntas frecuentes (brief 6.2, punto 9; textos de la p. 11 del plan, tal cual).
 //     Las usan la portada y la página de contacto con el componente Faq.
-//   - `helpEntries`: las tres formas de pedir ayuda (brief 6.2, punto 2), para EntryCard. Las usan la página
-//     de contacto y la página 404. `helpEntry('quoteList')` devuelve una sola.
+//   - `helpEntries`: las tres formas de pedir ayuda (brief 6.2, punto 2), para EntryCard. Las usan la portada
+//     y la página 404, en este orden. `helpEntry('quoteList')` devuelve una sola: la página de contacto las
+//     toma así, una por una, en su propio orden.
 // No llevan nombres, números ni correos: los datos de contacto salen de `contact.mjs`.
 import type { IconName } from './icons.ts';
 import { routes } from './routes.mjs';

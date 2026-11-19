@@ -66,7 +66,7 @@ test('«npm run verify» compila los dos modos y revisa las dos salidas', () => 
     'node scripts/scan-dist.mjs dist-preview --preview',
     'node scripts/check-links.mjs dist',
     'node scripts/check-links.mjs dist-preview',
-    // El marcado se revisa en los dos modos: la vista previa exige además la búsqueda y las categorías de la cabecera.
+    // El marcado se revisa en los dos modos: la vista previa exige además la búsqueda de la cabecera (#buscador).
     'node scripts/check-markup.mjs dist',
     'node scripts/check-markup.mjs dist-preview --preview',
   ]);

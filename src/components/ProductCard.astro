@@ -10,8 +10,8 @@
 // para quien lea el texto de la página.
 // Abrir WhatsApp no es un envío: ninguna página muestra confirmaciones.
 // Mientras el sitio no tenga dirección pública (SITE_URL), el mensaje se arma sin la línea «Enlace» y el
-// script compartido PageLinkScript la agrega al hacer clic, con la dirección de la ficha en el sitio donde se
-// está viendo (la ficha de producto usa el mismo script para sus enlaces).
+// script compartido PageLinkScript la agrega al cargar la página, con la dirección de la ficha en el sitio donde
+// se está viendo (la ficha de producto usa el mismo script para sus enlaces).
 import type { PublicProduct } from '../types/site.ts';
 import { absoluteUrl, contactLinks } from '../lib/contact.mjs';
 import { EXAMPLE_TAG } from '../lib/site-data.mjs';
