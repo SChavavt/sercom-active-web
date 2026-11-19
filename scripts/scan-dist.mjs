@@ -5,7 +5,8 @@
 //   carpeta       carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
 //   --preview     la compilación es la vista previa de diseño: los ejemplos se permiten, pero cada página
 //                 debe llevar el aviso de vista previa y cada ejemplo su etiqueta «Ejemplo»
-//   --launch      la compilación es la versión pública aprobada: `noindex` y el bloqueo de robots.txt deben haberse retirado
+//   --launch      la compilación es la versión pública aprobada: `noindex`, el bloqueo de robots.txt y el aviso
+//                 «Sitio en preparación» deben haberse retirado (R-PUB-03)
 //   --in-person   la atención presencial fue confirmada: se permiten dirección, «Visítanos» y mapa
 //   --strict      un WARN también hace fallar la revisión. `npm run verify` y el alojamiento lo usan para la
 //                 compilación de producción: en la etapa 1 la lista de normas y certificaciones debe estar vacía

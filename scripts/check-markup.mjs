@@ -13,7 +13,8 @@
 // comprobación recibe cada página ya leída (árbol de elementos, ruta publicada) y cada hoja de estilo, y devuelve
 // mensajes; agregar otra es agregar una entrada a CHECKS.
 //
-// Qué no revisa: el resultado visual (anchos, solapes, foco, colores). Eso lo prueban las pruebas con navegador.
+// Qué no revisa: el resultado visual (anchos, solapes, foco, colores). Eso se revisa a mano en un navegador
+// (docs/diseno.md, sección 15): el repositorio no tiene pruebas con navegador.
 //
 // Termina con código 1 si encuentra problemas y con 2 si la carpeta no existe o no tiene páginas HTML.
 import { readdir, readFile } from 'node:fs/promises';

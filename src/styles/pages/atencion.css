@@ -4,7 +4,8 @@
    Lo importan esas páginas y los dos componentes (Vite lo incluye una sola vez).
    Mismas reglas que la hoja global: celdas blancas sobre la lámina azul, filetes por huecos de 1 px,
    dentro de una celda solo el filete suave; solo variables de tokens.css y fonts.css.
-   Puntos de corte: 1099 (tableta) y 699 (celular), con max-width.
+   Puntos de corte: 1099 (tableta) y 699 (celular), con max-width; 1100 con min-width (computadora, notas de la
+   solicitud especial) y 1359 con max-width (el número de la 404).
    ========================================================================== */
 
 /* --- Registro numerado (ItemRegister) ------------------------------------- */
