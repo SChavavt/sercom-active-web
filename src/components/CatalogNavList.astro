@@ -39,13 +39,15 @@ const late = items.slice(cut).filter(item => item.current);
 const visible = [...items.slice(0, cut), ...late];
 const rest = items.slice(cut).filter(item => !item.current);
 /** Nombre de una fila con productos: «{nombre}, {n productos}». Leído de su contenido, el navegador pone un espacio
- * entre el nombre y el número oculto («Protección de manos , 1 producto»). Sin productos, el nombre es su texto. */
+ * entre el nombre y el número oculto («Protección de manos , 1 producto»). Sin productos, el nombre es su texto.
+ * Entre el nombre y el número va un espacio (la fila es flex: no se dibuja) para que el texto que se ve se lea
+ * «Protección de manos 1» y no «Protección de manos1», y siga contenido en el nombre (WCAG 2.5.3). */
 const rowLabel = (item: CatalogNavItem) => (item.count > 0 ? `${item.label}, ${resultSummary(item.count)}` : undefined);
 ---
 {visible.length > 0 && (
   <ul class="catalog-nav__list">
     {visible.map(item => (
-      <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+      <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && ' '}{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
     ))}
   </ul>
 )}
@@ -54,7 +56,7 @@ const rowLabel = (item: CatalogNavItem) => (item.count > 0 ? `${item.label}, ${r
     <summary class="catalog-nav__toggle"><span class="catalog-nav__toggle-more">{moreLabel}</span><span class="catalog-nav__toggle-less">{lessLabel}</span><Icon name="chevron-down" class="icon--18" /></summary>
     <ul class="catalog-nav__list">
       {rest.map(item => (
-        <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+        <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && ' '}{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
       ))}
     </ul>
   </details>
