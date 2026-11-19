@@ -63,7 +63,7 @@ Ningún punto se hace antes de que el propietario apruebe publicar.
 
 1. El `<meta name="robots" content="noindex, nofollow" />` de `src/layouts/BaseLayout.astro`, con el comentario que lo precede, según la salida elegida arriba. `noindex` no hace privado un sitio: cualquiera con la dirección puede abrirlo.
 2. El bloqueo de `public/robots.txt` (`User-agent: *` / `Disallow: /`): reemplazarlo por uno que permita el rastreo y nombre el sitemap, según la salida elegida arriba.
-3. El aviso de sitio en preparación: la línea `{!isPreview && <SiteNotice kind="development" />}` de `src/layouts/BaseLayout.astro`, con su comentario. La vista previa conserva su propio aviso.
+3. El aviso de sitio en preparación: la línea `{!isPreview && <SiteNotice kind="development" />}` de `src/layouts/BaseLayout.astro`, con su comentario. El aviso se quita del marcado; esconderlo no basta (`hidden`, `aria-hidden`, `display:none`, un `<template>`, un `<details>` cerrado o una regla de estilo): con `--launch` el escáner lo busca en todo el texto de los elementos, oculto o no, y lo sigue encontrando (R-PUB-03). La vista previa conserva su propio aviso.
 
 **Agregar:**
 
@@ -71,7 +71,7 @@ Ningún punto se hace antes de que el propietario apruebe publicar.
 2. Un sitemap (hoy no existe: antes del lanzamiento el escáner lo prohíbe).
 3. Metadatos para compartir (título, descripción e imagen para redes y mensajería). Hoy no existen.
 
-**Cambiar las comprobaciones:** agregar `--launch` al escáner de producción en `npm run verify` (`package.json`), en `vercel.json` y en la orden de compilación del alojamiento (`node scripts/scan-dist.mjs dist --strict --launch`). Sin `--launch` el escáner exige el `noindex`, el `robots.txt` bloqueante y el aviso (R-RULE-12); con `--launch` exige lo contrario y falla mientras quede cualquiera de los tres (R-PUB-03). Revisar entonces también `--strict` si ya hay normas con fuente (paso 3). En el mismo cambio se actualizan las dos pruebas de `tests/build-mode.test.mjs` que fijan la orden de `npm run verify` y el `buildCommand` de `vercel.json` ([`datos-y-modos.md`](datos-y-modos.md#62-pruebas)); si no, `npm test` falla.
+**Cambiar las comprobaciones:** agregar `--launch` al escáner de producción en `npm run verify` (`package.json`), en `vercel.json` y en la orden de compilación del alojamiento (`node scripts/scan-dist.mjs dist --strict --launch`). Sin `--launch` el escáner exige el `noindex`, el `robots.txt` bloqueante y el aviso (R-RULE-12); con `--launch` exige lo contrario y falla mientras quede cualquiera de los tres, el aviso también oculto (R-PUB-03). Revisar entonces también `--strict` si ya hay normas con fuente (paso 3). En el mismo cambio se actualizan las dos pruebas de `tests/build-mode.test.mjs` que fijan la orden de `npm run verify` y el `buildCommand` de `vercel.json` ([`datos-y-modos.md`](datos-y-modos.md#62-pruebas)); si no, `npm test` falla.
 
 **Probar:** compilar con `SITE_URL`, ejecutar las comprobaciones, revisar el sitio en computadora, tableta y celular, abrir un borrador de WhatsApp y uno de correo desde un teléfono real y confirmar que llegan a la persona de contacto. Documentar en `ESTADO.md` cómo volver a la versión anterior en el alojamiento elegido.
 
