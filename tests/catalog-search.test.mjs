@@ -104,3 +104,19 @@ test('una búsqueda que no muestra nada es la misma en el catálogo y en la soli
     assert.deepEqual(resultSummaryParts(10, query), { lead: '10 productos', term: '', end: '' });
   }
 });
+
+test('un relleno del hangul pegado a una palabra no se muestra: la línea de resultados dice la palabra que se buscó', () => {
+  for (const filler of ['ᅟ', 'ᅠ', 'ㅤ', 'ﾠ']) {
+    const code = `U+${filler.codePointAt(0).toString(16).toUpperCase()}`;
+    for (const query of [`cas${filler}co`, `${filler}casco`, `casco${filler}`]) {
+      assert.equal(displayQuery(query), 'casco', `${code} ${JSON.stringify(query)}`);
+      assert.equal(isActiveQuery(query), true, code);
+      assert.deepEqual(resultSummaryParts(1, query), { lead: '1 resultado para “', term: 'casco', end: '”' }, code);
+      assert.equal(resultSummary(1, query), '1 resultado para “casco”', code);
+    }
+    // Solo no es una búsqueda.
+    assert.equal(displayQuery(filler), '', code);
+    assert.equal(isActiveQuery(filler), false, code);
+    assert.equal(resultSummary(10, filler), '10 productos', code);
+  }
+});

@@ -115,7 +115,7 @@ test('árabe, hebreo, persa con U+200C, un emoji con U+200D y una bandera con ca
   assert.equal(matchesQuery(guante, '🏴󠁧󠁢󠁳󠁣󠁴󠁿 guante'), true);
 });
 
-test('los rellenos del hangul (U+3164, U+115F, U+1160, U+FFA0) solos son una consulta vacía; junto a texto visible se conservan', () => {
+test('los rellenos del hangul (U+3164, U+115F, U+1160, U+FFA0) solos son una consulta vacía; junto a texto visible se quitan sin dejar espacio', () => {
   for (const filler of FILLERS) {
     const code = hex(filler);
     for (const query of [filler, `${filler}${filler}`, ` ${filler} ${filler} `, `${filler}‍`, `‮${filler}\u0000`]) {
@@ -125,10 +125,10 @@ test('los rellenos del hangul (U+3164, U+115F, U+1160, U+FFA0) solos son una con
       assert.equal(resultSummary(10, query), '10 productos', code);
       assert.equal(requestDescription(query), '', code);
     }
-    // Junto a texto visible no se quitan: el coreano puede necesitarlos.
-    assert.equal(cleanQuery(`한${filler}글`), `한${filler}글`, code);
-    assert.equal(cleanQuery(`guante ${filler}`), `guante ${filler}`, code);
-    assert.equal(requestDescription(`${filler}casco`), `${filler}casco`, code);
+    // Junto a texto visible se quitan sin dejar espacio, como los otros invisibles: no dibujan nada.
+    assert.equal(cleanQuery(`한${filler}글`), '한글', code);
+    assert.equal(cleanQuery(`guante ${filler}`), 'guante', code);
+    assert.equal(requestDescription(`${filler}casco`), 'casco', code);
     // Una palabra hecha solo de rellenos no se busca: no se ve.
     assert.deepEqual(queryTokens(`guante ${filler}`), ['guante'], code);
     assert.equal(matchesQuery(guante, `guante ${filler}`), true, code);
@@ -144,5 +144,5 @@ test('el límite de 200 caracteres de los borradores cuenta caracteres completos
   assert.equal(requestDescription('a​'.repeat(300)), 'a'.repeat(200));
   assert.equal(requestDescription(`${'­'.repeat(400)}${'b'.repeat(250)}`), 'b'.repeat(200));
   assert.equal(requestDescription('🧤⁠'.repeat(300)), '🧤'.repeat(200));
-  assert.equal(Array.from(requestDescription('한ㅤ'.repeat(150))).length, 200);
+  assert.equal(requestDescription('한ㅤ'.repeat(300)), '한'.repeat(200));
 });

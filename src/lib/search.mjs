@@ -11,8 +11,8 @@ import { cleanQuery, normalizeCode, normalizeText } from './text.mjs';
 /** Nombre del parámetro de la URL que lleva la consulta: `/catalogo/?q=...`. */
 export const SEARCH_PARAM = 'q';
 
-// Una letra o una cifra que se ve: los rellenos del hangul (U+3164, U+115F, U+1160, U+FFA0) son letras que se ignoran
-// por omisión (\p{DI}) y no dibujan nada.
+// Una letra o una cifra que se ve: no cuenta una de las que se ignoran por omisión (\p{DI}), que no dibujan nada. Los
+// rellenos del hangul (U+115F, U+1160, U+3164, U+FFA0), que lo son, ya los quita `cleanQuery` sin dejar espacio.
 const SEARCHABLE = /(?!\p{DI})[\p{L}\p{N}]/u;
 
 /**
@@ -87,7 +87,8 @@ export function filterProducts(products, query) {
  * Consulta tal como se muestra en la página (`cleanQuery`): sin espacios al inicio o al final y con un solo
  * espacio entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
  * Quita sin dejar espacio los caracteres sin ancho: los de dirección (U+202E invertiría las palabras del sitio que
- * siguen al término), los invisibles y el guion suave, así «gu<U+200B>ante» se muestra y se busca «guante».
+ * siguen al término), los invisibles, el guion suave y los rellenos del hangul (U+115F, U+1160, U+3164, U+FFA0), así
+ * «gu<U+200B>ante» y «cas<U+115F>co» se muestran y se buscan «guante» y «casco».
  * Cambia por un espacio el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
  * (`?q=%E0%A4%A` → «�%A» → «%A»), los controles y las mitades sueltas de un par sustituto (`encodeURIComponent` no
  * las acepta). Una consulta sin nada visible queda vacía.

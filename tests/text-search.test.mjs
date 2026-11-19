@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterProducts, matchesQuery, matchesSearchText, queryTokens, SEARCH_PARAM, searchText } from '../src/lib/search.mjs';
+import { requestDescription } from '../src/lib/contact-core.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
 import { cleanQuery, normalizeCode, normalizeText } from '../src/lib/text.mjs';
 import { loadProjectData } from './helpers.mjs';
@@ -212,4 +213,34 @@ test('cleanQuery deja vacía una consulta sin ninguna letra, cifra, símbolo ni 
   assert.equal(cleanQuery('co\u00ADllar'), 'collar');
   // Un signo o un símbolo solos sí se ven: se muestran como los escribió la persona.
   for (const text of ['-', '¿?', '#', '$', '·', '❤️', '🇲🇽', '1️⃣']) assert.equal(cleanQuery(text), text, text);
+});
+
+// Rellenos del hangul: letras para Unicode (\p{Lo}) que no dibujan nada. Se quitan sin dejar espacio, como los otros
+// invisibles: pegado a una palabra, el relleno no puede hacer que la línea de resultados muestre una palabra que la
+// búsqueda no busca (?q=cas%E1%85%9Fco y ?q=%E3%85%A4casco).
+const HANGUL_FILLERS = ['ᅟ', 'ᅠ', 'ㅤ', 'ﾠ'];
+test('cleanQuery quita sin dejar espacio los rellenos del hangul U+115F, U+1160, U+3164 y U+FFA0', () => {
+  const casco = exampleProducts.find(product => product.code === 'EJ-3001');
+  assert.ok(casco && /^Casco\b/.test(casco.name));
+  for (const filler of HANGUL_FILLERS) {
+    const code = `U+${filler.codePointAt(0).toString(16).toUpperCase()}`;
+    for (const [where, query] of [['dentro', `cas${filler}co`], ['antes', `${filler}casco`], ['después', `casco${filler}`]]) {
+      const label = `${code} ${where} de la palabra`;
+      assert.equal(cleanQuery(query), 'casco', label);
+      assert.deepEqual(queryTokens(query), ['casco'], label);
+      assert.equal(matchesQuery(casco, query), true, label);
+      assert.equal(matchesSearchText(searchText(casco), query), true, label);
+      assert.deepEqual(codes(exampleProducts, query), ['EJ-3001'], label);
+      assert.equal(requestDescription(query), 'casco', label);
+    }
+    // Solo, o solo con otros caracteres que no se ven: consulta vacía.
+    for (const query of [filler, `${filler}${filler}`, ` ${filler} ${filler} `, `${filler}‍`]) {
+      assert.equal(cleanQuery(query), '', `${code} ${JSON.stringify(query)}`);
+      assert.deepEqual(queryTokens(query), [], code);
+      assert.equal(codes(exampleProducts, query).length, exampleProducts.length, code);
+      assert.equal(requestDescription(query), '', code);
+    }
+  }
+  // La prueba de lo visible sigue sin contar lo que se ignora por omisión: solo selectores de variante es vacía.
+  assert.equal(cleanQuery('️︎\u{E0100}'), '');
 });
