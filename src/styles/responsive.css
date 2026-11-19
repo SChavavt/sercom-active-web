@@ -105,6 +105,14 @@
   .masthead__search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
   .masthead__search-field { font-size: 1rem; }
   .masthead__search-btn { width: 48px; height: 48px; }
+  /* Texto de ayuda en dos líneas (.is-long: con la letra agrandada el placeholder no cabe): el panel crece con él en
+     lugar de dejarlo salir por arriba y por abajo de sus 64 px. La copia deja de flotar sobre el campo y comparte su
+     casilla con él (el campo la cubre entera y sigue recibiendo el clic), así su alto cuenta. Sin .is-long, nada cambia. */
+  .masthead__search:has(.is-long) { height: auto; min-height: 64px; padding-block: var(--s-2); }
+  .masthead__search-field.is-long { display: grid; }
+  .masthead__search-field.is-long > * { grid-area: 1 / 1; }
+  .masthead__search-field.is-long .masthead__search-input { height: auto; min-height: 44px; }
+  .masthead__search-field.is-long .masthead__search-hint { position: static; }
 
   /* sin JavaScript nada queda escondido detrás de un botón */
   html:not(.js) .site-header { position: static; }
