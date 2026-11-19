@@ -503,6 +503,7 @@ export const CHECKS = [
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…; la palabra cuenta en cualquier lugar del nombre: «textcolor», «MAINCOLOR», «navbg», «darktheme»; salvo «tema», que cuenta solo al principio del nombre o de una de sus partes, después de «_», «-» o «$» o en camelCase: «temaOscuro», «tema_claro», «miTema»; no dentro de otra palabra, como «sistema», ni en «temas», que son asuntos, ni en «temática», «temático» o «temario», que son otras palabras; pegado a otra palabra sí cuenta: «temaoscuro»), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
+  ['R-PUB-04', 'La página 404 (404.html de la raíz) nunca declara <link rel="canonical">: el servidor la entrega en cualquier dirección desconocida y /404/ no es una página. Las demás páginas llevan su dirección canónica solo cuando se compila con SITE_URL.'],
   ['R-COPY-15', 'El <title> de la portada (index.html de la raíz) es la denominación provisional: el nombre de src/data/business.json, « · » y su titleLabel («Sercom Active · Atención en Puebla»). Las páginas interiores llevan «<Página> · Sercom Active» y la etiqueta «Atención comercial en Puebla» sigue en el encabezado, el pie y las descripciones.'],
   ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
   ['R-A11Y-06', 'Los enlaces y botones tienen texto o aria-label (WARN).'],
@@ -944,6 +945,13 @@ export async function scanDist(directory, options = {}) {
     const noindex = [...markup.matchAll(/<meta\b[^>]*>/gi)].some(match => /^robots$/i.test(attribute(match[0], 'name') ?? '') && /\bnoindex\b/i.test(attribute(match[0], 'content') ?? ''));
     if (!launch && !noindex) add('FAIL', 'R-RULE-12', file, 'falta <meta name="robots" content="noindex, nofollow"> antes del lanzamiento');
     if (launch && noindex) add('FAIL', 'R-PUB-03', file, 'noindex sigue presente en la versión de lanzamiento');
+
+    // R-PUB-04: la página 404 no tiene dirección canónica (se entrega en cualquier dirección desconocida).
+    if (path === '404.html') {
+      for (const match of markup.matchAll(/<link\b[^>]*>/gi)) {
+        if ((attribute(match[0], 'rel') ?? '').toLowerCase().split(/\s+/).includes('canonical')) add('FAIL', 'R-PUB-04', file, `la página 404 declara una dirección canónica: ${match[0].slice(0, 100)}`);
+      }
+    }
 
     // R-COPY-15: el título de la portada es la denominación provisional (nombre y titleLabel de business.json).
     if (path === 'index.html') {

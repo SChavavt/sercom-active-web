@@ -4,7 +4,7 @@
 // Una fila: el número 404 en el estilo de los pasos (decorativo, oculto a los lectores de pantalla) en
 // 4 columnas y, en 8, el antetítulo, el H1, la explicación y dos filas de acción. Debajo, la placa de
 // categorías si hay categorías públicas (vista previa) o, si no hay (producción hoy), las tres entradas.
-// Textos: brief de páginas «atencion», sección 5.
+// Textos: brief de páginas «atencion», sección 5. Sin dirección canónica (canonical={false}): /404/ no es una página.
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ActionRow from '../components/ActionRow.astro';
 import CategoryPlate from '../components/CategoryPlate.astro';
@@ -15,7 +15,7 @@ import '../styles/pages/atencion.css';
 
 const hasCategories = categories.length > 0;
 ---
-<BaseLayout title="Página no encontrada" description="La página que buscas no existe o cambió de dirección.">
+<BaseLayout title="Página no encontrada" description="La página que buscas no existe o cambió de dirección." canonical={false}>
   <section class="section" aria-labelledby="titulo">
     <div class="nf__row grid12">
       <p class="nf__num cell span-4 span-sm-12" aria-hidden="true">404</p>

@@ -817,6 +817,26 @@ test('R-COPY-15: el título de la portada es el nombre del negocio, « · » y t
   assert.ok(failedIds(await scan({}, { data: data2 })).includes('R-COPY-15'));
 });
 
+test('R-PUB-04: la página 404 nunca declara una dirección canónica', async () => {
+  const canonical = '<link rel="canonical" href="https://sitio.example/404/">';
+  for (const options of [{}, { preview: true }]) {
+    const make = head => (options.preview ? previewPage('<h1>No encontramos esta página.</h1>', { head, title: 'Página no encontrada · Sercom Active' }) : page('<h1>No encontramos esta página.</h1>', { head, title: 'Página no encontrada · Sercom Active' }));
+    const home = options.preview ? { 'index.html': previewPage() } : {};
+    assert.deepEqual(failures(await scan({ ...home, '404.html': make('') }, options)), [], JSON.stringify(options));
+    for (const head of [canonical, "<link href='https://sitio.example/' rel='CANONICAL'>", '<link rel="alternate canonical" href="/">', '<link rel=canonical href=/404/>']) {
+      const result = await scan({ ...home, '404.html': make(head) }, options);
+      assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-PUB-04', '404.html']], head);
+    }
+    // En un comentario no es una declaración.
+    assert.deepEqual(failures(await scan({ ...home, '404.html': make(`<!-- ${canonical} -->`) }, options)), []);
+  }
+  // Las demás páginas sí la llevan cuando se compila con SITE_URL.
+  assert.deepEqual(failures(await scan({
+    'index.html': page('<h1>Inicio</h1>', { head: '<link rel="canonical" href="https://sitio.example/">' }),
+    'contacto/index.html': page('<h1>Contacto</h1>', { head: '<link rel="canonical" href="https://sitio.example/contacto/">' }),
+  })), []);
+});
+
 test('cada regla está documentada y conserva su identificador', () => {
   for (const rule of RULES) {
     assert.match(rule.id, /^R-[A-Z0-9]+-\d{2}$/);
@@ -824,7 +844,7 @@ test('cada regla está documentada y conserva su identificador', () => {
     assert.ok(['text', 'joined', 'words', 'prose', 'raw', 'norm'].includes(rule.scope), rule.id);
   }
   const documented = new Set([...RULES.map(rule => rule.id), ...CHECKS.map(([id]) => id)]);
-  for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17', 'R-COPY-15']) {
+  for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17', 'R-COPY-15', 'R-PUB-04']) {
     assert.ok(documented.has(id), id);
   }
   for (const [, doc] of CHECKS) assert.ok(doc.length > 30);

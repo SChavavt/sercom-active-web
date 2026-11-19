@@ -1,8 +1,8 @@
 ---
 // Plantilla de todas las páginas: <head> común (idioma es-MX, título, descripción, noindex, canónica solo
-// si se conoce la dirección del sitio, iconos, precarga de la fuente), enlace «Saltar al contenido», aviso de
-// vista previa (solo en esa compilación), la lámina con encabezado, <main id="contenido"> y pie, y la
-// barra fija del celular. Importa la hoja global una sola vez.
+// si se conoce la dirección del sitio y nunca en la 404, iconos, precarga de la fuente), enlace «Saltar al
+// contenido», aviso de vista previa (solo en esa compilación), la lámina con encabezado, <main id="contenido">
+// y pie, y la barra fija del celular. Importa la hoja global una sola vez.
 //
 // Uso:  <BaseLayout title="Catálogo" description="…"> …bloques de la página… </BaseLayout>
 // El contenido va directo dentro de <main>: cada bloque es una fila de la lámina (ver docs/diseno.md).
@@ -21,15 +21,19 @@ interface Props {
   title?: string;
   /** Descripción para buscadores y vistas previas de enlaces. Por omisión, la de la empresa. */
   description?: string;
+  /** `false` en la página 404: el servidor la entrega en cualquier dirección desconocida, así que nunca declara
+   *  una dirección canónica. Las demás páginas la llevan cuando se conoce la dirección del sitio (SITE_URL). */
+  canonical?: boolean;
 }
 
 const { businessName, locationLabel, titleLabel } = contactDetails;
 const {
   title,
   description = `Venta, entrega y asesoría de productos de seguridad industrial. ${locationLabel}.`,
+  canonical: hasCanonical = true,
 } = Astro.props;
 const pageTitle = title ? `${title} · ${businessName}` : `${businessName} · ${titleLabel}`;
-const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
+const canonical = hasCanonical && Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 <!doctype html>
 <html lang="es-MX">
