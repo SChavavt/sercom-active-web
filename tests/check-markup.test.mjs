@@ -148,6 +148,34 @@ test('U-07: los hijos del bloque .nav o .search, los selectores de atributo y lo
   }
 });
 
+test('U-07: una parte del valor que toca un espacio por un lado y su borde por el otro puede ser una palabra entera', async () => {
+  // «nav » está en «nav x»; « search», en «x search»; «x nav», en «x nav»; «x na», al principio de «x nav».
+  const cases = [
+    '[class*="nav "]{display:none}', '[class*=" search"]{display:none}', '[class*="x nav"]{x:0}', '[class*="av x"]{x:0}', '[class*="h__input y"]{x:0}',
+    '[class*=" nav__link"]{x:0}', '[class*=" nav__otro"]{x:0}', '[class^="x na"]{x:0}', '[class^="x nav__"]{x:0}', '[class$="av x"]{x:0}', '[class$="search x"]{x:0}',
+    '[class*="NAV " i]{x:0}', '[class*=" "]{x:0}', '[class^=" na"]{x:0}',
+  ];
+  for (const css of cases) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  // Partes que no pueden ser una de esas palabras entera.
+  const near = '[class*="navy"]{x:0}[class*="research"]{x:0}[class*="masthead__nav"]{x:0}[class*="x navy"]{x:0}[class*="anav "]{x:0}[class^="na x"]{x:0}'
+    + '[class$="x av"]{x:0}[class*="NAV "]{x:0}[class*="catalog-nav "]{x:0}[class*=" searchbox"]{x:0}';
+  assert.deepEqual(await check({ '_astro/pagina.css': near }, { ids: ['U-07'] }), []);
+});
+
+test('U-07: un selector de atributo con espacio de nombres (*|, |, ns|) se lee igual', async () => {
+  for (const css of ['[*|class~=nav]{display:none}', '[|class~=nav]{x:0}', '[svg|class="search"]{x:0}', '[*|CLASS*=" search"]{x:0}']) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  assert.deepEqual(selectorAttributes('[*|class~=nav][svg|class|=x][|data-x=nav]'), [{ operator: '~=', value: 'nav', insensitive: false }, { operator: '|=', value: 'x', insensitive: false }]);
+  // «class|=» sigue siendo el operador |=, no un espacio de nombres.
+  assert.deepEqual(selectorAttributes('[class|=nav]'), [{ operator: '|=', value: 'nav', insensitive: false }]);
+  assert.deepEqual(await check({ '_astro/pagina.css': '[*|class~=navy]{x:0}[*|data-x~=nav]{x:0}' }, { ids: ['U-07'] }), []);
+});
+
 test('U-07: la cabecera que usa las clases genéricas o no usa las de su bloque falla', async () => {
   const cases = [
     [{ nav: 'nav' }, 2], [{ nav: 'masthead__nav nav' }, 1], [{ search: 'search' }, 2], [{ input: 'search__input' }, 2], [{ button: 'search__btn' }, 2], [{ nav: 'navegacion' }, 1],
@@ -192,6 +220,36 @@ test('U-03: un botón después de su panel, o un orden de computadora distinto, 
   assert.equal((await check({ 'pagina/index.html': page({ order: ['logo', 'menuButton', 'nav', 'form', 'wa', 'cta'] }) }, { ids: ['U-03'] })).length, 1);
   assert.equal((await check({ 'pagina/index.html': page({ search: false }) }, { ids: ['U-03'] })).length, 1);
   assert.equal((await check({ 'pagina/index.html': '<!doctype html><html><body><main>Sin cabecera</main></body></html>' }, { ids: ['U-03'] })).length, 1);
+});
+
+test('U-03: un tabindex positivo en la cabecera, o -1 en un botón o en una pieza del orden de computadora, falla', async () => {
+  const cases = [
+    // tabindex positivo: ese elemento pasa delante de todo lo demás al usar Tab.
+    ['<a class="masthead__wa"', '<a tabindex="1" class="masthead__wa"'],
+    ['<li class="utility__item">', '<li class="utility__item" tabindex="2">'],
+    ['<span class="label">Buscar</span>', '<span class="label" tabindex=" +3x">Buscar</span>'],
+    // tabindex="-1" (o cualquier negativo): el elemento sale del orden de Tab.
+    ['data-toggle="menu"', 'data-toggle="menu" tabindex="-1"'],
+    ['data-toggle="search"', 'data-toggle="search" tabindex="-1"'],
+    ['<a class="masthead__logo span-2"', '<a tabindex="-1" class="masthead__logo span-2"'],
+    ['<a class="masthead__wa"', '<a tabindex="-1" class="masthead__wa"'],
+    ['<a class="masthead__cta span-2"', '<a tabindex="-2" class="masthead__cta span-2"'],
+    ['<a class="masthead__nav-link" href="/marcas/"', '<a class="masthead__nav-link" tabindex="-1" href="/marcas/"'],
+    ['<summary class="masthead__nav-link"', '<summary tabindex="-1" class="masthead__nav-link"'],
+    ['<a class="catpanel__link cell-link" href="/categorias/manos/"', '<a tabindex="-1" class="catpanel__link cell-link" href="/categorias/manos/"'],
+    ['<input class="masthead__search-input"', '<input tabindex="-1" class="masthead__search-input"'],
+    ['<button class="masthead__search-btn"', '<button tabindex="-1" class="masthead__search-btn"'],
+  ];
+  for (const [from, to] of cases) {
+    const html = page();
+    assert.ok(html.includes(from), from);
+    const problems = await check({ 'pagina/index.html': html.replace(from, to) }, { ids: ['U-03'] });
+    assert.equal(problems.length, 1, `${to} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+    assert.match(problems[0].message, /tabindex/);
+  }
+  // tabindex="0", o -1 en lo que no se enfoca con Tab (la copia oculta del texto de ayuda), no cambian el orden.
+  const fine = page().replace('<a class="masthead__wa"', '<a tabindex="0" class="masthead__wa"').replace('<span class="masthead__search-hint"', '<span tabindex="-1" class="masthead__search-hint"');
+  assert.deepEqual(await check({ 'pagina/index.html': fine }, { ids: ['U-03'] }), []);
 });
 
 // ---------------------------------------------------------------------------------------------------
@@ -246,6 +304,25 @@ test('U-05: una marca que falta, sobra o lleva otro valor falla', async () => {
   assert.equal((await check({ 'categorias/manos/index.html': page({ categories: false, marks: {} }) }, { ids: ['U-05'] })).length, 2);
   const withoutDock = page({ marks: { 'nav:/contacto/': 'page' } }).replace(/<nav class="dock"[\s\S]*?<\/nav>/, '');
   assert.equal((await check({ 'contacto/index.html': withoutDock }, { ids: ['U-05'] })).length, 1);
+});
+
+test('U-05: dentro de la navegación o de la barra fija, aria-current en un elemento que no es la entrada falla', async () => {
+  const marcas = page({ marks: { 'nav:/marcas/': 'page' } });
+  const cases = [
+    // En /marcas/: la marca en el <li> de Contacto, en un <span> dentro de su enlace o en la lista.
+    ['<li><a class="masthead__nav-link" href="/contacto/">', '<li aria-current="page"><a class="masthead__nav-link" href="/contacto/">'],
+    ['href="/contacto/">Contacto</a>', 'href="/contacto/"><span aria-current="page">Contacto</span></a>'],
+    ['<ul class="masthead__nav-list">', '<ul class="masthead__nav-list" aria-current="true">'],
+    ['<div class="catpanel">', '<div class="catpanel" aria-current="page">'],
+    // Y en la barra fija, dentro de un enlace.
+    ['<span>WhatsApp</span></a></nav>', '<span aria-current="page">WhatsApp</span></a></nav>'],
+  ];
+  for (const [from, to] of cases) {
+    assert.ok(marcas.includes(from), from);
+    const problems = await check({ 'marcas/index.html': marcas.replace(from, to) }, { ids: ['U-05'] });
+    assert.equal(problems.length, 1, `${to} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+    assert.match(problems[0].message, /no le corresponde/);
+  }
 });
 
 // ---------------------------------------------------------------------------------------------------

@@ -210,7 +210,8 @@ export const unescapeCss = text => text.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\n\r
   (_, hex, char) => (hex ? String.fromCodePoint(Number.parseInt(hex, 16) || 0xfffd) : char));
 const ESCAPE = String.raw`\\(?:[0-9a-fA-F]{1,6}[ \t\n\r\f]?|[^\n\r\f])`;
 const IDENT = new RegExp(String.raw`(?:${ESCAPE}|[\w\u00a0-\uffff-])+`, 'y');
-const ATTRIBUTE_SELECTOR = new RegExp(String.raw`^\s*((?:${ESCAPE}|[\w-])+)\s*(?:([~|^$*]?=)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:${ESCAPE}|[^\s\]\\])+)\s*([iIsS])?)?\s*$`, 's');
+// El nombre puede llevar delante un espacio de nombres («*|class», «|class», «svg|class»); «class|=» es el operador.
+const ATTRIBUTE_SELECTOR = new RegExp(String.raw`^\s*(?:(?:\*|(?:${ESCAPE}|[\w-])+)?\|(?!=))?((?:${ESCAPE}|[\w-])+)\s*(?:([~|^$*]?=)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:${ESCAPE}|[^\s\]\\])+)\s*([iIsS])?)?\s*$`, 's');
 
 /**
  * Lee un selector: las clases que nombra con «.» y sus selectores de atributo (lo que va entre corchetes y dentro de
@@ -283,25 +284,44 @@ const RETIRED_HEADER_CLASSES = ['nav', 'nav__list', 'nav__link', 'nav__cat', 'na
 /** ¿La clase es de un bloque retirado? */
 export const isRetiredClass = name => RETIRED_HEADER_BLOCKS.some(block => name === block || name.startsWith(`${block}__`) || name.startsWith(`${block}--`));
 /**
- * ¿Un selector de atributo sobre `class` puede seleccionar un elemento con una clase retirada?
+ * ¿Un selector de atributo sobre `class` puede seleccionar un elemento por una de ciertas clases, como palabra entera
+ * del atributo? `isWhole` dice si una palabra es una de esas clases; `names`, los nombres con los que se comparan las
+ * partes de palabra («[class^=na]» puede ser el principio de «nav»).
  * «=» y «~=» comparan palabras enteras; «|=», el valor o su prefijo con guion; «^=», «$=» y «*=», una parte del valor.
+ *
+ * Con «^=», «$=» y «*=» cada palabra del valor se lee según lo que tiene a cada lado: un espacio (dentro del valor) o
+ * el borde que fija el operador («^=» el principio del atributo, «$=» el final) es un límite de palabra; el borde
+ * libre del valor puede seguir con cualquier letra. Una palabra con límite a ambos lados es entera; con límite solo
+ * a la izquierda es el principio de una clase («[class*=" na"]», en «x nav»); solo a la derecha, su final
+ * («[class*="av "]», en «nav x»); sin ninguno, cualquier parte («[class*=av]»). Un valor de puros espacios cabe en
+ * « nav ».
  * @param {{ operator: string | null, value: string | null, insensitive: boolean }} attribute
+ * @param {{ isWhole: (word: string) => boolean, names: string[] }} target
  */
-export function classAttributeIsRetired({ operator, value, insensitive }) {
+export function classAttributeCouldMatch({ operator, value, insensitive }, { isWhole, names }) {
   if (!operator || !value) return false;
   const text = insensitive ? value.toLowerCase() : value;
   const words = text.split(/\s+/).filter(Boolean);
-  // Palabras completas dentro del valor: las que tienen espacio (o el borde que el operador fija) a ambos lados.
-  const whole = (open, close) => words.filter((_, index) => (index > 0 || open || /^\s/.test(text)) && (index < words.length - 1 || close || /\s$/.test(text)));
-  switch (operator) {
-    case '=': case '~=': return words.some(isRetiredClass);
-    case '|=': return isRetiredClass(text);
-    case '^=': return RETIRED_HEADER_CLASSES.some(name => name.startsWith(text)) || whole(true, false).some(isRetiredClass);
-    case '$=': return RETIRED_HEADER_CLASSES.some(name => name.endsWith(text)) || whole(false, true).some(isRetiredClass);
-    case '*=': return RETIRED_HEADER_CLASSES.some(name => name.includes(text)) || whole(false, false).some(isRetiredClass);
-    default: return false;
-  }
+  if (operator === '=' || operator === '~=' || operator === '|=') return words.some(isWhole);
+  if (!['^=', '$=', '*='].includes(operator)) return false;
+  if (operator === '*=' && !words.length) return names.some(name => ` ${name} `.includes(text));
+  const startBound = operator === '^=' || /^\s/.test(text);
+  const endBound = operator === '$=' || /\s$/.test(text);
+  return words.some((word, index) => {
+    const left = index > 0 || startBound;
+    const right = index < words.length - 1 || endBound;
+    if (isWhole(word)) return true;
+    if (left && right) return false;
+    if (left) return names.some(name => name.startsWith(word));
+    if (right) return names.some(name => name.endsWith(word));
+    return names.some(name => name.includes(word));
+  });
 }
+/**
+ * ¿Un selector de atributo sobre `class` puede seleccionar un elemento con una clase retirada?
+ * @param {{ operator: string | null, value: string | null, insensitive: boolean }} attribute
+ */
+export const classAttributeIsRetired = attribute => classAttributeCouldMatch(attribute, { isWhole: isRetiredClass, names: RETIRED_HEADER_CLASSES });
 
 /**
  * @typedef {{ file: string, route: string, root: Element, elements: Element[] }} Page
@@ -309,6 +329,16 @@ export function classAttributeIsRetired({ operator, value, insensitive }) {
  * @typedef {{ preview: boolean }} Options
  * @typedef {{ id: string, title: string, page?: (page: Page, options: Options) => string[], sheet?: (sheet: Sheet, options: Options) => string[] }} Check
  */
+
+/** El valor de tabindex como lo lee el navegador (espacios delante, signo, cifras; lo que sigue no cuenta); `null` si falta o no es un número. */
+function tabindexOf(element) {
+  const match = /^[\t\n\f\r ]*([+-]?\d+)/.exec(element.attributes.get('tabindex') ?? '');
+  return match ? Number(match[1]) : null;
+}
+/** ¿El elemento se enfoca con Tab sin tabindex? Enlaces con href, botones, campos visibles, listas, áreas de texto y resúmenes. */
+const isFocusable = element => (element.name === 'a' ? element.attributes.has('href')
+  : element.name === 'input' ? (element.attributes.get('type') ?? '').toLowerCase() !== 'hidden'
+    : ['button', 'select', 'textarea', 'summary'].includes(element.name));
 
 /** Partes de la cabecera de una página; `null` si falta. */
 function headerParts(page) {
@@ -342,12 +372,19 @@ function locationEntries(page, parts) {
       if (element.name === 'summary') add('nav:categorias', element);
       else if (element.name === 'a' && hasClass(element, 'catpanel__link')) add(hasClass(element, 'catpanel__link--all') ? 'cat:todo' : `cat:${element.attributes.get('href')}`, element);
       else if (element.name === 'a') add(`nav:${element.attributes.get('href')}`, element);
+      // Cualquier otro elemento de la navegación (un <li>, un <span> dentro de un enlace) nunca marca la ubicación.
+      else if (element.attributes.has('aria-current')) add(`otro:${describe(element)}`, element);
     } else if (hasClass(element, 'masthead__cta')) add('cta', element);
     else if (hasClass(element, 'masthead__logo')) add('logo', element);
     else if (element.attributes.has('aria-current')) add(`otro:${describe(element)}`, element);
   }
   const dock = page.elements.find(element => element.name === 'nav' && hasClass(element, 'dock'));
-  if (dock) for (const element of allElements(dock)) if (element.name === 'a') add(`dock:${element.attributes.get('href')}`, element);
+  if (dock) {
+    for (const element of allElements(dock)) {
+      if (element.name === 'a') add(`dock:${element.attributes.get('href')}`, element);
+      else if (element.attributes.has('aria-current')) add(`otro:${describe(element)}`, element);
+    }
+  }
   return { entries, dock };
 }
 
@@ -437,7 +474,7 @@ export const isRetiredPage = page => isProductRoute(page.route) && retiredMarks(
 export const CHECKS = [
   {
     id: 'U-03',
-    title: 'En la cabecera los botones Buscar y Menú van antes de la navegación y de la búsqueda; el orden de computadora es logotipo, navegación, búsqueda, WhatsApp y Cotizar mi lista',
+    title: 'En la cabecera los botones Buscar y Menú van antes de la navegación y de la búsqueda; el orden de computadora es logotipo, navegación, búsqueda, WhatsApp y Cotizar mi lista; ningún tabindex cambia ese orden',
     page(page, options) {
       const parts = headerParts(page);
       if (!parts || !parts.masthead) return ['la página no tiene la cabecera del sitio (<header class="site-header"> con .masthead)'];
@@ -469,6 +506,21 @@ export const CHECKS = [
       const present = sequence.filter(([, element]) => element);
       for (let i = 1; i < present.length; i++) {
         if (present[i][1].order < present[i - 1][1].order) problems.push(`${present[i][0]} está antes que ${present[i - 1][0]}: el orden de computadora es logotipo, navegación, búsqueda, WhatsApp, Cotizar mi lista`);
+      }
+      // El orden del documento solo es el del teclado si nada lo cambia: ningún tabindex positivo en la cabecera (ese
+      // elemento pasaría delante de todo) y ningún negativo en los botones ni en lo que se enfoca de esa secuencia.
+      for (const element of parts.elements) {
+        const index = tabindexOf(element);
+        if (index !== null && index > 0) problems.push(`${describe(element)} lleva tabindex="${element.attributes.get('tabindex')}": con Tab pasa delante de todo lo demás`);
+      }
+      const panelsContent = [menu, search].filter(Boolean).flatMap(panel => allElements(panel).filter(isFocusable));
+      const stops = [
+        [menuButton, 'el botón Menú'], [searchButton, 'el botón Buscar'], [sequence[0][1], 'el logotipo'], [sequence[3][1], 'WhatsApp'], [sequence[4][1], 'Cotizar mi lista'],
+        ...panelsContent.map(element => [element, `${describe(element)}${textOf(element) ? ` («${textOf(element)}»)` : ''} de ${closest(element, node => node === menu) ? 'la navegación' : 'la búsqueda'}`]),
+      ];
+      for (const [element, label] of stops) {
+        const index = element ? tabindexOf(element) : null;
+        if (index !== null && index < 0) problems.push(`${label} lleva tabindex="${element.attributes.get('tabindex')}": sale del orden de Tab`);
       }
       return problems;
     },
