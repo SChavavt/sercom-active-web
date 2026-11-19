@@ -32,27 +32,79 @@ const TEXT_EXTENSIONS = new Set(['.html', '.htm', '.js', '.mjs', '.css', '.json'
 // ---------------------------------------------------------------------------------------------------
 
 const stripAccents = text => text.normalize('NFD').replace(/\p{M}/gu, '');
+/**
+ * Forma comparable de un texto: compatibilidad Unicode (NFKC: «＄» es «$», «ＧＩＳＡ» es «GISA», el espacio duro es un
+ * espacio), sin caracteres de formato invisibles (espacio de ancho cero, guion suave, unión de palabras) y sin acentos.
+ * Así, un texto pegado en forma descompuesta (NFD) o con caracteres invisibles entre las letras se lee igual.
+ */
+const fold = text => stripAccents(text.normalize('NFKC').replace(/\p{Cf}/gu, ''));
+const codePoint = (value, radix) => {
+  const number = parseInt(value, radix);
+  return Number.isInteger(number) && number >= 0 && number <= 0x10ffff ? String.fromCodePoint(number) : undefined;
+};
+// Entidades con nombre que un texto en español puede llevar; las numéricas se decodifican todas.
+const NAMED_ENTITIES = {
+  nbsp: ' ', quot: '"', apos: "'", lt: '<', gt: '>', shy: '­', zwnj: '‌', zwj: '‍', ZeroWidthSpace: '​', NoBreak: '⁠',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', iexcl: '¡', iquest: '¿', laquo: '«', raquo: '»', ndash: '–', mdash: '—', hellip: '…',
+  middot: '·', bull: '•', copy: '©', reg: '®', trade: '™', deg: '°', dollar: '$', euro: '€', cent: '¢', pound: '£', star: '☆', starf: '★', commat: '@', period: '.', colon: ':', sol: '/', num: '#', percnt: '%',
+};
 const decodeEntities = text => text
-  .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-  .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
-  .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
+  .replace(/&(?:#(\d+)|#x([0-9a-f]+)|([A-Za-z][A-Za-z0-9]*));/gi, (entity, decimal, hex, name) => {
+    if (decimal) return codePoint(decimal, 10) ?? entity;
+    if (hex) return codePoint(hex, 16) ?? entity;
+    return name === 'amp' ? entity : NAMED_ENTITIES[name] ?? entity;
+  })
   .replace(/&amp;/g, '&');
 const decodePercent = text => text.replace(/(?:%[0-9a-f]{2})+/gi, run => {
   try { return decodeURIComponent(run); } catch { return run; }
 });
-/** Contenido comparable: entidades y %XX decodificados, sin acentos. Las reglas lo leen sin distinguir mayúsculas. */
-const normalizeContent = text => stripAccents(decodePercent(decodeEntities(text)));
+/** Contenido comparable: entidades y %XX decodificados, en forma comparable (`fold`). Las reglas lo leen sin distinguir mayúsculas. */
+const normalizeContent = text => fold(decodePercent(decodeEntities(text)));
 const oneLine = text => text.replace(/\s+/g, ' ').trim();
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const withoutScripts = html => html.replace(/<script\b[\s\S]*?<\/script>/gi, ' ').replace(/<style\b[\s\S]*?<\/style>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
+// Atributos que un visitante o un buscador leen como texto; el resto de los atributos se revisa en el ámbito `words`.
+const TEXT_ATTRIBUTES = /^(?:alt|title|aria-label|placeholder|content|value)$/i;
+// Atributos que no llevan texto: nombres de clase, geometría de SVG y similares.
+const NON_TEXT_ATTRIBUTES = /^(?:class|id|style|d|points|viewbox|transform|xmlns(?::\w+)?|width|height|x|y|x1|x2|y1|y2|cx|cy|r|rx|ry|fill|stroke|stroke-\w+|integrity|nonce|crossorigin|rel|type|charset|lang|dir|sizes|media|as|loading|decoding|fetchpriority|role|tabindex|hidden|aria-hidden|aria-labelledby|aria-describedby|aria-controls|aria-current|aria-expanded|for|name|method|target)$/i;
+/** Atributos de todas las etiquetas de un documento: [nombre, valor sin entidades]. */
+const attributesOf = html => [...html.matchAll(/<[a-zA-Z][^\s"'>/]*((?:"[^"]*"|'[^']*'|[^'">])*)>/g)]
+  .flatMap(tag => [...tag[1].matchAll(/([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)])
+  .map(match => [match[1], decodeEntities(match[2] ?? match[3] ?? match[4] ?? '')]);
 /** Texto que lee un visitante o un buscador: contenido de los elementos y atributos descriptivos. */
 function visibleText(html) {
   const body = withoutScripts(html);
-  const attributes = [...body.matchAll(/\s(?:alt|title|aria-label|placeholder|content|value)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)].map(match => match[1] ?? match[2]);
+  const attributes = attributesOf(body).filter(([name]) => TEXT_ATTRIBUTES.test(name)).map(([, value]) => value);
   return oneLine(decodeEntities(`${body.replace(/<[^>]+>/g, ' ')} \n ${attributes.join(' \n ')}`));
 }
+// Elementos en línea: no separan palabras, así que «GI<span>SA</span>» se lee «GISA».
+const INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)\b[^>]*>/gi;
+/** Texto visible con las etiquetas en línea retiradas sin dejar espacio. */
+const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).replace(INLINE_TAG, '').replace(/<[^>]+>/g, ' '))));
 const inlineScripts = html => [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]).join('\n');
+const inlineStyles = html => [...html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map(match => match[1]).join('\n');
+/**
+ * Lo que un script puede escribir en la página: decodifica los escapes de cadena (é, \x24) y une las piezas de
+ * una cadena partida («"Solicitud "+"enviada"», `Solicitud ${x}enviada`). Las cadenas de reemplazo de
+ * `.replace(…, "$1")` no son texto y se retiran.
+ */
+const unescapeScript = code => code
+  .replace(/\\u\{([0-9a-f]{1,6})\}/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
+  .replace(/\\u([0-9a-f]{4})/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
+  .replace(/\\x([0-9a-f]{2})/gi, (escape, hex) => codePoint(hex, 16) ?? escape)
+  .replace(/\\[nrtv]/g, ' ');
+const scriptText = code => unescapeScript(code
+  .replace(/(\.replace(?:All)?\(\s*(?:\/(?:\\.|[^/\\\n])+\/[a-z]*|[\w$.]+)\s*,\s*)(["'`])(?:\\.|(?!\2)[^\\\n])*\2/g, '$1$2$2'))
+  .replace(/\$\{\s*(["'])((?:(?!\1)[^\\])*)\1\s*\}/g, '$2')
+  .replace(/\$\{[^{}`]*\}/g, '')
+  .replace(/(["'`])\s*\+\s*(["'`])/g, '');
+/** Cadenas de `content:` de una hoja de estilo, con los escapes de CSS decodificados («\24 350» es «$350»). */
+const cssContent = css => [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<![\w-])content\s*:\s*([^;}]*)/gi)]
+  .flatMap(match => [...match[1].matchAll(/"((?:[^"\\]|\\[\s\S])*)"|'((?:[^'\\]|\\[\s\S])*)'/g)].map(string => string[1] ?? string[2]))
+  .map(value => value.replace(/\\([0-9a-f]{1,6})\s?/gi, (escape, hex) => codePoint(hex, 16) ?? escape).replace(/\\([\s\S])/g, '$1'))
+  .join('\n');
 const attribute = (tag, name) => {
   const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i'));
   return match ? decodeEntities(match[1] ?? match[2] ?? match[3] ?? '') : undefined;
@@ -69,32 +121,53 @@ const ALLOWED_SENTENCES = [
   'Revisamos requerimientos especiales. La personalización física o fabricación se ofrece solo si se confirma ese servicio.',
   'La cotización se prepara según el producto, la cantidad y las condiciones del requerimiento.',
 ];
-const withoutAllowed = text => ALLOWED_SENTENCES.reduce((rest, sentence) => rest.split(sentence).join(' '), text);
+const FOLDED_ALLOWED_SENTENCES = ALLOWED_SENTENCES.map(sentence => oneLine(fold(sentence)));
+/** Retira las frases permitidas de un texto ya en forma comparable (`fold`). */
+const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) => rest.split(sentence).join(' '), text);
 
 // ---------------------------------------------------------------------------------------------------
 // Reglas por patrón
 // ---------------------------------------------------------------------------------------------------
-// Ámbitos (`scope`):
-//   text   texto visible de cada página HTML, sin las frases permitidas
-//   words  lo que una persona podría llegar a leer: texto visible de HTML más el contenido de JS/JSON y de los
-//          <script> en línea (un script puede escribir texto en la página)
-//   raw    contenido tal cual de cada archivo de texto
-//   norm   contenido de cada archivo de texto con entidades y %XX decodificados y sin acentos
+// Ámbitos (`scope`). Salvo `raw`, todos están en forma comparable (`fold`: NFKC, sin caracteres invisibles y sin
+// acentos), así que un patrón escrito sin acentos también encuentra el texto acentuado o descompuesto.
+//   text    texto visible de cada página HTML, sin las frases permitidas
+//   joined  texto visible de cada página HTML con las etiquetas en línea retiradas sin dejar espacio
+//   words   lo que una persona podría llegar a leer: el texto visible, los demás atributos (data-*, enlaces con su
+//           %XX decodificado), los <script> en línea, las cadenas `content:` del CSS y el contenido de JS/JSON
+//           (un script puede escribir texto en la página), sin las frases permitidas
+//   raw     contenido tal cual de cada archivo de texto
+//   norm    contenido de cada archivo de texto con entidades y %XX decodificados
 // `level` puede ser una función del modo: los ejemplos nunca deben llevar normas ni certificaciones.
 
 const rule = (id, level, scope, pattern, title, doc) => ({ id, level, scope, pattern, title, doc });
+
+const EXCLUDED_BRAND = /\bgisa\b|guantes?[\s._+-]*internacional(?:es)?/i;
+const EXCLUDED_LETTERS = /\bg[\s._-]i[\s._-]s[\s._-]a\b/i;
+// Dentro de un identificador de código: «gisaLogo», «logoGisa», «GISA_URL». Distingue mayúsculas a propósito.
+const EXCLUDED_IN_IDENTIFIER = /(?<![A-Za-z0-9])(?:gisa|Gisa|GISA)(?=[A-Z0-9_$])|(?<=[a-z0-9_$])(?:Gisa|GISA)(?![a-z])/;
+// Sobre texto sin acentos. Un «no», «aún» o «todavía» cerca invierte el sentido: «tu mensaje no se ha enviado».
+const FALSE_CONFIRMATION = new RegExp([
+  /recibimos (?:tu|su)\b|\bhemos recibido\b|\bya recibimos\b/,
+  /\b(?:solicitud|mensaje|cotizacion|lista|pedido|correo|requerimiento|formulario)(?:es|s)?\s+(?:(?!(?:no|aun|todavia|nunca|sin|antes)\b)\S+\s+){0,3}(?:enviad|recibid|registrad)[oa]s?\b/,
+  /(?<!\bno\s+)\b(?:se|fue|fueron|ha sido|han sido)\s+(?:ha\s+|han\s+)?(?:enviad|recibid|registrad)[oa]s?\b/,
+  /\benviad[oa]s? (?:con exito|correctamente)\b|\benvio exitoso\b|\b(?:recibid|registrad)[oa]s? correctamente\b|\bmensaje enviado\b/,
+  /¡\s*(?:listo|enviad[oa]|recibid[oa]|hecho)\s*!/,
+  /gracias por (?:tu|su) (?:solicitud|mensaje|compra|cotizacion|pedido|lista|correo)/,
+  /\bfolio\b|numero de seguimiento/,
+  /\bte (?:responderemos|contactaremos|escribiremos|llamaremos)\b|\bnos pondremos en contacto\b|\b(?:en breve|pronto) (?:te|le) (?:respondemos|contactamos|escribimos|llamamos|respondera|contactara)\b/,
+].map(part => part.source).join('|'), 'i');
 const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 
 export const RULES = [
-  rule('R-RULE-01', 'FAIL', 'text',
-    /(?:\$|MXN|USD|M\.N\.)\s?\d[\d.,]*(?:\s?(?:pesos|MXN|USD|M\.N\.))?|\d[\d.,]*\s?(?:pesos|MXN|USD)\b|\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/i,
+  rule('R-RULE-01', 'FAIL', 'words',
+    /(?:\$|€|£|MXN|USD|EUR|M\.N\.)\s?\d[\d.,]*(?:\s?(?:pesos|MXN|USD|M\.N\.))?|\d[\d.,]*\s?(?:(?:pesos|MXN|USD|EUR)\b|M\.?N\b|[€£])|\bprecios?(?:\s+[a-z]+){0,2}\s*:?\s*\$?\s?\d|\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/i,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras, y vocabulario de oferta.'),
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «350 M.N.», «＄1,200»), la palabra «precio» seguida de una cifra y vocabulario de oferta, en el texto, en los atributos, en los scripts, en JSON y en las cadenas `content:` del CSS.'),
   rule('R-RULE-01', 'FAIL', 'raw',
     /"(?:price|precio|lowPrice|highPrice|priceCurrency|costo?s?)"\s*:|itemprop=["']?price|schema\.org\/(?:Offer|AggregateOffer)/i,
     'precio en datos estructurados',
     'Tampoco se publican precios en datos para buscadores (JSON-LD, microdatos) ni en archivos JSON.'),
-  rule('R-RULE-02', 'FAIL', 'text', /\bgratis\b|\bgratuit[oa]s?\b/i,
+  rule('R-RULE-02', 'FAIL', 'words', /\bgratis\b|\bgratuit[oa]s?\b/i,
     'producto marcado como gratuito',
     'Omitir el precio no convierte un producto en gratuito.'),
   rule('R-RULE-03', 'FAIL', 'norm', /\btest-(?:001|brand|category)\b|\bsintetic[oa] de prueba\b/i,
@@ -122,20 +195,31 @@ export const RULES = [
     /\boficial(?:es|mente)?\b|\bautorizad[oa]s?\b|\bdistribuidor(?:a|es|as)?\b|\bsucursal(?:es)?\b|\brepresentante(?:s)?\b/i,
     '«oficial», «autorizado», distribuidor o sucursal',
     'La atención en Puebla no se presenta como oficial, autorizada, distribuidora ni sucursal. El enlace de una marca se llama «Sitio del fabricante».'),
-  rule('R-RULE-08', 'FAIL', 'norm', /\bgisa\b|guantes?[\s._+-]*internacional(?:es)?/i,
+  rule('R-RULE-08', 'FAIL', 'norm', EXCLUDED_BRAND,
     'marca excluida',
-    'La marca excluida no aparece en ningún archivo, con o sin espacios, guiones, acentos, mayúsculas o codificación de URL.'),
-  rule('R-RULE-08', 'FAIL', 'text', /\bg[\s._-]i[\s._-]s[\s._-]a\b/i,
+    'La marca excluida no aparece en ningún archivo, con o sin espacios, guiones, acentos, mayúsculas, caracteres invisibles, ancho completo o codificación de URL.'),
+  rule('R-RULE-08', 'FAIL', 'words', EXCLUDED_BRAND,
+    'marca excluida en el texto o en un script',
+    'También cuando una etiqueta separa las palabras («<strong>Guantes</strong> …») o un script une la marca a partir de piezas.'),
+  rule('R-RULE-08', 'FAIL', 'joined', new RegExp(`${EXCLUDED_BRAND.source}|${EXCLUDED_LETTERS.source}`, 'i'),
+    'marca excluida partida por etiquetas en línea',
+    'Texto visible con las etiquetas en línea retiradas: «GI<span>SA</span>» se lee «GISA».'),
+  rule('R-RULE-08', 'FAIL', 'norm', EXCLUDED_IN_IDENTIFIER,
+    'marca excluida dentro de un identificador',
+    'Nombres de variable, clase o archivo que llevan la marca pegada a otra palabra («gisaLogo», «GISA_URL»).'),
+  rule('R-RULE-08', 'FAIL', 'text', EXCLUDED_LETTERS,
     'marca excluida escrita letra por letra',
     'Variante con puntos, guiones o espacios entre las letras; solo se busca en el texto visible.'),
   rule('R-RULE-09', 'FAIL', 'text',
     /\ben stock\b|\ben existencia\b|\bexistencias\b|\binventario\b|\bentrega (?:inmediata|el mismo d[ií]a|en \d+)|\bdisponibilidad inmediata\b|\bdisponibles? (?:hoy|ahora|de inmediato)\b|\benv[ií]os? (?:gratis|a todo|a toda)/i,
     'promesa de existencia, inventario o entrega',
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
-  rule('R-RULE-10', 'FAIL', 'raw',
-    /recibimos tu (?:solicitud|mensaje|cotizaci)|solicitud (?:enviada|recibida|registrada)|mensaje enviado|enviad[oa] con [eé]xito|gracias por (?:tu|su) (?:solicitud|mensaje|compra)|\bfolio\b|n[uú]mero de seguimiento|te contactaremos en \d/i,
+  rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones, folios o plazos de respuesta.'),
+    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones, folios o plazos de respuesta. Busca en el texto (también partido por etiquetas), en los atributos y en las cadenas que escribe un script.'),
+  rule('R-RULE-10', 'FAIL', 'norm', FALSE_CONFIRMATION,
+    'confirmación falsa en el contenido de un archivo',
+    'La misma revisión sobre el archivo completo (comentarios incluidos), con entidades y %XX decodificados.'),
   rule('R-RULE-13', 'FAIL', 'raw',
     /supplyConfirmed|usageConfirmed|checkedOn|sourceUrl|["']approval["']|\bapproval\s*:\s*\{|schemaVersion|whatsappTested|inPersonAttentionConfirmed|entity_id|entity_type|next_action|source_status|recommended_ingestion|unattended_api_or_feed_verified|monitoring_active|publication_policy|proposed_sync|excluded_entities|supplier_request_template|relationship_notes|Sercom_Active_Fuentes_Catalogos/,
     'metadatos internos o registro de investigación',
@@ -159,9 +243,9 @@ export const RULES = [
     'cifra o métrica comercial',
     'Las cifras comerciales deben ser reales y medidas. Se listan para revisión.'),
   rule('R-RULE-29', 'FAIL', 'raw',
-    /(?:#|%23)(?:0e2a3d|00a6e5)\b|rgba?\(\s*14[\s,]+42[\s,]+61\b|rgba?\(\s*0[\s,]+166[\s,]+229\b|prefers-color-scheme:\s*dark|color-scheme:[^;}"']*\bdark\b/i,
+    /(?:#|%23)(?:0e2a3d|00a6e5)(?:[0-9a-f]{2})?(?![0-9a-f])|rgba?\(\s*14[\s,]+42[\s,]+61\b|rgba?\(\s*0[\s,]+166[\s,]+229\b|prefers-color-scheme\s*:\s*dark|color-scheme:[^;}"']*\bdark\b|\blight-dark\(/i,
     'paleta anterior o tema oscuro',
-    'La identidad sale del logotipo: tinta #19171A, azul #0067B0 y fondos blancos. El azul marino #0E2A3D y el celeste #00A6E5 del plan anterior no se usan, tampoco un tema oscuro.'),
+    'La identidad sale del logotipo: tinta #19171A, azul #0067B0 y fondos blancos. El azul marino #0E2A3D y el celeste #00A6E5 del plan anterior no se usan, tampoco con transparencia (#0e2a3dcc, que es como la compilación escribe rgb(14 42 61 / 80%)), ni un tema oscuro (prefers-color-scheme, color-scheme, light-dark()).'),
 ];
 
 // Reglas que solo aplican mientras la atención presencial no esté confirmada (sin --in-person).
@@ -179,18 +263,22 @@ const PRODUCTION_RULES = [
   rule('R-RULE-03', 'FAIL', 'norm', /\bEJ-\d|\bmarca de ejemplo\b|\bejemplo-[a-z0-9]|\bde\s+ejemplo\b/i,
     'marca de producto de ejemplo en producción',
     'Los productos de ejemplo solo existen en la vista previa. En producción no puede aparecer «EJ-», «Marca de ejemplo», «ejemplo-» ni «de ejemplo» en ningún archivo (tampoco como nombre de clase CSS).'),
+  rule('R-RULE-03', 'FAIL', 'joined', /\bEJ-\d|\bmarca de ejemplo\b|\bde\s+ejemplo\b/i,
+    'marca de producto de ejemplo partida por etiquetas',
+    'Las mismas marcas en el texto visible, aunque una etiqueta las separe («de<br>ejemplo», «EJ-<span>1001</span>»).'),
 ];
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
-  ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa.'],
+  ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa. Los códigos también se buscan escritos con otro separador o sin él («EJ1001», «ej 1001»).'],
   ['R-RULE-03', 'Vista previa: cada página lleva el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran.'],
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
-  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03).'],
+  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» tiene «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03).'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
-  ['R-RULE-24', 'Los enlaces de WhatsApp y de correo, y los correos y teléfonos visibles, son los de src/data/business.json.'],
+  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api.whatsapp.com, whatsapp://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
+  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()), y ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
@@ -239,6 +327,121 @@ function registryLeaks(registry, brands) {
 }
 
 // ---------------------------------------------------------------------------------------------------
+// Contacto, paleta y robots.txt
+// ---------------------------------------------------------------------------------------------------
+
+const shorten = (text, length = 90) => (text.length > length ? `${text.slice(0, length)}…` : text);
+const URL_REST = `[^\\s"'<>\`)\\\\]*`;
+const WHATSAPP_LINK = new RegExp(`(?<![\\w.-])(?:(?:https?:)?//)?(?:www\\.)?wa\\.me(?![\\w.-])(${URL_REST})`, 'gi');
+const WHATSAPP_OTHER = new RegExp(`(?<![\\w.-])(?:(?:https?:)?//)?(?:api|web)\\.whatsapp\\.com(?![\\w.-])(${URL_REST})|\\bwhatsapp://(${URL_REST})`, 'gi');
+const MAILTO = new RegExp(`\\bmailto:(${URL_REST})`, 'gi');
+const TEL = new RegExp(`\\btel:(${URL_REST})`, 'gi');
+// Forma de correo. «logo@2x.png» o «paquete@5.2.8» tienen forma parecida, pero no son direcciones.
+const EMAIL_SHAPE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b(?<!\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|otf|css|m?js|map|json))/gi;
+/** Principio de una dirección que un script completa («`https://wa.me/${número}`», `a[href^="mailto:"]`): no es un destino. */
+const isPrefix = rest => rest === '' || rest === '/' || /^\/?[$`{'"+]/.test(rest);
+
+/**
+ * R-RULE-24: destinos de WhatsApp, correo y teléfono escritos en cualquier parte de un archivo (enlaces, otros
+ * atributos, scripts, JSON) que no son los de business.json. También rechaza un correo con copia (to, cc, bcc).
+ * @param {string} source Contenido del archivo con entidades y escapes de cadena decodificados.
+ * @param {{ joinedPieces?: boolean }} [options] `joinedPieces`: el texto viene de `scriptText`, con las piezas de las
+ *   cadenas unidas («"https://wa.me/"+"52155…"»); una dirección sin número o sin destinatario es entonces código.
+ */
+function contactProblems(source, { digits, email, knownNumbers }, { joinedPieces = false } = {}) {
+  const problems = new Set();
+  for (const match of source.matchAll(WHATSAPP_LINK)) {
+    const rest = match[1];
+    if (isPrefix(rest)) continue;
+    const path = rest.split(/[?#]/)[0];
+    // En el texto con las piezas unidas, «`https://wa.me/${número}?text=`» queda sin número: es código, no un destino.
+    if (joinedPieces && (path === '' || path === '/')) continue;
+    if (decodePercent(path) !== `/${digits}`) problems.add(`número de WhatsApp distinto del confirmado: ${shorten(match[0])}`);
+  }
+  for (const match of source.matchAll(WHATSAPP_OTHER)) {
+    if (isPrefix(match[1] ?? match[2] ?? '')) continue;
+    problems.add(`enlace de WhatsApp que no tiene la forma confirmada (https://wa.me/${digits}): ${shorten(match[0])}`);
+  }
+  for (const match of source.matchAll(MAILTO)) {
+    const value = match[1];
+    if (isPrefix(value)) continue;
+    const queryStart = value.indexOf('?');
+    if (joinedPieces && queryStart === 0) continue;
+    const addresses = decodePercent(queryStart === -1 ? value : value.slice(0, queryStart)).split(',').map(address => address.trim().toLowerCase());
+    if (addresses.some(address => address !== email)) problems.add(`correo distinto del confirmado: ${shorten(match[0])}`);
+    const query = queryStart === -1 ? '' : value.slice(queryStart + 1);
+    for (const key of query.split('&').map(param => decodePercent(param.split('=')[0]).trim().toLowerCase())) {
+      if (['to', 'cc', 'bcc'].includes(key)) problems.add(`el borrador de correo también iría a otra dirección (${key}=): ${shorten(match[0])}`);
+    }
+  }
+  for (const match of source.matchAll(TEL)) {
+    const number = decodePercent(match[1]).replace(/\D/g, '');
+    if (number && !knownNumbers.has(number)) problems.add(`teléfono distinto del confirmado: ${shorten(match[0])}`);
+  }
+  for (const match of source.matchAll(EMAIL_SHAPE)) {
+    if (match[0].toLowerCase() !== email) problems.add(`correo distinto del confirmado: ${match[0]}`);
+  }
+  return [...problems];
+}
+
+const OLD_PALETTE = [[0x0e, 0x2a, 0x3d], [0x00, 0xa6, 0xe5]];
+const NEAR = 4;
+/** HSL (grados y porcentajes) a RGB de 0 a 255. */
+function hslToRgb(hue, saturation, lightness) {
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const sector = (((hue % 360) + 360) % 360) / 60;
+  const second = chroma * (1 - Math.abs((sector % 2) - 1));
+  const [r, g, b] = sector < 1 ? [chroma, second, 0] : sector < 2 ? [second, chroma, 0] : sector < 3 ? [0, chroma, second]
+    : sector < 4 ? [0, second, chroma] : sector < 5 ? [second, 0, chroma] : [chroma, 0, second];
+  const offset = lightness - chroma / 2;
+  return [r, g, b].map(channel => Math.round((channel + offset) * 255));
+}
+/**
+ * R-RULE-29: colores casi iguales a la paleta anterior (hasta 4 de diferencia por canal), como los que deja la
+ * compilación al redondear un hsl() u oklch(), y los hsl() y rgb() de un atributo style, que la compilación no convierte.
+ * @param {string} source
+ */
+function nearPaletteColors(source) {
+  const found = [];
+  const check = (text, rgb, exactIsCovered) => {
+    const distance = Math.min(...OLD_PALETTE.map(color => Math.max(...color.map((channel, index) => Math.abs(channel - rgb[index])))));
+    if (distance <= NEAR && !(distance === 0 && exactIsCovered)) found.push(text);
+  };
+  for (const match of source.matchAll(/(?:#|%23)([0-9a-f]{6})(?:[0-9a-f]{2})?(?![0-9a-f])/gi)) {
+    check(match[0], [0, 2, 4].map(index => parseInt(match[1].slice(index, index + 2), 16)), true);
+  }
+  for (const match of source.matchAll(/rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)/gi)) {
+    const channels = match.slice(1, 4).map(value => (value.endsWith('%') ? Math.round(parseFloat(value) * 2.55) : Number(value)));
+    check(match[0], channels, !match[0].includes('%'));
+  }
+  for (const match of source.matchAll(/hsla?\(\s*(-?[\d.]+)(?:deg)?[\s,]+([\d.]+)%[\s,]+([\d.]+)%/gi)) {
+    check(match[0], hslToRgb(Number(match[1]), Number(match[2]) / 100, Number(match[3]) / 100), false);
+  }
+  return found;
+}
+
+/** Grupos de robots.txt: agentes y reglas. Los grupos de «*» se combinan, como hacen los buscadores. */
+function robotsStarRules(text) {
+  const groups = [];
+  let current;
+  let readingAgents = false;
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.replace(/#.*/, '').trim().match(/^([a-z-]+)\s*:\s*(.*)$/i);
+    if (!match) continue;
+    const [, field, value] = [match[0], match[1].toLowerCase(), match[2].trim()];
+    if (field === 'user-agent') {
+      if (!current || !readingAgents) groups.push(current = { agents: [], rules: [] });
+      current.agents.push(value.toLowerCase());
+      readingAgents = true;
+    } else {
+      readingAgents = false;
+      if (current && (field === 'allow' || field === 'disallow')) current.rules.push([field, value]);
+    }
+  }
+  return groups.filter(group => group.agents.includes('*')).flatMap(group => group.rules);
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Escaneo
 // ---------------------------------------------------------------------------------------------------
 
@@ -252,6 +455,8 @@ async function walk(directory) {
   return files;
 }
 
+// Separadores posibles dentro de un código: espacio, punto, guion bajo, diagonal y guiones de cualquier tipo.
+const CODE_SEPARATOR = '[\\s._/\\-\u2010-\u2015\u2212]*';
 const context = (text, index, length) => oneLine(text.slice(Math.max(0, index - 40), index + length + 40));
 const globalPattern = pattern => new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
 
@@ -276,6 +481,10 @@ export async function scanDist(directory, options = {}) {
   const leaks = registryLeaks(data.registry, data.brands);
   const exampleTokens = [...new Set(examples.flatMap(example => [example.id, example.code, example.name, example.summary, ...(example.characteristics ?? []), ...(example.variants ?? []).map(variant => variant.code)]))]
     .filter(token => typeof token === 'string' && token.length >= 6);
+  // Códigos de los ejemplos con cualquier separador (o ninguno) entre sus partes.
+  const exampleCodes = [...new Set(examples.flatMap(example => [example.code, ...(example.variants ?? []).map(variant => variant.code)]))]
+    .filter(code => typeof code === 'string' && /[a-z]/i.test(code) && /\d/.test(code))
+    .map(code => [code, new RegExp(`(?<![a-z0-9])${code.match(/[a-z]+|\d+/gi).map(escapeRegExp).join(CODE_SEPARATOR)}(?![0-9])`, 'i')]);
   const digits = String(business.whatsappDigits ?? '');
   const email = String(business.email ?? '').toLowerCase();
   const localNumber = digits.slice(-10);
@@ -304,15 +513,38 @@ export async function scanDist(directory, options = {}) {
       for (const token of exampleTokens) if (raw.includes(token)) add('FAIL', 'R-RULE-03', file, `contiene un dato del archivo de ejemplos: «${token.slice(0, 60)}»`);
     }
     if (!isText) continue;
+    // R-RULE-03, producción: los códigos de los ejemplos escritos de otra forma («EJ1001», «ej 1001», «EJ–1001»).
+    if (!preview) {
+      const folded = fold(decodeEntities(raw));
+      for (const [code, pattern] of exampleCodes) {
+        const found = folded.match(pattern);
+        if (found && !raw.includes(code)) add('FAIL', 'R-RULE-03', file, `contiene un código del archivo de ejemplos escrito de otra forma: «${found[0]}» (${code})`);
+      }
+    }
 
+    const extension = extname(file).toLowerCase();
     const norm = normalizeContent(raw);
     const shown = isHtml ? visibleText(raw) : '';
-    const text = isHtml ? withoutAllowed(shown) : '';
-    const words = isHtml ? `${text}\n${inlineScripts(raw)}` : raw;
+    const text = isHtml ? withoutAllowed(oneLine(fold(shown))) : '';
+    const joined = isHtml ? joinedText(raw) : '';
+    let readable;
+    if (isHtml) {
+      const markup = withoutScripts(raw);
+      const otherAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
+      const styles = [inlineStyles(raw), ...attributesOf(markup).filter(([name]) => /^style$/i.test(name)).map(([, value]) => `x{${value}}`)].join('\n');
+      readable = [text, ...otherAttributes, scriptText(inlineScripts(raw)), cssContent(styles)].join('\n');
+    } else if (extension === '.css') {
+      readable = `${raw}\n${cssContent(raw)}`;
+    } else {
+      readable = scriptText(raw);
+      if (extension === '.svg' || extension === '.xml') readable += `\n${visibleText(raw)}`;
+    }
+    const words = isHtml ? withoutAllowed(oneLine(fold(readable))) : withoutAllowed(fold(readable));
+    const scopes = { text, joined, words, norm, raw };
 
     for (const { id, level, scope, pattern, title } of rules) {
-      if (scope === 'text' && !isHtml) continue;
-      const haystack = scope === 'text' ? text : scope === 'words' ? words : scope === 'norm' ? norm : raw;
+      if ((scope === 'text' || scope === 'joined') && !isHtml) continue;
+      const haystack = scopes[scope];
       const seen = new Set();
       for (const match of haystack.matchAll(globalPattern(pattern))) {
         const key = match[0].toLowerCase();
@@ -333,6 +565,14 @@ export async function scanDist(directory, options = {}) {
     if (!inPerson && addressNeedle && oneLine(norm).toLowerCase().includes(addressNeedle)) add('FAIL', 'R-RULE-11', file, 'dirección del negocio publicada sin atención presencial confirmada');
     // R-RULE-03, producción: el aviso de vista previa delata una compilación de vista previa.
     if (!preview && oneLine(norm).toLowerCase().includes(noticeNeedle)) add('FAIL', 'R-RULE-03', file, 'aviso de vista previa en una compilación de producción');
+    // R-RULE-24: destinos de contacto en cualquier parte del archivo (atributos, scripts, JSON).
+    const contact = { digits, email, knownNumbers };
+    for (const problem of new Set([
+      ...contactProblems(unescapeScript(decoded).replace(/\p{Cf}/gu, ''), contact),
+      ...contactProblems(scriptText(decoded).replace(/\p{Cf}/gu, ''), contact, { joinedPieces: true }),
+    ])) add('FAIL', 'R-RULE-24', file, problem);
+    // R-RULE-29: colores casi iguales a la paleta anterior.
+    for (const color of new Set(nearPaletteColors(raw))) add('FAIL', 'R-RULE-29', file, `color casi igual a la paleta anterior: «${color}»`);
 
     if (!isHtml) continue;
     const markup = withoutScripts(raw);
@@ -345,19 +585,17 @@ export async function scanDist(directory, options = {}) {
     if (!launch && !noindex) add('FAIL', 'R-RULE-12', file, 'falta <meta name="robots" content="noindex, nofollow"> antes del lanzamiento');
     if (launch && noindex) add('FAIL', 'R-PUB-03', file, 'noindex sigue presente en la versión de lanzamiento');
 
-    // R-RULE-24 y R-QUOTE-06: contacto.
-    for (const match of markup.matchAll(/<a\b[^>]*>/gi)) {
-      const href = attribute(match[0], 'href') ?? '';
-      if (/wa\.me|api\.whatsapp\.com|^whatsapp:/i.test(href)) {
-        if (!(href === `https://wa.me/${digits}` || href.startsWith(`https://wa.me/${digits}?text=`))) add('FAIL', 'R-RULE-24', file, `enlace de WhatsApp distinto del confirmado: ${href.slice(0, 90)}`);
-        else if (/[^A-Za-z0-9%._~+*'()!-]/.test(href.split('?text=')[1] ?? '')) add('FAIL', 'R-QUOTE-06', file, `texto de WhatsApp sin codificar en la URL: ${href.slice(0, 90)}`);
-      }
-      if (/^mailto:/i.test(href) && href.slice(7).split('?')[0].toLowerCase() !== email) add('FAIL', 'R-RULE-24', file, `correo distinto del confirmado: ${href.slice(0, 90)}`);
-      if (/^tel:/i.test(href) && !knownNumbers.has(href.replace(/\D/g, ''))) add('FAIL', 'R-RULE-24', file, `teléfono distinto del confirmado: ${href}`);
+    // R-RULE-24 y R-QUOTE-06: un enlace de WhatsApp, en cualquier atributo (href, formaction, data-*…), tiene la forma
+    // confirmada y su texto va codificado. Los números, correos y teléfonos de todo el archivo se revisan arriba.
+    for (const [name, value] of attributesOf(markup)) {
+      const href = value.trim();
+      if (!/^(?:(?:https?:)?\/\/(?:www\.)?(?:wa\.me|api\.whatsapp\.com|web\.whatsapp\.com)\b|whatsapp:)/i.test(href)) continue;
+      if (!(href === `https://wa.me/${digits}` || href.startsWith(`https://wa.me/${digits}?text=`))) add('FAIL', 'R-RULE-24', file, `enlace de WhatsApp distinto del confirmado (${name}): ${shorten(href)}`);
+      else if (/[^A-Za-z0-9%._~+*'()!-]/.test(href.split('?text=')[1] ?? '')) add('FAIL', 'R-QUOTE-06', file, `texto de WhatsApp sin codificar en la URL: ${shorten(href)}`);
     }
-    // «logo@2x.png» tiene forma de correo pero es un nombre de archivo.
-    for (const match of shown.matchAll(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+(?<!\.(?:png|jpe?g|webp|avif|gif|svg))/gi)) {
-      if (match[0].toLowerCase() !== email) add('FAIL', 'R-RULE-24', file, `correo visible distinto del confirmado: ${match[0]}`);
+    // R-RULE-29: tema oscuro declarado con <meta name="color-scheme">.
+    for (const match of markup.matchAll(/<meta\b[^>]*>/gi)) {
+      if (/^color-scheme$/i.test(attribute(match[0], 'name') ?? '') && /\bdark\b/i.test(attribute(match[0], 'content') ?? '')) add('FAIL', 'R-RULE-29', file, `tema oscuro declarado: ${match[0].slice(0, 80)}`);
     }
     for (const match of shown.matchAll(/(?:\+?52[\s().-]*)?(?:1[\s().-]*)?\b\d{2,3}[\s().-]?\d{3,4}[\s().-]?\d{4}\b/g)) {
       const number = match[0].replace(/\D/g, '');
@@ -390,10 +628,14 @@ export async function scanDist(directory, options = {}) {
   }
 
   // R-RULE-12: robots.txt.
+  // Bloquea todo el sitio cuando el grupo «User-agent: *» tiene «Disallow: /» y ningún «Allow» que lo abra; un
+  // bloqueo que solo nombra a un buscador no cuenta.
   const robots = files.find(file => name(file) === 'robots.txt');
-  const blocksAll = /^Disallow:\s*\/\s*$/m.test(robots ? await readFile(robots, 'utf8') : '');
-  if (!launch && !blocksAll) add('FAIL', 'R-RULE-12', robots ?? join(directory, 'robots.txt'), 'robots.txt no bloquea el sitio antes del lanzamiento');
-  if (launch && blocksAll) add('FAIL', 'R-PUB-03', robots, 'robots.txt sigue bloqueando el sitio en la versión de lanzamiento');
+  const starRules = robotsStarRules(robots ? await readFile(robots, 'utf8') : '');
+  const disallowsRoot = starRules.some(([field, value]) => field === 'disallow' && value === '/');
+  const blocksAll = disallowsRoot && !starRules.some(([field, value]) => field === 'allow' && value !== '');
+  if (!launch && !blocksAll) add('FAIL', 'R-RULE-12', robots ?? join(directory, 'robots.txt'), 'robots.txt no bloquea todo el sitio a todos los buscadores (User-agent: * con Disallow: / y sin Allow) antes del lanzamiento');
+  if (launch && disallowsRoot) add('FAIL', 'R-PUB-03', robots, 'robots.txt sigue bloqueando el sitio en la versión de lanzamiento');
 
   // R-RULE-14: las páginas generadas corresponden a registros que pueden mostrarse.
   const categories = data.catalog?.categories ?? [];
