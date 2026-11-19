@@ -143,6 +143,8 @@ const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) 
 //           %XX decodificado), los <script> en línea, las cadenas `content:` del CSS y el contenido de JS/JSON
 //           (un script puede escribir texto en la página; el marcado que escribe se lee también sin sus etiquetas),
 //           sin las frases permitidas
+//   prose   la parte de `words` que no es código: el texto visible, los valores de los atributos, las cadenas
+//           `content:` del CSS y el texto de un SVG o XML (sin las frases permitidas)
 //   raw     contenido tal cual de cada archivo de texto
 //   norm    contenido de cada archivo de texto con entidades y %XX decodificados
 // `level` puede ser una función del modo: los ejemplos nunca deben llevar normas ni certificaciones.
@@ -173,32 +175,48 @@ const FALSE_CONFIRMATION = new RegExp([
   /\b(?:te|le) (?:responderemos|contactaremos|escribiremos|llamaremos|respondemos|contactamos|escribimos|llamamos|respondera|contactara|escribira|llamara)\b|\bnos (?:pondremos en contacto|comunicaremos)\b/,
 ].map(part => part.source).join('|'), 'i');
 // Precios: símbolo o código de moneda junto a una cifra, la palabra de un precio seguida de una cifra y vocabulario
-// de oferta. Un «$» pegado a una letra, a otro «$» o a «=» es código («$2», «x=$1»), no un precio.
+// de oferta. Un prefijo de moneda de una a tres mayúsculas antes de «$» («MX$350», «US$ 25») también es un precio.
 const PRICE_WORD = '\\b(?:precio|costo|importe|monto|tarifa)s?';
-const PUBLIC_PRICE = new RegExp([
-  /(?:(?<![\w$=])\$|€|£|\bMXN|\bUSD|\bEUR|\bM\.N\.)\s?\d[\d.,]*(?:\s?(?:pesos|MXN|USD|M\.N\.))?/,
+// Una cifra seguida de una unidad de cantidad es una cantidad, no un precio («precio por volumen: 100 piezas»).
+const NOT_QUANTITY = '(?![\\d.,]*\\s*(?:piezas?|pzas?|pz|pares?|cajas?|unidad(?:es)?|paquetes?|rollos?|metros?|mts?|litros?|lts?|kg|kilos?|gramos?|ml|cm|mm|juegos?|kits?|bultos?|docenas?|galones?|tramos?|frascos?|bolsas?|sobres?|cubetas?)\\b)';
+/**
+ * Patrón de R-RULE-01. En el código de un script (`code: true`) un «$» pegado a una letra, a otro «$» o a «=» es
+ * código («$2», «a$1», «x=$1»), no un precio, y un prefijo en mayúsculas solo cuenta si no es parte de un
+ * identificador («URL$1=…»). En el texto visible, en los atributos y en las cadenas `content:` del CSS no hay excepción.
+ */
+const pricePattern = ({ code }) => new RegExp([
+  new RegExp(`(?:${code ? '(?<![\\w$=])\\$' : '\\$'}|€|£|\\bMXN|\\bUSD|\\bEUR|\\bM\\.N\\.)\\s?\\d[\\d.,]*(?:\\s?(?:pesos|MXN|USD|M\\.N\\.))?`),
+  // «MX$350» en una cadena de un script: un prefijo en mayúsculas que no continúa como identificador, llamada o asignación.
+  ...(code ? [/(?<![\w$])(?-i:[A-Z]{1,3})\$\s?\d[\d.,]*(?![\w$]|[.,][A-Za-z_$]|\s*=(?!=)|\s*\(|\s*[;)}\]?:])/] : []),
   /\d[\d.,]*\s?(?:(?:pesos|dolares|dolar|euros?|dlls?|MXN|USD|EUR)\b|M\.N\b\.?|[€£])/,
   // «350 MN» sin puntos, salvo en un modelo, una talla o un tipo («Modelo 3 MN»).
   /(?<!\b(?:modelo|talla|tipo|clase|serie|nivel|numero|calibre|no\.?)\s+)\b\d[\d.,]*\s?MN\b/,
-  // «Precio: 350», «Precio por caja de 12: 350», «Costo: $350».
-  new RegExp(`${PRICE_WORD}(?:\\s+[a-z0-9]+){0,4}\\s*:\\s*\\$?\\s?\\d`),
+  // «Precio: 350», «Precio por caja de 12: 350», «Costo: $350»; una clave de código («{monto:5}») también.
+  new RegExp(`${PRICE_WORD}(?:\\s+[a-z0-9]+){0,4}\\s*:\\s*\\$?\\s?\\d${NOT_QUANTITY}`),
   // «Precio 350», «Precio unitario 350.00»; no «Precios y cotización 2026».
-  new RegExp(`${PRICE_WORD}(?:\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)[a-z]+){0,2}\\s+\\$?\\s?\\d`),
+  new RegExp(`${PRICE_WORD}(?:\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)[a-z]+){0,2}\\s+\\$?\\s?\\d${NOT_QUANTITY}`),
+  // «Precio por pieza 350.00», «Precio con IVA 350», «Precio de mayoreo 300»: «por», «con», «de» o «para» y una palabra antes de la cifra.
+  new RegExp(`${PRICE_WORD}\\s+(?:por|con|de|para)\\s+[a-z]+\\s+\\$?\\s?\\d${NOT_QUANTITY}`),
   /\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/,
 ].map(part => part.source).join('|'), 'i');
+const PUBLIC_PRICE = pricePattern({ code: true });
+const VISIBLE_PRICE = pricePattern({ code: false });
 const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 
 export const RULES = [
   rule('R-RULE-01', 'FAIL', 'words', PUBLIC_PRICE,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos, o sin ellos cuando no hay una conjunción o preposición entre la palabra y la cifra) y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS.'),
-  rule('R-RULE-01', 'FAIL', 'joined', PUBLIC_PRICE,
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cifra seguida de una unidad de cantidad («100 piezas», «12 pares») no es un precio. En el código de un script, un «$» pegado a un identificador («$2», «a$1», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
+  rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
+    'precio en el texto, en un atributo o en el CSS',
+    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos y en las cadenas `content:` del CSS, cualquier «$» seguido de una cifra es un precio («MX$350», «Desde MX$ 1,200»).'),
+  rule('R-RULE-01', 'FAIL', 'joined', VISIBLE_PRICE,
     'precio o descuento partido por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
   rule('R-RULE-01', 'FAIL', 'raw',
-    /"(?:price|precio|lowPrice|highPrice|priceCurrency|costo?s?|importes?|montos?|tarifas?)"\s*:|itemprop=["']?price|schema\.org\/(?:Offer|AggregateOffer)/i,
-    'precio en datos estructurados',
-    'Tampoco se publican precios en datos para buscadores (JSON-LD, microdatos) ni en archivos JSON.'),
+    /"(?:price|precio|lowPrice|highPrice|priceCurrency|costo?s?|importes?|montos?|tarifas?)"\s*:|[{,]\s*(?:price|precio|costo|importe|monto|tarifa)s?\s*:|\bdata-(?:price|precio|costo|importe|monto|tarifa)s?(?=\s*=)|itemprop=["']?price|schema\.org\/(?:Offer|AggregateOffer)/i,
+    'precio en datos estructurados o en un campo de precio',
+    'Tampoco se publican precios en datos para buscadores (JSON-LD, microdatos), ni campos de precio: una clave «price», «precio», «costo», «importe», «monto» o «tarifa» en un JSON o en el código público (`{"precio": 120}`, `var o={monto:5}`) o un atributo `data-precio` fallan siempre.'),
   rule('R-RULE-02', 'FAIL', 'words', /\bgratis\b|\bgratuit[oa]s?\b/i,
     'producto marcado como gratuito',
     'Omitir el precio no convierte un producto en gratuito.'),
@@ -647,22 +665,29 @@ export async function scanDist(directory, options = {}) {
     const shown = isHtml ? visibleText(raw) : '';
     const text = isHtml ? withoutAllowed(oneLine(fold(shown))) : '';
     const joined = isHtml ? withoutAllowed(joinedText(raw)) : '';
+    // `words` junta lo que no es código (`visible`: texto, atributos, `content:` del CSS) y el código de los scripts.
     let readable;
+    let visible;
     if (isHtml) {
       const markup = withoutScripts(raw);
       const otherAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
       const styles = [inlineStyles(raw), ...attributesOf(markup).filter(([name]) => /^style$/i.test(name)).map(([, value]) => `x{${value}}`)].join('\n');
       const scripts = scriptText(inlineScripts(raw));
       readable = [text, ...otherAttributes, scripts, withoutMarkup(scripts), cssContent(styles)].join('\n');
+      visible = [text, ...otherAttributes, cssContent(styles)].join('\n');
     } else if (extension === '.css') {
       readable = `${raw}\n${cssContent(raw)}`;
+      visible = cssContent(raw);
     } else {
       const scripts = scriptText(raw);
       readable = `${scripts}\n${withoutMarkup(scripts)}`;
-      if (extension === '.svg' || extension === '.xml') readable += `\n${visibleText(raw)}`;
+      visible = extension === '.svg' || extension === '.xml' ? visibleText(raw) : '';
+      if (visible) readable += `\n${visible}`;
     }
-    const words = isHtml ? withoutAllowed(oneLine(fold(readable))) : withoutAllowed(fold(readable));
-    const scopes = { text, joined, words, norm, raw };
+    const comparable = value => (isHtml ? withoutAllowed(oneLine(fold(value))) : withoutAllowed(fold(value)));
+    const words = comparable(readable);
+    const prose = comparable(visible);
+    const scopes = { text, joined, words, prose, norm, raw };
 
     // Un mismo hallazgo (regla y texto encontrado) se informa una sola vez aunque lo encuentren varios ámbitos.
     const seen = new Set();

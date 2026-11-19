@@ -489,6 +489,41 @@ test('R-RULE-24: un enlace de correo o de teléfono vacío o sin sustituir, y de
   assert.deepEqual(failures(await scan({ '_astro/sitio.css': 'a[href^="mailto:"],a[href^="tel:"]{text-decoration:none}' })), []);
 });
 
+test('R-RULE-01: un prefijo de moneda antes de «$» es un precio en el texto, en los atributos, en los scripts y en el CSS', async () => {
+  // La base y la ronda 1 los detectaban; la excepción de «$» pegado a una letra solo vale para el código de un script.
+  await assertEachFails('R-RULE-01', [
+    '<p>MX$350</p>', '<p>Desde MX$ 1,200</p>', '<p>US$25</p>', '<p>MN$350</p>', '<p>Casco: mx$350</p>', '<p title="US$25">Casco</p>', '<p data-precio-visible="Desde MX$350">Casco</p>',
+    '<style>.p::after{content:"MX$350"}</style>', '<script>el.textContent="MX$350";</script>',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 'el.textContent="MX$350";'], ['_astro/app.js', "el.innerHTML='Desde <b>US$ 25</b>';"], ['_astro/sitio.css', '.p::after{content:"MX$350"}'],
+    ['datos.json', '{"t":"Desde MX$ 1,200"}'], ['img/p.svg', '<svg xmlns="http://www.w3.org/2000/svg"><text>MX$350</text></svg>']]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-01'], content);
+  }
+  // En el código, «$» pegado a un identificador sigue sin ser un precio.
+  for (const content of ['const x=$(1);const y=$2;', 'const a$1=2;', 'const u=`${n}`;', 'const URL$1=globalThis.URL;new URL$1(a);', 'var A$2=e=>e;A$2(1);']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+});
+
+test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabra antes de la cifra, y las claves de precio en el código', async () => {
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio por pieza 350.00</p>', '<p>Precio con IVA 350</p>', '<p>Precio de mayoreo 300</p>', '<p>Precio para mayoristas 300</p>', '<p>Costo por unidad 120</p>',
+    '<p>Tarifa de envío $90</p>',
+  ]);
+  await assertNoneFails(['<h2>Precios y cotización 2026</h2>', '<p>Te damos el precio en 24 horas</p>', '<p>Modelo 3 MN</p>', '<p>Pedido mínimo 12 piezas</p>', '<p>Paquete con 2 frascos de 350 ml</p>']);
+  // Una clave de precio en el código público o en un JSON falla siempre: el sitio no tiene campos de precio.
+  for (const content of ['var o={monto:5};', 'var o={price:5};', 'var p={a:1,precio:"350"};']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-01'], content);
+  }
+  assert.ok(RULES.some(rule => rule.id === 'R-RULE-01' && rule.doc.includes('{monto:5}')), 'el texto de --rules dice que una clave de precio en el código falla');
+});
+
+test('R-RULE-01: una cifra seguida de una unidad de cantidad no es un precio', async () => {
+  await assertNoneFails(['<p>Cotiza precio por volumen: 100 piezas o más</p>', '<p>Precio por volumen: 12 pares</p>', '<p>Tarifa de envío: 3 cajas</p>', '<p>Precio de mayoreo 50 pzas. en adelante</p>']);
+  // La misma frase con una cifra que no es una cantidad sigue siendo un precio.
+  await assertEachFails('R-RULE-01', ['<p>Precio por volumen: 100</p>', '<p>Precio por volumen: 100 pesos</p>', '<p>Precio: 100.00 por pieza</p>', '<p>Precio por pieza 35 MXN</p>']);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
@@ -519,7 +554,7 @@ test('cada regla está documentada y conserva su identificador', () => {
   for (const rule of RULES) {
     assert.match(rule.id, /^R-[A-Z0-9]+-\d{2}$/);
     assert.ok(rule.title.length > 5 && rule.doc.length > 40, rule.id);
-    assert.ok(['text', 'joined', 'words', 'raw', 'norm'].includes(rule.scope), rule.id);
+    assert.ok(['text', 'joined', 'words', 'prose', 'raw', 'norm'].includes(rule.scope), rule.id);
   }
   const documented = new Set([...RULES.map(rule => rule.id), ...CHECKS.map(([id]) => id)]);
   for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17']) {
