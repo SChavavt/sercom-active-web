@@ -478,3 +478,33 @@
     .masthead__wa .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   }
 }
+
+/* Pie (E-04): la columna de contacto debe tener lugar para la parte más ancha del correo, «sercomactive.com» (7.68rem
+   con la letra del pie de computadora, 7.17rem con la de tableta) más su icono; los enlaces, para su palabra más
+   larga. Si no lo tiene, las columnas se reacomodan en dos filas: en computadora, cuatro celdas de 6 columnas; en
+   tableta, enlaces y categorías lado a lado y contacto a todo lo ancho. Sin categorías (producción) las tres celdas
+   tienen lugar de sobra en estos anchos. En el celular, los enlaces pasan de dos columnas a una cuando una palabra
+   («señalización», 5.17rem) no cabe en la mitad de la celda. */
+@media (min-width: 1100px) and (max-width: 1359px) {
+  @container lamina (width < calc(296px + 30.8rem)) {
+    .site-footer:not(.site-footer--no-cats) .footer__cell { grid-column: span 6; }
+  }
+}
+@media (min-width: 1360px) {
+  @container lamina (width < calc(360px + 30.8rem)) {
+    .site-footer:not(.site-footer--no-cats) .footer__cell { grid-column: span 6; }
+  }
+}
+@media (min-width: 700px) and (max-width: 1099px) {
+  @container lamina (width < calc(180px + 17.3rem)) {
+    .site-footer:not(.site-footer--no-cats) .footer__nav,
+    .site-footer:not(.site-footer--no-cats) .footer__cats { grid-column: span 6; }
+    .site-footer:not(.site-footer--no-cats) .footer__reach { grid-column: span 12; }
+  }
+}
+@media (min-width: 380px) and (max-width: 699px) {
+  @container lamina (width < calc(64px + 10.4rem)) { .footer__links { columns: 1; } }
+}
+@media (max-width: 379px) {
+  @container lamina (width < calc(64px + 9.7rem)) { .footer__links { columns: 1; } }
+}
