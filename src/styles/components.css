@@ -416,7 +416,9 @@
 .product__cat { color: var(--blue); font-size: var(--label-sm); }
 .product__name { margin-top: var(--s-2); min-height: 2.5em; padding-bottom: var(--s-3); font-size: 1.125rem; }
 .product__meta { margin-top: auto; color: var(--grey-700); }
-.product__meta .t-code { color: var(--ink); }
+/* El código es lo que el cliente pide al cotizar: nunca se corta. Pasa entero al renglón siguiente si cabe ahí;
+   si no cabe ni solo, se parte dentro de la tarjeta, después de un guion o, si no hay, en cualquier carácter. */
+.product__meta .t-code { display: inline-block; max-width: 100%; color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
 .product__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--line) solid var(--rule-soft); }
 .product__action {
   display: flex;
