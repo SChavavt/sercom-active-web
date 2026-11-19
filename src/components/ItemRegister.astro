@@ -1,0 +1,28 @@
+---
+// Registro numerado (`.item-register`): una fila de la lámina por dato, con el número en azul (el estilo de
+// los pasos de «Cómo funciona», a tamaño pequeño), una etiqueta breve y una línea de explicación.
+// Lo usan «Cotizar mi lista» (qué enviar) y «Solicitud especial» (qué nos ayuda a encontrarlo).
+//
+//   <ItemRegister items={[{ label: 'Marca', text: 'La marca del producto, si la conoces.' }, …]} />
+//
+// Va dentro de una columna de celdas (por ejemplo 8 columnas junto al borrador del mensaje). El número
+// grande es decorativo; los lectores de pantalla oyen «1. », «2. »… antes de cada etiqueta.
+// Estilos: src/styles/pages/atencion.css.
+import '../styles/pages/atencion.css';
+
+interface Props {
+  items: readonly { label: string; text: string }[];
+  class?: string;
+}
+
+const { items, class: className } = Astro.props;
+---
+<ol class:list={['item-register', className]}>
+  {items.map((item, index) => (
+    <li class="item-register__row">
+      <span class="item-register__num" aria-hidden="true">{index + 1}</span>
+      <p class="item-register__label"><span class="vh">{index + 1}. </span>{item.label}</p>
+      <p class="item-register__text">{item.text}</p>
+    </li>
+  ))}
+</ol>

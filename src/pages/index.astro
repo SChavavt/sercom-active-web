@@ -19,6 +19,7 @@ import ProductGrid from '../components/ProductGrid.astro';
 import SectionHead from '../components/SectionHead.astro';
 import Steps from '../components/Steps.astro';
 import type { IconName } from '../lib/icons.ts';
+import { faqs } from '../lib/ayuda.ts';
 import { contactDetails, contactLinks } from '../lib/contact.mjs';
 import { brands, categories, featuredProducts, routes } from '../lib/site-data.mjs';
 
@@ -36,14 +37,6 @@ const steps = [
   'Explora o cuéntanos qué necesitas',
   `${contactFirstName} revisa opciones, disponibilidad y condiciones`,
   'Recibes tu cotización por WhatsApp o correo',
-];
-
-const faqs = [
-  { question: '¿Por qué no aparecen precios?', answer: 'La cotización se prepara según el producto, la cantidad y las condiciones del requerimiento.' },
-  { question: '¿Todo está en existencia?', answer: 'La disponibilidad y el tiempo de entrega se confirman al cotizar.' },
-  { question: '¿Puedo pedir algo que no está aquí?', answer: 'Sí. Compártenos la información del artículo y revisaremos opciones para conseguirlo.' },
-  { question: '¿Qué datos envío?', answer: 'Producto o descripción, cantidad y unidad; si aplica, talla, lugar de entrega y fecha requerida.' },
-  { question: '¿Hacen productos personalizados?', answer: 'Revisamos requerimientos especiales. La personalización física o fabricación se ofrece solo si se confirma ese servicio.' },
 ];
 ---
 <BaseLayout>

@@ -1,13 +1,122 @@
 ---
-// PROVISIONAL: la reemplaza quien construya la solicitud especial («Ayúdame a encontrarlo»).
+// Solicitud especial (/solicitud-especial/), la entrada «Ayúdame a encontrarlo». El título es la banda azul
+// de la portada (H1); la ruta de navegación va encima. Acciones: WhatsApp (botón de la banda, la más fuerte)
+// y correo (fila de acción bajo la banda, en la columna del botón), las dos con la plantilla de solicitud
+// especial. Después, la misma estructura que /cotizar/: registro numerado junto al borrador, nota y
+// datos de contacto. El sitio no envía nada: abre un borrador en la aplicación del cliente.
+//
+// Búsqueda que llega del catálogo: /solicitud-especial/?q=<búsqueda> (SEARCH_PARAM). Con JavaScript, el
+// script de abajo escribe la búsqueda en la línea «Descripción o uso» de los dos enlaces y del borrador, y
+// muestra la nota «Agregamos tu búsqueda “…” al borrador.». La búsqueda es texto no confiable: solo se
+// escribe con textContent o dentro del enlace codificado. Sin JavaScript o sin parámetro, la página es la
+// misma de siempre. Textos: brief de páginas «atencion», sección 2.
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import PageHeader from '../../components/PageHeader.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import Band from '../../components/Band.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import ContactData from '../../components/ContactData.astro';
+import DraftMessage from '../../components/DraftMessage.astro';
+import ItemRegister from '../../components/ItemRegister.astro';
+import Monogram from '../../components/Monogram.astro';
+import Note from '../../components/Note.astro';
+import SectionHead from '../../components/SectionHead.astro';
+import { contactDetails, contactLinks } from '../../lib/contact.mjs';
 import { routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/atencion.css';
+
+const request = contactLinks.specialRequest();
+
+const items = [
+  { label: 'Descripción', text: 'Qué es y para qué lo usas.' },
+  { label: 'Marca o modelo', text: 'Si lo tienes.' },
+  { label: 'Cantidad y unidad', text: 'Cuántas piezas, pares, cajas o paquetes.' },
+  { label: 'Foto o archivo', text: 'Adjúntalo en la conversación de WhatsApp o en el correo.' },
+  { label: 'Lugar de entrega y fecha', text: 'Ciudad o código postal y para cuándo lo necesitas.' },
+];
 ---
-<BaseLayout title="Solicitud especial">
-  <PageHeader
-    title="Ayúdame a encontrarlo"
-    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Solicitud especial' }]}
-    lead="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
-  />
+<BaseLayout
+  title="Solicitud especial"
+  description="Pide un producto que no aparece en el catálogo: envía una descripción, foto, marca o modelo y la cantidad por WhatsApp o por correo."
+>
+  <div class="solicitud__crumbs cell">
+    <Breadcrumbs items={[{ label: 'Inicio', href: routes.home }, { label: 'Solicitud especial' }]} />
+  </div>
+
+  <section class="solicitud__head section" aria-labelledby="titulo" data-solicitud>
+    <Band
+      headingLevel={1}
+      id="titulo"
+      title="¿Buscas algo que no aparece en el catálogo?"
+      text="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
+      action={{ href: request.whatsapp, label: 'Enviar mi solicitud por WhatsApp' }}
+    />
+    <div class="grid12">
+      <div class="solicitud__found cell span-8 span-md-12" data-search-cell>
+        <div class="solicitud__note" data-search-note hidden>
+          <Note icon="search">Agregamos tu búsqueda “<span data-search-term></span>” al borrador.</Note>
+        </div>
+      </div>
+      <ActionRow class="span-4 span-md-12" href={request.mailto} icon="mail">Enviar mi solicitud por correo</ActionRow>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="ayuda-title">
+    <SectionHead title="Qué nos ayuda a encontrarlo" id="ayuda-title" />
+    <div class="grid12">
+      <div class="atencion__col span-8 span-md-12">
+        <ItemRegister items={items} />
+      </div>
+      <DraftMessage text={request.text} id="borrador-title" class="span-4 span-md-12" />
+    </div>
+    <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
+  </section>
+
+  <section class="section" aria-labelledby="atencion-title" data-solicitud>
+    <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
+      <Monogram slot="side" />
+    </SectionHead>
+    <div class="grid12">
+      <ContactData class="span-8 span-md-12" whatsappHref={request.whatsapp} mailHref={request.mailto} />
+      <div class="atencion__side span-4 span-md-12">
+        <div class="atencion__intro"><p class="t-lead">Conoce las categorías y las marcas que manejamos.</p></div>
+        <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Búsqueda que llega del catálogo (?q=). Texto no confiable: solo textContent y enlaces codificados.
+    import { requestDescription, withRequestDescription } from '../../lib/contact-core.mjs';
+    import { SEARCH_PARAM } from '../../lib/search.mjs';
+
+    // Una secuencia % mal formada llega como el carácter de reemplazo (U+FFFD): se quita para no mostrarlo.
+    const query = new URLSearchParams(window.location.search).get(SEARCH_PARAM);
+    const description = requestDescription(query?.replace(/�/g, ' '));
+    if (description) {
+      const links = document.querySelectorAll<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"], [data-solicitud] a[href^="mailto:"]');
+      for (const link of links) link.setAttribute('href', withRequestDescription(link.getAttribute('href'), description));
+
+      // El borrador visible es el mismo texto que abrirá WhatsApp.
+      const whatsapp = document.querySelector<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"]');
+      const draft = document.querySelector<HTMLElement>('[data-draft-text]');
+      const text = whatsapp ? new URL(whatsapp.href).searchParams.get('text') : null;
+      if (draft && text) {
+        // Un renglón por línea, como lo imprime DraftMessage; el salto entre renglones se conserva en el texto.
+        draft.replaceChildren(...text.split('\n').flatMap((line, index) => {
+          const span = document.createElement('span');
+          span.className = 'draft__line';
+          span.textContent = line;
+          return index > 0 ? [document.createTextNode('\n'), span] : [span];
+        }));
+      }
+
+      const note = document.querySelector<HTMLElement>('[data-search-note]');
+      const term = document.querySelector<HTMLElement>('[data-search-term]');
+      if (note && term) {
+        term.textContent = description;
+        note.hidden = false;
+        document.querySelector('[data-search-cell]')?.classList.add('is-filled');
+      }
+    }
+  </script>
 </BaseLayout>
