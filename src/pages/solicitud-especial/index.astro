@@ -2,14 +2,17 @@
 // Solicitud especial (/solicitud-especial/), la entrada «Ayúdame a encontrarlo». El título es la banda azul
 // de la portada (H1); la ruta de navegación va encima. Acciones: WhatsApp (botón de la banda, la más fuerte)
 // y correo (fila de acción bajo la banda, en la columna del botón), las dos con la plantilla de solicitud
-// especial. Después, la misma estructura que /cotizar/: registro numerado junto al borrador, nota y
-// datos de contacto. El sitio no envía nada: abre un borrador en la aplicación del cliente.
+// especial. Junto a la acción de correo, en 8 columnas, la nota «Los botones abren tu aplicación…» (la única
+// vez que aparece en la página). En computadora la nota va a la izquierda y la acción a la derecha; hasta
+// 1099 px la acción va primero, justo bajo la banda, y la nota después (la acción va antes en el marcado y
+// atencion.css las coloca en computadora). Después, la misma estructura que /cotizar/: registro numerado
+// junto al borrador y datos de contacto. El sitio no envía nada: abre un borrador en la aplicación del cliente.
 //
 // Búsqueda que llega del catálogo: /solicitud-especial/?q=<búsqueda> (SEARCH_PARAM). Con JavaScript, el
 // script de abajo escribe la búsqueda en la línea «Descripción o uso» de los dos enlaces y del borrador, y
-// muestra la nota «Agregamos tu búsqueda “…” al borrador.». La búsqueda es texto no confiable: solo se
-// escribe con textContent o dentro del enlace codificado. Sin JavaScript o sin parámetro, la página es la
-// misma de siempre. Textos: brief de páginas «atencion», sección 2.
+// muestra la nota «Agregamos tu búsqueda “…” al borrador.» en la misma celda, encima de la otra nota. La
+// búsqueda es texto no confiable: solo se escribe con textContent o dentro del enlace codificado. Sin
+// JavaScript o sin parámetro, la página es la misma de siempre. Textos: brief de páginas «atencion», sección 2.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ActionRow from '../../components/ActionRow.astro';
 import Band from '../../components/Band.astro';
@@ -51,12 +54,13 @@ const items = [
       action={{ href: request.whatsapp, label: 'Enviar mi solicitud por WhatsApp' }}
     />
     <div class="grid12">
-      <div class="solicitud__found cell span-8 span-md-12" data-search-cell>
-        <div class="solicitud__note" data-search-note hidden>
+      <ActionRow class="solicitud__mail span-4 span-md-12" href={request.mailto} icon="mail">Enviar mi solicitud por correo</ActionRow>
+      <div class="solicitud__notes cell span-8 span-md-12">
+        <div data-search-note hidden>
           <Note icon="search">Agregamos tu búsqueda “<span data-search-term></span>” al borrador.</Note>
         </div>
+        <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
       </div>
-      <ActionRow class="span-4 span-md-12" href={request.mailto} icon="mail">Enviar mi solicitud por correo</ActionRow>
     </div>
   </section>
 
@@ -68,7 +72,6 @@ const items = [
       </div>
       <DraftMessage text={request.text} id="borrador-title" class="span-4 span-md-12" />
     </div>
-    <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
   </section>
 
   <section class="section" aria-labelledby="atencion-title" data-solicitud>
@@ -115,7 +118,6 @@ const items = [
       if (note && term) {
         term.textContent = description;
         note.hidden = false;
-        document.querySelector('[data-search-cell]')?.classList.add('is-filled');
       }
     }
   </script>
