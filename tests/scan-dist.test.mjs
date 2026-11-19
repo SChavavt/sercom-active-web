@@ -619,6 +619,15 @@ test('R-RULE-10: un nombre o un sustantivo de dos palabras entre el sustantivo y
   ]);
 });
 
+test('R-RULE-10: un plazo de respuesta con una cifra', async () => {
+  const promises = ['Recibirás tu cotización en 24 horas', 'Te respondemos en menos de 24 horas', 'Te cotizamos en 24 hrs', 'Respondemos en 2 horas', 'Te enviamos tu cotización en 1 día hábil',
+    'Recibes tu cotización dentro de 48 horas'];
+  await assertEachFails('R-RULE-10', promises.map(text => `<p>${text}</p>`));
+  for (const text of promises) assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
+  await assertNoneFails(['<p>Precio en 24 horas</p>', '<p>La disponibilidad y el tiempo de entrega se confirman al cotizar.</p>', '<label>Fecha requerida:</label>', '<label>Entrega en (ciudad o código postal):</label>',
+    '<p>Horario: lunes a viernes de 9 a 18 horas</p>', '<p>Usa el respirador un máximo de 8 horas</p>', '<p>Cambia el filtro cada 40 horas</p>', '<p>No recibirás nada en 24 horas sin pedirlo.</p>']);
+});
+
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
   await assertEachFails('R-RULE-24', [
     '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',

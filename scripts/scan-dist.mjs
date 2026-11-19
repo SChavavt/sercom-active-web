@@ -300,6 +300,11 @@ const AUXILIARY = '(?:ya|fue|fueron|ha|han|sido|se|quedo|quedaron|quedado|queda|
 // «Lista de marcas registradas»: «marca registrada» es un nombre, no una confirmación.
 const CONFIRMED = `(?<!\\bmarcas?\\s+)${PARTICIPLE}\\b`;
 const DETERMINER = '(?:el|la|los|las|un|una|unos|unas|cada|este|esta|ese|esa|otro|otra)';
+// Un verbo de recibir, responder, enviar, cotizar o contactar en primera persona del plural o dirigido al lector…
+const RESPONSE_VERB = '\\b(?:recibiras|recibes|recibira|(?:te\\s+)?respondemos|te\\s+contestamos|(?:te\\s+)?cotizamos|(?:te\\s+)?enviamos|te\\s+contactamos|te\\s+llamamos|te\\s+atendemos)\\b';
+// …y, a seis palabras como máximo y sin fin de frase, un plazo con una cifra: «en 24 horas», «dentro de 48 horas»,
+// «en menos de 2 horas», «en un día hábil».
+const RESPONSE_TIME = '(?:en|dentro\\s+de)\\s+(?:(?:menos\\s+de|maximo|un\\s+maximo\\s+de)\\s+)?(?:\\d+|un|una)\\s+(?:minutos|min|horas?|hrs|h|dias?)(?:\\s+habil(?:es)?)?\\b';
 const FALSE_CONFIRMATION = new RegExp([
   // En primera persona: «Hemos enviado tu solicitud», «Ya enviamos tu mensaje», «Registramos tu pedido».
   new RegExp(`${NEGATED}\\b(?:recibimos|enviamos|registramos) (?:tu|su|tus|sus)\\b|\\bhemos (?:recibido|enviado|registrado)\\b|\\bya (?:recibimos|enviamos|registramos)\\b`),
@@ -321,6 +326,8 @@ const FALSE_CONFIRMATION = new RegExp([
   // Un tercero que responde («Un asesor se comunicará contigo») o un plazo («Recibirás tu cotización en breve»).
   new RegExp(`${NEGATED}\\bse (?:comunicara|pondra en contacto)\\b`),
   /\brecibiras\b[^.!?<]{0,40}?\b(?:en breve|pronto|a la brevedad|hoy mismo|en (?:unos|pocos) minutos|en menos de)\b/,
+  // Un plazo con una cifra: «Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos en 2 horas».
+  new RegExp(`${NEGATED}${RESPONSE_VERB}(?:\\s+[^\\s.!?;<]+){0,6}?\\s+${RESPONSE_TIME}`),
 ].map(part => part.source).join('|'), 'i');
 // Precios: símbolo o código de moneda junto a una cifra, la palabra de un precio seguida de una cifra y vocabulario
 // de oferta. Un prefijo de moneda de una a tres mayúsculas antes de «$» («MX$350», «US$ 25») también es un precio.
@@ -426,7 +433,7 @@ export const RULES = [
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
   rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve», «Un asesor se comunicará contigo»). El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
+    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve», «Un asesor se comunicará contigo»), también con una cifra: un verbo de recibir, responder, enviar, cotizar o contactar dirigido al lector o en primera persona del plural y, a seis palabras como máximo y sin fin de frase, «en» o «dentro de» con una cifra y una unidad de tiempo («Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos en menos de 2 horas»; no «Precio en 24 horas» ni «Usa el respirador un máximo de 8 horas»). El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
   rule('R-RULE-10', 'FAIL', 'joined', FALSE_CONFIRMATION,
     'confirmación falsa partida por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Solicitud envi<span>ada</span>».'),
