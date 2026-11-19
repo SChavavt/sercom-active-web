@@ -187,6 +187,12 @@
   .producto__chips[data-fill-4] .producto__chip-fill { display: none; }
   .producto__chips[data-fill-2="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chip { min-height: 64px; }
+  /* Letra agrandada (E-06): en un celular más angosto que 20rem (con la letra normal no lo hay desde 320 px) una
+     variante larga («Extragrande») se parte con guion dentro de su celda en lugar de salirse de la pantalla
+     (contenedor lamina: layout.css; las demás reglas de la letra agrandada están en responsive.css 6.9). */
+  @container lamina (width < 20rem) {
+    .producto__chip-label { max-width: 100%; hyphens: auto; }
+  }
 
   .producto__doc { column-gap: var(--s-3); }
 }

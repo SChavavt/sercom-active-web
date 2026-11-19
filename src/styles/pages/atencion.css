@@ -31,6 +31,18 @@
 }
 .item-register__label { font-size: 1.125rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; }
 .item-register__text { color: var(--grey-700); text-wrap: pretty; }
+/* Letra agrandada (E-06): las columnas del número (2.5rem) y de la etiqueta (13rem) crecen con la letra y dejaban a
+   la explicación una columna más angosta que sus palabras. Si no le quedan 12rem, la explicación pasa bajo la
+   etiqueta, como en el celular. El registro es su propio contenedor; con la letra normal mide 650 px o más y la
+   condición (27.5rem más el hueco y el relleno: 552 px) no se cumple. El celular tiene su propia regla. */
+.item-register { container: registro / inline-size; }
+@media (min-width: 700px) {
+  @container registro (width < calc(27.5rem + 112px)) {
+    .item-register__row { grid-template-columns: 2.5rem minmax(0, 1fr); row-gap: 2px; }
+    .item-register__num { grid-row: span 2; }
+    .item-register__text { grid-column: 2; }
+  }
+}
 
 /* --- Borrador del mensaje (DraftMessage) ----------------------------------- */
 .draft { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }

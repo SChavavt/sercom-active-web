@@ -558,9 +558,12 @@
 }
 
 /* Celular más angosto que 20rem (con la letra normal no lo hay desde 320 px; con 200 % lo es hasta 640 px): la
-   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla. */
+   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla, y la
+   categoría de una tarjeta de producto («Protección respiratoria», en mayúsculas espaciadas) también, y en último
+   caso donde no quepa, en lugar de salirse de la tarjeta (E-06). */
 @media (max-width: 699px) {
   @container lamina (width < 20rem) {
     .faq__q .t-h3 { hyphens: auto; }
+    .product__cat { hyphens: auto; overflow-wrap: break-word; }
   }
 }
