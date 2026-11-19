@@ -21,6 +21,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   row-gap: var(--line);
+  /* Contenedor de consultas: con @container lamina (responsive.css 6.9) una regla compara el ancho de la lámina con
+     el tamaño de letra (rem), lo que una consulta de medios no puede: así las celdas se reacomodan solo cuando el
+     texto agrandado ya no cabe. No cambia el dibujo de la lámina. */
+  container: lamina / inline-size;
 }
 
 .sheet > main,

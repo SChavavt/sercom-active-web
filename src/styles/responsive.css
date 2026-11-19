@@ -51,12 +51,13 @@
   .masthead__logo img { width: 136px; height: 51px; }
   .masthead__btn {
     display: flex;
+    flex: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 5px;
-    width: 72px;
-    padding: 0;
+    min-width: 72px;                      /* mínimo, no fijo: con la letra agrandada el botón crece con su etiqueta */
+    padding: 0 var(--s-1);
     border: 0;
     border-radius: 0;
     color: var(--ink);
@@ -69,7 +70,7 @@
   .masthead__btn .icon--close, .masthead__btn[aria-expanded="true"] .icon--open { display: none; }
   .masthead__btn[aria-expanded="true"] .icon--close { display: block; }
   .masthead__btn--menu { order: 1; }      /* en el documento va antes de la navegación (orden del teclado); a la vista, al final */
-  .masthead__wa { width: 88px; }
+  .masthead__wa { flex: none; min-width: 88px; }
   .masthead__cta { padding: 0 var(--s-5); }
   .masthead__cta .icon { display: none; }
 
@@ -207,7 +208,7 @@
   .utility__hours { display: none; }
 
   .masthead__logo img { width: 122px; height: 46px; }
-  .masthead__btn { width: 64px; }
+  .masthead__btn { min-width: 64px; }
   .masthead__wa, .masthead__cta { display: none; }           /* en el celular ambos viven en la barra fija */
   .masthead__nav, .masthead__search { left: 0; right: 0; border-inline: 0; border-bottom: var(--line) solid var(--rule); }
 
@@ -445,4 +446,31 @@
 @media (forced-colors: active) and (max-width: 1099px) {
   :where(.masthead__nav-list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
   .masthead__nav-link[aria-current] { border-left: 4px solid CanvasText; }
+}
+
+/* 6.9 Letra agrandada (el tamaño de letra del navegador: la raíz a 125, 150 o 200 %)
+   Los controles y las celdas crecen con su texto (mínimos en lugar de anchos fijos) y un texto largo pasa a otro
+   renglón. Cuando ni así cabe, las reglas de aquí reacomodan la fila. Cada condición compara el ancho de la lámina
+   (contenedor `lamina`, layout.css) con lo que mide el texto en rem; con la letra normal ninguna se cumple a partir
+   de 320 px, así que nada de esto cambia el diseño aprobado. Las medidas en rem son las de las etiquetas en
+   Archivo (por ejemplo «Buscar» o «Cerrar» en los botones: 3.37rem; «WhatsApp»: 4.46rem). */
+/* Botones Buscar y Menú del celular: sin lugar para sus etiquetas junto al logotipo (142 px de celda), la etiqueta
+   queda solo para el lector (sigue siendo el nombre del botón) y el botón muestra su icono, con sus 64 px. */
+@media (max-width: 699px) {
+  @container lamina (width < calc(162px + 6.75rem)) {
+    .masthead__btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+}
+/* Tableta: logotipo (160 px), Buscar, WhatsApp, «Cotizar» (la palabra más larga del bloque, 3.36rem, más sus 40 px
+   de relleno) y Menú. Si no caben con sus etiquetas, Buscar y Menú quedan con su icono. */
+@media (min-width: 700px) and (max-width: 1099px) {
+  @container lamina (width < calc(230px + 14.6rem)) {
+    .masthead__btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
+}
+/* Computadora: WhatsApp ocupa una columna de las doce; si «WhatsApp» no cabe en ella, queda su icono. */
+@media (min-width: 1100px) {
+  @container lamina (width < calc(109px + 53.6rem)) {
+    .masthead__wa .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  }
 }
