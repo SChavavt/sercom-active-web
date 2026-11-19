@@ -589,6 +589,8 @@ test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección
     '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',
     '<a href="https://l.example.com/?u=https%25253A%25252F%25252Fwa.me%25252F5215555555555">WhatsApp</a>',
     '<a href="https://l.example.com/?u=mailto%253Aotro%2540example.com">Correo</a>',
+    // Codificado cinco veces: la base lo detectaba.
+    `<a href="https://l.example.com/?u=${[1, 2, 3, 4, 5].reduce(text => encodeURIComponent(text), 'https://wa.me/5215555555555')}">WhatsApp</a>`,
   ]);
   assert.deepEqual(failedIds(await scan({ '_astro/app.js': 'location.href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555";' })), ['R-RULE-24']);
   // El enlace confirmado codificado dos veces dentro de otro sigue siendo el confirmado.
