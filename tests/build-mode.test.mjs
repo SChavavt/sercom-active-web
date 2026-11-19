@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPreviewFlag, PREVIEW_FLAG, previewFlagWarning } from '../src/lib/build-mode.mjs';
 import { listFiles, readJson, readText, ROOT } from './helpers.mjs';
@@ -116,6 +116,62 @@ test('el archivo de ejemplos solo se carga dentro de la rama de vista previa de 
   // Nadie más lee la constante: las páginas usan `isPreview` o `mode`.
   const readers = [...sources].filter(([path, code]) => path !== 'src/env.d.ts' && code.includes('__CATALOG_PREVIEW__')).map(([path]) => path);
   assert.deepEqual(readers, ['src/lib/site-data.mjs']);
+});
+
+// Archivo de ejemplos, tal como lo vería un patrón de Vite resuelto desde la raíz del proyecto.
+const EXAMPLES_FILE = '/src/data/preview/example-products.json';
+/**
+ * Patrones de `import.meta.glob(…)` y de `import(\`…${x}…\`)` (que Vite convierte en un patrón) en el código de un
+ * archivo, resueltos desde la raíz del proyecto. Un `import()` cuyo argumento no es un texto escrito tal cual no se
+ * puede revisar y se devuelve como «?».
+ * @param {string} path Ruta del archivo («src/pages/x.astro»).
+ * @param {string} code Código sin comentarios.
+ */
+function loadPatterns(path, code) {
+  const directory = posix.dirname(`/${path}`);
+  const resolvePattern = pattern => {
+    const negated = pattern.startsWith('!');
+    const body = negated ? pattern.slice(1) : pattern;
+    const absolute = body.startsWith('/') ? posix.normalize(body) : posix.join(directory, body);
+    return negated ? `!${absolute}` : absolute;
+  };
+  const patterns = [];
+  for (const match of code.matchAll(/import\.meta\.glob\s*(?:<[^>]*>)?\s*\(\s*(\[[^\]]*\]|["'`][^"'`]*["'`]|[^,)]*)/g)) {
+    const literals = [...match[1].matchAll(/["'`]([^"'`]*)["'`]/g)].map(literal => literal[1]);
+    patterns.push(...(literals.length ? literals.map(resolvePattern) : ['?']));
+  }
+  for (const match of code.matchAll(/(?<![\w$.])import\s*\(\s*([^)]*)\)/g)) {
+    const argument = match[1].trim();
+    if (/^(["'])[^"'`]*\1(?:\s*,|$)/.test(argument)) continue; // Texto escrito tal cual: lo revisa la prueba de las menciones.
+    const template = argument.match(/^`([^`]*)`/);
+    patterns.push(template ? resolvePattern(template[1].replace(/\$\{[^}]*\}/g, '*')) : '?');
+  }
+  return patterns;
+}
+/** ¿Alguno de los patrones puede cargar el archivo de ejemplos? */
+const reachesExamples = patterns => patterns.some(pattern => pattern === '?')
+  || (patterns.some(pattern => !pattern.startsWith('!') && posix.matchesGlob(EXAMPLES_FILE, pattern))
+    && !patterns.some(pattern => pattern.startsWith('!') && posix.matchesGlob(EXAMPLES_FILE, pattern.slice(1))));
+
+test('ningún import.meta.glob ni import() con patrón puede cargar el archivo de ejemplos', () => {
+  // La comprobación reconoce las formas que esquivan la búsqueda por nombre.
+  const misuse = [
+    ['src/pages/muestra.astro', "const datos = import.meta.glob('../data/*/*.json', { eager: true });"],
+    ['src/pages/muestra.astro', "const datos = import.meta.glob(['../data/**/*.json', '!../data/catalog.json']);"],
+    ['src/components/Tarjeta.astro', "const datos = import.meta.glob('/src/**/*.json');"],
+    ['src/lib/otra.mjs', 'const datos = await import(`../data/${carpeta}/${nombre}.json`);'],
+    ['src/lib/otra.mjs', 'const datos = await import(ruta);'],
+  ];
+  for (const [path, code] of misuse) assert.ok(reachesExamples(loadPatterns(path, code)), code);
+  const harmless = [
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob('../icons/*.svg', { eager: true, query: '?raw' });"],
+    ['src/pages/muestra.astro', "const datos = import.meta.glob(['../data/*.json', '!../data/preview/**']);"],
+    ['src/lib/site-data.mjs', "const datos = (await import('../data/preview/example-products.json', { with: { type: 'json' } })).default;"],
+  ];
+  for (const [path, code] of harmless) assert.equal(reachesExamples(loadPatterns(path, code)), false, code);
+
+  const offenders = [...sources].filter(([path, code]) => reachesExamples(loadPatterns(path, code))).map(([path]) => path);
+  assert.deepEqual(offenders, [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
 });
 
 test('el código del sitio nunca importa el registro de investigación', () => {

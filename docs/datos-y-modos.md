@@ -69,10 +69,12 @@ La dirección del sitio todavía no existe (`SITE_URL` vacío), así que `absolu
 ## Cómo se mantienen los ejemplos fuera de producción
 
 1. Viven en un archivo aparte y nunca entran en `catalog.json`: la validación rechaza cualquier ficha con identificador `ejemplo-…`, código `EJ-…` o nombre con «de ejemplo».
-2. `site-data.mjs` los carga solo dentro de la rama de vista previa. Con la bandera apagada, la compilación elimina esa rama y el archivo no llega a ningún HTML, script ni JSON.
+2. `site-data.mjs` los carga solo dentro de la rama de vista previa. Con la bandera apagada, la compilación elimina esa rama y el archivo no llega a ningún HTML, script ni JSON. `tests/build-mode.test.mjs` comprueba que ningún otro archivo de `src/` nombra el archivo de ejemplos ni puede alcanzarlo con un `import.meta.glob(…)` o un `import()` con patrón (por ejemplo, `'../data/*/*.json'`).
 3. En modo producción, `createSiteData` ignora los ejemplos aunque los reciba.
 4. `tests/build-output.test.mjs` compila una página de prueba en ambos modos y comprueba que los ejemplos solo aparecen en la vista previa.
-5. `npm run verify` escanea `dist/` y falla si encuentra `EJ-`, «Marca de ejemplo», `ejemplo-` o «de ejemplo» en cualquier archivo.
+5. `npm run verify` escanea `dist/` y falla si encuentra `EJ-`, «Marca de ejemplo», `ejemplo-` o «de ejemplo» en cualquier archivo, o cualquier identificador, nombre, texto o código del archivo de ejemplos (los códigos también escritos con otro separador o sin él, como `EJ1001`).
+
+El escáner reconoce los ejemplos por esas marcas y por sus textos. Una página que copiara un ejemplo y reescribiera todos sus textos ya no se distinguiría de una ficha real: por eso la garantía principal es el paso 2, que impide cargar el archivo fuera de la rama de vista previa.
 
 Consecuencia para quien escribe páginas: esas cadenas tampoco pueden usarse en producción como nombre de clase CSS, identificador o texto (por ejemplo, una clase `ejemplo-…`). «Por ejemplo» sí puede escribirse.
 
