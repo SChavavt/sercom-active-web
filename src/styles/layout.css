@@ -1,0 +1,41 @@
+/* ==========================================================================
+   3. Composición: la lámina y su retícula de doce columnas
+   Parte de la hoja global del sitio (entrada: global.css). Guía: docs/diseno.md.
+   La idea en una línea: la página es una lámina. `.sheet` se pinta de azul Sercom y cada bloque
+   es una celda blanca; los huecos de 1 px entre celdas son los filetes. Ningún elemento dibuja su
+   propio borde, así que las líneas nunca se duplican y siempre caen en la misma retícula.
+   ========================================================================== */
+.sheet {
+  width: min(100% - 2 * var(--margin), var(--sheet-max));
+  margin: 0 auto var(--s-9);
+  padding: 0 var(--line) var(--line);
+  background: var(--rule);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--line);
+}
+
+.sheet > main,
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--line);
+}
+.sheet > main:focus { outline: none; }
+
+/* Una fila de celdas. Todas las filas usan las mismas doce pistas, así que cada filete vertical
+   de la página cae en una de once posiciones. */
+.grid12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--line);
+}
+.cell { background: var(--surface); }
+.span-2 { grid-column: span 2; }
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-5 { grid-column: span 5; }
+.span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; }
+.span-8 { grid-column: span 8; }
+.span-12 { grid-column: span 12; }

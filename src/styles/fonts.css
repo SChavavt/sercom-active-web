@@ -1,0 +1,247 @@
+/* ==========================================================================
+   Tipografía: kit Archivo (fuente de verdad: kit tipográfico del proyecto, sin cambios en reglas ni valores)
+   Una sola familia para títulos y texto: ARCHIVO variable, ejes wght 100–900 y wdth 62–125.
+
+   Origen    npm @fontsource-variable/archivo@5.3.0; archivos copiados sin modificar a src/assets/fonts/.
+   Licencia  SIL Open Font License 1.1 (src/assets/fonts/OFL-Archivo.txt; avisos en docs/licencias-de-terceros.md).
+   Peso      latin 88.0 KB (todas las páginas, precargado desde BaseLayout) · latin-ext 84.2 KB (solo se
+             descarga si una página contiene un carácter de su rango; el español nunca lo hace).
+   Vite procesa los url() de este archivo: en dist/ quedan como /_astro/<nombre>.<hash>.woff2, sin
+   peticiones a terceros.
+
+   Uso
+   - El ancho se fija con `font-stretch` (96 % en h1 y h2, 110 % en etiquetas). Nunca más de 104 % en títulos.
+   - La instancia por omisión del archivo es SemiBold (wght 600): no quitar el rango `font-weight: 100 900`.
+   - No hay cursivas: el énfasis se hace con peso, nunca con una inclinación sintética.
+   - Códigos, cantidades y columnas: `font-variant-numeric: tabular-nums`.
+   - Caracteres que NO están en el archivo (caerían en la fuente del sistema): flechas → ←, palomita ✓,
+     ≤ ≥ Ω ⌀ № ‰ ⅛ ⅜ ⅝ ⅞ y el guion sin corte U+2011. Flechas y palomitas salen del kit de iconos.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Fuente web
+   -------------------------------------------------------------------------- */
+
+/* archivo-latin-ext-wdth-normal */
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url("../assets/fonts/archivo-latin-ext-wdth-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* archivo-latin-wdth-normal */
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url("../assets/fonts/archivo-latin-wdth-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --------------------------------------------------------------------------
+   2. Respaldos del sistema con métricas ajustadas
+   Se ven mientras carga la fuente web (font-display: swap) y en caracteres que la fuente no tiene.
+   size-adjust = avance medio de Archivo con sus ejes / avance medio de la fuente del sistema, medido
+   sobre los textos en español del sitio; los ajustes verticales reproducen ascent 0.878, descent 0.210
+   y line gap 0 de Archivo. Dos juegos: Arial (y sus gemelas Liberation Sans y Arimo) y Roboto, que va
+   primero en las pilas porque Android trata el nombre Arial como alias de su sans-serif.
+   -------------------------------------------------------------------------- */
+
+/* Texto, pesos regulares (Archivo wght 400, wdth 100 contra Arial) */
+@font-face {
+  font-family: "Archivo Fallback";
+  font-style: normal;
+  font-weight: 100 549;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Arimo"), local("Arimo Regular");
+  size-adjust: 98.54%;
+  ascent-override: 89.1%;
+  descent-override: 21.31%;
+  line-gap-override: 0%;
+}
+
+/* Texto, pesos 600 y 650: botones, negritas, códigos (Archivo wght 650, wdth 100 contra Arial Bold).
+   Archivo se ensancha al ganar peso (alrededor de 1.7 % por cada 50 unidades), por eso hay dos rangos. */
+@font-face {
+  font-family: "Archivo Fallback";
+  font-style: normal;
+  font-weight: 550 674;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 96.9%;
+  ascent-override: 90.61%;
+  descent-override: 21.67%;
+  line-gap-override: 0%;
+}
+
+/* Texto, peso 700: h3 y títulos de tarjeta (Archivo wght 700, wdth 100 contra Arial Bold) */
+@font-face {
+  font-family: "Archivo Fallback";
+  font-style: normal;
+  font-weight: 675 900;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 98.79%;
+  ascent-override: 88.88%;
+  descent-override: 21.26%;
+  line-gap-override: 0%;
+}
+
+/* Titulares h1 y h2 (Archivo wght 700, wdth 96 contra Arial Bold) */
+@font-face {
+  font-family: "Archivo Display Fallback";
+  font-style: normal;
+  font-weight: 100 900;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 95.48%;
+  ascent-override: 91.96%;
+  descent-override: 21.99%;
+  line-gap-override: 0%;
+}
+
+/* Etiquetas (Archivo wght 650, wdth 110, mayúsculas, contra Arial Bold; calibrado con las etiquetas del sitio) */
+@font-face {
+  font-family: "Archivo Label Fallback";
+  font-style: normal;
+  font-weight: 100 900;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold");
+  size-adjust: 111.5%;
+  ascent-override: 78.74%;
+  descent-override: 18.83%;
+  line-gap-override: 0%;
+}
+
+/* Las mismas caras sobre Roboto (medidas contra @fontsource-variable/roboto en un Chromium simulado; sin prueba
+   en un dispositivo real). Si el sistema no expone estos nombres, las reglas se omiten y se usa la siguiente familia. */
+@font-face {
+  font-family: "Archivo Fallback Roboto";
+  font-style: normal;
+  font-weight: 100 549;
+  src: local("Roboto"), local("Roboto Regular"), local("Roboto-Regular");
+  size-adjust: 99.12%;
+  ascent-override: 88.58%;
+  descent-override: 21.19%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Fallback Roboto";
+  font-style: normal;
+  font-weight: 550 674;
+  src: local("Roboto Bold"), local("Roboto-Bold"), local("Roboto");
+  size-adjust: 103.1%;
+  ascent-override: 85.16%;
+  descent-override: 20.37%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Fallback Roboto";
+  font-style: normal;
+  font-weight: 675 900;
+  src: local("Roboto Bold"), local("Roboto-Bold"), local("Roboto");
+  size-adjust: 105.11%;
+  ascent-override: 83.53%;
+  descent-override: 19.98%;
+  line-gap-override: 0%;
+}
+
+/* h1 y h2 (Archivo wght 700, wdth 96 contra Roboto Bold) */
+@font-face {
+  font-family: "Archivo Display Fallback Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  src: local("Roboto Bold"), local("Roboto-Bold"), local("Roboto");
+  size-adjust: 102.1%;
+  ascent-override: 85.99%;
+  descent-override: 20.57%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Archivo Label Fallback Roboto";
+  font-style: normal;
+  font-weight: 100 900;
+  src: local("Roboto Bold"), local("Roboto-Bold"), local("Roboto");
+  size-adjust: 120.65%;
+  ascent-override: 72.77%;
+  descent-override: 17.41%;
+  line-gap-override: 0%;
+}
+
+/* --------------------------------------------------------------------------
+   3. Variables tipográficas
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* Pilas. La fuente web es la misma en las tres; solo cambia el respaldo ajustado.
+     --font-heading  solo h1 y h2 (respaldo ajustado al corte pesado de ancho 96 %)
+     --font-body     todo lo demás: texto, h3, títulos de tarjeta, botones, navegación, códigos
+     --font-label    etiquetas pequeñas en mayúsculas de ancho 110 % (antetítulos, etiquetas, encabezados de tabla) */
+  --font-heading: "Archivo Variable", "Archivo Display Fallback Roboto", "Archivo Display Fallback", system-ui, sans-serif;
+  --font-body: "Archivo Variable", "Archivo Fallback Roboto", "Archivo Fallback", system-ui, sans-serif;
+  --font-label: "Archivo Variable", "Archivo Label Fallback Roboto", "Archivo Label Fallback", system-ui, sans-serif;
+
+  /* h1 del kit: 32 px a 360, 33 px a 390, 64 px desde 1280 (la portada usa --h1 de tokens.css en computadora) */
+  --type-h1-size: clamp(2rem, 1.217rem + 3.478vw, 4rem);
+  --type-h1-weight: 700;
+  --type-h1-width: 96%;
+  --type-h1-tracking: -0.015em;
+  --type-h1-leading: 1.05;
+
+  /* h1 de páginas interiores (catálogo, categoría, producto): mismo corte, 28 px en celular, 44 px desde 1280 */
+  --type-title-size: clamp(1.75rem, 1.312rem + 1.798vw, 2.75rem);
+  --type-title-leading: 1.08;
+
+  /* h2: títulos de sección. 24 px a 360, 36 px desde 1280 */
+  --type-h2-size: clamp(1.5rem, 1.207rem + 1.304vw, 2.25rem);
+  --type-h2-weight: 700;
+  --type-h2-width: 96%;
+  --type-h2-tracking: -0.012em;
+  --type-h2-leading: 1.1;
+
+  /* h3: títulos de tarjeta, nombres de producto, títulos de panel (18 px) */
+  --type-h3-size: 1.125rem;
+  --type-h3-weight: 700;
+  --type-h3-width: 100%;
+  --type-h3-tracking: -0.005em;
+  --type-h3-leading: 1.25;
+
+  /* Etiqueta: antetítulos y etiquetas en mayúsculas, 12.5 px (agregar text-transform: uppercase) */
+  --type-label-size: 0.78125rem;
+  --type-label-weight: 650;
+  --type-label-width: 110%;
+  --type-label-tracking: 0.08em;
+  --type-label-leading: 1.3;
+
+  /* Texto corrido (16 px) */
+  --type-body-size: 1rem;
+  --type-body-weight: 400;
+  --type-body-width: 100%;
+  --type-body-tracking: 0em;
+  --type-body-leading: 1.55;
+
+  /* Párrafo de entrada: 17 px en celular, 19 px desde 1280 */
+  --type-lead-size: clamp(1.0625rem, 1.008rem + 0.225vw, 1.1875rem);
+  --type-lead-leading: 1.5;
+
+  /* Texto pequeño: notas, celdas de tabla, líneas de datos (14 px) */
+  --type-small-size: 0.875rem;
+  --type-small-tracking: 0.005em;
+  --type-small-leading: 1.45;
+
+  /* Interfaz */
+  --type-button-size: 1rem;
+  --type-button-weight: 650;
+  --type-button-tracking: 0em;
+  --type-nav-size: 0.9375rem;
+  --type-nav-weight: 500;
+  --type-strong-weight: 650;
+
+  /* Códigos y cifras (códigos de fabricante, cantidades, tallas) */
+  --type-code-weight: 600;
+  --type-code-numeric: tabular-nums;
+}
