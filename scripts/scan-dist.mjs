@@ -139,7 +139,7 @@ function withoutHiddenElements(html) {
  * que lo esconda no se ve aquí.
  */
 const elementText = html => oneLine(fold(decodeEntities(withoutHiddenElements(withoutScripts(html))
-  .replace(TAG, (tag, closing, name) => (INLINE_ELEMENT.test(name) ? '' : ' '))
+  .replace(TAG, (_tag, _closing, name) => (INLINE_ELEMENT.test(name) ? '' : ' '))
   .replace(/<![^>]*>/g, ' ')))).toLowerCase();
 // Etiquetas dentro del texto de un script («t.innerHTML="Solicitud <b>enviada</b>"»). El nombre debe ir seguido de un
 // espacio, «/» o «>», y la etiqueta no puede contener «<», para no confundirlas con comparaciones («i<a.length»).
