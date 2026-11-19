@@ -22,7 +22,7 @@
   aspect-ratio: 4 / 3;
   max-height: calc(100vh - var(--masthead-h) - var(--line));
 }
-.producto__tag { position: absolute; top: var(--s-6); left: var(--pad); }
+.producto__tag { position: absolute; z-index: 1; top: var(--s-6); left: var(--pad); }   /* sobre la fotografía */
 .producto__plate {
   display: grid;
   place-items: center;

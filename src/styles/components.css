@@ -411,7 +411,7 @@
   color: var(--blue);
 }
 .product__plate .icon { width: 58%; height: 58%; }
-.product__media .tag { position: absolute; top: var(--s-4); left: var(--pad); }
+.product__media .tag { position: absolute; z-index: 1; top: var(--s-4); left: var(--pad); }   /* sobre la fotografía */
 .product__body { display: flex; flex: 1; flex-direction: column; padding: var(--s-5) var(--pad) var(--s-5); }
 .product__cat { color: var(--blue); font-size: var(--label-sm); }
 .product__name { margin-top: var(--s-2); min-height: 2.5em; padding-bottom: var(--s-3); font-size: 1.125rem; }
@@ -558,9 +558,10 @@
 .empty__title { font-size: var(--h3-lg); font-weight: 700; line-height: 1.15; letter-spacing: -0.012em; text-wrap: balance; }
 .empty__text { margin-top: var(--s-2); max-width: 60ch; font-size: 1.0625rem; color: var(--grey-700); text-wrap: pretty; }
 
-/* Fotografía real de producto: sobre blanco, completa, sin recortar */
+/* Fotografía real de producto: sobre blanco, completa, sin recortar. Va encima del área, sin ocupar lugar en
+   ella: el área conserva su proporción con una foto vertical, horizontal o cuadrada y la foto se contiene. */
 .product__media--photo { background: var(--surface); }
-.product__img { width: 100%; height: 100%; object-fit: contain; }
+.product__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
 /* Celdas de marca altas (página de marcas) */
 .brands--lg .brand { min-height: 96px; }
