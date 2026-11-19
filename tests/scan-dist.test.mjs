@@ -1211,6 +1211,50 @@ test('R-PUB-04: la página 404 nunca declara una dirección canónica', async ()
   })), []);
 });
 
+test('R-RULE-10: «estaremos …ando» y «vamos a …» se leen como la forma simple del mismo verbo y la misma persona', async () => {
+  // Las fórmulas más comunes de un negocio en México, que ninguna versión detectaba.
+  const promises = ['Te estaremos contactando a la brevedad.', 'En breve te estaremos contactando.', 'Te vamos a contestar a la brevedad.', 'Te voy a responder a la brevedad.',
+    'Te estaremos enviando tu cotización.', 'Te vamos a mandar la cotización hoy mismo.', 'Me pondré en contacto contigo hoy mismo.', 'Les daremos respuesta en breve.',
+    'Daremos respuesta a tu solicitud en 24 horas.'];
+  await assertEachFails('R-RULE-10', promises.map(text => `<p>${text}</p>`));
+  for (const text of promises) assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
+  // Donde la forma simple falla sin plazo, la perífrasis también («Te contactaremos», «Te enviaremos», «Te escribiremos»,
+  // «Le llamaremos», «Te daremos respuesta», «Nos pondremos en contacto»), también con el pronombre al final.
+  await assertEachFails('R-RULE-10', [
+    '<p>Te estaremos escribiendo.</p>', '<p>Te vamos a responder.</p>', '<p>Te vamos a contactar.</p>', '<p>Te vamos a llamar.</p>', '<p>Le estaremos llamando.</p>',
+    '<p>Te vamos a dar respuesta.</p>', '<p>Te estaremos dando una respuesta.</p>', '<p>Me pondré en contacto contigo.</p>', '<p>Me voy a poner en contacto contigo.</p>',
+    '<p>Nos vamos a poner en contacto contigo.</p>', '<p>Vamos a ponernos en contacto contigo.</p>', '<p>Nos estaremos comunicando contigo.</p>', '<p>Me comunicaré contigo.</p>',
+    '<p>Vamos a contactarte.</p>', '<p>Estaremos contactándote.</p>', '<p>Vamos a responderle.</p>',
+  ]);
+  // Donde la forma simple necesita un plazo, la perífrasis también (con el plazo antes o después del verbo).
+  await assertEachFails('R-RULE-10', [
+    '<p>Te estaremos respondiendo en 24 horas.</p>', '<p>Vamos a contestar tu mensaje en 24 horas.</p>', '<p>Vamos a responder a la brevedad.</p>',
+    '<p>Te voy a escribir hoy mismo.</p>', '<p>Voy a responder en menos de 2 horas.</p>', '<p>Te voy a enviar la cotización en breve.</p>', '<p>A la brevedad te vamos a contestar.</p>',
+    '<p>Pronto te voy a escribir.</p>', '<p>En 24 horas te estaremos respondiendo.</p>', '<p>Estaremos respondiendo tu mensaje en 24 horas.</p>', '<p>Estaré respondiendo en breve.</p>',
+    '<p>Te estaré escribiendo en 24 horas.</p>', '<p>Vamos a cotizar tu lista en 24 horas.</p>', '<p>Te vamos a atender en 24 horas.</p>', '<p>Vamos a contestarte a la brevedad.</p>',
+    // «daremos respuesta» y «damos respuesta» sin «te» ni «le», con un plazo; con «les», como con «te».
+    '<p>Damos respuesta en 24 horas.</p>', '<p>Damos respuesta a tu solicitud a la brevedad.</p>', '<p>Daremos respuesta en breve.</p>', '<p>En breve daremos respuesta.</p>',
+    '<p>Vamos a dar respuesta en 24 horas.</p>', '<p>Les damos respuesta.</p>', '<p>Les daremos respuesta.</p>', '<p>Les vamos a dar respuesta.</p>',
+  ]);
+  // Sin plazo, la perífrasis de un verbo que necesita uno no promete nada, igual que su forma simple; tampoco la de un
+  // verbo que la regla no conoce.
+  await assertNoneFails([
+    '<p>Te respondo dudas sobre tallas por WhatsApp.</p>', '<p>Escríbeme por WhatsApp y te respondo.</p>', '<p>Mando la ficha técnica si el fabricante la publica.</p>',
+    '<p>Revisa tu lista y envíala por WhatsApp.</p>', '<p>Escríbenos y te ayudamos a elegir la talla.</p>', '<p>Te ayudo a elegir el guante adecuado.</p>',
+    '<p>Pronto agregaremos más productos.</p>', '<p>En breve publicaremos más categorías.</p>', '<p>Muy pronto encontrarás aquí el catálogo completo.</p>',
+    '<p>Hoy mismo puedes enviar tu lista por WhatsApp.</p>', '<p>Escribo las medidas en centímetros.</p>', '<p>Te escribo por WhatsApp para confirmar la talla.</p>',
+    '<p>Si tienes prisa, escríbeme hoy mismo.</p>', '<p>Respondo mensajes de lunes a viernes de 9:00 a 18:00.</p>', '<p>Atiendo de lunes a viernes de 9:00 a 18:00.</p>',
+    '<p>Te respondo en horario de atención: lunes a viernes de 9:00 a 18:00.</p>', '<p>Envíame tu lista y te cotizo.</p>', '<p>Pronto podrás armar tu cotización aquí.</p>',
+    '<p>Vamos a revisar tu lista contigo por WhatsApp.</p>', '<p>Te voy a pedir la talla y la cantidad.</p>', '<p>Voy a responder aquí las preguntas frecuentes.</p>',
+    '<p>A esto les llamamos calibre.</p>', '<p>Un pronto envío</p>', '<p>Paro de emergencia: de inmediato mando a cero.</p>',
+    '<p>Vamos a responder tus dudas sobre tallas.</p>', '<p>Estaremos agregando más marcas pronto.</p>', '<p>Te voy a explicar cómo medir tu mano.</p>',
+    '<p>Les damos la bienvenida.</p>', '<p>Damos respuesta a tus dudas por WhatsApp.</p>', '<p>Te damos el precio en 24 horas</p>',
+  ]);
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.match(printed, /las dos perífrasis de futuro en primera persona[^\n]*se leen como la forma simple del mismo verbo y la misma persona/);
+  assert.match(printed, /«Me pondré en contacto» como «Nos pondremos en contacto»/);
+});
+
 test('cada regla está documentada y conserva su identificador', () => {
   for (const rule of RULES) {
     assert.match(rule.id, /^R-[A-Z0-9]+-\d{2}$/);
