@@ -1000,6 +1000,20 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
     '<p>Precio de 3M — 350</p>', '<p>Precio de 3M – 350</p>', '<p>Precio de 3M · 350</p>', '<p>Precio de 3M/350</p>', '<p>Precio de 3M=350</p>', '<p>Precio de 3M,350</p>',
     '<p>Precio de 3M.350</p>', '<p>Precio de 3M_350</p>', '<p>Precio de 3M$</p>', '<p>Precio unitario de 3M desde 350</p>', '<p>Precio de marca 3M (350)</p>',
     '<p>Los precios de 3M van desde 350</p>', '<p>Precio de 3M<br>350</p>',
+    // Unos puntos suspensivos, varios signos seguidos o un signo seguido de otra cosa que un espacio y una letra no
+    // terminan la frase (f37334b también las detectaba).
+    '<p>Precio de 3M… 350</p>', '<p>Precio de 3M... 350</p>', '<p>Precio de 3M ... 350</p>', '<p>Precio de 3M: … 350</p>', '<p>Precio de 3M…350</p>',
+    '<p>Precio de 3M.. 350</p>', '<p>Precio de 3M?! 350</p>', '<p>Precio de 3M!!! 350</p>', '<p>Precio de 3M.- 350</p>', '<p>Precio de 3M! — 350</p>',
+    '<p>Precio de 3M; — 350</p>', '<p>Precio de 3M. —350</p>', '<p>Precio de 3M. (350)</p>', '<p>Precio de 3M. «350»</p>', '<p>Precio de 3M… desde 350</p>',
+    '<p>Los precios de 3M… van desde 350</p>', '<p>Precio de 3M. 350</p>', '<p>Precio de 3M! 350</p>', '<p>Precio de 3M. ¿350?</p>',    // Con «por», «para» o «con» antes de la marca, la misma regla (0c4f8c2 detectaba las dos primeras).
+    '<p>Precio por 3M 350</p>', '<p>Precio para 3M 350</p>', '<p>Precio para 3M: 350</p>', '<p>Precio con 3M… desde 350</p>',
+  ]);
+  // Límite escrito de la línea única: el escáner lee el texto de la página como una sola línea, así que un bloque que
+  // termina sin signo sigue en el siguiente, y una frase que empieza con una cifra justo después del signo sigue siendo
+  // la misma frase. Fallan (también en f37334b): quien escribe termina la frase con punto y no empieza la siguiente con
+  // una cifra.
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio de 3M: a cotizar</p><p>Respirador 3M 6200</p>', '<p>Los precios de 3M se confirman al cotizar. 12 modelos disponibles.</p>',
   ]);
   // La marca escrita como la escribe (con su mayúscula y como palabra completa) es un nombre. «Los precios de 3M…» y
   // «Precio de 3M: a cotizar» fallaban en f37334b: son texto de marca y no dicen ningún precio (la única excepción a
@@ -1009,8 +1023,15 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
     '<p>Los precios actuales de 3M y Ansell se confirman al cotizar.</p>', '<p>El costo real de 3M se confirma al cotizar.</p>', '<p>Precio unitario de 3M: a cotizar</p>',
     '<p>Precio de marca 3M</p>', '<p>Precio de <b>3M</b>: a cotizar</p>', '<p>Precio de 3M, a cotizar</p>', '<p>Precio de 3M (a cotizar)</p>',
     '<p>Precio de 3M®: a cotizar</p>', '<p>Precio de 3M — consulta disponibilidad</p>',
-    // La cifra de la frase siguiente no es de la marca.
-    '<p>Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.</p>',
+    // La cifra de la frase siguiente no es de la marca: la frase termina en «.», «!», «?» o «;» (o varios que no son
+    // puntos suspensivos) seguidos de un espacio y una letra, también con un signo de apertura delante.
+    '<p>Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.</p>', '<p>Precio de 3M: a cotizar. Respirador 3M 6200.</p>',
+    '<p>Los precios de 3M se confirman al cotizar. ¿Tienes dudas? Escríbeme por WhatsApp.</p>', '<p>Los precios de 3M se confirman al cotizar. «Tenemos» 12 modelos.</p>',
+    '<p>Los precios de 3M se confirman al cotizar?! Tenemos 12 modelos.</p>', '<p>Los precios de 3M se confirman al cotizar. (Tenemos 12 modelos.)</p>',
+    // El borde decidido de la excepción: lo que dice la frase siguiente no se lee, aunque sea un precio. La regla no
+    // puede distinguir «Precio de 3M. Desde 350» de «Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.».
+    '<p>Precio de 3M. Desde 350</p>', '<p>Precio de 3M! Solo 350</p>',
+    '<p>Precio por 3M: a cotizar</p>', '<p>Precio para 3M: a cotizar. Tenemos 12 modelos.</p>',
   ]);
   // Cada marca de brands.json cuyo nombre empieza con una cifra está en la excepción: una marca nueva así se nota aquí.
   const figureBrands = data.brands.map(brand => brand.name).filter(name => /^\d/.test(name));
@@ -1026,6 +1047,8 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
   assert.match(printed, /«Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí/);
   assert.match(printed, /la marca seguida de una cifra en la misma frase, con lo que sea en medio[^\n]*«Precio de 3M desde 350», «Precio de 3M \(350\)»/);
+  assert.match(printed, /unos puntos suspensivos \(«…» o dos o más puntos seguidos\) nunca terminan la frase/);
+  assert.match(printed, /«Precio de 3M\. Desde 350» no falla[^\n]*Límite de la línea única/);
 });
 
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
