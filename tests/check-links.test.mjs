@@ -83,6 +83,29 @@ test('enlaces y recursos internos sin destino', async () => {
   assert.deepEqual(css.problems.map(problem => [problem.file, problem.kind]), [['_astro/otra.css', 'roto'], ['_astro/otra.css', 'roto']]);
 });
 
+test('una dirección que empieza con «//» no es interna ni externa: es un error al unir rutas', async () => {
+  // «'/' + routes.catalog» da «//catalogo/», que el navegador abre en el servidor «catalogo».
+  await assertEach('roto', [
+    '<a href="//catalogo/">Catálogo</a>', '<a href="//marcas/ansell/">Ansell</a>', '<img src="//logo.svg" alt="">', '<img src="/logo.svg" srcset="//logo.svg 2x" alt="">',
+    '<link rel="stylesheet" href="//_astro/sitio.abc123.css">', '<p style="background:url(//fondo.svg)">Fondo</p>', '<form action="//catalogo/"><input name="q"></form>',
+  ], SITE);
+  const result = await check({ ...SITE, 'pagina/index.html': page('<a href="//catalogo/">Catálogo</a>') });
+  assert.match(result.problems[0].message, /«\/\/» al inicio/);
+  // Con esquema explícito sigue siendo un enlace externo, y «//localhost» sigue siendo local.
+  await assertClean(['<a href="https://catalogo.example/">Externo</a>'], SITE);
+  await assertEach('local', ['<a href="//localhost:4321/">Local</a>'], SITE);
+});
+
+test('las direcciones de image-set() también se revisan', async () => {
+  await assertEach('roto', [
+    '<style>.a{background-image:image-set("/no-existe.png" 1x, "/logo.svg" 2x)}</style>', '<style>.a{background-image:-webkit-image-set(\'/no-existe.png\' 1x)}</style>',
+    '<p style="background-image:image-set(&quot;/no-existe.png&quot; 1x)">Fondo</p>', '<style>.a{background-image:image-set(url("/no-existe.png") 1x, "/logo.svg" 2x)}</style>',
+  ], SITE);
+  const css = await check({ ...SITE, '_astro/otra.css': '.a{background:image-set("../no-existe.png" 1x,"/logo.svg" type("image/svg+xml") 2x)}' });
+  assert.deepEqual(css.problems.map(problem => [problem.file, problem.kind, problem.target]), [['_astro/otra.css', 'roto', '../no-existe.png']]);
+  await assertClean(['<style>.a{background-image:image-set("/logo.svg" 1x, "/fondo.svg" 2x)}</style>'], SITE);
+});
+
 test('una página se enlaza con su diagonal final', async () => {
   await assertEach('diagonal', ['<a href="/catalogo">Catálogo</a>', '<a href="/catalogo?q=guante">Buscar</a>', '<a href="/catalogo#filtros">Filtros</a>', '<a href="../marcas">Marcas</a>'], SITE);
   const result = await check({ ...SITE, 'pagina/index.html': page('<a href="/catalogo">Catálogo</a>') });

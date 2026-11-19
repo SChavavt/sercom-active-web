@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { absoluteUrl, contactDetails, contactLinks, mailtoUrl, messages, subjects, whatsappUrl } from '../src/lib/contact.mjs';
-import { buildMailtoUrl, buildWhatsappUrl, createContact, withPageLink, withRequestDescription } from '../src/lib/contact-core.mjs';
+import { buildMailtoUrl, buildWhatsappUrl, createContact, requestDescription, withPageLink, withRequestDescription } from '../src/lib/contact-core.mjs';
 import { loadProjectData } from './helpers.mjs';
 
 const { business, catalog } = await loadProjectData();
@@ -282,6 +282,36 @@ test('withRequestDescription escribe en el navegador lo que el cliente buscó', 
   const general = contactLinks.general();
   assert.equal(withRequestDescription(general.whatsapp, 'guante'), general.whatsapp);
   assert.equal(withRequestDescription(general.mailto, 'guante'), general.mailto);
+});
+
+test('el recorte a 200 caracteres no parte un emoji ni deja caracteres sueltos que rompan el enlace', () => {
+  const descriptionOf = url => whatsappText(url).split('\n')[1];
+  const empty = contactLinks.specialRequest();
+  // 🧤 ocupa dos unidades de UTF-16: con 199 letras delante, cortar por unidades lo partía por la mitad.
+  for (const before of [198, 199, 200]) {
+    const query = `${'a'.repeat(before)}🧤 resto`;
+    const expected = [...`${'a'.repeat(before)}🧤 resto`].slice(0, 200).join('').trim();
+    assert.equal(requestDescription(query), expected, String(before));
+    assert.ok(requestDescription(query).isWellFormed(), String(before));
+    // En la compilación ya no lanza URIError, y en el navegador el borrador sí recibe la búsqueda.
+    const pair = contactLinks.specialRequest({ query });
+    assert.equal(descriptionOf(pair.whatsapp), `Descripción o uso: ${expected}`, String(before));
+    assert.ok(messages.specialRequest({ query }).isWellFormed());
+    assert.equal(descriptionOf(withRequestDescription(empty.whatsapp, query)), `Descripción o uso: ${expected}`, String(before));
+    assert.equal(mailtoParts(withRequestDescription(empty.mailto, query)).body.split('\r\n')[1], `Descripción o uso: ${expected}`, String(before));
+  }
+  // Un carácter suelto (mitad de un par sustituto) se descarta en lugar de romper el enlace.
+  const lone = 'Guante \uD83E recubierto';
+  assert.equal(requestDescription(lone), 'Guante recubierto');
+  assert.equal(descriptionOf(withRequestDescription(empty.whatsapp, lone)), 'Descripción o uso: Guante recubierto');
+  const broken = { brandName: 'Marca \uDC00', code: 'X-1', name: 'Guante \uD800' };
+  assert.doesNotThrow(() => contactLinks.product(broken));
+  assert.equal(messages.product(broken).split('\n')[1], 'Producto: Marca X-1 (Guante)');
+  assert.doesNotThrow(() => whatsappUrl('Hola \uD800'));
+  assert.doesNotThrow(() => mailtoUrl({ subject: 'Hola \uD800', body: 'Texto \uDFFF' }));
+  assert.equal(whatsappText(whatsappUrl('Hola \uD800 y 🧤')), 'Hola  y 🧤');
+  // El límite para texto sin emojis no cambia.
+  assert.equal(requestDescription('ñ'.repeat(300)), 'ñ'.repeat(200));
 });
 
 test('createContact usa los datos que recibe y rechaza datos de contacto mal formados', () => {

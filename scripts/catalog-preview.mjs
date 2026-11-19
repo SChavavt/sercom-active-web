@@ -5,9 +5,14 @@
 //
 // Uso: node scripts/catalog-preview.mjs dev [opciones de astro dev]
 //      node scripts/catalog-preview.mjs build [opciones de astro build]   (escribe en dist-preview/)
+//
+// La vista previa nunca se escribe en dist/, la carpeta de la compilación de producción: `--outDir dist` (o una
+// carpeta dentro de dist/) se rechaza aquí con código 2, y astro.config.mjs vuelve a comprobarlo al compilar.
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { previewOutDirError } from '../src/lib/build-mode.mjs';
 
 const PREVIEW_OUT_DIR = 'dist-preview';
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -29,9 +34,27 @@ try {
   process.exit(2);
 }
 
+/** Valor de una opción de Astro escrita como «--opcion valor» o «--opcion=valor». */
+const option = (/** @type {string} */ name) => {
+  const index = rest.findIndex(arg => arg === name || arg.startsWith(`${name}=`));
+  if (index === -1) return undefined;
+  return rest[index] === name ? rest[index + 1] ?? '' : rest[index].slice(name.length + 1);
+};
+
 const args = [command, ...rest];
-// La vista previa nunca se escribe en dist/, que es la carpeta de la compilación de producción.
-if (command === 'build' && !rest.some(arg => arg === '--outDir' || arg.startsWith('--outDir='))) args.push('--outDir', PREVIEW_OUT_DIR);
+if (command === 'build') {
+  const outDir = option('--outDir');
+  if (outDir === undefined) {
+    args.push('--outDir', PREVIEW_OUT_DIR);
+  } else {
+    // Astro resuelve --outDir relativo a --root, y --root relativo a la carpeta del proyecto.
+    const error = previewOutDirError(resolve(root, option('--root') ?? '.', outDir), root);
+    if (error) {
+      console.error(error);
+      process.exit(2);
+    }
+  }
+}
 
 const child = spawn(process.execPath, [astroBin, ...args], {
   cwd: root,

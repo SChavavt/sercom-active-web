@@ -1,5 +1,6 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
-import { isPreviewFlag, previewFlagWarning } from './src/lib/build-mode.mjs';
+import { isPreviewFlag, previewFlagWarning, previewOutDirError } from './src/lib/build-mode.mjs';
 
 // Modo de compilación (docs/datos-y-modos.md). CATALOG_PREVIEW=1 (o true) activa la vista previa de diseño:
 // categorías en borrador y productos de ejemplo. Sin la variable, o con otro valor, se compila producción.
@@ -9,8 +10,30 @@ const flagWarning = previewFlagWarning(process.env.CATALOG_PREVIEW);
 if (flagWarning) console.warn(`[sercom] ${flagWarning}`);
 if (catalogPreview) console.log('[sercom] Vista previa de diseño (CATALOG_PREVIEW): incluye categorías en borrador y productos de ejemplo. No es la versión para publicar.');
 
+// La vista previa nunca se escribe en dist/ del proyecto, que es lo que publica el alojamiento: si la bandera
+// llega por error al entorno de una compilación de producción, la compilación se detiene en lugar de publicar los
+// ejemplos. Se compara la ruta absoluta, así que la sonda de las pruebas (otra raíz u otra carpeta) sigue funcionando.
+const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+/** @type {string | undefined} */
+let astroCommand;
+const previewOutsideDist = {
+  name: 'sercom:vista-previa-fuera-de-dist',
+  hooks: {
+    'astro:config:setup': ({ command }) => {
+      astroCommand = command;
+    },
+    // Solo al compilar: `astro dev` también tiene dist/ como carpeta de salida, pero no escribe en ella.
+    'astro:config:done': ({ config }) => {
+      if (!catalogPreview || astroCommand !== 'build') return;
+      const error = previewOutDirError(fileURLToPath(config.outDir), projectRoot);
+      if (error) throw new Error(error);
+    },
+  },
+};
+
 export default defineConfig({
   output: 'static',
+  integrations: [previewOutsideDist],
   site: process.env.SITE_URL || undefined,
   // Todas las rutas del sitio terminan en diagonal (/catalogo/); así una diagonal olvidada falla al revisar.
   trailingSlash: 'always',

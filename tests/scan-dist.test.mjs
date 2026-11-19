@@ -72,6 +72,25 @@ test('R-RULE-08: la marca excluida, con cualquier escritura y en cualquier archi
   await assertNoneFails(['<p>Guantes de uso internacional</p>', '<p>Registro sagisal</p>', '<p>Comercio internacional de guantes</p>']);
 });
 
+test('R-RULE-08: la marca excluida partida por etiquetas en línea o por caracteres invisibles', async () => {
+  const [longName, shortName] = data.registry.scope.excluded_entities;
+  const [first, second] = longName.split(' ');
+  const [a, b, c, d] = shortName.split('');
+  await assertEachFails('R-RULE-08', [
+    `<p><strong>${first}</strong> ${second}</p>`, `<p>${first} <em>${second}</em></p>`, `<p>${first}<br>${second}</p>`, `<p>${a}${b}<span>${c}${d}</span></p>`,
+    `<p>${a}&#8203;${b}${c}${d}</p>`, `<p>${a}\u200b${b}${c}${d}</p>`, `<p>${a}${b}&shy;${c}${d}</p>`, `<p>${a}\u2060${b}${c}${d}</p>`,
+    `<p>${[a, b, c, d].map(letter => String.fromCodePoint(letter.codePointAt(0) + 0xfee0)).join('')}</p>`, `<p>${a}.<b>${b}</b>.${c}.${d}.</p>`,
+    `<script>el.textContent="${a}${b}"+"${c}${d}";</script>`,
+  ]);
+  for (const content of [`el.textContent="${a}${b}"+"${c}${d}";`, `el.textContent=\`${a}${b}\${""}${c}${d}\`;`, `el.textContent="${a}${b}\\u200b${c}${d}";`,
+    `const ${shortName.toLowerCase()}Logo=1;`, `const logo${a}${b.toLowerCase()}${c.toLowerCase()}${d.toLowerCase()}=1;`, `const ${shortName}_URL="";`]) {
+    assert.ok(failedIds(await scan({ '_astro/app.js': content })).includes('R-RULE-08'), content);
+  }
+  // Palabras que solo contienen esas letras, o etiquetas entre palabras separadas, no son la marca.
+  await assertNoneFails(['<p>Registro <b>sagisal</b></p>', '<p><span>Lógica</span> <span>sanitaria</span></p>', '<p><b>Gi</b> <i>Sa</i></p>', '<p>Gi<br>sa</p>']);
+  assert.deepEqual(failures(await scan({ '_astro/app.js': 'const legisAtura=1,magisAdo=2;' })), []);
+});
+
 test('R-RULE-01 y R-RULE-02: precios, monedas, descuentos y «gratis»', async () => {
   await assertEachFails('R-RULE-01', [
     '<p>$1,250.00</p>', '<p>$ 99</p>', '<p>MXN 350</p>', '<p>350 pesos</p>', '<p>1,200 MXN</p>', '<p>USD 20</p>', '<p>Precio desde 10 piezas</p>',
@@ -87,6 +106,49 @@ test('R-RULE-01 y R-RULE-02: precios, monedas, descuentos y «gratis»', async (
     '<p>¿Por qué no aparecen precios?</p>', '<p>La cotización se prepara según el producto, la cantidad y las condiciones del requerimiento.</p>',
     '<p>Cono de 71 cm</p>', '<p>Código 37-175, talla 9</p>', '<p>Lunes a viernes de 9:00 a 18:00</p>', '<p>Solicita tu cotización</p>',
   ]);
+});
+
+test('R-RULE-01: precios sin símbolo antes de la cifra, en JS, JSON, CSS y atributos, y texto en forma descompuesta', async () => {
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio: 350</p>', '<p>Precio unitario 350.00</p>', '<p>PRECIO DE LISTA: $ 1 200</p>', '<p>350.00 M.N.</p>', '<p>350 MN</p>', '<p>\uff041,200</p>', '<p>1.200 €</p>', '<p>EUR 90</p>',
+    '<div data-precio="$350 MXN"></div>', '<p data-x="Precio: 350">Casco</p>', '<p>' + 'Promoción'.normalize('NFD') + '</p>', '<p>Descuento&nbsp;de temporada</p>',
+    '<style>.a::after{content:"$350"}</style>', '<style>.a::after{content:"\\24 350"}</style>', '<p style="--x:1">Casco</p><style>.b::before{content:\'Precio: 99\'}</style>',
+    '<script>el.textContent="$350 MXN";</script>', '<script>el.textContent="\\u0024350";</script>',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 'el.textContent="$350 MXN";'], ['buscar.json', '[{"t":"Casco $350 MXN"}]'], ['_astro/sitio.css', '.a::after{content:"$350"}'],
+    ['_astro/app.js', 'el.textContent=`Precio: ${""}350`;'], ['_astro/app.js', 'el.textContent="Precio: "+"350";']]) {
+    assert.ok(failedIds(await scan({ [path]: content })).includes('R-RULE-01'), content);
+  }
+  assert.ok(failedIds(await scan({ '_astro/app.js': 'b.textContent="Muestra gratis";' })).includes('R-RULE-02'));
+  // Las demás reglas del texto visible también leen el texto descompuesto (NFD) o con caracteres de ancho completo.
+  await assertEachFails('R-RULE-05', ['<p>' + 'Reseñas'.normalize('NFD') + '</p>']);
+  await assertEachFails('R-RULE-18', ['<p>' + 'Facturación'.normalize('NFD') + '</p>']);
+  await assertEachFails('R-RULE-22', ['<p>Comprar\u00a0ahora</p>']);
+  // El código de un script (referencias de reemplazo, plantillas) y las frases del sitio no son precios.
+  await assertNoneFails([
+    '<p>Los productos se muestran sin precio: la cotización se prepara según lo que necesitas.</p>', '<p>Precio sujeto a cotización</p>', '<p>Cono de 71 cm, 10 piezas</p>',
+    '<script>const t=s.replace(/(\\d+)/g,"$1 ").replaceAll(r,"$&");const u=`https://wa.me/${e}`;</script>',
+  ]);
+  for (const content of ['const t=s.replace(/(\\d+)-(\\d+)/g,"$1$2");', 'const u=`${a}${b}`;', 'a.style.width=`${n}%`;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+});
+
+test('R-RULE-01 y R-RULE-02: costos, importes y otras monedas, precios partidos por etiquetas o escritos como marcado desde un script', async () => {
+  await assertEachFails('R-RULE-01', [
+    '<p>Costo: 350</p>', '<p>Importe: 350</p>', '<p>Monto total: 1,200.00</p>', '<p>Tarifa por pieza: 35</p>', '<p>350 dólares</p>', '<p>350 euros</p>', '<p>Precio 350</p>',
+    '<p>Precio por caja de 12: 350</p>', '<p>Precio: <b>350</b></p>', '<p><sup>$</sup>350</p>', '<p>Pro<b>moción</b></p>', '<p>Des<span>cuento</span> por volumen</p>',
+  ]);
+  await assertEachFails('R-RULE-02', ['<p>Muestra gra<b>tis</b></p>']);
+  for (const [path, content] of [['_astro/app.js', 'el.innerHTML="Precio: <b>350</b>";'], ['_astro/app.js', 'el.innerHTML="<span>$</span>350";'],
+    ['_astro/app.js', "el.innerHTML='<b>Costo:</b> 350';"], ['datos.json', '{"importe":350}'], ['datos.json', '{"monto":350}'], ['datos.json', '{"tarifa":"350"}']]) {
+    assert.ok(failedIds(await scan({ [path]: content })).includes('R-RULE-01'), content);
+  }
+  // Un año junto a «precios», un modelo con «MN» o el código de un script no son precios.
+  await assertNoneFails(['<h2>Precios y cotización 2026</h2>', '<p>Modelo 3 MN</p>', '<p>Precio: a cotizar</p>', '<p>Precios sujetos a cotización en 2026</p>']);
+  for (const content of ['const x=$(1);const y=$2;', 'const r=/^\\$\\d+$/;', 'a=b.replace(c,"$1");d=`${e}`;f="$"+g;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
 });
 
 test('R-RULE-07: «oficial», «autorizado» y afirmaciones de representación', async () => {
@@ -110,6 +172,46 @@ test('R-RULE-10: confirmaciones falsas de recepción', async () => {
   await assertNoneFails(['<p>Se abrirá WhatsApp con un borrador. Revísalo y envíalo desde tu aplicación.</p>', '<p>Enviar mi lista por WhatsApp</p>']);
 });
 
+test('R-RULE-10: otras formas de confirmación, partidas por etiquetas o escritas desde un script', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>Tu solicitud fue enviada</p>', '<p>Hemos recibido tu solicitud</p>', '<p>¡Listo! Te responderemos pronto</p>', '<p>Cotización enviada</p>', '<p>Cotizaci&oacute;n enviada</p>',
+    '<p>Mensaje <b>enviado</b></p>', '<p>Solicitud&nbsp;enviada</p>', '<p>Solicitud\u00a0enviada</p>', '<p>Tu lista se ha enviado</p>', '<p>Pedido registrado</p>',
+    '<p>Te contactaremos pronto</p>', '<p>Nos pondremos en contacto contigo</p>', '<p>¡Enviado!</p>', '<p>Gracias por tu cotización</p>', '<div data-aviso="Solicitud enviada"></div>',
+    '<p>' + 'Cotización recibida'.normalize('NFD') + '</p>', '<!-- Solicitud enviada -->',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 't.textContent=`Solicitud ${""}enviada`;'], ['_astro/app.js', 't.textContent=`Solicitud ${"enviada"}`;'], ['_astro/app.js', 'el.textContent="Mensaje "+"enviado";'],
+    ['_astro/app.js', 'toast("Solicitud\\u00a0enviada");'], ['avisos.json', '{"aviso":"Hemos recibido tu lista"}']]) {
+    assert.ok(failedIds(await scan({ [path]: content })).includes('R-RULE-10'), content);
+  }
+  // Las frases del sitio que explican que nada se envía solo no son confirmaciones.
+  await assertNoneFails([
+    '<p>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</p>', '<p>El sitio no envía el mensaje por ti ni guarda una copia.</p>',
+    '<p>Lo que envíes por WhatsApp o por correo llega directamente a Sercom Active para atender tu solicitud de cotización.</p>',
+    '<p>Tu mensaje no se ha enviado todavía: revísalo en tu aplicación.</p>', '<p>Tu solicitud aún no ha sido enviada.</p>', '<p>Recibes tu cotización por WhatsApp o correo</p>',
+    '<p>Agregamos tu búsqueda al borrador.</p>', '<p>Listo para cotizar</p>', '<p>Enviar mi solicitud por correo</p>',
+  ]);
+});
+
+test('R-RULE-10: confirmaciones en primera persona, partidas dentro de una palabra o escritas como marcado desde un script', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>Hemos enviado tu solicitud</p>', '<p>Ya enviamos tu mensaje</p>', '<p>Enviamos tu cotización a Sercom</p>', '<p>Registramos tu pedido</p>',
+    '<p>Un asesor te contactará pronto</p>', '<p>Te respondemos en breve</p>', '<p>Tu solicitud se envió correctamente</p>', '<p>Solicitud de cotización enviada</p>',
+    '<p>Solicitud envi<span>ada</span></p>', '<p>Men<b>saje</b> enviado</p>', '<p>Tu solicitud quedó enviada</p>', '<p>Solicitud\n<b>enviada</b></p>',
+    '<script>t.innerHTML="Solicitud <b>enviada</b>";</script>',
+  ]);
+  for (const content of ['t.innerHTML="Solicitud <b>enviada</b>";', "t.innerHTML='Mensaje <strong>enviado</strong>';", 't.innerHTML="Solicitud "+"<b>enviada</b>";',
+    't.innerHTML=`<p>Gracias por tu <em>solicitud</em></p>`;', 'toast("Te <b>respondemos</b> en breve")']) {
+    assert.ok(failedIds(await scan({ '_astro/app.js': content })).includes('R-RULE-10'), content);
+  }
+  // Frases legítimas: un participio usado como adjetivo, o una negación con «nada».
+  await assertNoneFails([
+    '<p>Consulta la lista de marcas registradas en cada ficha.</p>', '<p>Escribe al correo registrado del negocio.</p>', '<p>Nada ha sido enviado aún.</p>',
+    '<p>Tu lista se envía por WhatsApp cuando tú lo decides.</p>', '<p>Nada se envía hasta que tú lo envíes desde tu aplicación.</p>', '<p>Revisa tu mensaje antes de enviarlo.</p>',
+    '<p>Los datos no se envían a ningún servidor.</p>', '<p>El mensaje queda sin enviar hasta que lo confirmes.</p>', '<p>No se ha enviado nada todavía.</p>', '<p>Tu mensaje no se envió.</p>',
+  ]);
+  for (const content of ['if(a<b&&c>d)x="Mensaje";', 'for(let i=0;i<a.length;i++)y=`${i}`;']) assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+});
+
 test('R-RULE-29: paleta anterior y tema oscuro', async () => {
   for (const css of ['a{color:#0e2a3d}', 'a{color:#0E2A3D}', 'a{background:#00a6e5}', 'a{color:rgb(14, 42, 61)}', 'a{color:rgba(0,166,229,.5)}',
     '@media (prefers-color-scheme: dark){a{color:#fff}}', ':root{color-scheme:light dark}', 'a{background:url("data:image/svg+xml,%3Csvg fill=\'%230e2a3d\'/%3E")}']) {
@@ -117,7 +219,26 @@ test('R-RULE-29: paleta anterior y tema oscuro', async () => {
   }
   await assertEachFails('R-RULE-29', ['<p style="color:#0e2a3d">Texto</p>', '<svg><path fill="#00A6E5" d="M0 0"/></svg>']);
   assert.deepEqual(failedIds(await scan({ 'index.html': page('<h1>Inicio</h1>', { head: '<meta name="theme-color" content="#0e2a3d">' }) })), ['R-RULE-29']);
-  assert.deepEqual(failures(await scan({ '_astro/sitio.css': ':root{color-scheme:light;--ink:#19171a;--blue:#0067b0;--otro:#0e2a3df0}' })), []);
+  // Una cadena hexadecimal más larga que empieza igual (por ejemplo, un hash) no es un color.
+  assert.deepEqual(failures(await scan({ '_astro/sitio.css': ':root{color-scheme:light;--ink:#19171a;--blue:#0067b0;--otro:#0e2a3df0e1}' })), []);
+});
+
+test('R-RULE-29: la paleta anterior con transparencia, en colores casi iguales y como tema oscuro declarado', async () => {
+  // Lightning CSS escribe rgb(14 42 61 / 80%) como #0e2a3dcc, y redondea hsl() u oklch() a un hexadecimal vecino.
+  for (const css of ['.a{color:#0e2a3dcc}', '.a{background:#00a6e580}', '.a{color:#0E2A3DFF}', '.a{color:#0e2a3e}', '.a{color:#00a4e6}', '.a{color:#0b293c}',
+    '.a{color:light-dark(#fff,#000)}', '.a{color:rgb(13 41 62)}', '.a{color:rgb(5.5% 16.5% 23.9%)}', '.a{color:hsl(205 63% 15%)}', '.a{color:hsla(197deg,100%,45%,.5)}',
+    '@media (prefers-color-scheme : dark){a{color:red}}']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/sitio.css': css })), ['R-RULE-29'], css);
+  }
+  await assertEachFails('R-RULE-29', ['<p style="color:hsl(205 63% 15%)">Texto</p>', '<p style="color:#0e2a3dcc">Texto</p>']);
+  for (const head of ['<meta name="color-scheme" content="light dark">', '<meta content="dark" name="color-scheme">', "<meta name='color-scheme' content='only dark'>"]) {
+    assert.deepEqual(failedIds(await scan({ 'index.html': page('<h1>Inicio</h1>', { head }) })), ['R-RULE-29'], head);
+  }
+  // La paleta aprobada y colores lejanos no fallan.
+  for (const css of ['.a{color:#0067b0cc;background:#19171a}', '.a{color:#0067b0;border-color:#e6eef5}', '.a{color:rgb(0 103 176)}', '.a{color:#1e3a4d}']) {
+    assert.deepEqual(failures(await scan({ '_astro/sitio.css': css })), [], css);
+  }
+  assert.deepEqual(failures(await scan({ 'index.html': page('<h1>Inicio</h1>', { head: '<meta name="color-scheme" content="light">' }) })), []);
 });
 
 test('R-RULE-12: noindex en cada página, robots.txt bloqueado y sin sitemap hasta el lanzamiento', async () => {
@@ -128,6 +249,14 @@ test('R-RULE-12: noindex en cada página, robots.txt bloqueado y sin sitemap has
   assert.deepEqual(failedIds(await scan({ 'robots.txt': 'User-agent: *\nAllow: /\n' })), ['R-RULE-12']);
   assert.deepEqual(failedIds(await scan({ 'robots.txt': 'User-agent: *\nDisallow: /privado/\n' })), ['R-RULE-12']);
   assert.deepEqual(failedIds(await scan({ 'sitemap-index.xml': '<sitemapindex/>' })), ['R-RULE-12']);
+  // Un bloqueo que solo vale para un buscador, o que el grupo «*» deshace, no bloquea el sitio.
+  for (const robots of ['User-agent: Googlebot\nDisallow: /\n', 'User-agent: *\nAllow: /\n\nUser-agent: Bingbot\nDisallow: /\n', 'User-agent: *\nDisallow: /\nAllow: /\n',
+    'User-agent: *\nDisallow: /\nAllow: /catalogo/\n', 'Disallow: /\n', 'User-agent: *\n# Disallow: /\n']) {
+    assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
+  }
+  for (const robots of ['User-agent: Googlebot\nUser-agent: *\nDisallow: /\n', '# Antes del lanzamiento\nuser-agent: * # todos\ndisallow: / # todo\n', 'User-agent: *\r\nDisallow: /\r\nAllow:\r\n']) {
+    assert.deepEqual(failures(await scan({ 'robots.txt': robots })), [], robots);
+  }
   // El orden de los atributos y las comillas no importan.
   assert.deepEqual(failures(await scan({ 'index.html': page('<h1>Inicio</h1>', { robots: "<meta content='NOINDEX,nofollow' name='robots'>" }) })), []);
 
@@ -136,6 +265,25 @@ test('R-RULE-12: noindex en cada página, robots.txt bloqueado y sin sitemap has
   assert.deepEqual(failures(await scan(launched, { launch: true })), []);
   assert.deepEqual(failedIds(await scan({}, { launch: true })), ['R-PUB-03']);
   await assert.rejects(scan({}, { launch: true, preview: true }), /se excluyen/);
+});
+
+test('R-RULE-12 y R-PUB-03: robots.txt revisa cada grupo de buscadores, no solo el de «*»', async () => {
+  // Antes del lanzamiento, un buscador con su propio grupo obedece ese grupo: si no bloquea todo, el sitio queda abierto para él.
+  for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nAllow: /\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow:\n',
+    'User-agent: *\nDisallow: /\n\nUser-agent: Bingbot\nCrawl-delay: 5\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\nAllow: /catalogo/\n']) {
+    assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
+  }
+  for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n', '\ufeffUser-agent: *\nDisallow: /\n', 'User-agent: *\nDisallow: /\nSitemap: https://sitio.example/sitemap.xml\n']) {
+    assert.deepEqual(failures(await scan({ 'robots.txt': robots })), [], robots);
+  }
+  // Con --launch, ningún grupo puede seguir bloqueando el sitio.
+  const launched = robots => ({ 'index.html': page('<h1>Inicio</h1>', { robots: '' }), 'robots.txt': robots });
+  for (const robots of ['User-agent: Googlebot\nDisallow: /\n', 'User-agent: *\nAllow: /\n\nUser-agent: Googlebot\nDisallow: /\n', 'User-agent: *\nDisallow: /*\n']) {
+    assert.deepEqual(failedIds(await scan(launched(robots), { launch: true })), ['R-PUB-03'], robots);
+  }
+  for (const robots of ['User-agent: *\nAllow: /\n', 'User-agent: *\nDisallow: /privado/\n\nUser-agent: Googlebot\nDisallow:\n']) {
+    assert.deepEqual(failures(await scan(launched(robots), { launch: true })), [], robots);
+  }
 });
 
 test('R-RULE-13: metadatos internos y registro de investigación', async () => {
@@ -175,8 +323,27 @@ test('R-RULE-03 en producción: cualquier marca de ejemplo, en cualquier archivo
   ]) {
     assert.ok(failedIds(await scan({ [path]: content })).includes('R-RULE-03'), path);
   }
+  // Los códigos de los ejemplos escritos sin el guion, con otro separador o en caracteres de ancho completo.
+  const compact = example.code.replace('-', '');
+  await assertEachFails('R-RULE-03', [
+    `<p>Guante ${compact}</p>`, `<p>Código ${example.code.replace('-', ' ').toLowerCase()}</p>`, `<p>${example.code.replace('-', '_')}</p>`, `<p>${example.code.replace('-', '\u2013')}</p>`,
+    `<p>${example.variants[0].code.replaceAll('-', '')}</p>`, `<p>${[...example.code].map(char => (char === '-' ? char : String.fromCodePoint(char.codePointAt(0) + 0xfee0))).join('')}</p>`,
+    '<p>Guante de<br>ejemplo</p>', `<p>${example.code.slice(0, 3)}<span>${example.code.slice(3)}</span></p>`,
+  ]);
+  assert.ok(failedIds(await scan({ '_astro/chunk.js': `const c="${compact}";` })).includes('R-RULE-03'));
   // «por ejemplo» y palabras parecidas son texto normal.
-  await assertNoneFails(['<p>Por ejemplo, guantes y lentes.</p>', '<p>Un ejemplar del catálogo</p>', '<p>Modelo EJE-100</p>', '<p>Ejemplo: 10 pares</p>']);
+  await assertNoneFails(['<p>Por ejemplo, guantes y lentes.</p>', '<p>Un ejemplar del catálogo</p>', '<p>Modelo EJE-100</p>', '<p>Ejemplo: 10 pares</p>', `<p>Hoja ${compact.slice(2)}</p>`, `<p>REJ${compact.slice(2)}</p>`]);
+});
+
+test('R-RULE-29 y R-RULE-03: un ancla, un identificador o una abreviatura no son un color ni un código de ejemplo', async () => {
+  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<p>Pedidos grandes, ej. 1001 piezas</p>']);
+  assert.deepEqual(failures(await scan({ 'datos.json': '{"x":"#0e2a40"}' })), []);
+  assert.deepEqual(failures(await scan({ '_astro/app.js': 'const ancla="#00a6e9";' })), []);
+  // Los colores casi iguales siguen fallando donde son un color: CSS, style, fill, stroke y theme-color.
+  await assertEachFails('R-RULE-29', ['<p style="color:#0e2a40">Texto</p>', '<svg><path fill="#00a6e9" d="M0 0"/></svg>', '<svg><path stroke="#0e2a40" d="M0 0"/></svg>', '<style>.a{color:#0e2a40}</style>']);
+  assert.deepEqual(failedIds(await scan({ 'index.html': page('<h1>Inicio</h1>', { head: '<meta name="theme-color" content="#0e2a40">' }) })), ['R-RULE-29']);
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><path fill="#0e2a3e" d="M0 0"/></svg>' })), ['R-RULE-29']);
+  await assertEachFails('R-RULE-03', ['<p>Pedidos grandes, EJ1001</p>', '<p>Código ej 1001</p>']);
 });
 
 test('R-RULE-03 en vista previa: aviso en cada página y etiqueta «Ejemplo» en cada ejemplo', async () => {
@@ -267,6 +434,292 @@ test('R-RULE-24 y R-QUOTE-06: el contacto es el confirmado y el texto de WhatsAp
   assert.deepEqual(warnedIds(await scan({ 'pagina/index.html': page('<p>Llámanos al 55 1122 3344</p>') })), ['R-RULE-24']);
 });
 
+test('R-RULE-24: destinos de contacto en cualquier atributo, script o archivo, y correos con copia a otra dirección', async () => {
+  const EMAIL = data.business.email;
+  await assertEachFails('R-RULE-24', [
+    `<a href="mailto:${EMAIL}?cc=otro@example.com">Correo</a>`, `<a href="mailto:${EMAIL}?subject=Hola&amp;bcc=otro@example.com">Correo</a>`,
+    `<a href="mailto:${EMAIL}?to=otro@example.com">Correo</a>`, `<a href="mailto:${EMAIL}?CC=${EMAIL}">Correo</a>`, `<a href="mailto:${EMAIL},otro@example.com">Correo</a>`,
+    `<a href="mailto:${EMAIL}%2Cotro@example.com">Correo</a>`, '<a href="MAILTO:otro@example.com">Correo</a>',
+    '<map name="m"><area href="https://wa.me/5215555555555" alt="WhatsApp"></map>', '<form><button formaction="https://wa.me/5215555555555">WhatsApp</button></form>',
+    '<a data-href="https://api.whatsapp.com/send?phone=5215555555555" href="/">WhatsApp</a>', '<p data-contacto="whatsapp://send?phone=5215555555555">WhatsApp</p>',
+    `<script>location.href='https://wa.me/5215555555555';</script>`, `<script>location.href="mailto:otro@example.com";</script>`, '<script>const c="otro@example.com";</script>',
+    '<p data-correo="otro@example.com">Correo</p>', '<a href="https://wa.me/message/ABCDEF">WhatsApp</a>', '<button data-tel="tel:+525511223344">Llamar</button>',
+  ]);
+  for (const content of ["location.href='https://wa.me/5215555555555'", "location.href='mailto:otro@example.com'", 'const correo="otro@example.com";',
+    `const c=\`mailto:${EMAIL}?bcc=otro@example.com\`;`, "location.href='tel:+525511223344'", "a.href='//wa.me/5215555555555?text=Hola'"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-24'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'datos.json': '{"whatsapp":"https://wa.me/5215555555555"}' })), ['R-RULE-24']);
+  // El código que completa los enlaces confirmados (contact-core.mjs ya compilado) no es un destino.
+  const contactCore = 'function i(e,t){let n=t==null?``:String(t);return n?`https://wa.me/${e}?text=${encodeURIComponent(n)}`:`https://wa.me/${e}`}'
+    + 'function a(e,t){return t.length?`mailto:${e}?${t.join(`&`)}`:`mailto:${e}`}if(o.startsWith(`https://wa.me/`)){}if(o.startsWith(`mailto:`)){}'
+    + 'document.querySelectorAll(`[data-solicitud] a[href^="https://wa.me/"], [data-solicitud] a[href^="mailto:"], a[href^="tel:"]`);const logo="logo@2x.png";';
+  assert.deepEqual(failures(await scan({ '_astro/contact-core.js': contactCore })), []);
+  await assertNoneFails([
+    `<a href="${WHATSAPP}?text=Hola%2C%20Yosmara.%0AEnlace%3A%20https%3A%2F%2Fsitio.example%2F">WhatsApp</a>`,
+    `<a href="mailto:${EMAIL}?subject=Solicitud%20especial&amp;body=Hola%2C%20Yosmara.%0D%0Acc%3D%20to%3Dalguien%40example.com">Correo</a>`,
+    `<a href="mailto:${EMAIL.toUpperCase()}">Correo</a>`, `<area href="${WHATSAPP}" alt="WhatsApp">`, `<script>location.href='${WHATSAPP}';</script>`,
+  ]);
+});
+
+test('R-RULE-24: un enlace de correo o de teléfono vacío o sin sustituir, y destinos escondidos en otra dirección', async () => {
+  const EMAIL = data.business.email;
+  const DIGITS = data.business.whatsappDigits;
+  await assertEachFails('R-RULE-24', [
+    '<a href="mailto:">Correo</a>', '<a href="mailto:%20">Correo</a>', '<a href="mailto:?subject=Hola">Correo</a>', '<a href="mailto:{correo}">Correo</a>', '<a href="mailto:${correo}">Correo</a>',
+    '<a href="tel:">Llamar</a>', '<a href="tel:+">Llamar</a>', '<a href="tel:abc">Llamar</a>', '<a href="tel:{tel}">Llamar</a>', '<a href="tel:${tel}">Llamar</a>', `<a href="tel:+${DIGITS}abc">Llamar</a>`,
+    '<a href="https://wa.me/">WhatsApp</a>', '<a href="https://wa.me/{numero}">WhatsApp</a>', '<a href="sms:+525511223344">SMS</a>',
+    '<a href="https://l.example.com/?u=https%3A%2F%2Fwa.me%2F5215555555555">WhatsApp</a>', '<a href="https://l.example.com/?u=mailto%3Aotro%40example.com">Correo</a>',
+    '<a href="https://chat.whatsapp.com/AbCdEf">Grupo</a>', '<a href="https://whatsapp.com/send?phone=5215555555555">WhatsApp</a>', '<a href="https://wa.link/abc123">WhatsApp</a>',
+    '<a href="intent://send/5215555555555#Intent;scheme=whatsapp;end">WhatsApp</a>', '<p data-u="https:\\/\\/wa.me\\/5215555555555">x</p>',
+    '<script type="application/ld+json">{"contactPoint":{"url":"https:\\/\\/wa.me\\/5215555555555"}}</script>',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 'location.href="https:\\/\\/wa.me\\/5215555555555";'], ['datos.json', '{"u":"https:\\/\\/wa.me\\/5215555555555"}'],
+    ['datos.json', '{"correo":"mailto:{correo}"}'], ['datos.json', '{"tel":"tel:{tel}"}'], ['_astro/sitio.css', 'a[href^="tel:+"]{x:1}'], ['_astro/app.js', 'location.href="https%3A%2F%2Fwa.me%2F5215555555555";']]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-24'], content);
+  }
+  // Lo que sí es legítimo: los enlaces confirmados, el código que los completa y un comentario de licencia con correo.
+  await assertNoneFails([`<a href="tel:+${DIGITS}">Llamar</a>`, `<a href="tel:+52 1 221 400 2219">Llamar</a>`, `<a href="mailto:${EMAIL}?subject=Hola&amp;body=Hola%2C%20Yosmara.">Correo</a>`,
+    `<script>document.querySelectorAll('a[href^="mailto:"], a[href^="tel:"]');const u=\`https://wa.me/\${d}?text=\${encodeURIComponent(t)}\`;</script>`]);
+  for (const content of ['/*! (c) autor <dev@example.org> MIT */const a=1;', 'const u=`https://wa.me/${d}?text=${encodeURIComponent(t)}`;', 'const t=`tel:${n}`;a.href="mailto:"+e;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  // Una etiqueta «Tel:» o «WhatsApp:» del texto y un selector de CSS no son enlaces.
+  await assertNoneFails(['<p>Tel: 221 400 2219</p>', '<p>WhatsApp: 221 400 2219</p>', '<style>a[href^="mailto:"]::before{content:"✉"}</style>']);
+  assert.deepEqual(failures(await scan({ '_astro/sitio.css': 'a[href^="mailto:"],a[href^="tel:"]{text-decoration:none}' })), []);
+});
+
+test('R-RULE-01: un prefijo de moneda antes de «$» es un precio en el texto, en los atributos, en los scripts y en el CSS', async () => {
+  // La base y la ronda 1 los detectaban; la excepción de «$» pegado a una letra solo vale para el código de un script.
+  await assertEachFails('R-RULE-01', [
+    '<p>MX$350</p>', '<p>Desde MX$ 1,200</p>', '<p>US$25</p>', '<p>MN$350</p>', '<p>Casco: mx$350</p>', '<p title="US$25">Casco</p>', '<p data-precio-visible="Desde MX$350">Casco</p>',
+    '<style>.p::after{content:"MX$350"}</style>', '<script>el.textContent="MX$350";</script>',
+  ]);
+  for (const [path, content] of [['_astro/app.js', 'el.textContent="MX$350";'], ['_astro/app.js', "el.innerHTML='Desde <b>US$ 25</b>';"], ['_astro/sitio.css', '.p::after{content:"MX$350"}'],
+    ['datos.json', '{"t":"Desde MX$ 1,200"}'], ['img/p.svg', '<svg xmlns="http://www.w3.org/2000/svg"><text>MX$350</text></svg>']]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-01'], content);
+  }
+  // En el código, «$» pegado a un identificador sigue sin ser un precio.
+  for (const content of ['const x=$(1);const y=$2;', 'const a$1=2;', 'const u=`${n}`;', 'const URL$1=globalThis.URL;new URL$1(a);', 'var A$2=e=>e;A$2(1);']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+});
+
+test('R-RULE-01: dentro de una cadena de un script o de un JSON, «MX$350» es un precio aunque lo siga un signo', async () => {
+  // La excepción del código («$» pegado a un identificador) no vale dentro de una cadena: ahí todo es texto.
+  const texts = ['Desde MX$350 (IVA incluido)', 'Casco (MX$350)', 'MX$350; envío aparte', '¿Solo MX$350?', 'MX$350: lista', '(desde MX$ 350)'];
+  for (const text of texts) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': `el.textContent=${JSON.stringify(text)};` })), ['R-RULE-01'], `JS ${text}`);
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': `el.textContent=\`${text}\`;` })), ['R-RULE-01'], `plantilla ${text}`);
+    assert.deepEqual(failedIds(await scan({ 'datos.json': JSON.stringify({ t: text }) })), ['R-RULE-01'], `JSON ${text}`);
+  }
+  await assertEachFails('R-RULE-01', ['<script>el.textContent="Desde MX$350 (IVA incluido)";</script>', '<script>el.textContent="Casco (MX$350)";</script>', '<script type="application/json">{"t":"Casco (MX$350)"}</script>']);
+  // Fuera de las cadenas sigue la excepción del código; la cadena de reemplazo de .replace() y una expresión regular no son texto.
+  for (const content of ['var URL$1=globalThis.URL;function f(e){return e.$2}const a=$1;', 'a=b.replace(/x/,"MX$1");', 'const r=/^MX$/;', 'const q=/["\']/g;var A$1=2;A$1(q);', 'const t=`${a}`;var B$2=1;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  await assertNoneFails(['<script>$(1);var A$1=2;</script>']);
+  // Una dirección se lee como texto: ninguna dirección del sitio lleva «$» seguido de una cifra, así que «a$1» en un
+  // href falla a propósito (la excepción del código solo vale para el código de un script).
+  await assertEachFails('R-RULE-01', ['<a href="/catalogo/?q=a$1">Catálogo</a>']);
+});
+
+test('R-RULE-01: un precio en el texto de un borrador de WhatsApp o de correo, aunque lo siga un signo', async () => {
+  // El borrador es la única acción comercial del sitio: su texto se lee como texto, con el %XX decodificado.
+  const EMAIL = data.business.email;
+  await assertEachFails('R-RULE-01', [
+    `<a href="${WHATSAPP}?text=Hola%2C%20quiero%20cotizar%20Casco%20(MX%24350)">Cotizar</a>`,
+    `<a href="${WHATSAPP}?text=Casco%20MX%24350%3B%20gracias">Cotizar</a>`,
+    `<a href="${WHATSAPP}?text=%C2%BFEl%20casco%20cuesta%20MX%24350%3F">Cotizar</a>`,
+    `<a href="mailto:${EMAIL}?subject=Casco%20(MX%24350)">Correo</a>`,
+    `<a href="mailto:${EMAIL}?subject=Cotizaci%C3%B3n&amp;body=Casco%20(MX%24350)">Correo</a>`,
+    `<a href="${WHATSAPP}?text=Casco%20precio%3D%24350">Cotizar</a>`,
+  ]);
+  // Sin codificar, el mismo texto falla además por R-QUOTE-06.
+  assert.ok(failedIds(await scan({ 'pagina/index.html': page(`<a href="${WHATSAPP}?text=precio=$350">Cotizar</a>`) })).includes('R-RULE-01'));
+  // El texto de --rules lo dice.
+  assert.ok(RULES.some(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose' && rule.doc.includes('también las direcciones')));
+  assert.ok(!RULES.some(rule => rule.doc.includes('salvo los que son una dirección')));
+  // El texto de un borrador sin precio sigue limpio.
+  await assertNoneFails([`<a href="${WHATSAPP}?text=Hola%2C%20Yosmara.%0AProducto%3A%20Casco%20(modelo%203)%3B%20cantidad%3A%2012">WhatsApp</a>`]);
+});
+
+test('R-RULE-01: una cadena `content:` del CSS se lee entera, aunque lleve «;» o «}»', async () => {
+  const css = ['.p::after{content:"Desde MX$350; IVA incluido"}', '.p::after{content:"Envío; casco (MX$350)"}', ".p::after{content:'Envío} casco $350'}",
+    '.p::after{content:"Desde " "MX$350;"}', '.p::after{content:"\\24 350"}', 'a::before{content:"x"}b::after{content:"Casco; MX$350"}b{color:red}'];
+  for (const content of css) assert.deepEqual(failedIds(await scan({ '_astro/sitio.css': content })), ['R-RULE-01'], content);
+  await assertEachFails('R-RULE-01', ['<style>.p::after{content:"Desde MX$350; IVA incluido"}</style>', "<style>.p::after{content:'Envío} casco $350'}</style>", '<p style=\'--x:1;content:"Envío; casco (MX$350)"\'>x</p>']);
+  // Lo que ya estaba limpio sigue limpio: cadenas vacías, escapes que no son un precio, contadores y CSS compactado.
+  for (const content of ['.a::before{content:""}', '.q::before{content:"\\201C"}', 'li::before{content:counter(x) ". "}', 'a::before{content:"x"}b{color:red}',
+    '.p::after{content:";"}.q{margin:0}', ".p::after{content:'}'}.q{margin:0}"]) {
+    assert.deepEqual(failures(await scan({ '_astro/sitio.css': content })), [], content);
+  }
+  await assertNoneFails(['<style>.q::before{content:"\\201C"}</style>', '<p style=\'content:"; "\'>x</p>']);
+});
+
+test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabra antes de la cifra, y las claves de precio en el código', async () => {
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio por pieza 350.00</p>', '<p>Precio con IVA 350</p>', '<p>Precio de mayoreo 300</p>', '<p>Precio para mayoristas 300</p>', '<p>Costo por unidad 120</p>',
+    '<p>Tarifa de envío $90</p>',
+  ]);
+  await assertNoneFails(['<h2>Precios y cotización 2026</h2>', '<p>Te damos el precio en 24 horas</p>', '<p>Modelo 3 MN</p>', '<p>Pedido mínimo 12 piezas</p>', '<p>Paquete con 2 frascos de 350 ml</p>']);
+  // Una clave de precio en el código público o en un JSON falla siempre: el sitio no tiene campos de precio.
+  for (const content of ['var o={monto:5};', 'var o={price:5};', 'var p={a:1,precio:"350"};']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-01'], content);
+  }
+  assert.ok(RULES.some(rule => rule.id === 'R-RULE-01' && rule.doc.includes('{monto:5}')), 'el texto de --rules dice que una clave de precio en el código falla');
+});
+
+test('R-RULE-01: una cifra seguida de una unidad de cantidad no es un precio', async () => {
+  await assertNoneFails(['<p>Cotiza precio por volumen: 100 piezas o más</p>', '<p>Precio por volumen: 12 pares</p>', '<p>Tarifa de envío: 3 cajas</p>', '<p>Precio de mayoreo 50 pzas. en adelante</p>',
+    '<p>Precio por volumen 100 pzas</p>', '<p>Pregunta el precio de 12 pares</p>', '<p>El precio de 2026 lo confirma Sercom</p>']);
+  // La misma frase con una cifra que no es una cantidad sigue siendo un precio.
+  await assertEachFails('R-RULE-01', ['<p>Precio por volumen: 100</p>', '<p>Precio por volumen: 100 pesos</p>', '<p>Precio: 100.00 por pieza</p>', '<p>Precio por pieza 35 MXN</p>']);
+  // Solo es una cantidad un número entero seguido de una unidad en plural, sin otra cifra en la misma frase: «35 pza»,
+  // «35.50 pieza» o «3 pares por 250» son la forma de escribir un precio por unidad.
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio: 35 pza</p>', '<p>Precio 35 pza</p>', '<p>Precio: 35.50 pieza</p>', '<p>Precio: 3 pares por 250</p>', '<p>Precio: 12 piezas 1,500</p>', '<p>Precio: 120 caja</p>',
+    '<p>Precio: 45 metro</p>', '<p>Precio: 1 pieza 35.00</p>', '<p>Precio: 10 piezas = 350</p>', '<p>Precio: 100 piezas o más, 30 c/u</p>', '<p>Precio: 3 cajas por 900</p>',
+    '<p>Precio de mayoreo: 6 pares 900</p>', '<p>Costo: 1 kit 1500</p>', '<p>Precio: 350 kg</p>', '<p>Precio de 350</p>',
+  ]);
+});
+
+test('R-RULE-01: un porcentaje, una talla, una serie o un modelo después de «precio por|con|de|para» no son un precio', async () => {
+  await assertNoneFails(['<p>El precio con IVA 16% se confirma al cotizar</p>', '<p>Precio para talla 9 al cotizar</p>', '<p>Precio de serie 6000: se cotiza</p>', '<p>Precio por modelo 3M al cotizar</p>']);
+  await assertEachFails('R-RULE-01', ['<p>Precio con IVA 350</p>', '<p>Precio para mayoristas 300</p>', '<p>Precio de mayoreo 300</p>']);
+});
+
+test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>Mensaje de WhatsApp enviado</p>', '<p>Tu lista de productos enviada</p>', '<p>Solicitud por WhatsApp enviada</p>', '<p>¡Tu solicitud a Sercom enviada!</p>',
+    '<p>Su solicitud ha quedado registrada</p>', '<p>La solicitud enviada.</p>', '<p>La solicitud enviada</p>', '<p>Tu lista de productos fue enviada</p>', '<p>Solicitud especial enviada</p>',
+    '<p>Te enviaremos la cotización en breve</p>', '<p>Un asesor se comunicará contigo</p>', '<p>Recibirás tu cotización en breve</p>', '<div data-msg="Solicitud &lt;b&gt;enviada&lt;/b&gt;"></div>',
+  ]);
+  for (const content of ['toast("Mensaje de WhatsApp enviado");', 't.innerHTML="La solicitud <b>enviada</b>.";']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-10'], content);
+  }
+  // El participio como adjetivo dentro de una frase que sigue, o después de una preposición, no es una confirmación.
+  await assertNoneFails([
+    '<p>Revisa la lista enviada por WhatsApp</p>', '<p>Una vez enviado tu mensaje, Sercom contesta por WhatsApp.</p>', '<p>Cuando tu mensaje sea enviado desde tu teléfono.</p>',
+    '<p>Marcas y productos registrados</p>', '<p>El correo registrado del negocio</p>', '<p>Nunca se ha enviado nada sin tu permiso.</p>', '<p>Nadie ha recibido tus datos.</p>',
+    '<p>Escribe al correo registrado.</p>', '<p>Revisa los datos en la lista enviada.</p>', '<p>Recibirás tu cotización por WhatsApp o por correo.</p>', '<p>Consulta la lista de marcas registradas en cada ficha.</p>', '<p>Lista de marcas registradas</p>',
+  ]);
+});
+
+test('R-RULE-10: un nombre o un sustantivo de dos palabras entre el sustantivo y el participio, y la frase con su destino', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>¡Tu solicitud a Sercom Active enviada!</p>', '<p>Solicitud por correo electrónico enviada</p>', '<p>Mensaje de WhatsApp Business enviado</p>', '<p>Mensaje para Sercom Active enviado</p>',
+    '<p>Tu lista de 3 productos enviada</p>', '<p>Tu pedido de 3 productos enviado</p>', '<p>La solicitud enviada a Sercom</p>', '<p>Listo: la solicitud enviada a Sercom.</p>',
+  ]);
+  assert.deepEqual(failedIds(await scan({ '_astro/app.js': 'toast("¡Tu solicitud a Sercom Active enviada!");' })), ['R-RULE-10']);
+  // Una negación o una condición antes del sustantivo, un verbo en el hueco o el participio que sigue como adjetivo no confirman nada.
+  await assertNoneFails([
+    '<p>Ningún mensaje queda registrado en este sitio.</p>', '<p>Cuando tu solicitud queda enviada desde tu WhatsApp, Sercom responde.</p>', '<p>Sin correo registrado.</p>',
+    '<p>Escribe tu mensaje para que sea enviado desde tu WhatsApp.</p>', '<p>La lista enviada a Sercom incluye la página de cada producto.</p>',
+  ]);
+});
+
+test('R-RULE-10: un plazo de respuesta con una cifra', async () => {
+  const promises = ['Recibirás tu cotización en 24 horas', 'Te respondemos en menos de 24 horas', 'Te cotizamos en 24 hrs', 'Respondemos en 2 horas', 'Te enviamos tu cotización en 1 día hábil',
+    'Recibes tu cotización dentro de 48 horas'];
+  await assertEachFails('R-RULE-10', promises.map(text => `<p>${text}</p>`));
+  for (const text of promises) assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
+  await assertNoneFails(['<p>Precio en 24 horas</p>', '<p>La disponibilidad y el tiempo de entrega se confirman al cotizar.</p>', '<label>Fecha requerida:</label>', '<label>Entrega en (ciudad o código postal):</label>',
+    '<p>Horario: lunes a viernes de 9 a 18 horas</p>', '<p>Usa el respirador un máximo de 8 horas</p>', '<p>Cambia el filtro cada 40 horas</p>', '<p>No recibirás nada en 24 horas sin pedirlo.</p>']);
+  // Después de «que», «y», «para» o una coma empieza otra oración: el plazo ya no es el de la respuesta.
+  await assertNoneFails(['<p>Recibes guantes de nitrilo que se cambian en 4 horas de uso.</p>', '<p>Recibes un extintor que se recarga en 1 hora.</p>', '<p>Te cotizamos el equipo que usas en 8 horas de turno.</p>',
+    '<p>Te enviamos la lista para que la revises en 5 minutos.</p>', '<p>Recibes el arnés y lo ajustas en 2 minutos.</p>', '<p>Recibes un respirador que protege en 8 horas de jornada.</p>', '<p>Te enviamos el casco, que se ajusta en 2 minutos.</p>',
+    // Una duración de uso («de turno», «de uso», «de jornada») tampoco es un plazo de respuesta.
+    '<p>Respondemos tus dudas sobre el uso en 8 horas de turno.</p>', '<p>Te cotizamos filtros para trabajar en 40 horas de uso.</p>']);
+  // El segundo verbo de la frase sigue contando por sí mismo.
+  await assertEachFails('R-RULE-10', ['<p>Te respondemos y cotizamos en 24 horas</p>']);
+});
+
+test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
+  await assertEachFails('R-RULE-24', [
+    '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',
+    '<a href="https://l.example.com/?u=https%25253A%25252F%25252Fwa.me%25252F5215555555555">WhatsApp</a>',
+    '<a href="https://l.example.com/?u=mailto%253Aotro%2540example.com">Correo</a>',
+    // Codificado cinco veces: la base lo detectaba.
+    `<a href="https://l.example.com/?u=${[1, 2, 3, 4, 5].reduce(text => encodeURIComponent(text), 'https://wa.me/5215555555555')}">WhatsApp</a>`,
+  ]);
+  assert.deepEqual(failedIds(await scan({ '_astro/app.js': 'location.href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555";' })), ['R-RULE-24']);
+  // El enlace confirmado codificado dos veces dentro de otro sigue siendo el confirmado.
+  await assertNoneFails([`<a href="https://l.example.com/?u=${encodeURIComponent(encodeURIComponent(WHATSAPP))}">WhatsApp</a>`]);
+});
+
+test('R-RULE-29: colores de la paleta anterior en setProperty, constantes y claves de color, animaciones de SVG y atributos de color antiguos', async () => {
+  for (const content of ["el.style.setProperty('--marca','#0e2a3e');", "el.style.setProperty('--x', '#00a6e4');", "const NAVY='#0e2a3e';el.style.color=NAVY;", "const tema={primary:'#00a6e4'};",
+    'const brand="#0e2a3e";', 'var c={accent:"#00a4e6",bg:"#0e2a3e"};']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect><animate attributeName="fill" to="#0e2a3e"/></rect></svg>' })), ['R-RULE-29']);
+  await assertEachFails('R-RULE-29', [
+    '<svg><rect><set attributeName="fill" to="#0e2a3e"/></rect></svg>', '<svg><rect><animate attributeName="fill" from="#00a6e4" to="#fff"/></rect></svg>',
+    '<svg><rect><animate attributeName="fill" values="#fff;#0e2a3e"/></rect></svg>', '<table bordercolor="#0e2a3e"><tr><td>x</td></tr></table>',
+    '<table bgcolor="#0e2a3e"><tr><td>x</td></tr></table>', '<font color="#00a6e4">x</font>',
+  ]);
+  // El segundo argumento de setProperty sea cual sea el primero, los valores de un objeto o una lista de colores y «by» de <animate>.
+  for (const content of ["el.style.setProperty(nombre,'#0e2a3e');", "const colores={fondo:'#0e2a3e'};", "const palette=['#0e2a3e','#fff'];", "const paleta=['#0e2a3e'];", "const tema={fondo:'#0e2a3e'};"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect><animate attributeName="fill" by="#0e2a3e"/></rect></svg>' })), ['R-RULE-29']);
+  // Un ancla, un identificador o un dato con forma de color, fuera de un nombre de color, siguen limpios.
+  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<svg><a href="#00a6e9"><text>x</text></a></svg>', '<svg><set attributeName="href" to="#00a6e9"/></svg>']);
+  for (const [path, content] of [['datos.json', '{"x":"#0e2a40"}'], ['_astro/app.js', 'const ancla="#00a6e9";'], ['_astro/app.js', "el.style.setProperty('--ancho','12px');location.hash='#00a6e9';"],
+    ['_astro/app.js', "const marca={id:'#0e2a3e'};"], ['_astro/app.js', "const primary={label:'Cotizar',href:'#00a6e9'};"]]) {
+    assert.deepEqual(failures(await scan({ [path]: content })), [], content);
+  }
+});
+
+test('R-RULE-29: un nombre de color cuenta donde empieza un nombre o una parte de él, no dentro de otra palabra', async () => {
+  // «tema» dentro de «sistema» no es un tema, y «temas» son asuntos: un ancla bajo esos nombres no es un color.
+  for (const content of ["const sistema={id:'#00a6e9'};", "const temas=[{titulo:'Envíos',ancla:'#00a6e9'}];", "const sistemas={id:'#00a6e9'};", "const problemas=[{ancla:'#00a6e9'}];",
+    "const esquema={id:'#00a6e9'};", "const sistema='#00a6e9';", "var o={sistema:'#00a6e9',subtema:'#00a6e9'};", "const TEMAS=[{ancla:'#00a6e9'}];", "const temasDelMes=[{ancla:'#00a6e9'}];"]) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  assert.deepEqual(failures(await scan({ 'datos.json': '{"sistema":{"id":"#00a6e9"},"temas":[{"ancla":"#00a6e9"}]}' })), [], 'JSON');
+  // Al principio del nombre, después de «_», «-» o «$», o en una parte en camelCase, sí cuenta.
+  for (const content of ["const themeColors={fondo:'#0e2a3e'};", "const brandColors=['#0e2a3e'];", "const miPaleta=['#0e2a3e'];", "const TEMA={primary:'#0e2a3e'};", "const tema_claro={x:'#0e2a3e'};",
+    "const temaSecundario={x:'#0e2a3e'};", "const COLOR_PRIMARIO='#0e2a3e';", "const azulMarino='#0e2a3e';", "const btnFondo='#0e2a3e';", "const $marca='#0e2a3e';", "el.style.setProperty('--color-marca','#0e2a3e');"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+});
+
+test('R-RULE-29: un nombre de color pegado a otra palabra o en mayúsculas sigue contando', async () => {
+  // Solo «tema» necesita empezar un nombre o una parte de él; «color», «bg», «theme» y las demás palabras de color
+  // cuentan en cualquier lugar del nombre, como antes: «textcolor», «MAINCOLOR», «navbg», «darktheme».
+  for (const content of ["const textcolor='#0e2a3e';", "const maincolor='#0e2a3e';", "const MAINCOLOR='#0e2a3e';", "const UIColor='#0e2a3e';", "var o={linkcolor:'#0e2a3e'};",
+    "var o={fontcolor:'#0e2a3e'};", "const navbg='#0e2a3e';", "const darktheme={x:'#0e2a3e'};", "const sitetheme={x:'#0e2a3e'};", "const textcolor='rgb(14,42,62)';"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'datos.json': '{"textcolor":"#0e2a3e"}' })), ['R-RULE-29'], 'JSON');
+});
+
+test('R-RULE-29: «temática», «temático» y «temario» son otras palabras; «tema» pegado a otra palabra sigue contando', async () => {
+  for (const content of ["const tematica={id:'#00a6e9'};", "const temario=[{ancla:'#00a6e9'}];", "const TEMARIO=[{ancla:'#00a6e9'}];", "const Tematica={id:'#00a6e9'};", "var o={tematica:'#00a6e9'};",
+    "const temática={id:'#00a6e9'};", "const tematico=[{ancla:'#00a6e9'}];", "const temarios=[{ancla:'#00a6e9'}];", "const TEMATICAS=[{ancla:'#00a6e9'}];"]) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  // «tema» sigue contando solo, en camelCase, después de «_», en mayúsculas y pegado a otra palabra.
+  for (const content of ["const tema={x:'#0e2a3e'};", "const temaOscuro={x:'#0e2a3e'};", "const TemaClaro={x:'#0e2a3e'};", "const TEMA_OSCURO={x:'#0e2a3e'};", "const tema2={x:'#0e2a3e'};",
+    "const temaoscuro={x:'#0e2a3e'};", "const temaclaro={texto:'#0e2a3e',enlace:'#00a6e4'};", "const TEMAOSCURO={x:'#0e2a3e'};", "const temaprincipal='#0e2a3e';"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'datos.json': '{"temaoscuro":{"texto":"#0e2a3e"}}' })), ['R-RULE-29'], 'JSON');
+});
+
+test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
+  for (const robots of ['User-agent: *\nDisallow: /\n\nuseragent: Googlebot\nDisallow:\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nAllow: /\n', 'useragent: *\nDisallow: /\n\nUSERAGENT: Bingbot\nDisallow: /privado/\n']) {
+    assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
+  }
+  for (const robots of ['useragent: *\nDisallow: /\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nDisallow: /\n']) {
+    assert.deepEqual(failures(await scan({ 'robots.txt': robots })), [], robots);
+  }
+  const launched = robots => ({ 'index.html': page('<h1>Inicio</h1>', { robots: '' }), 'robots.txt': robots });
+  assert.deepEqual(failedIds(await scan(launched('User-agent: *\nAllow: /\n\nuser agent: Bingbot\nDisallow: /\n'), { launch: true })), ['R-PUB-03']);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
@@ -297,7 +750,7 @@ test('cada regla está documentada y conserva su identificador', () => {
   for (const rule of RULES) {
     assert.match(rule.id, /^R-[A-Z0-9]+-\d{2}$/);
     assert.ok(rule.title.length > 5 && rule.doc.length > 40, rule.id);
-    assert.ok(['text', 'words', 'raw', 'norm'].includes(rule.scope), rule.id);
+    assert.ok(['text', 'joined', 'words', 'prose', 'raw', 'norm'].includes(rule.scope), rule.id);
   }
   const documented = new Set([...RULES.map(rule => rule.id), ...CHECKS.map(([id]) => id)]);
   for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17']) {
@@ -328,6 +781,19 @@ test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay n
     assert.equal(cli(`${clean}-no-existe`).status, 2);
     assert.equal(cli(clean, '--otra-opcion').status, 2);
     assert.equal(cli(clean, '--preview', '--launch').status, 2);
+    // --strict: un aviso (WARN) también hace fallar la revisión.
+    const warned = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page('<p>Guante EN 388. Arnés certificado.</p>') });
+    try {
+      const lenient = cli(warned);
+      assert.equal(lenient.status, 0, lenient.stdout);
+      assert.match(lenient.stdout, /0 FAIL, 2 WARN\./);
+      const strict = cli(warned, '--strict');
+      assert.equal(strict.status, 1, strict.stdout + strict.stderr);
+      assert.match(strict.stdout, /modo producción \+ estricto: .* 0 FAIL, 2 WARN\./);
+      assert.equal(cli(clean, '--strict').status, 0);
+    } finally {
+      await removeTree(warned);
+    }
     const rules = cli('--rules');
     assert.equal(rules.status, 0);
     for (const id of ['R-RULE-01', 'R-RULE-08', 'R-RULE-29', 'R-RULE-12', 'R-RULE-14', 'BUILD']) assert.ok(rules.stdout.includes(id), id);

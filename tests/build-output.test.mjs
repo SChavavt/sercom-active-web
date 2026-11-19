@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanDist } from '../scripts/scan-dist.mjs';
+import { matchesSearchText, SEARCH_PARAM } from '../src/lib/search.mjs';
 import { listFiles, loadProjectData, ROOT } from './helpers.mjs';
 
 const PROBE = join(ROOT, 'tests', 'build-probe');
@@ -155,6 +156,35 @@ test('vista previa (control): los mismos archivos sí contienen los diez ejemplo
   // es la rama que la compilación de producción elimina.
   const scripts = [...files].filter(([path]) => path.endsWith('.js'));
   for (const example of data.examples) assert.ok(scripts.some(([, content]) => content.includes(example.code)), example.code);
+});
+
+test('vista previa: la búsqueda del navegador sobre los data-search compilados da los productos esperados', () => {
+  // El mismo camino que el script de la página: el atributo escrito en el HTML (con sus entidades), leído como lo
+  // devuelve getAttribute, y la consulta leída de la dirección con URLSearchParams. Lo esperado está escrito a mano.
+  const decode = text => text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos|#39));/gi, (_entity, decimal, hex, name) => (
+    decimal ? String.fromCodePoint(Number(decimal)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }[name.toLowerCase()]));
+  const index = builds.preview.files.get('index.html');
+  const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }));
+  assert.equal(cards.length, 10);
+  const found = location => cards.filter(card => matchesSearchText(card.search, new URL(location, 'https://sitio.example/').searchParams.get(SEARCH_PARAM))).map(card => card.id);
+  const all = data.examples.map(example => example.id);
+  const expectations = [
+    ['/catalogo/', all],
+    ['/catalogo/?q=', all],
+    ['/catalogo/?q=guante', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=GUANTE+recubierto', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=EJ-1001', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=ej1001', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=ej%201001', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=EJ-8001-27', ['ejemplo-bota-con-casquillo']],
+    ['/catalogo/?q=ARN%C3%89S', ['ejemplo-arnes-de-cuerpo-completo']],
+    ['/catalogo/?q=se%C3%B1alizaci%C3%B3n', ['ejemplo-cono-de-71-cm']],
+    ['/catalogo/?q=senalizacion', ['ejemplo-cono-de-71-cm']],
+    ['/catalogo/?q=casco%20cachucha', ['ejemplo-casco-tipo-cachucha']],
+    ['/catalogo/?q=casco+EJ-1001', []],
+    ['/catalogo/?q=zzzz', []],
+  ];
+  for (const [location, expected] of expectations) assert.deepEqual(found(location), expected, location);
 });
 
 test('vista previa (control): el escáner en modo producción detecta los ejemplos en HTML, JSON y scripts', async () => {
