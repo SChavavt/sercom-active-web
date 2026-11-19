@@ -887,6 +887,28 @@ test('R-RULE-01: una cifra más IVA, «c/u» después de una cifra con dos decim
   ]);
 });
 
+test('R-RULE-01: una cifra con IVA incluido, con o sin IVA, I.V.A.; una cifra pegada a una letra después de «de» es un nombre', async () => {
+  // Otras escrituras de una cifra con el IVA, que ninguna versión detectaba.
+  await assertEachFails('R-RULE-01', [
+    '<p>Casco 350 IVA incluido</p>', '<p>Casco 350 con IVA</p>', '<p>Casco 350 + I.V.A.</p>', '<p>Casco 350 más I.V.A.</p>', '<p>Casco 350 sin IVA</p>',
+    '<p>Casco 350 más el IVA</p>', '<p>Guante 25.50 I.V.A. incluido</p>', '<p>Casco 350 iva incluido</p>', '<p>Casco 350 con I.V.A</p>',
+  ]);
+  // «Precio … de» con una cifra sigue fallando, también con una unidad pegada o una moneda.
+  await assertEachFails('R-RULE-01', ['<p>Precio unitario de 120</p>', '<p>Precio de 350</p>', '<p>Precio de 35pza</p>', '<p>Precio unitario de 25.50pza</p>', '<p>Precio de 350MXN</p>']);
+  await assertNoneFails([
+    // 3M es una de las marcas: «de 3M» no es una cifra (también «Los precios de 3M…», que la versión de f37334b marcaba).
+    '<p>El precio vigente de 3M se confirma al cotizar.</p>', '<p>Los precios actuales de 3M y Ansell se confirman al cotizar.</p>', '<p>El costo real de 3M se confirma al cotizar.</p>',
+    '<p>Precio unitario de 3M: a cotizar</p>', '<p>Tarifas vigentes de 3M: a cotizar</p>', '<p>Los precios de 3M se confirman al cotizar.</p>', '<p>Precio de 3M: a cotizar</p>',
+    // Un porcentaje con IVA y el IVA sin cifra siguen como estaban.
+    '<p>16% IVA incluido</p>', '<p>16% con IVA</p>', '<p>16 % + IVA</p>', '<p>IVA del 16 %</p>', '<p>Todas las cotizaciones son en pesos mexicanos más IVA.</p>',
+    '<p>Caja con 12 pares con IVA desglosado</p>', '<p>NOM-017-STPS-2008 con IVA desglosado al cotizar</p>',
+  ]);
+  // El texto de --rules dice lo que la regla reconoce ahora.
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.match(printed, /«con IVA», «sin IVA» o «IVA incluido», también escrito «I\.V\.A\.»/);
+  assert.match(printed, /una cifra pegada a una letra es un nombre y no cuenta: «El precio vigente de 3M»/);
+});
+
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
   await assertEachFails('R-RULE-10', [
     '<p>Mensaje de WhatsApp enviado</p>', '<p>Tu lista de productos enviada</p>', '<p>Solicitud por WhatsApp enviada</p>', '<p>¡Tu solicitud a Sercom enviada!</p>',
@@ -955,6 +977,28 @@ test('R-RULE-10: contestar y mandar, la primera persona del singular con un plaz
     '<p>Envío de la ficha técnica: pídela en tu mensaje.</p>', '<p>Si lo necesitas pronto, dilo en tu mensaje.</p>', '<p>Tenemos tu lista de marcas a la vista en el catálogo.</p>',
     '<p>Escríbeme y te respondo con la disponibilidad confirmada al cotizar.</p>',
   ]);
+});
+
+test('R-RULE-10: el plazo antes del verbo con coma o con cifra, «te damos respuesta»; «envío» y «mando» solos no son verbos', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>En breve, recibirás tu cotización.</p>', '<p>A la brevedad, te respondo.</p>', '<p>Pronto, recibirás tu cotización.</p>', '<p>A la brevedad, recibirás respuesta.</p>',
+    '<p>En 24 horas recibirás tu cotización.</p>', '<p>Dentro de 48 horas recibirás tu cotización.</p>', '<p>En 24 horas, te contesto.</p>', '<p>En un día hábil cotizamos tu lista.</p>',
+    '<p>Te damos respuesta en 24 horas.</p>', '<p>Te damos respuesta a la brevedad.</p>', '<p>Le damos una respuesta pronto.</p>',
+    // «envío» y «mando» con te, le o les delante siguen siendo verbos en los dos órdenes.
+    '<p>Pronto te envío la cotización.</p>', '<p>De inmediato le mando la ficha.</p>', '<p>A la brevedad les mando la cotización.</p>',
+  ]);
+  await assertNoneFails([
+    // Sustantivos después de un plazo sin cifra.
+    '<p>Solicita tu cotización para un pronto envío.</p>', '<p>Arnés con pronto envío de la ficha técnica.</p>', '<p>Paro de emergencia: de inmediato mando a cero.</p>',
+    '<p>Válvula de cierre de inmediato mando manual.</p>', '<p>Botón de paro de inmediato mando apagado.</p>',
+    // Una duración de uso no es un plazo, y un plazo con coma seguido de otra cosa que un verbo de respuesta no promete nada.
+    '<p>En 8 horas de uso recibes una alerta para cambiar el filtro.</p>', '<p>En 8 horas de turno, recibes protección continua.</p>', '<p>Pronto, más marcas en el catálogo.</p>',
+    '<p>En breve, el catálogo tendrá productos.</p>', '<p>Te damos el precio en 24 horas</p>',
+  ]);
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.match(printed, /«te damos respuesta»/);
+  assert.match(printed, /el plazo antes del verbo, con cifra o sin ella y con una coma o sin ella/);
+  assert.match(printed, /«un pronto envío» y «de inmediato mando a cero» no fallan/);
 });
 
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
