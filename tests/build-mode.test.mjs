@@ -428,6 +428,105 @@ test('el código del sitio nunca importa el registro de investigación', () => {
   assert.ok(!sourceFiles.some(path => /research|fuentes/i.test(path)));
 });
 
+// Capa de datos: los únicos módulos de src/ que cargan archivos de src/data/ o de research/, cada uno con lo que carga.
+// Las páginas, los componentes, las plantillas y los demás módulos leen los datos a través de ellos, que filtran por
+// estado y por modo (docs/datos-y-modos.md, sección 2): una página que importa catalog.json directamente publicaría en
+// producción las categorías en borrador. El archivo de ejemplos tiene además su propia regla, más estricta (arriba).
+const DATA_LAYER = {
+  'src/lib/site-data.mjs': ['/src/data/brands.json', '/src/data/catalog.json', '/src/data/preview/example-products.json'],
+  'src/lib/contact.mjs': ['/src/data/business.json'],
+};
+const DATA_DIRECTORIES = ['/src/data', '/research'];
+// Carpetas de datos que existen hoy, con sus subcarpetas: un patrón de import.meta.glob las alcanza si puede cargar
+// un archivo dentro de alguna de ellas.
+const dataDirectories = [...DATA_DIRECTORIES, ...(await Promise.all(DATA_DIRECTORIES.map(async directory => (await readdir(join(ROOT, directory), { recursive: true, withFileTypes: true }))
+  .filter(entry => entry.isDirectory())
+  .map(entry => `${directory}/${join(entry.parentPath, entry.name).slice(join(ROOT, directory).length + 1).split('\\').join('/')}`)))).flat()];
+// Una mención solo de tipo no carga nada: `import type … from '…'`, `export type … from '…'` y `typeof import('…')`.
+const TYPE_ONLY = /\b(?:import|export)\s+type\s+(?:\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+)\s+from\s*(["'])[^"'\n]*\1|\btypeof\s+import\s*\(\s*(["'])[^"'\n]*\2\s*\)/g;
+// `import … from '…'`, `export … from '…'` (también con `with { type: 'json' }` después), `import '…'` e `import('…')`.
+const LOAD_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s*)(["'])([^"'\n]+)\1/g;
+const inDataDirectory = target => DATA_DIRECTORIES.some(directory => target === directory || target.startsWith(`${directory}/`));
+/** Archivo al que apunta un especificador, resuelto desde la raíz del proyecto, o `undefined` si es un paquete. */
+function resolveSpecifier(path, specifier) {
+  const file = specifier.replace(/[?#].*$/, '');
+  if (file.startsWith('/')) return posix.normalize(file);
+  if (file.startsWith('./') || file.startsWith('../')) return posix.join(posix.dirname(`/${path}`), file);
+  return undefined;
+}
+/** ¿Puede un patrón de `import.meta.glob` (ya resuelto, como los de `loadPatterns`) cargar un archivo de la carpeta? */
+const globReaches = (pattern, directory) => {
+  const slash = pattern.lastIndexOf('/');
+  const last = pattern.slice(slash + 1);
+  // Cualquier archivo de la carpeta: el último segmento se cambia por «*», salvo «**», que ya baja a las subcarpetas.
+  return posix.matchesGlob(`${directory}/archivo`, last.includes('**') ? pattern : `${pattern.slice(0, slash)}/*`);
+};
+/**
+ * Archivos de src/data/ o de research/ que carga un código, leído sin comentarios: cada especificador de `import`,
+ * `export … from` e `import()` que apunta a ellos, y «patrón <…>» por cada patrón de `import.meta.glob` o de
+ * `import()` con plantilla que puede alcanzarlos (también «?», un patrón que no se puede revisar). Un patrón negado
+ * («!../data/**») excluye la carpeta que cubre entera.
+ * @param {string} path Ruta del archivo («src/pages/x.astro»).
+ * @param {string} text Contenido del archivo.
+ */
+function dataLoads(path, text) {
+  const code = stripComments(text).replace(TYPE_ONLY, '');
+  const loads = [...code.matchAll(LOAD_SPECIFIER)].map(match => resolveSpecifier(path, match[2])).filter(target => target && inDataDirectory(target));
+  const patterns = loadPatterns(path, code);
+  const excluded = directory => patterns.some(pattern => pattern.startsWith('!') && pattern.endsWith('/**') && posix.matchesGlob(`${directory}/archivo`, pattern.slice(1)));
+  for (const pattern of patterns.filter(item => !item.startsWith('!'))) {
+    if (pattern === '?' || dataDirectories.some(directory => !excluded(directory) && globReaches(pattern, directory))) loads.push(`patrón ${pattern}`);
+  }
+  return [...new Set(loads)].sort();
+}
+
+test('solo los módulos de la capa de datos cargan archivos de src/data/ o de research/', () => {
+  // Las formas sencillas de cargar un archivo, plantadas en una página, un componente o un módulo: todas fallan.
+  const misuse = [
+    // La de la revisión: la página lista las diez categorías en borrador, también en producción.
+    ['src/pages/contacto/index.astro', "---\nimport catalogoCrudo from '../../data/catalog.json';\nconst nombresCat = catalogoCrudo.categories.map(c => c.name).join(', ');\n---\n<p>{nombresCat}</p>", ['/src/data/catalog.json']],
+    ['src/pages/contacto/index.astro', "---\nimport catalogo from '../../data/catalog.json' with { type: 'json' };\n---", ['/src/data/catalog.json']],
+    ['src/components/SiteFooter.astro', "---\nimport { categories } from '../data/catalog.json';\n---", ['/src/data/catalog.json']],
+    ['src/lib/catalogo-crudo.mjs', "export { default as catalogo } from '../data/catalog.json';", ['/src/data/catalog.json']],
+    ['src/lib/marcas.mjs', "export * from '../data/brands.json';", ['/src/data/brands.json']],
+    ['src/pages/marcas/index.astro', "---\nimport '../../data/brands.json';\n---", ['/src/data/brands.json']],
+    ['src/pages/marcas/index.astro', "---\nconst marcas = (await import('../../data/brands.json')).default;\n---", ['/src/data/brands.json']],
+    ['src/pages/contacto/index.astro', "---\nconst negocio = (await import(\"../../data/business.json\", { with: { type: 'json' } })).default;\n---", ['/src/data/business.json']],
+    ['src/layouts/BaseLayout.astro', "---\nimport negocio from '/src/data/business.json';\n---", ['/src/data/business.json']],
+    ['src/components/Tarjeta.astro', "---\nimport texto from '../data/catalog.json?raw';\n---", ['/src/data/catalog.json']],
+    ['src/pages/sonda.astro', "---\nimport registro from '../../research/Sercom_Active_Fuentes_Catalogos.json';\n---", ['/research/Sercom_Active_Fuentes_Catalogos.json']],
+    ['src/components/Aviso.astro', "<script>\n  import negocio from '../data/business.json';\n</script>", ['/src/data/business.json']],
+    // import.meta.glob con un patrón que alcanza data/, e import() con una plantilla.
+    ['src/pages/sonda.astro', "---\nconst datos = import.meta.glob('../data/*.json', { eager: true });\n---", ['patrón /src/data/*.json']],
+    ['src/components/Tarjeta.astro', "---\nconst datos = import.meta.glob('/src/**/*.json', { eager: true, import: 'default' });\n---", ['patrón /src/**/*.json']],
+    ['src/lib/datos.mjs', "export const datos = import.meta.glob('./*.yaml', { base: '../data/preview' });", ['patrón /src/data/preview/*.yaml']],
+    ['src/lib/datos.mjs', "export const datos = import.meta.glob(['/src/**', '!/src/data/preview/**']);", ['patrón /src/**']],
+    ['src/lib/datos.mjs', 'export const cargar = nombre => import(`../data/${nombre}.json`);', ['patrón /src/data/*.json']],
+    ['src/lib/datos.mjs', 'export const cargar = ruta => import(ruta);', ['patrón ?']],
+  ];
+  for (const [path, code, loads] of misuse) {
+    assert.deepEqual(dataLoads(path, code), loads, code);
+    assert.ok(!(path in DATA_LAYER), path);
+  }
+  // Un módulo de la capa de datos que carga otro archivo de datos también falla: se compara con su lista.
+  assert.deepEqual(dataLoads('src/lib/contact.mjs', "import catalog from '../data/catalog.json' with { type: 'json' };"), ['/src/data/catalog.json']);
+  // No son cargas: un comentario, una mención solo de tipo, otro JSON del proyecto, un patrón que no alcanza data/.
+  const harmless = [
+    ['src/pages/contacto/index.astro', "---\n// import catalogo from '../../data/catalog.json';\n/* import('../../data/brands.json') */\nimport { categories } from '../../lib/site-data.mjs';\n---\n<!-- import negocio from '../../data/business.json' -->"],
+    ['src/types/site.ts', "/** Contenido de `src/data/catalog.json`. */\nexport type CatalogoCrudo = typeof import('../data/catalog.json');\nimport type { Brand } from '../data/brands.json';"],
+    ['src/lib/icons.ts', "import kit from '../assets/icons/icons.json';"],
+    ['src/components/Tarjeta.astro', "---\nconst iconos = import.meta.glob('../assets/icons/*.svg', { eager: true, query: '?raw' });\n---"],
+    ['src/lib/datos.mjs', "export const iconos = import.meta.glob(['/src/**/*.svg', '!/src/data/**']);"],
+    ['src/pages/contacto/index.astro', '<p>Los datos salen de catalog.json, de brands.json y de business.json.</p>'],
+  ];
+  for (const [path, code] of harmless) assert.deepEqual(dataLoads(path, code), [], code);
+
+  // El árbol de hoy: fuera de la capa de datos nadie carga datos, y cada módulo de la capa carga exactamente su lista.
+  const outside = [...rawSources].filter(([path]) => !(path in DATA_LAYER)).flatMap(([path, text]) => dataLoads(path, text).map(load => `${path}: ${load}`));
+  assert.deepEqual(outside, [], 'un archivo de src/ carga datos directamente: las páginas y los componentes leen los datos con site-data.mjs o contact.mjs (docs/datos-y-modos.md, sección 2)');
+  for (const [path, allowed] of Object.entries(DATA_LAYER)) assert.deepEqual(dataLoads(path, rawSources.get(path)), allowed, path);
+});
+
 test('los módulos para el navegador no importan datos ni usan APIs de Node o de Astro', () => {
   const allowed = {
     'src/lib/text.mjs': [],
