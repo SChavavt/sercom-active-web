@@ -78,6 +78,20 @@ El escáner reconoce los ejemplos por esas marcas y por sus textos. Una página 
 
 Consecuencia para quien escribe páginas: esas cadenas tampoco pueden usarse en producción como nombre de clase CSS, identificador o texto (por ejemplo, una clase `ejemplo-…`). «Por ejemplo» sí puede escribirse.
 
+## Límite conocido: las reglas de afirmaciones y el texto de los productos
+
+Las reglas del escáner son mecánicas: buscan palabras y no saben quién las escribe. Se pensaron para el texto del sitio (lo que Sercom Active dice de sí mismo), pero también leen los campos de producto, y con texto legítimo de un fabricante fallan. Hoy harían fallar la compilación, por ejemplo:
+
+- R-RULE-07: la señal «Solo personal autorizado», «Prohibido el paso a personal no autorizado» o «Chaleco reflejante para oficial de tránsito».
+- R-RULE-18: «Fecha de fabricación impresa» o «Logotipo bordado».
+- R-RULE-10: un candado con «etiqueta con folio consecutivo».
+- R-RULE-06: «Casco para líder de cuadrilla», «Costuras garantizadas por el fabricante» o «Norma vigente desde 2019».
+- R-RULE-11: un modelo o número de parte 72090.
+
+Antes de cargar los productos reales (etapa 3) hay que decidir cómo se revisan los campos de producto. Por ejemplo: una región marcada en las páginas (como `data-scan="producto"`) que las reglas sobre el negocio no lean y que revise un validador que conoce la fuente de cada ficha, o un archivo de excepciones revisado junto con esa fuente. No se resuelve agregando frases a la lista de frases permitidas de `scripts/scan-dist.mjs`, que es solo para textos del propio sitio.
+
+Las reservas de los ejemplos se mantienen: los códigos `EJ-` seguidos de un dígito y la frase «de ejemplo» pertenecen a los productos de ejemplo, y la validación los rechaza en el catálogo. Una ficha real con un código así («Lente EJ-200») también necesita esa decisión.
+
 ## Aprobar una categoría o agregar un producto real
 
 El procedimiento completo está en `docs/catalogo-y-actualizaciones.md`. En resumen:
