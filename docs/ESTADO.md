@@ -54,7 +54,7 @@ Tomadas al integrar y revisar el paso 1. Todas pueden revisarse con el propietar
 
 - **Portada**: titular, accesos a cotizar y a la solicitud especial, categorías, marcas, productos, banda «¿Buscas algo que no aparece…?», atención con Yosmara, «Cómo funciona» y preguntas frecuentes. En producción, sin categorías ni productos aprobados, dice «Estamos preparando el catálogo» y ofrece las tres entradas.
 - **Catálogo** con buscador, barra lateral de categorías y marcas y tarjetas de producto; en producción, una página de «Estamos preparando el catálogo» con las marcas.
-- **Diez páginas de categoría** (solo en la vista previa, porque ninguna categoría está aprobada).
+- **Una página por categoría** (solo en la vista previa, porque ninguna categoría está aprobada).
 - **Marcas**: la lista de las 19 y una página por marca, con «Sitio del fabricante» cuando hay enlace verificado.
 - **Ficha de producto** con imagen o pictograma, marca, código, unidad de venta, resumen, características, variantes, documentación o «Solicitar ficha técnica», «Cotizar este producto» y «Cotizar por correo» (diez ejemplos en la vista previa).
 - **Producto retirado**: página informativa en la misma dirección de un producto que fue público, con «Consultar alternativas» (un ejemplo en la vista previa, en `/productos/ejemplo-producto-retirado/`, al que no enlaza ninguna página).
@@ -119,7 +119,7 @@ El trabajo está en la rama `claude/project-thread-xtacqo` (una línea de trabaj
 | 5 | Tres entradas; «Cotizar mi lista» y «Ayúdame a encontrarlo» visibles y funcionando | Cumple | Portada, encabezado, banda y pie. |
 | 6 | Catálogo con tarjetas iguales, entrada por categoría y marca, búsqueda, ningún control inerte | Cumple | Búsqueda probada (conteo, sin resultados, limpiar, regreso con `?q`); producción no tiene búsqueda porque no hay productos. El verificador de enlaces revisa que ningún enlace esté vacío, sea «#» o use `javascript:`, y el de marcado, los botones de la cabecera; un botón que no hace nada solo lo encuentra la revisión en el navegador. |
 | 7 | Página de categoría | Cumple hasta donde los datos lo permiten | «Marcas en esta categoría» no aparece porque los ejemplos no tienen marca real. |
-| 8 | Marcas como texto, ningún proveedor como marca, sin afirmar disponibilidad | Cumple | Las 19 páginas; «Sitio del fabricante» abre en otra pestaña. |
+| 8 | Marcas como texto, ningún proveedor como marca, sin afirmar disponibilidad | Cumple | La página de cada marca; «Sitio del fabricante» abre en otra pestaña. |
 | 9 | Ficha con sus zonas, texto de condiciones y «Cotizar este producto» con marca, código y enlace | Cumple | El enlace se agrega al cargar la página sin dirección del sitio, o va escrito con ella. |
 | 10 | Estados: sin resultados, dato no confirmado, documento no disponible, producto retirado, lista vacía | Cumple | Ver [`diseno.md`](diseno.md#8-estados). |
 | 11 | Contacto sin dirección, mapa ni «Visítanos» | Cumple | El escáner no encuentra ninguno. |
