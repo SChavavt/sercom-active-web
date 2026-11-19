@@ -31,10 +31,12 @@ Cada producto de `catalog.json` es un objeto con estos campos y ningún otro (un
 
 Además, en todo el archivo:
 
-- Ninguna clave se llama precio, costo, existencias o inventario (`price`, `precio`, `cost`, `costo`, `stock`, `inventory`, `inventario`, en singular o plural): el sitio no publica esos datos.
+- Ninguna clave se llama `price`, `precio`, `cost` o `costo` (en singular o plural), `stock`, `inventory` ni `inventario`: el sitio no publica esos datos. Otras formas (`existencias`, `stocks`, `inventarios`) el validador no las rechaza; tampoco deben usarse.
 - La marca excluida no puede aparecer en `id`, `brandId`, `model`, `name` ni en el nombre de la marca.
 - Lo reservado a los ejemplos se rechaza: un `id` que empieza con `ejemplo-`, un nombre con «de ejemplo» y un código (`model` o de variante) que empieza con `EJ-` y una cifra.
 - Una ficha `approved` exige que **todas** sus categorías estén aprobadas.
+
+Un solo error, aunque sea de una ficha en `draft`, detiene la validación y la compilación de los dos modos: `getPublishedProducts` no entrega nada si `validateCatalog` encuentra un problema. Un borrador incompleto puede quedarse en el archivo (el validador solo exige lo de `approved` a las fichas aprobadas), pero sus campos deben tener la forma correcta.
 
 Lo que el validador no revisa todavía: el texto de los campos de producto frente a las reglas de afirmaciones del sitio. Un texto legítimo de fabricante puede hacer fallar el escáner; está descrito en [`datos-y-modos.md`](datos-y-modos.md#7-límite-conocido-las-reglas-de-afirmaciones-y-el-texto-de-los-productos) y se decide antes de cargar el piloto.
 
@@ -45,8 +47,9 @@ Lo que el validador no revisa todavía: el texto de los campos de producto frent
 3. Completar `description`, de 3 a 5 `characteristics` verificadas en la fuente, `saleUnit`, las `variants` aplicables con su código original y los `documents` que se puedan enlazar.
 4. Revisar el uso de la imagen y de los documentos: no se asumen derechos por estar disponibles en Internet. Registrar `image.sourceUrl` y poner `usageConfirmed: true` solo con el uso confirmado.
 5. Con la revisión del contacto comercial, registrar `approval` (`by`, `on`, `supplyConfirmed: true`) y pasar a `approved`. Si su categoría sigue en borrador, aprobarla también (ver [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría)).
-6. Ejecutar `npm run check`, `npm test` y `npm run verify`, revisar la diferencia y la página generada en la compilación de producción (`npm run build` y `npm run preview`).
-7. Integrar el cambio en `main`. Cuando haya alojamiento conectado, su compilación publicará el cambio (hoy no hay ninguno).
+6. Actualizar las pruebas que fijan «ningún producto real». Hoy varias pruebas dan por hecho que el catálogo real no tiene fichas y que las categorías están en borrador, y algunas agregan una ficha de prueba a una copia del catálogo real esperando conteos fijos: aprobar el primer producto (con su categoría) hace fallar 27, en `tests/categories.test.mjs`, `tests/site-data.test.mjs`, `tests/build-output.test.mjs`, `tests/scan-dist.test.mjs`, `tests/retired-products.test.mjs` y `tests/text-search.test.mjs` ([`datos-y-modos.md`](datos-y-modos.md#62-pruebas)). Se corrigen en el mismo cambio, de modo que sigan probando la regla con el catálogo que haya; conviene hacerlo una vez, al cargar el primer producto del piloto, para que dependan menos de los datos.
+7. Ejecutar `npm run check`, `npm test` y `npm run verify`, revisar la diferencia y la página generada en la compilación de producción (`npm run build` y `npm run preview`). Con el primer producto aparece también la búsqueda del encabezado.
+8. Integrar el cambio en `main`. Cuando haya alojamiento conectado, su compilación publicará el cambio (hoy no hay ninguno).
 
 `getPublishedProducts` entrega a las páginas solo lo público (sin aprobación, fuente ni uso de imagen). Un campo booleano no sustituye la revisión humana ni confirma inventario.
 
