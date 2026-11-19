@@ -597,6 +597,14 @@
 @container lamina (width < calc((1rem - 16px) * 400)) {
   .product__cat { hyphens: auto; overflow-wrap: break-word; }
 }
+/* Acciones de la tarjeta de producto: con la letra agrandada «Cotizar» baja a menudo a una segunda fila
+   (components.css, «Las dos acciones van en una fila»). Su etiqueta empieza entonces donde la de «Ver ficha», en el
+   relleno de la celda, como en el celular y en el catálogo de cuatro columnas, y no 4 px más a la izquierda (12 px
+   desde 1360 px). En una sola fila solo deja más aire antes de «Cotizar». Con la letra normal no cambia nada (el
+   interruptor de arriba); con el espaciado de texto a tamaño normal quedan los 4 px. */
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .product__action--quote { padding-left: var(--pad); }
+}
 
 /* Panel Categorías de computadora (E-06): seis categorías por fila mientras la palabra más larga («señalización»,
    5.51rem) cabe en su celda junto al icono; si no, dos por fila y «Ver todo el catálogo» a todo lo ancho, como en
