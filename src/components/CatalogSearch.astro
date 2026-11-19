@@ -76,7 +76,8 @@ const { total } = Astro.props;
   }
 
   if (form && input) {
-    const initial = new URLSearchParams(window.location.search).get(SEARCH_PARAM) ?? '';
+    // Tal como se muestra (displayQuery): una secuencia % mal formada no llega al campo como «�».
+    const initial = displayQuery(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
     if (initial) {
       input.value = initial;
       for (const field of headerInputs) field.value = initial;
