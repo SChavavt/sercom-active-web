@@ -4,7 +4,7 @@
 // página actual lleva aria-current="page" y el cuadro azul sólido.
 // Con `collapseAfter`, las filas que siguen quedan dentro de un <details> nativo que se abre en su lugar sin
 // JavaScript («Ver todas las marcas» / «Ver menos marcas»). La fila actual nunca queda escondida: si está más
-// abajo del corte, el corte se recorre hasta ella.
+// abajo del corte, se muestra justo después de las visibles (y no se repite entre las plegadas).
 //
 // Uso:
 //   <CatalogNavList items={[{ label: 'Ansell', href: '/marcas/ansell/', count: 0, current: false }]}
@@ -32,10 +32,12 @@ interface Props {
 }
 
 const { items, collapseAfter, moreLabel = '', lessLabel = '' } = Astro.props;
-const currentIndex = items.findIndex(item => item.current);
-const visibleCount = collapseAfter === undefined ? items.length : Math.max(collapseAfter, currentIndex + 1);
-const visible = items.slice(0, visibleCount);
-const rest = items.slice(visibleCount);
+const cut = collapseAfter ?? items.length;
+// La fila actual que cae después del corte se muestra a continuación de las visibles y sale de las plegadas:
+// la lista sigue plegada después de `collapseAfter` filas aunque la página actual sea la última.
+const late = items.slice(cut).filter(item => item.current);
+const visible = [...items.slice(0, cut), ...late];
+const rest = items.slice(cut).filter(item => !item.current);
 ---
 {visible.length > 0 && (
   <ul class="catalog-nav__list">
