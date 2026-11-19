@@ -26,7 +26,7 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
   const searchButton = search ? '<button class="masthead__btn masthead__btn--search" type="button" aria-expanded="false" aria-controls="buscador" data-toggle="search"><span class="label">Buscar</span></button>' : '';
   const menuButton = '<button class="masthead__btn masthead__btn--menu" type="button" aria-expanded="false" aria-controls="menu" data-toggle="menu"><span class="label">Menú</span></button>';
   const cats = categories
-    ? `<li><details class="${c.cat}"><summary class="${c.link}"${current('nav:categorias')}>Categorías<svg class="icon"><path d="M0 0"/></svg></summary><div class="catpanel"><ul class="catpanel__list grid12">`
+    ? `<li><details class="${c.cat}"><summary class="${c.link}"${current('nav:categorias')}>Categorías<svg class="icon" width="20" height="20"><path d="M0 0"/></svg></summary><div class="catpanel"><ul class="catpanel__list grid12">`
       + `<li class="span-2"><a class="catpanel__link cell-link" href="/categorias/manos/"${current('cat:/categorias/manos/')}><span>Protección de manos</span></a></li>`
       + `<li class="span-2"><a class="catpanel__link cell-link" href="/categorias/cabeza/"${current('cat:/categorias/cabeza/')}><span>Protección de cabeza</span></a></li>`
       + `<li class="catpanel__all"><a class="catpanel__link catpanel__link--all cell-link" href="/catalogo/"${current('cat:todo')}><span>Ver todo el catálogo</span></a></li></ul></div></details></li>`
@@ -35,7 +35,7 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
     + `<li class="${c.quote}">${link('/cotizar/', 'Cotizar mi lista').slice(4, -5)}</li>${link('/contacto/', 'Contacto')}</ul></nav>`;
   const form = search
     ? `<form class="${c.search} span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action="/catalogo/" method="get"><label class="vh" for="q">Buscar</label>`
-      + `<span class="masthead__search-field"><input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><span class="masthead__search-hint" aria-hidden="true"><span>Buscar por producto, marca o código</span></span></span><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon"></svg></button></form>`
+      + `<span class="masthead__search-field"><input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><span class="masthead__search-hint" aria-hidden="true"><span>Buscar por producto, marca o código</span></span></span><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon" width="20" height="20"></svg></button></form>`
     : '';
   return `<header class="site-header"><div class="utility"><ul class="utility__group"><li class="utility__item">Puebla, México</li></ul></div>`
     + '<div class="masthead grid12">'
@@ -258,7 +258,7 @@ const crumbs = items => `<nav class="crumbs label" aria-label="Ruta de navegaci�
 const crumb = (label, href) => `<li class="crumbs__item"><a class="crumbs__link" href="${href}">${label}</a><span class="crumbs__sep" aria-hidden="true">/</span></li>`;
 const crumbHere = label => `<li class="crumbs__item"><span aria-current="page">${label}</span></li>`;
 const BRAND_MARK = '<span class="brand__mark" aria-hidden="true"></span>';
-const brandCell = (href, name, extra = '', inside = '') => `<li class="span-3"><a class="brand cell-link" href="${href}"${extra}>${inside}<span>${name}</span><svg class="icon"></svg></a></li>`;
+const brandCell = (href, name, extra = '', inside = '') => `<li class="span-3"><a class="brand cell-link" href="${href}"${extra}>${inside}<span>${name}</span><svg class="icon" width="20" height="20"></svg></a></li>`;
 const brandCells = cells => `<ul class="brands grid12">${cells.join('')}<li class="span-3"><a class="brand brand--all cell-link" href="/marcas/"><span>Ver todas las marcas</span></a></li><li class="brands__fill span-3" aria-hidden="true"></li></ul>`;
 const FOOTER_MARK = '<span class="footer__mark" aria-hidden="true"></span>';
 const FOOTER_LINKS = [['/catalogo/', 'Catálogo'], ['/marcas/', 'Marcas'], ['/contacto/', 'Contacto'], ['/privacidad/', 'Privacidad']];
@@ -293,7 +293,7 @@ test('U-04: una celda de relleno vacía, oculta y sin foco pasa; con contenido, 
 test('U-11: la dirección en dos partes pasa; entera, partida en otro punto o distinta de la del enlace falla', async () => {
   const good = [
     `<a href="mailto:${ADDRESS}">${EMAIL}</a>`,
-    `<a class="data__value" href="mailto:${ADDRESS}?subject=Cotizaci%C3%B3n&amp;body=Hola"><svg class="icon"></svg>${EMAIL}</a>`,
+    `<a class="data__value" href="mailto:${ADDRESS}?subject=Cotizaci%C3%B3n&amp;body=Hola"><svg class="icon" width="20" height="20"></svg>${EMAIL}</a>`,
     // Una acción que no muestra la dirección no entra en la regla.
     `<a class="action" href="mailto:${ADDRESS}?subject=Hola"><span>Escribir por correo</span></a>`,
   ];
@@ -531,6 +531,39 @@ test('A-02c: una acción o una fila sin nombre, o con otro, falla', async () => 
     const problems = await check({ 'catalogo/index.html': page({}, html) }, { ids: ['A-02c'] });
     assert.equal(problems.length, 1, html);
     assert.match(problems[0].message, expected, html);
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------
+// A-06: tamaño de los iconos sin la hoja de estilo
+// ---------------------------------------------------------------------------------------------------
+
+test('A-06: los iconos con width y height numéricos pasan; un SVG que no es icono no entra', async () => {
+  const good = [
+    '<svg class="icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"></svg>',
+    '<svg class="icon icon--18" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"></svg>',
+    '<svg class="icon icon--28 icon--art" viewBox="0 0 24 24" width="28" height="28" role="img" aria-label="Guantes"></svg>',
+    '<svg class="icon" width="17.5" height="17.5"></svg>',
+    // El dibujo de una placa o un logotipo no es un icono del kit.
+    '<svg viewBox="0 0 10 10"></svg>',
+  ];
+  assert.deepEqual(await check({ 'catalogo/index.html': page({}, good.join('')) }, { ids: ['A-06'] }), []);
+});
+
+test('A-06: un icono sin width o sin height, o con un valor que no es un número de píxeles, falla', async () => {
+  const bad = [
+    ['<svg class="icon" viewBox="0 0 24 24"></svg>', /width numérico ni height numérico/],
+    ['<svg class="icon icon--16" width="16"></svg>', /no lleva height numérico/],
+    ['<svg class="icon" height="20"></svg>', /no lleva width numérico/],
+    ['<svg class="icon" width="100%" height="20"></svg>', /no lleva width numérico/],
+    ['<svg class="icon" width="1em" height="1em"></svg>', /width numérico ni height numérico/],
+    ['<svg class="icon" width="0" height="20"></svg>', /no lleva width numérico/],
+  ];
+  for (const [html, expected] of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, `<p>${html}</p>`) }, { ids: ['A-06'] });
+    assert.equal(problems.length, 1, html);
+    assert.match(problems[0].message, expected, html);
+    assert.match(problems[0].message, /dentro de <p>/, html);
   }
 });
 

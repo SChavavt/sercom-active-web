@@ -833,6 +833,19 @@ export const CHECKS = [
       return problems;
     },
   },
+  {
+    id: 'A-06',
+    title: 'Cada icono en línea (<svg class="icon">) lleva width y height numéricos: sin la hoja de estilo conserva su tamaño',
+    page(page) {
+      const problems = [];
+      const numeric = value => value !== undefined && /^\d+(\.\d+)?$/.test(value.trim()) && Number(value) > 0;
+      for (const svg of page.elements.filter(element => element.name === 'svg' && hasClass(element, 'icon'))) {
+        const missing = ['width', 'height'].filter(key => !numeric(svg.attributes.get(key)));
+        if (missing.length) problems.push(`${describe(svg)}${svg.parent ? ` dentro de ${describe(svg.parent)}` : ''} no lleva ${missing.map(key => `${key} numérico`).join(' ni ')}: sin la hoja de estilo crece al ancho de la página`);
+      }
+      return problems;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------------

@@ -17,7 +17,7 @@ const AVAILABILITY = 'Disponibilidad y tiempo de entrega sujetos a confirmación
 const FOOTER = `<footer class="site-footer"><p class="t-small">${AVAILABILITY}</p></footer>`;
 const doc = (title, body) => `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>${title} · Sercom Active</title></head><body>`
   + `<a class="skip-link" href="#contenido">Saltar al contenido</a><div class="sheet"><main id="contenido" tabindex="-1">${body}</main>${FOOTER}</div></body></html>`;
-const action = (label, href, primary = false) => `<a class="action cell-link${primary ? ' action--primary' : ''}" href="${href}"><span>${label}</span><svg class="icon"></svg></a>`;
+const action = (label, href, primary = false) => `<a class="action cell-link${primary ? ' action--primary' : ''}" href="${href}"><span>${label}</span><svg class="icon" width="20" height="20"></svg></a>`;
 const WA = 'https://wa.me/5212214002219?text=Hola';
 const MAIL = 'mailto:ventas.puebla@sercomactive.com?subject=Consulta%20de%20alternativas';
 const row = (key, value) => `<div class="data__row"><dt class="data__key label">${key}</dt><dd class="data__value">${value}</dd></div>`;
