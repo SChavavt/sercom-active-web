@@ -29,7 +29,9 @@ const list = productsByCategory(category.id);
 const brandIds = new Set(list.map(product => product.brandId).filter(id => id !== null));
 const categoryBrands = [...brandIds].map(id => getBrand(id)).filter((brand): brand is PublicBrand => Boolean(brand));
 categoryBrands.sort((a, b) => brands.indexOf(a) - brands.indexOf(b));
-const description = `${category.name}${category.summary ? `: ${category.summary}` : ''}. ${contactDetails.locationLabel}.`;
+// Descripción: nombre, línea de subcategorías y lugar, cada uno como frase propia (la línea de subcategorías
+// empieza con mayúscula, así que no va después de dos puntos).
+const description = [category.name, category.summary, contactDetails.locationLabel].filter(Boolean).map(text => `${text.replace(/\.$/, '')}.`).join(' ');
 ---
 <BaseLayout title={category.name} description={description}>
   <PageHeader
