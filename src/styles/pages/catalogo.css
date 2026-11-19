@@ -69,14 +69,20 @@
   padding: var(--s-2) var(--pad);
   background: var(--surface);
 }
+/* La línea de resultados se lee entera en uno o dos renglones, en todos los anchos; solo una consulta que tampoco
+   cabe en dos renglones se corta, con «…» al final del segundo. El número va al principio y siempre se ve. Con la
+   línea en dos renglones la celda crece y la fila entera crece con ella (campo, botón y celda a la misma altura). */
 .catalog-search__count {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   max-width: 100%;
   overflow: hidden;
+  overflow-wrap: anywhere;
   font-weight: var(--type-strong-weight);
   font-variant-numeric: tabular-nums;
   line-height: 1.35;
-  white-space: nowrap;
-  text-overflow: ellipsis;                  /* una consulta muy larga se corta; el número siempre queda a la vista */
 }
 .catalog-search__clear {
   display: inline-flex;
@@ -211,8 +217,10 @@
 @media (max-width: 1099px) {
   .catalog-search__field { grid-column: span 9; }
   .catalog-search__submit { grid-column: span 3; }
-  .catalog-search__status { flex-direction: row; align-items: center; justify-content: space-between; column-gap: var(--s-5); min-height: 56px; padding-block: var(--s-1); }
-  .catalog-search__count { flex: 1 1 0; min-width: 0; }
+  /* La línea y «Limpiar búsqueda» en una fila; en un celular angosto (menos de unos 370 px) la línea no tendría
+     11em a su lado y una consulta corriente («lentes de seguridad») no cabría en dos renglones: el enlace baja. */
+  .catalog-search__status { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--s-5); min-height: 56px; padding-block: var(--s-1); }
+  .catalog-search__count { flex: 1 1 0; min-width: min(100%, 11em); }
   .catalog-search__clear { flex: none; min-height: 44px; }
 
   .catalog-nav { background: transparent; }
@@ -252,7 +260,5 @@
   .catalog-search__field { grid-column: span 12; gap: var(--s-3); padding-right: var(--s-2); }
   .catalog-search__input { font-size: 1rem; }
   .catalog-search__submit { grid-column: span 12; min-height: 52px; }
-  /* En el celular la línea de resultados pasa a dos líneas antes de cortarse */
-  .catalog-search__count { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
 }
 
