@@ -79,3 +79,8 @@
   .solicitud__crumbs { padding-block: var(--s-2); }
   .solicitud__found:not(.is-filled) { display: none; }      /* vacía no ocupa una fila en tableta y celular */
 }
+
+/* --- Contacto --------------------------------------------------------------- */
+/* La ubicación como etiqueta con el cuadro azul, igual que en la franja de servicio */
+.contacto__place { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.contacto__place::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--blue); }
