@@ -346,7 +346,7 @@ export const CHECKS = [
   ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero.'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
-  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
+  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea dos o tres veces), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke…), un <meta> de color o una propiedad de color de un script, y ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
@@ -475,11 +475,22 @@ function contactProblems(source, { digits, email, knownNumbers }, { script = fal
   return [...problems];
 }
 
-/** Revisa un texto y, si cambia al decodificar su %XX, también los destinos que lleva dentro. */
+// Veces que se decodifica %XX como máximo: un destino puede ir codificado dos o tres veces dentro de otra dirección.
+const PERCENT_PASSES = 4;
+/**
+ * Revisa un texto y, mientras cambia al decodificar su %XX (hasta `PERCENT_PASSES` veces), también los destinos que
+ * lleva dentro: «https://l.example.com/?u=https%253A%252F%252Fwa.me%252F…» es un wa.me codificado dos veces.
+ */
 function contactProblemsDecoded(source, contact, options = {}) {
-  const clean = source.replace(/\p{Cf}/gu, '');
-  const decoded = decodePercent(clean);
-  return [...contactProblems(clean, contact, options), ...(decoded === clean ? [] : contactProblems(decoded, contact, { ...options, nestedOnly: true }))];
+  let text = source.replace(/\p{Cf}/gu, '');
+  const problems = contactProblems(text, contact, options);
+  for (let pass = 0; pass < PERCENT_PASSES; pass += 1) {
+    const decoded = decodePercent(text);
+    if (decoded === text) break;
+    problems.push(...contactProblems(decoded, contact, { ...options, nestedOnly: true }));
+    text = decoded;
+  }
+  return problems;
 }
 
 // Un <script> con código: sin type, o de tipo módulo o JavaScript. Los de datos (JSON-LD, application/json) se leen como texto.

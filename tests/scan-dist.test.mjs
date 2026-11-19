@@ -541,6 +541,17 @@ test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ello
   ]);
 });
 
+test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
+  await assertEachFails('R-RULE-24', [
+    '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',
+    '<a href="https://l.example.com/?u=https%25253A%25252F%25252Fwa.me%25252F5215555555555">WhatsApp</a>',
+    '<a href="https://l.example.com/?u=mailto%253Aotro%2540example.com">Correo</a>',
+  ]);
+  assert.deepEqual(failedIds(await scan({ '_astro/app.js': 'location.href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555";' })), ['R-RULE-24']);
+  // El enlace confirmado codificado dos veces dentro de otro sigue siendo el confirmado.
+  await assertNoneFails([`<a href="https://l.example.com/?u=${encodeURIComponent(encodeURIComponent(WHATSAPP))}">WhatsApp</a>`]);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
