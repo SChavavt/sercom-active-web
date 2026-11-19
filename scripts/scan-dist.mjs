@@ -264,9 +264,15 @@ const EXCLUDED_IN_IDENTIFIER = /(?<![A-Za-z0-9])(?:gisa|Gisa|GISA)(?=[A-Z0-9_$])
 const CONFIRMATION_NOUN = '(?:solicitud|mensaje|cotizacion|lista|pedido|correo|requerimiento|formulario)(?:es|s)?';
 const PARTICIPLE = '(?:enviad|recibid|registrad)[oa]s?';
 const NEGATED = '(?<!\\b(?:no|nada|nadie|nunca)\\s+)';
-// Entre el sustantivo y el participio puede haber una preposición y una palabra o un nombre («Mensaje de WhatsApp
-// enviado», «Tu solicitud a Sercom enviada») o «especial» («Solicitud especial enviada»); nunca un verbo.
-const CONFIRMATION_GAP = '(?:\\s+(?:de|del|por|a|al|para|con|en)\\s+[a-z0-9]+|\\s+especial(?:es)?)?';
+// Antes del sustantivo, una negación o una condición: «Ningún mensaje queda registrado», «Sin correo registrado»,
+// «Cuando tu solicitud queda enviada desde tu WhatsApp…» no afirman un envío.
+const NOT_ASSERTED = '(?<!\\b(?:no|nada|nadie|nunca|ningun|ninguna|ninguno|sin|cuando|si)\\s+(?:(?:tu|su|tus|sus|el|la|los|las|un|una)\\s+)?)';
+// Una palabra entre el sustantivo y el participio: letras o cifras, nunca un verbo ni una conjunción («para que sea enviado»).
+const GAP_WORD = '(?!(?:que|se|sea|sean|ser|es|son|fue|fueron|sera|haya|hayan|esta|estan|no|y|e|o|u|ni|si|cuando|como|donde)\\b)[a-z0-9]+\\b';
+// Entre el sustantivo y el participio puede haber una preposición y una o dos palabras o un nombre («Mensaje de
+// WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada») o
+// «especial» («Solicitud especial enviada»); nunca un verbo.
+const CONFIRMATION_GAP = `(?:\\s+(?:de|del|por|a|al|para|con|en)\\s+${GAP_WORD}(?:\\s+${GAP_WORD})?|\\s+especial(?:es)?)?`;
 const AUXILIARY = '(?:ya|fue|fueron|ha|han|sido|se|quedo|quedaron|quedado|queda|quedan|esta|estan|sera|seran|correctamente|exitosamente)';
 // «Lista de marcas registradas»: «marca registrada» es un nombre, no una confirmación.
 const CONFIRMED = `(?<!\\bmarcas?\\s+)${PARTICIPLE}\\b`;
@@ -275,14 +281,14 @@ const FALSE_CONFIRMATION = new RegExp([
   // En primera persona: «Hemos enviado tu solicitud», «Ya enviamos tu mensaje», «Registramos tu pedido».
   new RegExp(`${NEGATED}\\b(?:recibimos|enviamos|registramos) (?:tu|su|tus|sus)\\b|\\bhemos (?:recibido|enviado|registrado)\\b|\\bya (?:recibimos|enviamos|registramos)\\b`),
   // El sustantivo con un auxiliar: «Tu solicitud fue enviada», «Tu lista se ha enviado», «Su solicitud ha quedado registrada».
-  new RegExp(`\\b${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+(?:${AUXILIARY}\\s+){1,3}${PARTICIPLE}\\b`),
+  new RegExp(`${NOT_ASSERTED}\\b${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+(?:${AUXILIARY}\\s+){1,3}${PARTICIPLE}\\b`),
   // El sustantivo seguido del participio («Solicitud enviada», «Tu mensaje de WhatsApp enviado»), salvo después de un
   // artículo o una preposición: «al correo registrado», «la lista enviada por ti».
-  new RegExp(`(?<!\\b(?:al|del|en|con|por|para|el|la|los|las|un|una|unos|unas|cada|este|esta|ese|esa|otro|otra)\\s+)\\b${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+${CONFIRMED}`),
-  // Con un artículo, la frase que termina ahí también es una confirmación («La solicitud enviada.»); la que sigue
-  // («Revisa la lista enviada por WhatsApp», «El correo registrado del negocio») es un adjetivo. Después de una
-  // preposición («en la lista enviada») nunca lo es.
-  new RegExp(`(?<!\\b(?:a|al|de|del|en|con|por|para)\\s+)\\b${DETERMINER}\\s+${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+${CONFIRMED}(?!\\s+(?-i:[a-z0-9]))`),
+  new RegExp(`(?<!\\b(?:al|del|en|con|por|para|el|la|los|las|un|una|unos|unas|cada|este|esta|ese|esa|otro|otra)\\s+)${NOT_ASSERTED}\\b${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+${CONFIRMED}`),
+  // Con un artículo, la frase que termina ahí también es una confirmación («La solicitud enviada.»), también con su
+  // destino («La solicitud enviada a Sercom.»); la que sigue («Revisa la lista enviada por WhatsApp», «El correo
+  // registrado del negocio») es un adjetivo. Después de una preposición («en la lista enviada») nunca lo es.
+  new RegExp(`(?<!\\b(?:a|al|de|del|en|con|por|para)\\s+)\\b${DETERMINER}\\s+${CONFIRMATION_NOUN}${CONFIRMATION_GAP}\\s+${CONFIRMED}(?:\\s+(?:a|al)\\s+${GAP_WORD}(?:\\s+${GAP_WORD})?)?(?!\\s+(?-i:[a-z0-9]))`),
   new RegExp(`${NEGATED}\\b(?:se|fue|fueron|ha sido|han sido)\\s+(?:ha\\s+|han\\s+)?${PARTICIPLE}\\b|${NEGATED}\\b(?:ya\\s+)?se (?:envio|enviaron|recibio|recibieron|registro|registraron)\\b`),
   /\benviad[oa]s? (?:con exito|correctamente)\b|\benvio exitoso\b|\b(?:recibid|registrad)[oa]s? correctamente\b|\bmensaje enviado\b/,
   /¡\s*(?:listo|enviad[oa]|recibid[oa]|hecho)\s*!/,
@@ -397,7 +403,7 @@ export const RULES = [
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
   rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve», «Un asesor se comunicará contigo»). El sustantivo y el participio pueden llevar entre ellos una preposición y una palabra («Mensaje de WhatsApp enviado», «Tu solicitud a Sercom enviada») o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla («La solicitud enviada.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
+    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve», «Un asesor se comunicará contigo»). El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
   rule('R-RULE-10', 'FAIL', 'joined', FALSE_CONFIRMATION,
     'confirmación falsa partida por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Solicitud envi<span>ada</span>».'),

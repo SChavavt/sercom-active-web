@@ -571,6 +571,19 @@ test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ello
   ]);
 });
 
+test('R-RULE-10: un nombre o un sustantivo de dos palabras entre el sustantivo y el participio, y la frase con su destino', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>¡Tu solicitud a Sercom Active enviada!</p>', '<p>Solicitud por correo electrónico enviada</p>', '<p>Mensaje de WhatsApp Business enviado</p>', '<p>Mensaje para Sercom Active enviado</p>',
+    '<p>Tu lista de 3 productos enviada</p>', '<p>Tu pedido de 3 productos enviado</p>', '<p>La solicitud enviada a Sercom</p>', '<p>Listo: la solicitud enviada a Sercom.</p>',
+  ]);
+  assert.deepEqual(failedIds(await scan({ '_astro/app.js': 'toast("¡Tu solicitud a Sercom Active enviada!");' })), ['R-RULE-10']);
+  // Una negación o una condición antes del sustantivo, un verbo en el hueco o el participio que sigue como adjetivo no confirman nada.
+  await assertNoneFails([
+    '<p>Ningún mensaje queda registrado en este sitio.</p>', '<p>Cuando tu solicitud queda enviada desde tu WhatsApp, Sercom responde.</p>', '<p>Sin correo registrado.</p>',
+    '<p>Escribe tu mensaje para que sea enviado desde tu WhatsApp.</p>', '<p>La lista enviada a Sercom incluye la página de cada producto.</p>',
+  ]);
+});
+
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
   await assertEachFails('R-RULE-24', [
     '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',
