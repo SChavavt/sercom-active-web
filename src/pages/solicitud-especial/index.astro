@@ -98,7 +98,15 @@ const items = [
       const whatsapp = document.querySelector<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"]');
       const draft = document.querySelector<HTMLElement>('[data-draft-text]');
       const text = whatsapp ? new URL(whatsapp.href).searchParams.get('text') : null;
-      if (draft && text) draft.textContent = text;
+      if (draft && text) {
+        // Un renglón por línea, como lo imprime DraftMessage; el salto entre renglones se conserva en el texto.
+        draft.replaceChildren(...text.split('\n').flatMap((line, index) => {
+          const span = document.createElement('span');
+          span.className = 'draft__line';
+          span.textContent = line;
+          return index > 0 ? [document.createTextNode('\n'), span] : [span];
+        }));
+      }
 
       const note = document.querySelector<HTMLElement>('[data-search-note]');
       const term = document.querySelector<HTMLElement>('[data-search-term]');

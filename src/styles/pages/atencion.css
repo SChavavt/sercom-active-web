@@ -33,14 +33,13 @@
 
 /* --- Borrador del mensaje (DraftMessage) ----------------------------------- */
 .draft { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
-.draft__text {
-  /* renglones de filete suave: uno cada línea de texto, como una hoja rayada */
-  --draft-line: 2rem;
-  border-top: var(--line) solid var(--rule-soft);
-  background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--draft-line) - 1px), var(--rule-soft) calc(var(--draft-line) - 1px) var(--draft-line));
-  line-height: var(--draft-line);
-  white-space: pre-line;
-  overflow-wrap: anywhere;
+.draft__text { border-top: var(--line) solid var(--rule-soft); overflow-wrap: anywhere; }
+.draft__line {                              /* una línea del mensaje sobre su renglón de filete suave */
+  display: block;
+  min-height: 2rem;
+  padding: 4px 0 3px;
+  border-bottom: var(--line) solid var(--rule-soft);
+  line-height: 1.5;
 }
 
 /* --- Piezas comunes de las páginas del grupo ------------------------------- */
@@ -65,6 +64,7 @@
   .item-register__text { grid-column: 2; font-size: 0.9375rem; line-height: 1.45; }
   .draft { padding: var(--s-6) var(--pad) var(--s-7); }
   .draft__text { font-size: 0.9375rem; }
+  .draft__line { min-height: 1.875rem; }
   .atencion__enough { padding: var(--s-5) var(--pad); font-size: 1rem; }
 }
 
@@ -129,7 +129,7 @@
   .nf__body { min-height: 0; padding: var(--s-8) var(--pad) var(--s-7); }
 }
 @media (max-width: 699px) {
-  .nf__num { padding: var(--s-6) var(--pad) 0; font-size: 4rem; }
+  .nf__num { padding: var(--s-6) var(--pad) var(--s-1); font-size: 4rem; line-height: 1; }
   .nf__body { padding: var(--s-4) var(--pad) var(--s-7); gap: var(--s-4); }
-  .nf__num + .nf__main { margin-top: calc(-1 * var(--line)); }   /* número y mensaje forman una sola celda */
+  .nf__row { row-gap: 0; }                 /* número y mensaje forman una sola celda */
 }
