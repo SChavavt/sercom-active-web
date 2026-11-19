@@ -2,6 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "astro",
   "installCommand": "npm ci",
-  "buildCommand": "npm run check && npm test && npm run build",
+  "buildCommand": "npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist && node scripts/check-links.mjs dist",
   "outputDirectory": "dist"
 }

@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { isPreviewFlag, PREVIEW_FLAG, previewFlagWarning } from '../src/lib/build-mode.mjs';
 import { listFiles, readJson, readText, ROOT } from './helpers.mjs';
 
@@ -13,6 +15,9 @@ const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path
 const stripComments = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
 const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|mjs|js|ts|css)$/.test(path)).map(async path => [path, await readText(path)])));
 const sources = new Map([...rawSources].map(([path, text]) => [path, stripComments(text)]));
+const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);
+const { bin: astroBinField } = JSON.parse(await readFile(astroPackage, 'utf8'));
+const astroBin = fileURLToPath(new URL(typeof astroBinField === 'string' ? astroBinField : astroBinField.astro, astroPackage));
 const importsOf = code => [...code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)["']([^"']+)["']/g)].map(match => match[1]);
 
 test('la bandera CATALOG_PREVIEW solo se activa con «1» o «true»', () => {
@@ -72,7 +77,8 @@ test('ningún archivo del repositorio activa la vista previa en una compilación
   assert.match(config, /trailingSlash: 'always'/);
 
   const vercel = await readJson('vercel.json');
-  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build');
+  // El alojamiento publica dist/ solo si la salida pasa el escáner de reglas y el verificador de enlaces.
+  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist && node scripts/check-links.mjs dist');
   assert.equal(vercel.outputDirectory, 'dist');
   const committed = [await readText('vercel.json'), await readText('.env.example'), await readText('.github/workflows/quality.yml')];
   for (const text of committed) assert.doesNotMatch(text, /CATALOG_PREVIEW|build:preview(?!\b.*verify)|catalog-preview/);
@@ -151,4 +157,35 @@ test('ningún <script> de navegador importa los módulos de datos', () => {
   const misuse = "<script>\n  import { products } from '../lib/site-data.mjs';\n</script>";
   assert.match(importsOf(misuse.replace(/<\/?script>/g, ''))[0], buildOnly);
   assert.ok(scripts >= 0);
+});
+
+test('la vista previa nunca se compila en la carpeta dist/ del proyecto', async () => {
+  const { previewOutDirError } = await import('../src/lib/build-mode.mjs');
+  const dist = join(ROOT, 'dist');
+  for (const outDir of [dist, `${dist}/`, join(dist, 'vista'), join(ROOT, 'otra', '..', 'dist')]) {
+    assert.match(previewOutDirError(outDir, ROOT), /dist/, outDir);
+  }
+  // Las demás carpetas sí se permiten: la de la vista previa, la de la sonda de las pruebas y una temporal.
+  for (const outDir of [join(ROOT, 'dist-preview'), join(ROOT, 'tests', 'build-probe', 'dist'), join(ROOT, 'distribucion'), join(tmpdir(), 'sercom-sonda', 'preview')]) {
+    assert.equal(previewOutDirError(outDir, ROOT), '', outDir);
+  }
+});
+
+test('el lanzador de la vista previa rechaza --outDir dist', () => {
+  for (const args of [['--outDir', 'dist'], ['--outDir=dist'], ['--outDir', './dist/'], ['--outDir', join(ROOT, 'dist')], ['--outDir', 'dist/vista']]) {
+    const result = spawnSync(process.execPath, ['scripts/catalog-preview.mjs', 'build', ...args], { cwd: ROOT, encoding: 'utf8', timeout: 60_000 });
+    assert.equal(result.status, 2, `${args.join(' ')}\n${result.stdout}${result.stderr}`);
+    assert.match(result.stderr, /La vista previa no se compila en dist\//);
+  }
+});
+
+test('Astro se niega a compilar la vista previa en dist/ aunque la bandera llegue desde el entorno', () => {
+  const env = { ...process.env, CATALOG_PREVIEW: '1', ASTRO_TELEMETRY_DISABLED: '1' };
+  const astro = (...args) => spawnSync(process.execPath, [astroBin, 'build', ...args], { cwd: ROOT, encoding: 'utf8', env, timeout: 120_000 });
+  // Sin --outDir (la carpeta por omisión es dist/) y con la sonda de las pruebas dirigida a dist/.
+  for (const args of [[], ['--root', 'tests/build-probe', '--config', '../../astro.config.mjs', '--outDir', join(ROOT, 'dist')]]) {
+    const result = astro(...args);
+    assert.notEqual(result.status, 0, `${args.join(' ')}\n${result.stdout}`);
+    assert.match(`${result.stdout}${result.stderr}`, /La vista previa no se compila en dist\//, args.join(' '));
+  }
 });

@@ -25,7 +25,7 @@ Los tipos están en `src/types/` (`catalog.ts`, `site.ts`, `contact.ts`).
 | Marcas | Las 19 | Las 19 |
 | Distintivos | Ninguno | Aviso de vista previa en cada página y etiqueta «Ejemplo» en cada ejemplo |
 
-La vista previa sirve para revisar el diseño; nunca es la versión que se publica ni la que lleva el QR.
+La vista previa sirve para revisar el diseño; nunca es la versión que se publica ni la que lleva el QR. Por eso nunca se escribe en `dist/`, la carpeta que publica el alojamiento: si `CATALOG_PREVIEW` está activa y la salida es `dist/` (o una carpeta dentro de ella), `astro build` se detiene con un error antes de escribir nada, y `scripts/catalog-preview.mjs build --outDir dist` se rechaza con código 2. Se comparan rutas absolutas, así que otras carpetas (`dist-preview/`, una temporal o la de la sonda de las pruebas) siguen permitidas.
 
 El modo lo decide la variable de entorno `CATALOG_PREVIEW`:
 
@@ -47,6 +47,8 @@ Otros usos: `npx astro dev` abre el servidor de desarrollo en modo producción; 
 | `npm run scan:dist` | Revisa las reglas duras sobre `dist/`. Para la vista previa: `npm run scan:dist -- dist-preview --preview`. |
 | `npm run check:links` | Revisa los enlaces de `dist/`. Otra carpeta: `npm run check:links -- dist-preview`. |
 | `npm run verify` | Compila los dos modos y ejecuta el escáner y el verificador de enlaces sobre ambas salidas. Es la comprobación completa antes de entregar un cambio. |
+
+La orden de compilación del alojamiento (`buildCommand` de `vercel.json`; la misma está en `docs/publicacion.md`) ejecuta `npm run check`, `npm test` y `npm run build`, y después el escáner y el verificador de enlaces sobre `dist/`: una salida que no los pasa no se publica.
 
 `node scripts/scan-dist.mjs --rules` imprime todas las reglas con su explicación. El escáner falla, entre otras cosas, por: la marca excluida, precios o monedas, «oficial» o «autorizado», confirmaciones falsas de envío, la paleta anterior, páginas sin `noindex`, datos internos o del registro, y contactos distintos de los de `business.json`. Opciones para más adelante: `--launch` (versión pública: exige retirar `noindex` y el bloqueo de `robots.txt`) y `--in-person` (atención presencial confirmada: permite dirección y mapa).
 
