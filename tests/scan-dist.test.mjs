@@ -679,6 +679,16 @@ test('R-RULE-29: un nombre de color cuenta donde empieza un nombre o una parte d
   }
 });
 
+test('R-RULE-29: un nombre de color pegado a otra palabra o en mayúsculas sigue contando', async () => {
+  // Solo «tema» necesita empezar un nombre o una parte de él; «color», «bg», «theme» y las demás palabras de color
+  // cuentan en cualquier lugar del nombre, como antes: «textcolor», «MAINCOLOR», «navbg», «darktheme».
+  for (const content of ["const textcolor='#0e2a3e';", "const maincolor='#0e2a3e';", "const MAINCOLOR='#0e2a3e';", "const UIColor='#0e2a3e';", "var o={linkcolor:'#0e2a3e'};",
+    "var o={fontcolor:'#0e2a3e'};", "const navbg='#0e2a3e';", "const darktheme={x:'#0e2a3e'};", "const sitetheme={x:'#0e2a3e'};", "const textcolor='rgb(14,42,62)';"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'datos.json': '{"textcolor":"#0e2a3e"}' })), ['R-RULE-29'], 'JSON');
+});
+
 test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
   for (const robots of ['User-agent: *\nDisallow: /\n\nuseragent: Googlebot\nDisallow:\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nAllow: /\n', 'useragent: *\nDisallow: /\n\nUSERAGENT: Bingbot\nDisallow: /privado/\n']) {
     assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
