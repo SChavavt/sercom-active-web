@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { absoluteUrl, contactLinks, mailtoUrl, messages, subjects, whatsappUrl } from '../src/lib/contact.mjs';
+import { absoluteUrl, contactDetails, contactLinks, mailtoUrl, messages, subjects, whatsappUrl } from '../src/lib/contact.mjs';
 import { buildMailtoUrl, buildWhatsappUrl, createContact, withPageLink, withRequestDescription } from '../src/lib/contact-core.mjs';
 import { loadProjectData } from './helpers.mjs';
 
@@ -28,6 +28,18 @@ test('los datos de contacto salen de business.json y el número se conserva tal 
   assert.equal(mailtoUrl(), `mailto:${EMAIL}`);
   // Sin «normalizar»: el 1 después del 52 se conserva.
   assert.ok(!whatsappUrl('Hola').includes('522214002219'));
+});
+
+test('contactDetails muestra los datos de contacto de business.json y nunca la dirección', () => {
+  assert.equal(contactDetails.email, EMAIL);
+  assert.equal(contactDetails.whatsappDisplay, '+52 1 221 400 2219');
+  assert.equal(contactDetails.contactName, business.contactName);
+  assert.equal(contactDetails.locationLabel, 'Atención comercial en Puebla');
+  assert.equal(contactDetails.hoursText, 'Lunes a viernes de 9:00 a 18:00. Sábado y domingo cerrado.');
+  assert.ok(contactDetails.hoursText.startsWith(contactDetails.hoursShortText));
+  assert.ok(Object.isFrozen(contactDetails));
+  const shown = JSON.stringify(contactDetails);
+  assert.ok(!shown.includes(business.address) && !/address|inPerson|whatsappTested|timezone/.test(Object.keys(contactDetails).join(' ')));
 });
 
 test('whatsappUrl codifica el texto completo y se puede leer de vuelta', () => {

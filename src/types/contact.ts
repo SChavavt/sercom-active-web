@@ -11,6 +11,27 @@ export interface ContactSettings {
   whatsappDigits: string;
 }
 
+/** Datos de contacto que las páginas muestran. No incluye la dirección: no se publica hasta confirmar la atención presencial. */
+export interface ContactDetails {
+  /** «Sercom Active». */
+  readonly businessName: string;
+  /** «Atención comercial en Puebla». */
+  readonly locationLabel: string;
+  /** Nombre completo de la persona que atiende. */
+  readonly contactName: string;
+  /** Nombre de pila, para frases como «Yosmara revisa opciones…». */
+  readonly contactFirstName: string;
+  /** Iniciales para el monograma («YT»); no hay fotografía. */
+  readonly contactInitials: string;
+  readonly email: string;
+  /** Número tal como se muestra: «+52 1 221 400 2219». */
+  readonly whatsappDisplay: string;
+  /** Horario completo: «Lunes a viernes de 9:00 a 18:00. Sábado y domingo cerrado.» */
+  readonly hoursText: string;
+  /** Horario corto para espacios estrechos: «Lunes a viernes de 9:00 a 18:00». */
+  readonly hoursShortText: string;
+}
+
 /** Producto al que se refiere un mensaje. Las partes vacías se omiten del texto. */
 export interface ProductReference {
   brandName?: string | null;

@@ -16,6 +16,23 @@ if (typeof document !== 'undefined') {
   throw new Error('contact.mjs es solo para compilación: en el navegador usa contact-core.mjs.');
 }
 
+/**
+ * Datos de contacto para mostrar en las páginas (encabezado, pie, bloque de atención personal).
+ * Es una proyección de `business.json`: la dirección y los campos internos no salen de aquí.
+ * @type {import('../types/contact.ts').ContactDetails}
+ */
+export const contactDetails = Object.freeze({
+  businessName: business.name,
+  locationLabel: business.locationLabel,
+  contactName: business.contactName,
+  contactFirstName: business.contactFirstName,
+  contactInitials: business.contactInitials,
+  email: business.email,
+  whatsappDisplay: business.whatsappDisplay,
+  hoursText: business.hoursText,
+  hoursShortText: business.hoursShortText,
+});
+
 export const {
   /** `whatsappUrl(text)` → `https://wa.me/<dígitos>?text=<texto codificado>`. */
   whatsappUrl,
