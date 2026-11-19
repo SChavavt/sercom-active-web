@@ -1,6 +1,13 @@
 ---
+// Página no encontrada (versión simple). Se muestra en cualquier dirección: todos los enlaces son absolutos.
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ActionRow from '../components/ActionRow.astro';
+import PageHeader from '../components/PageHeader.astro';
+import { routes } from '../lib/site-data.mjs';
 ---
-<BaseLayout title="Página no encontrada · Sercom Active" description="Regresa al inicio para contactar a Sercom Active.">
-  <main id="contenido" class="shell error-page"><p class="eyebrow">Error 404</p><h1>No encontramos esta página.</h1><a class="button" href="/">Volver al inicio</a></main>
+<BaseLayout title="Página no encontrada" description="La página que buscas no existe. Regresa al inicio de Sercom Active.">
+  <PageHeader title="No encontramos esta página." eyebrow="Error 404">
+    <ActionRow href={routes.home} primary>Volver al inicio</ActionRow>
+    <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
+  </PageHeader>
 </BaseLayout>
