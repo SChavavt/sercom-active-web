@@ -27,7 +27,7 @@ Con el repositorio disponible y acceso a una cuenta del responsable del sitio:
 - Framework: Astro.
 - Directorio raíz: raíz del repositorio.
 - Instalación: `npm ci`, si el panel permite definirla; de otro modo conservar detección por lockfile.
-- Compilación: `npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/check-links.mjs dist`. Los dos últimos pasos revisan la salida de `dist/` (reglas y enlaces): si fallan, no se publica nada.
+- Compilación: `npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/check-links.mjs dist && node scripts/check-markup.mjs dist`. Los tres últimos pasos revisan la salida de `dist/` (reglas, enlaces y marcado): si fallan, no se publica nada.
 - Salida: `dist`.
 - Versión de Node: 24, consistente con `.nvmrc`.
 - Rama de producción: `main`.

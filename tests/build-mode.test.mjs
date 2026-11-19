@@ -48,6 +48,7 @@ test('los scripts de npm no dependen de la sintaxis de una terminal', () => {
   assert.equal(scripts.dev, 'node scripts/catalog-preview.mjs dev');
   assert.equal(scripts['scan:dist'], 'node scripts/scan-dist.mjs');
   assert.equal(scripts['check:links'], 'node scripts/check-links.mjs');
+  assert.equal(scripts['check:markup'], 'node scripts/check-markup.mjs');
   for (const [name, command] of Object.entries(scripts)) {
     // Nada de «VARIABLE=valor comando», «set VARIABLE=» ni utilidades externas para definir variables.
     assert.doesNotMatch(command, /(?:^|&&\s*|;\s*)\s*[A-Z_][A-Z0-9_]*=|\bset\s+[A-Z_]+=|cross-env|\bexport\s/, name);
@@ -65,6 +66,9 @@ test('«npm run verify» compila los dos modos y revisa las dos salidas', () => 
     'node scripts/scan-dist.mjs dist-preview --preview',
     'node scripts/check-links.mjs dist',
     'node scripts/check-links.mjs dist-preview',
+    // El marcado se revisa en los dos modos: la vista previa exige además la búsqueda y las categorías de la cabecera.
+    'node scripts/check-markup.mjs dist',
+    'node scripts/check-markup.mjs dist-preview --preview',
   ]);
 });
 
@@ -82,8 +86,8 @@ test('ningún archivo del repositorio activa la vista previa en una compilación
   assert.match(config, /trailingSlash: 'always'/);
 
   const vercel = await readJson('vercel.json');
-  // El alojamiento publica dist/ solo si la salida pasa el escáner de reglas y el verificador de enlaces.
-  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/check-links.mjs dist');
+  // El alojamiento publica dist/ solo si la salida pasa el escáner de reglas, el verificador de enlaces y el de marcado.
+  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/check-links.mjs dist && node scripts/check-markup.mjs dist');
   assert.equal(vercel.outputDirectory, 'dist');
   const committed = [await readText('vercel.json'), await readText('.env.example'), await readText('.github/workflows/quality.yml')];
   for (const text of committed) assert.doesNotMatch(text, /CATALOG_PREVIEW|build:preview(?!\b.*verify)|catalog-preview/);

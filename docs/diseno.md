@@ -357,7 +357,7 @@ Cuando se apruebe una categoría o un producto real, la entrada «Categorías»,
 
 ## 9. Comprobaciones
 
-- `npm run check`, `npm test` y `npm run verify` (compila ambos modos y ejecuta el escáner de reglas y el verificador de enlaces).
+- `npm run check`, `npm test` y `npm run verify` (compila ambos modos y ejecuta el escáner de reglas, el verificador de enlaces y el de marcado).
 - Revisión visual: `npm run build:preview`, servir `dist-preview` y capturar 1440, 1280, 768, 390 y 360 px; ningún desbordamiento horizontal. Revisar también la compilación de producción.
 - Accesibilidad con axe (WCAG 2.1 A y AA y buenas prácticas): cero infracciones, también con paneles abiertos (Categorías, menú y búsqueda del celular, una pregunta abierta).
 - Las comprobaciones no sustituyen leer la página: textos, alineación con la retícula y estados vacíos.
