@@ -447,9 +447,20 @@
 /* El código es lo que el cliente pide al cotizar: nunca se corta. Pasa entero al renglón siguiente si cabe ahí;
    si no cabe ni solo, se parte dentro de la tarjeta, después de un guion o, si no hay, en cualquier carácter. */
 .product__meta .t-code { display: inline-block; max-width: 100%; color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
-.product__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--line) solid var(--rule-soft); }
+/* Las dos acciones van en una fila, en dos mitades iguales. Sus etiquetas nunca se parten (a 1100-1159 px «Ver ficha»
+   bajaba «ficha» a otro renglón): la mitad que no cabe con su etiqueta en un renglón toma ese ancho y la otra el resto.
+   Si las dos juntas no caben (texto espaciado o agrandado), «Cotizar» baja a una segunda fila del ancho de la tarjeta
+   en lugar de salirse de ella. Mitades iguales: las dos parten de una base de un cuarto de la fila (más que su relleno,
+   menos que cualquier etiqueta: la fila se parte solo cuando las etiquetas no caben) y crecen lo mismo.
+   El filete entre las dos mitades es el borde izquierdo de «Cotizar» y el que separa las dos filas es el borde
+   inferior de «Ver ficha»: cada uno está corrido 1 px hacia fuera de su acción (margen negativo, que la primera
+   mitad compensa con 1 px de base y de relleno) y la fila recorta lo que pasa de ella, así en una sola fila se ve
+   solo el filete vertical y en dos solo el horizontal, sin cambiar un píxel la fila de siempre. El celular y el
+   catálogo de cuatro columnas apilan las acciones con su propia regla (rejilla). */
+.product__actions { display: flex; flex-wrap: wrap; overflow: clip; border-top: var(--line) solid var(--rule-soft); }
 .product__action {
   display: flex;
+  flex: 1 1 25%;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-2);
@@ -461,13 +472,12 @@
   transition: background-color var(--ease);
 }
 .product__action .icon { color: var(--blue); transition: transform var(--ease); }
-/* «Ver ficha» y «Cotizar» nunca se parten: a 1100-1159 px «Ver ficha» bajaba «ficha» a otro renglón. La mitad
-   de la acción toma el ancho de su texto; las dos acciones siguen cabiendo en la tarjeta. */
 .product__action > span { white-space: nowrap; }
+.product__action--sheet { flex-basis: calc(25% + var(--line)); margin-bottom: calc(-1 * var(--line)); padding-right: calc(var(--s-5) + var(--line)); border-bottom: var(--line) solid var(--rule-soft); }
 .product__action--sheet::after { content: ""; position: absolute; inset: 0; }                 /* toda la tarjeta abre la ficha */
 .product__action--sheet:focus-visible { outline: none; }
 .product__action--sheet:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; }
-.product__action--quote { position: relative; z-index: 1; padding-left: var(--s-5); border-left: var(--line) solid var(--rule-soft); color: var(--blue); }
+.product__action--quote { position: relative; z-index: 1; margin-left: calc(-1 * var(--line)); padding-left: var(--s-5); border-left: var(--line) solid var(--rule-soft); color: var(--blue); }
 .product__action--quote:hover { background: var(--blue); color: var(--white); }
 .product__action--quote:hover .icon { color: var(--white); }
 .product__action--quote:focus-visible { outline-offset: -3px; }

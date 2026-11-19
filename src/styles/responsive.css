@@ -241,8 +241,10 @@
   .product__meta { font-size: 0.8125rem; }
   .product__meta .sep { display: none; }
   .product__meta .t-code { display: block; }
-  .product__actions { grid-template-columns: minmax(0, 1fr); }
-  .product__action { min-height: 48px; padding: 0 var(--s-4) 0 var(--pad); }
+  /* acciones apiladas, una por fila: aquí ocupan todo el ancho y la etiqueta puede partirse si la letra se agranda */
+  .product__actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .product__action { min-height: 48px; margin: 0; padding: 0 var(--s-4) 0 var(--pad); border-bottom: 0; }
+  .product__action > span { white-space: normal; }
   .product__action--quote { padding-left: var(--pad); border-left: 0; border-top: var(--line) solid var(--rule-soft); }
   .product__media { aspect-ratio: auto; padding: 46px 0 var(--s-5); }      /* fila de la etiqueta y luego la placa */
   .product__plate { width: 76px; height: 76px; margin-top: 0; }

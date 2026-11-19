@@ -175,7 +175,10 @@
 @media (min-width: 1360px) {
   /* Con cuatro tarjetas en 9 columnas cada mitad de la fila de acciones mide unos 120 px y «Ver ficha» se
      partiría en dos líneas: las dos acciones se apilan, igual que en la tarjeta del celular. */
-  .catalog-grid .product__actions { grid-template-columns: minmax(0, 1fr); }
+  .catalog-grid .product__actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .catalog-grid .product__action { margin: 0; border-bottom: 0; }
+  .catalog-grid .product__action > span { white-space: normal; }
+  .catalog-grid .product__action--sheet { padding-right: var(--s-5); }
   .catalog-grid .product__action--quote { padding-left: var(--pad); border-left: 0; border-top: var(--line) solid var(--rule-soft); }
   .catalog-grid__fill[data-fill4="1"] { display: block; grid-column: span 1; }
   .catalog-grid__fill[data-fill4="2"] { display: block; grid-column: span 2; }
