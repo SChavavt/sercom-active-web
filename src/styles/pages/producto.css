@@ -155,6 +155,12 @@
   .producto__chips[data-fill-4="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chips[data-fill-4="2"] .producto__chip-fill { display: block; grid-column: span 2; }
   .producto__chips[data-fill-4="3"] .producto__chip-fill { display: block; grid-column: span 3; }
+  /* Letra agrandada (E-06): una variante larga («Extragrande») se parte con guion dentro de su celda en lugar de
+     salirse de la pantalla (celular) o de quedar cortada por la celda vecina (tableta). Solo con la raíz de más de
+     16 px: es el interruptor de la letra agrandada de responsive.css 6.9 sobre el contenedor lamina (layout.css). */
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .producto__chip-label { max-width: 100%; hyphens: auto; }
+  }
 
   /* códigos largos: las variantes siguen en filas, como en computadora */
   .producto__chips--rows { grid-template-columns: minmax(0, 1fr); }
@@ -187,12 +193,6 @@
   .producto__chips[data-fill-4] .producto__chip-fill { display: none; }
   .producto__chips[data-fill-2="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chip { min-height: 64px; }
-  /* Letra agrandada (E-06): en un celular más angosto que 20rem (con la letra normal no lo hay desde 320 px) una
-     variante larga («Extragrande») se parte con guion dentro de su celda en lugar de salirse de la pantalla
-     (contenedor lamina: layout.css; las demás reglas de la letra agrandada están en responsive.css 6.9). */
-  @container lamina (width < 20rem) {
-    .producto__chip-label { max-width: 100%; hyphens: auto; }
-  }
 
   .producto__doc { column-gap: var(--s-3); }
 }

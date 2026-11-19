@@ -152,6 +152,24 @@
   .nf__num { font-size: 5.5rem; }
   .nf__body { min-height: 0; padding: var(--s-8) var(--pad) var(--s-7); }
 }
+/* Letra agrandada (E-06): si «404» (9.32rem en tableta, 13.56rem de 1100 a 1359 px, 15.26rem desde 1360, a 100 %)
+   no cabe en sus cuatro columnas, el número va en una fila propia sobre el mensaje, como en el celular, en lugar de
+   quedar cortado por la celda vecina. Con la letra normal no se cumple (lamina: layout.css; responsive.css 6.9). */
+@media (min-width: 700px) and (max-width: 1099px) {
+  @container lamina (width < calc(148px + 28rem)) {
+    .nf__row > .nf__num, .nf__row > .nf__main { grid-column: span 12; }
+  }
+}
+@media (min-width: 1100px) and (max-width: 1359px) {
+  @container lamina (width < calc(148px + 40.7rem)) {
+    .nf__row > .nf__num, .nf__row > .nf__main { grid-column: span 12; }
+  }
+}
+@media (min-width: 1360px) {
+  @container lamina (width < calc(196px + 45.8rem)) {
+    .nf__row > .nf__num, .nf__row > .nf__main { grid-column: span 12; }
+  }
+}
 @media (max-width: 699px) {
   .nf__num { padding: var(--s-6) var(--pad) var(--s-1); font-size: 4rem; line-height: 1; }
   .nf__body { padding: var(--s-4) var(--pad) var(--s-7); gap: var(--s-4); }

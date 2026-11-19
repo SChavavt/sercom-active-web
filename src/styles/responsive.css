@@ -585,12 +585,42 @@
 }
 
 /* Celular más angosto que 20rem (con la letra normal no lo hay desde 320 px; con 200 % lo es hasta 640 px): la
-   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla, y la
-   categoría de una tarjeta de producto («Protección respiratoria», en mayúsculas espaciadas) también, y en último
-   caso donde no quepa, en lugar de salirse de la tarjeta (E-06). */
+   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla (E-05). */
 @media (max-width: 699px) {
   @container lamina (width < 20rem) {
     .faq__q .t-h3 { hyphens: auto; }
-    .product__cat { hyphens: auto; overflow-wrap: break-word; }
+  }
+}
+/* La categoría de una tarjeta de producto («Vial y señalización», en mayúsculas espaciadas) se parte con guion y, en
+   último caso, donde no quepa, en lugar de salirse de la tarjeta (E-06; en el celular y en las cuatro columnas de
+   computadora). Solo con la letra agrandada (el interruptor de arriba). */
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .product__cat { hyphens: auto; overflow-wrap: break-word; }
+}
+
+/* Panel Categorías de computadora (E-06): seis categorías por fila mientras la palabra más larga («señalización»,
+   5.51rem) cabe en su celda junto al icono; si no, dos por fila y «Ver todo el catálogo» a todo lo ancho, como en
+   tableta, en lugar de partir los nombres letra por letra. */
+@media (min-width: 1100px) {
+  @container lamina (width < calc(370px + 33.2rem)) {
+    .catpanel__list > li { grid-column: span 6; }
+    .catpanel__list > .catpanel__all { grid-column: span 12; }
+  }
+}
+
+/* Pasos de la portada (E-06): con la letra agrandada una palabra larga del paso («disponibilidad») se parte con guion
+   dentro de su celda en lugar de quedar cortada por la celda vecina (tableta y computadora, tres pasos por fila). */
+@media (min-width: 700px) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .step__text { hyphens: auto; overflow-wrap: break-word; }
+  }
+}
+
+/* Filas de datos (contacto, producto) de tableta y computadora (E-06): la clave va en una columna de 148 px y la más
+   larga, «WhatsApp», mide 5.44rem: cabe hasta una raíz de 27 px (cerca de 170 %). Con más, la clave va arriba y el
+   valor debajo, como en el celular, en lugar de encimarse con el valor. Con la letra normal no se cumple nunca. */
+@media (min-width: 700px) {
+  @container lamina (width < calc((1rem - 27px) * 100000)) {
+    .data__row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   }
 }

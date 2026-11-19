@@ -58,13 +58,19 @@
 .catalog-search__submit:hover { background: var(--blue-700); }
 .catalog-search__submit:active { background: var(--blue-800); }
 .catalog-search__submit:focus-visible { outline-offset: -3px; }
-/* Letra agrandada (E-05): en computadora «Buscar» (3.35rem) más su relleno no cabe en una columna de la lámina: el
-   botón toma dos y el campo una menos. Con la letra normal la condición no se cumple desde 1100 px (lamina:
-   layout.css; las demás reglas de la letra agrandada están en responsive.css 6.9). */
+/* Letra agrandada (E-05, E-06): en computadora «Buscar» (3.35rem) más su relleno no cabe en una columna de la
+   lámina, y la línea de resultados tampoco cabe en sus tres columnas junto a «Limpiar búsqueda» (se encima con el
+   enlace y la consulta se corta). La fila toma entonces el arreglo de la tableta: campo en 9 columnas, «Buscar» en
+   3 y la línea de resultados en una fila propia. Con la letra normal la condición no se cumple desde 1100 px
+   (lamina: layout.css; las demás reglas de la letra agrandada están en responsive.css 6.9). */
 @media (min-width: 1100px) {
   @container lamina (width < calc(304px + 40.3rem)) {
-    .catalog-search__field { grid-column: span 7; }
-    .catalog-search__submit { grid-column: span 2; }
+    .catalog-search__form.span-9 { grid-column: span 12; }
+    .catalog-search__field { grid-column: span 9; }
+    .catalog-search__submit { grid-column: span 3; }
+    .catalog-search__status.span-3 { grid-column: span 12; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--s-5); min-height: 56px; padding-block: var(--s-1); }
+    .catalog-search__count { flex: 1 1 0; min-width: min(100%, 11em); }
+    .catalog-search__clear { flex: none; min-height: 44px; }
   }
 }
 
