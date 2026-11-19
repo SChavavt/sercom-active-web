@@ -689,14 +689,17 @@ test('R-RULE-29: un nombre de color pegado a otra palabra o en mayúsculas sigue
   assert.deepEqual(failedIds(await scan({ 'datos.json': '{"textcolor":"#0e2a3e"}' })), ['R-RULE-29'], 'JSON');
 });
 
-test('R-RULE-29: «tema» seguido de otra letra en la misma caja es otra palabra («temática», «temario», «TEMARIO»)', async () => {
-  for (const content of ["const tematica={id:'#00a6e9'};", "const temario=[{ancla:'#00a6e9'}];", "const TEMARIO=[{ancla:'#00a6e9'}];", "const Tematica={id:'#00a6e9'};", "var o={tematica:'#00a6e9'};"]) {
+test('R-RULE-29: «temática», «temático» y «temario» son otras palabras; «tema» pegado a otra palabra sigue contando', async () => {
+  for (const content of ["const tematica={id:'#00a6e9'};", "const temario=[{ancla:'#00a6e9'}];", "const TEMARIO=[{ancla:'#00a6e9'}];", "const Tematica={id:'#00a6e9'};", "var o={tematica:'#00a6e9'};",
+    "const temática={id:'#00a6e9'};", "const tematico=[{ancla:'#00a6e9'}];", "const temarios=[{ancla:'#00a6e9'}];", "const TEMATICAS=[{ancla:'#00a6e9'}];"]) {
     assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
   }
-  // «tema» sigue contando solo, en camelCase, después de «_» o en mayúsculas.
-  for (const content of ["const tema={x:'#0e2a3e'};", "const temaOscuro={x:'#0e2a3e'};", "const TemaClaro={x:'#0e2a3e'};", "const TEMA_OSCURO={x:'#0e2a3e'};", "const tema2={x:'#0e2a3e'};"]) {
+  // «tema» sigue contando solo, en camelCase, después de «_», en mayúsculas y pegado a otra palabra.
+  for (const content of ["const tema={x:'#0e2a3e'};", "const temaOscuro={x:'#0e2a3e'};", "const TemaClaro={x:'#0e2a3e'};", "const TEMA_OSCURO={x:'#0e2a3e'};", "const tema2={x:'#0e2a3e'};",
+    "const temaoscuro={x:'#0e2a3e'};", "const temaclaro={texto:'#0e2a3e',enlace:'#00a6e4'};", "const TEMAOSCURO={x:'#0e2a3e'};", "const temaprincipal='#0e2a3e';"]) {
     assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
   }
+  assert.deepEqual(failedIds(await scan({ 'datos.json': '{"temaoscuro":{"texto":"#0e2a3e"}}' })), ['R-RULE-29'], 'JSON');
 });
 
 test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
