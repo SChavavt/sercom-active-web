@@ -85,12 +85,62 @@ function visibleText(html) {
 const INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)\b[^>]*>/gi;
 /** Texto visible con las etiquetas en línea retiradas sin dejar espacio. */
 const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).replace(INLINE_TAG, '').replace(/<[^>]+>/g, ' '))));
+// Una etiqueta de inicio o de cierre: [etiqueta, «/» si cierra, nombre]. Los valores entre comillas pueden llevar «>»
+// («data-x="a>b"»): la etiqueta no termina ahí.
+const TAG = /<(\/?)([a-zA-Z][^\s"'>/]*)(?:"[^"]*"|'[^']*'|[^'">])*>/g;
+const INLINE_ELEMENT = /^(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/i;
+const VOID_ELEMENT = /^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i;
+// Elementos cuyo contenido el visitante no ve nunca en la página (el <title> es el de la pestaña o el de un SVG; el
+// de <noscript> solo aparece sin JavaScript). El de <title> y <textarea> es texto: termina en su primera etiqueta de cierre.
+const NEVER_SHOWN = /^(?:head|title|template|textarea|noscript)$/i;
+const RAW_TEXT = /^(?:title|textarea)$/i;
+const HIDDEN_STYLE = /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!\s*important\s*)?(?:;|$)/i;
+/** ¿La etiqueta de inicio esconde su contenido? hidden, aria-hidden="true", display:none o visibility:hidden en su style, un <dialog> cerrado. */
+function hidesContent(name, tag) {
+  if (NEVER_SHOWN.test(name)) return true;
+  const attributes = new Map(attributesOf(tag).map(([key, value]) => [key.toLowerCase(), value]));
+  if (/^dialog$/i.test(name) && !attributes.has('open')) return true;
+  return attributes.has('hidden') || attributes.get('aria-hidden')?.trim().toLowerCase() === 'true' || HIDDEN_STYLE.test(attributes.get('style') ?? '');
+}
+/** Posición tras la etiqueta que cierra el elemento `name` abierto antes de `from` (o el final, si no cierra). */
+function elementEnd(html, name, from) {
+  const tags = new RegExp(TAG.source, 'g');
+  tags.lastIndex = from;
+  let depth = 1;
+  for (let match; (match = tags.exec(html));) {
+    if (match[2].toLowerCase() !== name.toLowerCase()) continue;
+    if (match[1]) depth -= 1;
+    else if (!RAW_TEXT.test(name) && !match[0].endsWith('/>')) depth += 1;
+    if (depth === 0) return tags.lastIndex;
+  }
+  return html.length;
+}
+/** El marcado sin los elementos que no se ven (`hidesContent`), con todo su contenido. */
+function withoutHiddenElements(html) {
+  const tags = new RegExp(TAG.source, 'g');
+  let result = '';
+  let kept = 0;
+  for (let match; (match = tags.exec(html));) {
+    const [tag, closing, name] = match;
+    if (closing || VOID_ELEMENT.test(name) || tag.endsWith('/>') || !hidesContent(name, tag)) continue;
+    const end = elementEnd(html, name, tags.lastIndex);
+    result += `${html.slice(kept, match.index)} `;
+    kept = end;
+    tags.lastIndex = end;
+  }
+  return result + html.slice(kept);
+}
 /**
  * Lo que una página muestra como texto, para buscar sus avisos: el contenido de los elementos (las etiquetas en línea
  * no separan palabras), en forma comparable y en minúsculas. Un comentario, un script, un estilo o un atributo no
- * cuentan: el aviso tiene que estar a la vista.
+ * cuentan (tampoco un valor con «>»), ni el contenido de un elemento que no se ve (`withoutHiddenElements`): el
+ * <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o un elemento con hidden, aria-hidden="true" o
+ * display:none / visibility:hidden en su style. El aviso tiene que estar a la vista. Una regla de una hoja de estilo
+ * que lo esconda no se ve aquí.
  */
-const elementText = html => joinedText(html).toLowerCase();
+const elementText = html => oneLine(fold(decodeEntities(withoutHiddenElements(withoutScripts(html))
+  .replace(TAG, (tag, closing, name) => (INLINE_ELEMENT.test(name) ? '' : ' '))
+  .replace(/<![^>]*>/g, ' ')))).toLowerCase();
 // Etiquetas dentro del texto de un script («t.innerHTML="Solicitud <b>enviada</b>"»). El nombre debe ir seguido de un
 // espacio, «/» o «>», y la etiqueta no puede contener «<», para no confundirlas con comparaciones («i<a.length»).
 const SCRIPT_INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)(?=[\s/>])[^<>]*>/gi;
@@ -499,9 +549,9 @@ const PRODUCTION_RULES = [
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
   ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa. Los códigos también se buscan escritos con otro separador o sin él («EJ1001», «ej 1001»).'],
-  ['R-RULE-03', 'Vista previa: cada página muestra el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran. Mostrar es estar en el texto de los elementos: un comentario, un script, un estilo o un atributo no cuentan.'],
+  ['R-RULE-03', 'Vista previa: cada página muestra el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran. Mostrar es estar en el texto de los elementos: un comentario, un script, un estilo o un atributo (aunque su valor lleve «>») no cuentan, ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o uno con hidden, aria-hidden="true" o display:none / visibility:hidden en su style.'],
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
-  ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra el aviso «${DEVELOPMENT_NOTICE}» (en el texto de los elementos: un comentario, un script, un estilo o un atributo no cuentan). La vista previa lleva solo su propio aviso: una página suya que muestra el de sitio en preparación falla. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero, ninguna página lleva noindex y ninguna muestra el aviso.`],
+  ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra el aviso «${DEVELOPMENT_NOTICE}» (en el texto de los elementos: un comentario, un script, un estilo o un atributo no cuentan, ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o uno con hidden, aria-hidden="true" o display:none / visibility:hidden en su style). La vista previa lleva solo su propio aviso: una página suya que muestra el de sitio en preparación falla. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero, ninguna página lleva noindex y ninguna muestra el aviso.`],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
@@ -1004,7 +1054,7 @@ export async function scanDist(directory, options = {}) {
     for (const match of markup.matchAll(/<(a|button)\b[^>]*>(?:\s|<[^>]+>)*<\/\1>/gi)) {
       if (!/\saria-label=["'][^"']+["']/i.test(match[0]) && !/\salt=["'][^"']+["']/i.test(match[0]) && !/<title>[^<]+<\/title>/i.test(match[0])) add('WARN', 'R-A11Y-06', file, `control sin texto: ${match[0].slice(0, 80)}`);
     }
-    for (const match of markup.matchAll(/<img\b[^>]*>/gi)) if (attribute(match[0], 'alt') === undefined && !/\salt(?=[\s/>])/i.test(match[0])) add('FAIL', 'R-A11Y-07', file, `imagen sin alt: ${match[0].slice(0, 80)}`);
+    for (const match of markup.matchAll(/<img\b(?:"[^"]*"|'[^']*'|[^'">])*>/gi)) if (attribute(match[0], 'alt') === undefined && !/\salt(?=[\s/>])/i.test(match[0])) add('FAIL', 'R-A11Y-07', file, `imagen sin alt: ${match[0].slice(0, 80)}`);
 
     // R-RULE-03, vista previa: aviso en cada página y etiqueta en cada ejemplo.
     if (preview) {

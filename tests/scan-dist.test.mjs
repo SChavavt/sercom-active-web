@@ -321,6 +321,52 @@ test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación, visible en cada p
   assert.deepEqual(failures(await scan({ 'index.html': previewPage(`<h1>Inicio</h1><!-- ${DEVELOPMENT_NOTICE} --><script>var a=${JSON.stringify(DEVELOPMENT_NOTICE)}</script>`) }, preview)), []);
 });
 
+// El aviso dentro de algo que el visitante no ve: un atributo que contiene «>», un elemento oculto (hidden,
+// aria-hidden="true", display:none o visibility:hidden en su style), <template>, <textarea>, <noscript>, un
+// <dialog> cerrado, el <head> (el <title>) o un <title> de SVG.
+const hiddenNotices = notice => [
+  `<div data-x="a>${notice}"></div>`, `<div data-x='a>${notice}'></div>`, `<img alt="x>${notice}" src="/a.svg">`,
+  `<aside hidden><p>${notice}</p></aside>`, `<aside class="site-notice" HIDDEN=""><p>${notice}</p></aside>`, `<p hidden="hidden">${notice}</p>`,
+  `<aside aria-hidden="true"><p>${notice}</p></aside>`, `<div style="display:none"><p>${notice}</p></div>`, `<div style="color: red; DISPLAY : none !important"><p>${notice}</p></div>`,
+  `<div style="visibility:hidden"><p>${notice}</p></div>`, `<div style='visibility: collapse'><p>${notice}</p></div>`,
+  `<template><aside><p>${notice}</p></aside></template>`, `<textarea hidden>${notice}</textarea>`, `<textarea>${notice}</textarea>`,
+  `<noscript><p>${notice}</p></noscript>`, `<dialog><p>${notice}</p></dialog>`, `<svg><title>${notice}</title></svg>`,
+  // Anidado: el elemento oculto cierra en su propia etiqueta de cierre, no en la primera del mismo nombre.
+  `<div hidden><div><p>Otro</p></div><p>${notice}</p></div>`,
+];
+// Elementos visibles junto a otros ocultos: el aviso sigue a la vista.
+const shownNotices = notice => [
+  `<div hidden><div><p>Otro</p></div></div><aside><p>${notice}</p></aside>`, `<input type="hidden" name="a"><p>${notice}</p>`, `<input hidden><p>${notice}</p>`,
+  `<p data-hidden="1" class="hidden-x">${notice}</p>`, `<p aria-hidden="false">${notice}</p>`, `<p style="display:block" title="a>b">${notice}</p>`,
+  `<dialog open><p>${notice}</p></dialog>`, `<p>Uno &lt; dos</p><p>${notice}</p>`, `<p data-x="a>b">${notice}</p>`, `<br/><hr /><p>${notice}</p>`,
+];
+
+test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación escondido en un elemento que no se ve no cuenta', async () => {
+  for (const hidden of hiddenNotices(DEVELOPMENT_NOTICE)) {
+    // Antes del lanzamiento falta; con --launch no falla (no se ve); en la vista previa no falla (no se ve).
+    assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${hidden}`, { notice: 'none' }) })), ['R-RULE-12'], hidden);
+    assert.deepEqual(failures(await scan({ 'robots.txt': 'User-agent: *\nAllow: /\n', 'index.html': page('<h1>Inicio</h1>', { robots: '' }),
+      'contacto/index.html': page(`<h1>Contacto</h1>${hidden}`, { robots: '' }) }, { launch: true })), [], hidden);
+    assert.deepEqual(failures(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${hidden}`) }, { preview: true })), [], hidden);
+  }
+  // Solo en el <title> de la página tampoco cuenta.
+  assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page('<h1>Contacto</h1>', { notice: 'none', title: DEVELOPMENT_NOTICE }) })), ['R-RULE-12']);
+  for (const shown of shownNotices(DEVELOPMENT_NOTICE)) {
+    assert.deepEqual(failures(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${shown}`, { notice: 'none' }) })), [], shown);
+  }
+});
+
+test('R-RULE-03 en vista previa: el aviso de vista previa escondido en un elemento que no se ve no cuenta', async () => {
+  const options = { preview: true };
+  for (const hidden of hiddenNotices(PREVIEW_NOTICE)) {
+    assert.deepEqual(failedIds(await scan({ 'index.html': page(`<h1>Inicio</h1>${hidden}`, { notice: 'none' }) }, options)), ['R-RULE-03'], hidden);
+  }
+  assert.deepEqual(failedIds(await scan({ 'index.html': previewPage(), 'contacto/index.html': page('<h1>Contacto</h1>', { notice: 'none', title: PREVIEW_NOTICE }) }, options)), ['R-RULE-03']);
+  for (const shown of shownNotices(PREVIEW_NOTICE)) {
+    assert.deepEqual(failures(await scan({ 'index.html': page(`<h1>Inicio</h1>${shown}`, { notice: 'none' }) }, options)), [], shown);
+  }
+});
+
 test('R-RULE-12 y R-PUB-03: robots.txt revisa cada grupo de buscadores, no solo el de «*»', async () => {
   // Antes del lanzamiento, un buscador con su propio grupo obedece ese grupo: si no bloquea todo, el sitio queda abierto para él.
   for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nAllow: /\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow:\n',
