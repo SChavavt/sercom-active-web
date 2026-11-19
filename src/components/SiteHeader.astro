@@ -136,6 +136,21 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     fit();
   }
 
+  // Alto real de la franja de servicio y de la cabecera. Con texto agrandado o espaciado crecen; la cabecera fija
+  // (components.css) y el margen de desplazamiento (base.css) usan estas medidas en lugar de los altos del diseño.
+  const utility = document.querySelector<HTMLElement>('.utility');
+  const masthead = document.querySelector<HTMLElement>('.masthead');
+  if (utility && masthead && 'ResizeObserver' in window) {
+    const measure = new ResizeObserver(() => {
+      const root = document.documentElement.style;
+      root.setProperty('--utility-shift', `${utility.getBoundingClientRect().height}px`);
+      root.setProperty('--masthead-shift', `${masthead.getBoundingClientRect().height}px`);
+      fit();
+    });
+    measure.observe(utility);
+    measure.observe(masthead);
+  }
+
   window.addEventListener('scroll', fit, { passive: true });
   window.addEventListener('resize', fit);
 

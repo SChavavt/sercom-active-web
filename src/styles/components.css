@@ -17,7 +17,9 @@
 /* 4.2 Encabezado: franja de servicio + cabecera (el cajetín de la lámina) --- */
 .site-header {
   position: sticky;
-  top: calc(-1 * (var(--utility-h) + var(--line)));    /* la franja de servicio se desplaza; la cabecera se queda */
+  /* la franja de servicio se desplaza; la cabecera se queda. --utility-shift es el alto real de la franja
+     (lo mide SiteHeader): crece si el texto se agranda o se espacia */
+  top: calc(-1 * (var(--utility-shift, var(--utility-h)) + var(--line)));
   z-index: 50;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -29,16 +31,17 @@
 .utility {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;                                       /* con texto agrandado o espaciado los grupos bajan de línea */
   justify-content: space-between;
-  gap: var(--s-6);
-  height: var(--utility-h);
-  padding: 0 var(--pad);
+  gap: var(--s-1) var(--s-6);
+  min-height: var(--utility-h);
+  padding: var(--s-1) var(--pad);
   background: var(--surface);
   font-size: 0.8125rem;
   line-height: 1.2;
   color: var(--grey-700);
 }
-.utility__group { display: flex; align-items: center; gap: var(--s-5); min-width: 0; }
+.utility__group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-5); min-width: 0; }
 .utility__item { display: flex; align-items: center; gap: var(--s-2); white-space: nowrap; }
 .utility__item + .utility__item::before { content: ""; width: var(--line); height: 14px; margin-right: calc(var(--s-5) - var(--s-2)); background: var(--rule); }
 .utility__place { color: var(--ink); font-size: var(--label-sm); }
@@ -47,7 +50,7 @@
 .utility__link:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
 .utility .icon { color: var(--blue); }
 
-.masthead { height: var(--masthead-h); }
+.masthead { min-height: var(--masthead-h); }               /* mínimo, no fijo: con texto espaciado la cabecera crece */
 .masthead > * { background: var(--surface); }
 
 .masthead__logo { display: flex; align-items: center; padding-left: var(--pad); }
@@ -55,7 +58,7 @@
 .masthead__logo img { width: 156px; height: 59px; }        /* logo.svg sin margen propio: proporción 2.656 */
 
 .masthead__nav { display: flex; min-width: 0; }
-.nav__list { display: flex; flex: 1; justify-content: space-between; padding: 0 var(--s-3); }
+.nav__list { display: flex; flex: 1; flex-wrap: wrap; justify-content: space-between; padding: 0 var(--s-3); }   /* si no caben, los enlaces bajan de línea */
 .nav__list > li { display: flex; }
 .nav__link {
   position: relative;
@@ -117,6 +120,7 @@
   text-decoration: none;
 }
 .catpanel__link .icon { color: var(--blue); }
+.catpanel__link > span { min-width: 0; overflow-wrap: anywhere; }     /* una palabra larga se parte antes que salir de su celda */
 .catpanel__link:hover { background: var(--surface-tint); }
 .catpanel__link--all { justify-content: space-between; padding-inline: var(--pad); background: var(--surface-tint); }
 .catpanel__link--all:hover { background: var(--blue-100); }
