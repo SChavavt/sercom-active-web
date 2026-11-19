@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
-// (celdas de relleno de las retículas, dirección de correo, ruta de navegación y marcas de la página actual) que se
-// leen en el HTML y en las hojas de estilo, sin navegador.
+// (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
+// de un producto retirado) que se leen en el HTML y en las hojas de estilo, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -365,6 +365,60 @@ const FOCUSABLE = ['a', 'button', 'input', 'select', 'textarea', 'summary'];
 /** El primer hijo de `element` si lleva la clase `name`; si no, `null`. */
 const leadingMark = (element, name) => (element.children[0] && hasClass(element.children[0], name) ? element.children[0] : null);
 
+// Página informativa de un producto retirado (R-STATE-04): la página de un producto (/productos/{id}/) que lleva el
+// aviso «Producto retirado» (RetiredProduct.astro). Que exista solo cuando los datos lo dicen lo revisa R-RULE-14 en
+// scripts/scan-dist.mjs; aquí se revisa lo que la página muestra y lo que no. Los textos son los de las plantillas:
+// una prueba avisa si dejan de coincidir.
+export const RETIRED_PAGE_TEXTS = {
+  notice: 'Producto retirado',
+  sentences: ['Este producto ya no forma parte del catálogo.', 'Dinos qué necesitas y revisamos alternativas.'],
+  alternatives: 'Consultar alternativas',
+  alternativesMail: 'Consultar por correo',
+};
+// Lo que una ficha muestra y la página de un retirado no: nadie mantiene ya esos datos y el producto no se cotiza.
+export const FICHA_TEXTS = {
+  actions: ['Cotizar este producto', 'Cotizar por correo', 'Solicitar ficha técnica'],
+  availability: 'Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.',
+  parts: ['Características', 'Variantes', 'Documentación'],
+  helpBand: '¿Necesitas otra talla, color o presentación?',
+};
+const FICHA_CLASSES = ['producto__summary', 'producto__note', 'producto__part', 'producto__list', 'producto__chips', 'producto__docs', 'producto__help'];
+
+/** El texto directo de un elemento, sin el de sus hijos. */
+const ownText = element => element.text.join(' ').replace(/\s+/g, ' ').trim();
+/**
+ * La forma de un texto para reconocerlo: sin acentos ni mayúsculas, y solo letras y números. Así un texto partido en
+ * elementos («Producto <b>retirado</b>», «Produc<b>to</b> retirado»), con puntuación («Producto retirado.»,
+ * «¡Producto retirado!», «“Producto retirado”»), en mayúsculas o con otros espacios sigue siendo el mismo.
+ *
+ * Con esta forma se compara todo lo que una página NO debe mostrar (el aviso fuera de su página, las acciones de
+ * cotizar, las partes de la ficha, el aviso de disponibilidad): que cambie una coma no lo vuelve aceptable. Lo que la
+ * página SÍ debe llevar (la etiqueta, sus dos frases, las dos acciones) se compara al pie de la letra.
+ */
+const bare = text => text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+/** ¿El texto completo del elemento (el suyo y el de sus hijos, como se lee) es `text` en cualquier forma? */
+const reads = (element, text) => bare(textOf(element)) === bare(text);
+/** ¿La ruta es la de un producto (/productos/{id}/)? */
+const isProductRoute = route => route.startsWith(prefix(routes.product)) && /^[^/]+\/$/.test(route.slice(prefix(routes.product).length));
+/** Contenido principal de la página (<main>); el pie repite el aviso de disponibilidad y no cuenta. */
+const mainOf = page => page.elements.find(element => element.name === 'main') ?? null;
+const inMain = page => {
+  const main = mainOf(page);
+  return main ? allElements(main) : [];
+};
+/**
+ * Las marcas del aviso «Producto retirado» en una página: cada celda `.producto__retired` y cada elemento cuyo texto
+ * completo es esa etiqueta en cualquier forma (`reads`). Una frase que solo la contiene («Si un producto retirado te
+ * interesa…») no es el aviso.
+ */
+const retiredMarks = page => page.elements.filter(element => hasClass(element, 'producto__retired') || reads(element, RETIRED_PAGE_TEXTS.notice));
+/** Enlaces con un texto exacto: las acciones que la página debe llevar. */
+const linksWithText = (elements, text) => elements.filter(element => element.name === 'a' && textOf(element) === text);
+/** Enlaces y botones que dicen `text` en cualquier forma: las acciones que la página no debe llevar. */
+const actionsReading = (elements, text) => elements.filter(element => (element.name === 'a' || element.name === 'button') && reads(element, text));
+/** Una página es de retirado si es la de un producto y lleva el aviso. */
+export const isRetiredPage = page => isProductRoute(page.route) && retiredMarks(page).length > 0;
+
 /** @type {Check[]} */
 export const CHECKS = [
   {
@@ -586,6 +640,103 @@ export const CHECKS = [
         }
       }
       if (inFooter.some(element => hasClass(element, 'footer__mark') && !links.includes(element.parent))) problems.push('hay un cuadro de página actual (.footer__mark) fuera de un enlace del pie');
+      return problems;
+    },
+  },
+  {
+    id: 'R-STATE-04a',
+    title: 'La página de un producto es una ficha (con «Cotizar este producto») o la de un producto retirado (con el aviso «Producto retirado»), nunca las dos ni ninguna; el aviso solo aparece en la página de un retirado',
+    page(page) {
+      const { notice } = RETIRED_PAGE_TEXTS;
+      const [quoteAction] = FICHA_TEXTS.actions;
+      const marks = retiredMarks(page);
+      if (!isProductRoute(page.route)) {
+        // Se nombra el elemento más interno: el que lleva la etiqueta, no la celda que lo contiene.
+        const inner = marks.find(mark => !marks.some(other => other !== mark && closest(other.parent, element => element === mark)));
+        return marks.length ? [`${describe(inner ?? marks[0])} lleva el aviso «${notice}» y esta página no es la de un producto`] : [];
+      }
+      const quote = actionsReading(inMain(page), quoteAction);
+      if (marks.length && quote.length) return [`la página lleva el aviso «${notice}» y la acción «${quoteAction}»: es una ficha o la de un retirado, no las dos`];
+      if (!marks.length && !quote.length) return [`la página de producto no lleva «${quoteAction}» ni el aviso «${notice}»`];
+      return [];
+    },
+  },
+  {
+    id: 'R-STATE-04b',
+    title: 'La página de un retirado lleva el aviso completo (la etiqueta «Producto retirado» con el cuadro sólido y sus dos frases) y, después, «Consultar alternativas» por WhatsApp y «Consultar por correo»',
+    page(page) {
+      if (!isRetiredPage(page)) return [];
+      const { notice, sentences, alternatives, alternativesMail } = RETIRED_PAGE_TEXTS;
+      const problems = [];
+      const main = inMain(page);
+      const cells = main.filter(element => hasClass(element, 'producto__retired'));
+      if (cells.length !== 1) return [`la página lleva ${cells.length} celdas del aviso (.producto__retired); lleva una`];
+      const [cell] = cells;
+      const inCell = allElements(cell);
+      const label = inCell.find(element => ownText(element) === notice);
+      if (!label) problems.push(`el aviso no lleva la etiqueta «${notice}»`);
+      else if (!hasClass(label, 'label') || !hasClass(label, 'eyebrow')) problems.push(`la etiqueta «${notice}» no tiene el estilo de etiqueta con el cuadro sólido (.eyebrow.label)`);
+      else if (!hasClass(label, 'producto__retired-label')) problems.push(`la etiqueta «${notice}» no lleva .producto__retired-label (la que la pinta en tinta, no en azul)`);
+      const paragraphs = inCell.filter(element => element.name === 'p').map(ownText);
+      for (const sentence of sentences) if (!paragraphs.includes(sentence)) problems.push(`al aviso le falta la frase «${sentence}»`);
+      if (label && paragraphs.indexOf(sentences[0]) !== -1 && paragraphs.indexOf(sentences[0]) > paragraphs.indexOf(sentences[1])) problems.push('las dos frases del aviso van en otro orden');
+      const whatsapp = linksWithText(main, alternatives);
+      const mail = linksWithText(main, alternativesMail);
+      if (whatsapp.length !== 1) problems.push(`la página lleva ${whatsapp.length} acciones «${alternatives}»; lleva una`);
+      else {
+        if (!(whatsapp[0].attributes.get('href') ?? '').startsWith('https://wa.me/')) problems.push(`«${alternatives}» no abre WhatsApp (https://wa.me/…)`);
+        if (!hasClass(whatsapp[0], 'action--primary')) problems.push(`«${alternatives}» no es la acción sólida (.action--primary)`);
+        if (whatsapp[0].order < cell.order) problems.push(`«${alternatives}» va antes del aviso`);
+      }
+      if (mail.length !== 1) problems.push(`la página lleva ${mail.length} acciones «${alternativesMail}»; lleva una`);
+      else {
+        if (!/^mailto:/i.test(mail[0].attributes.get('href') ?? '')) problems.push(`«${alternativesMail}» no abre el correo (mailto:)`);
+        if (hasClass(mail[0], 'action--primary')) problems.push(`«${alternativesMail}» no es la acción principal y va sólida`);
+        if (whatsapp.length === 1 && mail[0].order < whatsapp[0].order) problems.push(`«${alternativesMail}» va antes de «${alternatives}»`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'R-STATE-04c',
+    title: 'La página de un retirado tiene un solo H1, el nombre, antes del aviso, y su título dice «(producto retirado)»',
+    page(page) {
+      if (!isRetiredPage(page)) return [];
+      const problems = [];
+      const headings = page.elements.filter(element => element.name === 'h1');
+      if (headings.length !== 1) return [`la página lleva ${headings.length} H1; lleva uno`];
+      const [h1] = headings;
+      if (!textOf(h1)) problems.push('el H1 está vacío');
+      if (!closest(h1, element => hasClass(element, 'producto__head'))) problems.push('el H1 no está en el bloque del título de la hoja (.producto__head)');
+      const cell = page.elements.find(element => hasClass(element, 'producto__retired'));
+      if (cell && h1.order > cell.order) problems.push('el H1 va después del aviso');
+      const title = page.elements.find(element => element.name === 'title');
+      const expected = `${textOf(h1)} (producto retirado)`;
+      if (!title || !textOf(title).startsWith(expected)) problems.push(`el título de la página no empieza con «${expected}»`);
+      return problems;
+    },
+  },
+  {
+    id: 'R-STATE-04d',
+    title: 'La página de un retirado nunca muestra una acción de cotizar ni pedir la ficha, la unidad de venta, el resumen, las características, las variantes, la documentación, el aviso de disponibilidad ni la banda de ayuda de la ficha',
+    page(page) {
+      if (!isRetiredPage(page)) return [];
+      const problems = [];
+      const main = inMain(page);
+      for (const text of FICHA_TEXTS.actions) if (actionsReading(main, text).length) problems.push(`la página muestra la acción «${text}»`);
+      const keys = main.filter(element => element.name === 'dt').map(textOf);
+      for (const key of keys) if (key !== 'Marca' && key !== 'Código') problems.push(`la página muestra la fila «${key}»; solo lleva Marca y Código`);
+      for (const element of main) {
+        const ficha = classesOf(element).filter(name => FICHA_CLASSES.includes(name));
+        if (ficha.length) problems.push(`la página lleva ${describe(element)}, un bloque de la ficha`);
+      }
+      for (const heading of main.filter(element => /^h[2-6]$/.test(element.name))) {
+        const part = [...FICHA_TEXTS.parts, FICHA_TEXTS.helpBand].find(text => reads(heading, text));
+        if (part) problems.push(`la página muestra «${part}»`);
+      }
+      // El aviso se busca en todo el contenido principal, como se lee: partido en elementos sigue siendo el aviso.
+      const whole = mainOf(page);
+      if (whole && bare(textOf(whole)).includes(bare(FICHA_TEXTS.availability))) problems.push('la página muestra el aviso de disponibilidad');
       return problems;
     },
   },
