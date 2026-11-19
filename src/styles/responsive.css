@@ -508,3 +508,59 @@
 @media (max-width: 379px) {
   @container lamina (width < calc(64px + 9.7rem)) { .footer__links { columns: 1; } }
 }
+
+/* Celdas de marca (E-05): cuatro por fila desde 700 px y dos en el celular, mientras el nombre más largo
+   («Espomega», 5.69rem con la letra de tableta y celular, 6.32rem en computadora más su flecha) cabe en la celda.
+   Si no cabe, la mitad de celdas por fila: dos (y la celda de relleno solo con un número impar, como en el celular)
+   o una (sin relleno). */
+@media (max-width: 699px) {
+  @container lamina (width < calc(84px + 11.4rem)) {
+    .brands > li { grid-column: span 12; }
+    .brands > .brands__fill { display: none; }
+  }
+}
+@media (min-width: 700px) and (max-width: 1099px) {
+  @container lamina (width < calc(152px + 22.8rem)) {
+    .brands > li { grid-column: span 6; }
+    .brands > .brands__fill--even { display: none; }
+  }
+}
+@media (min-width: 1100px) and (max-width: 1359px) {
+  @container lamina (width < calc(320px + 25.3rem)) {
+    .brands > li { grid-column: span 6; }
+    .brands > .brands__fill--even { display: none; }
+  }
+}
+@media (min-width: 1360px) {
+  @container lamina (width < calc(384px + 27.9rem)) {
+    .brands > li { grid-column: span 6; }
+    .brands > .brands__fill--even { display: none; }
+  }
+}
+
+/* Mosaicos de la portada (E-05): si la palabra más larga de un nombre («Señalización»: 6.05rem en tableta, 6.43rem de
+   1100 a 1359 px, 6.81rem desde 1360) no cabe en el mosaico, se parte con guion (la página es es-MX) y, como último
+   recurso, donde no quepa; los mosaicos de una fila conservan el mismo alto. El celular ya lo hace siempre (6.3). */
+@media (min-width: 700px) and (max-width: 1099px) {
+  @container lamina (width < calc(136px + 24.3rem)) {
+    .tile:not(.tile--wide) .tile__name { hyphens: auto; overflow-wrap: anywhere; }
+  }
+}
+@media (min-width: 1100px) and (max-width: 1359px) {
+  @container lamina (width < calc(226px + 38.7rem)) {
+    .tile:not(.tile--wide) .tile__name { hyphens: auto; overflow-wrap: anywhere; }
+  }
+}
+@media (min-width: 1360px) {
+  @container lamina (width < calc(274px + 41rem)) {
+    .tile:not(.tile--wide) .tile__name { hyphens: auto; overflow-wrap: anywhere; }
+  }
+}
+
+/* Celular más angosto que 20rem (con la letra normal no lo hay desde 320 px; con 200 % lo es hasta 640 px): la
+   pregunta de un acordeón puede partir una palabra con guion para que el signo «+» quede entero en la pantalla. */
+@media (max-width: 699px) {
+  @container lamina (width < 20rem) {
+    .faq__q .t-h3 { hyphens: auto; }
+  }
+}

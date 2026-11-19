@@ -58,6 +58,15 @@
 .catalog-search__submit:hover { background: var(--blue-700); }
 .catalog-search__submit:active { background: var(--blue-800); }
 .catalog-search__submit:focus-visible { outline-offset: -3px; }
+/* Letra agrandada (E-05): en computadora «Buscar» (3.35rem) más su relleno no cabe en una columna de la lámina: el
+   botón toma dos y el campo una menos. Con la letra normal la condición no se cumple desde 1100 px (lamina:
+   layout.css; las demás reglas de la letra agrandada están en responsive.css 6.9). */
+@media (min-width: 1100px) {
+  @container lamina (width < calc(304px + 40.3rem)) {
+    .catalog-search__field { grid-column: span 7; }
+    .catalog-search__submit { grid-column: span 2; }
+  }
+}
 
 .catalog-search__status {
   display: flex;
