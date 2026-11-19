@@ -14,10 +14,18 @@ export default defineConfig({
   site: process.env.SITE_URL || undefined,
   // Todas las rutas del sitio terminan en diagonal (/catalogo/); así una diagonal olvidada falla al revisar.
   trailingSlash: 'always',
+  // Espacios en blanco fieles al HTML (comportamiento de Astro 6). El valor por omisión de Astro 7 ('jsx')
+  // elimina el espacio de los saltos de línea entre elementos en línea y une palabras de la maqueta.
+  compressHTML: true,
   vite: {
     define: {
       // Constante de compilación declarada en src/env.d.ts. Las páginas usan `isPreview` de src/lib/site-data.mjs.
       __CATALOG_PREVIEW__: JSON.stringify(catalogPreview),
+    },
+    build: {
+      // Sin esto, Lightning CSS conserva el anidamiento y escribe consultas de rango (width<=1099px)
+      // que los navegadores anteriores a Safari 16.4 no entienden.
+      cssTarget: ['chrome90', 'edge90', 'firefox90', 'safari14', 'ios14'],
     },
   },
 });
