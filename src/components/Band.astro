@@ -13,16 +13,18 @@ interface Props {
   action: { href: string; label: string };
   /** Pictograma de 72 px sobre el botón (se oculta en tableta y celular). Por omisión `zoom-question`. */
   icon?: IconName;
-  /** 2 por omisión; 1 si la banda es el título de la página. */
+  /** 2 por omisión; 1 si la banda es el título de la página: el H1 toma entonces el tamaño de los títulos de
+   *  página interior (`.band__title--page`: 44 px en computadora, 28 en celular) en lugar del de un H2. */
   headingLevel?: 1 | 2;
 }
 
 const { title, id, text, action, icon = 'zoom-question', headingLevel = 2 } = Astro.props;
 const Heading = `h${headingLevel}` as 'h1' | 'h2';
+const headingClass = headingLevel === 1 ? 't-h2 band__title--page' : 't-h2';
 ---
 <div class="band grid12">
   <div class="band__body span-8">
-    <Heading class="t-h2" id={id}>{title}</Heading>
+    <Heading class={headingClass} id={id}>{title}</Heading>
     {text && <p class="band__text">{text}</p>}
     <slot />
   </div>

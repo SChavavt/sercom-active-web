@@ -446,6 +446,7 @@
 .band > * { background: var(--blue); }
 .band :focus-visible { outline-color: var(--white); }
 .band__body { padding: var(--s-11) var(--pad); }
+.band__title--page { font-size: var(--type-title-size); line-height: var(--type-title-leading); }   /* Band con headingLevel={1}: título de la página */
 .band__text { margin-top: var(--s-5); max-width: 58ch; font-size: 1.125rem; line-height: 1.5; text-wrap: pretty; }
 .band__action { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s-7); padding: var(--s-11) var(--pad); }
 .band__icon { width: 72px; height: 72px; }

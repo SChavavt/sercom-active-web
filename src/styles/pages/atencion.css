@@ -69,9 +69,6 @@
 }
 
 /* --- Solicitud especial ----------------------------------------------------- */
-/* La banda es el título de la página: su H1 toma el tamaño de los títulos de página interior
-   (44 px en computadora, 28 en celular) en lugar del de un H2 de sección (24 en celular). */
-.solicitud__head .band h1 { font-size: var(--type-title-size); line-height: var(--type-title-leading); }
 /* Ruta de navegación sobre la banda: una fila delgada */
 .solicitud__crumbs { padding: var(--s-5) var(--pad); }
 /* Celda junto a la acción de correo: guarda la nota de la búsqueda cuando llega una */
