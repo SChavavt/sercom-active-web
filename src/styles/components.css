@@ -461,6 +461,9 @@
   transition: background-color var(--ease);
 }
 .product__action .icon { color: var(--blue); transition: transform var(--ease); }
+/* «Ver ficha» y «Cotizar» nunca se parten: a 1100-1159 px «Ver ficha» bajaba «ficha» a otro renglón. La mitad
+   de la acción toma el ancho de su texto; las dos acciones siguen cabiendo en la tarjeta. */
+.product__action > span { white-space: nowrap; }
 .product__action--sheet::after { content: ""; position: absolute; inset: 0; }                 /* toda la tarjeta abre la ficha */
 .product__action--sheet:focus-visible { outline: none; }
 .product__action--sheet:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; }
