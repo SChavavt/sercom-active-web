@@ -195,7 +195,7 @@
   .tile { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr; align-items: center; column-gap: var(--s-3); min-height: 64px; padding: var(--s-3) var(--s-3) var(--s-3) var(--pad); }
   .tile__icon { width: 32px; height: 32px; }
   .tile__num { display: none; }
-  .tile__name { grid-column: auto; align-self: center; font-size: 1rem; }
+  .tile__name { grid-column: auto; align-self: center; font-size: 1rem; hyphens: auto; overflow-wrap: anywhere; }   /* con el espaciado de WCAG 1.4.12 una palabra larga se parte con guion (la página es es-MX) antes de salirse de la celda */
   .tile--wide { grid-template-columns: minmax(0, 1fr) auto; min-height: 84px; padding: var(--s-4) var(--pad); }
   .tile--wide .tile__icon { display: none; }
   .tile--wide .tile__name { font-size: 1.1875rem; }
