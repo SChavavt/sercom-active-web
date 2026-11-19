@@ -689,6 +689,16 @@ test('R-RULE-29: un nombre de color pegado a otra palabra o en mayúsculas sigue
   assert.deepEqual(failedIds(await scan({ 'datos.json': '{"textcolor":"#0e2a3e"}' })), ['R-RULE-29'], 'JSON');
 });
 
+test('R-RULE-29: «tema» seguido de otra letra en la misma caja es otra palabra («temática», «temario», «TEMARIO»)', async () => {
+  for (const content of ["const tematica={id:'#00a6e9'};", "const temario=[{ancla:'#00a6e9'}];", "const TEMARIO=[{ancla:'#00a6e9'}];", "const Tematica={id:'#00a6e9'};", "var o={tematica:'#00a6e9'};"]) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  // «tema» sigue contando solo, en camelCase, después de «_» o en mayúsculas.
+  for (const content of ["const tema={x:'#0e2a3e'};", "const temaOscuro={x:'#0e2a3e'};", "const TemaClaro={x:'#0e2a3e'};", "const TEMA_OSCURO={x:'#0e2a3e'};", "const tema2={x:'#0e2a3e'};"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+});
+
 test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
   for (const robots of ['User-agent: *\nDisallow: /\n\nuseragent: Googlebot\nDisallow:\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nAllow: /\n', 'useragent: *\nDisallow: /\n\nUSERAGENT: Bingbot\nDisallow: /privado/\n']) {
     assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
