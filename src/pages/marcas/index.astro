@@ -1,9 +1,31 @@
 ---
-// PROVISIONAL: la reemplaza quien construya la página de marcas.
+// Marcas (/marcas/): «Marcas que manejamos». Bloque de título con la ruta; las celdas de marca de la portada en
+// tamaño grande (cuatro por fila, 96 px), una por marca en el orden de los datos, como texto y nunca como
+// logotipo, con su número de productos cuando tiene alguno; la nota de disponibilidad y la banda de
+// solicitud especial de la portada. Hoy es igual en producción y en vista previa: diecinueve marcas y
+// ningún producto con marca real. Textos: brief de la página de marcas.
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Band from '../../components/Band.astro';
+import BrandCells from '../../components/BrandCells.astro';
+import Note from '../../components/Note.astro';
 import PageHeader from '../../components/PageHeader.astro';
-import { routes } from '../../lib/site-data.mjs';
+import { contactDetails } from '../../lib/contact.mjs';
+import { brands, routes } from '../../lib/site-data.mjs';
+
+const description = `Marcas que manejamos en ${contactDetails.businessName}. ${contactDetails.locationLabel}.`;
 ---
-<BaseLayout title="Marcas que manejamos">
+<BaseLayout title="Marcas que manejamos" description={description}>
   <PageHeader title="Marcas que manejamos" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Marcas' }]} />
+
+  <BrandCells brands={brands} size="lg" counts />
+  <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
+
+  <section class="section" aria-labelledby="especial-title">
+    <Band
+      title="¿Buscas algo que no aparece en el catálogo?"
+      id="especial-title"
+      text="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
+      action={{ href: routes.specialRequest, label: 'Ayúdame a encontrarlo' }}
+    />
+  </section>
 </BaseLayout>

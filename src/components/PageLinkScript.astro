@@ -1,0 +1,21 @@
+---
+// Script compartido de los enlaces de cotización: agrega la línea «Enlace» con la dirección de la ficha al
+// mensaje de WhatsApp o de correo cuando la compilación no la conocía (sin SITE_URL, `absoluteUrl()` es
+// `undefined`). Lo usan ProductCard y la ficha de producto; Astro lo incluye una sola vez por página.
+//
+// Uso: imprime <PageLinkScript /> en el componente o la página y pon en cada enlace de cotización
+//   data-page-link={pageUrl ? undefined : product.url}
+// (la ruta de la ficha, por ejemplo `/productos/abc/`). Al hacer clic, el script reescribe el `href` con
+// `withPageLink` y quita el atributo. Mejora progresiva: sin JavaScript el mensaje sale igual, sin el enlace.
+// Abrir WhatsApp o el correo no es un envío: el script no muestra ninguna confirmación.
+---
+<script>
+  import { withPageLink } from '../lib/contact-core.mjs';
+
+  document.addEventListener('click', event => {
+    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-page-link]') : null;
+    if (!link?.dataset.pageLink) return;
+    link.href = withPageLink(link.href, new URL(link.dataset.pageLink, window.location.href).href);
+    delete link.dataset.pageLink;
+  });
+</script>
