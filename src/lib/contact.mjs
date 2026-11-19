@@ -17,6 +17,20 @@ if (typeof document !== 'undefined') {
 }
 
 /**
+ * `createContact` con los datos del negocio. Si los rechaza (por ejemplo, whatsappDisplay y whatsappDigits no son el
+ * mismo número), el error dice además en qué archivo se corrigen: contact-core.mjs también llega al navegador y no
+ * nombra archivos, y Astro solo muestra dónde se cargó el módulo.
+ * @param {Parameters<typeof createContact>[0]} settings
+ */
+export function contactFromBusiness(settings) {
+  try {
+    return createContact(settings);
+  } catch (error) {
+    throw new Error(`${error instanceof Error ? error.message : String(error)} Los datos están en src/data/business.json.`, { cause: error });
+  }
+}
+
+/**
  * Datos de contacto para mostrar en las páginas (encabezado, pie, bloque de atención personal).
  * Es una proyección de `business.json`: la dirección y los campos internos no salen de aquí.
  * @type {import('../types/contact.ts').ContactDetails}
@@ -45,4 +59,4 @@ export const {
   subjects,
   /** Atajo: `contactLinks.product(p)` → `{ whatsapp, mailto, subject, text }` con el mismo mensaje en ambos canales. */
   contactLinks,
-} = createContact(business);
+} = contactFromBusiness(business);

@@ -223,7 +223,8 @@ export function createContact(settings) {
   // El número que muestran las páginas (whatsappDisplay) y el que abren los enlaces (whatsappDigits) son el mismo:
   // las mismas cifras, con los espacios y signos que se quieran para mostrarlo. Se revisa aquí porque contact.mjs
   // llama a createContact con business.json al cargarse, y toda página que muestra el número o un enlace pasa por
-  // contact.mjs: si no coinciden, la compilación se detiene.
+  // contact.mjs: si no coinciden, la compilación se detiene. Este archivo también llega al navegador y no nombra
+  // archivos: contact.mjs (contactFromBusiness) añade al error dónde están los datos.
   const display = clean(settings?.whatsappDisplay);
   if (!display) throw new Error('Contacto: falta whatsappDisplay, el número que muestran las páginas; sus cifras deben ser las de whatsappDigits.');
   if (display.replace(/\D/g, '') !== digits) {

@@ -428,3 +428,16 @@ test('el número que muestran las páginas y el que abren los enlaces son las mi
   const withoutDisplay = Object.fromEntries(Object.entries(valid).filter(([key]) => key !== 'whatsappDisplay'));
   assert.throws(() => createContact(/** @type {any} */ (withoutDisplay)), /falta whatsappDisplay/);
 });
+
+test('al compilar, un error de los datos de contacto dice en qué archivo se corrigen', async () => {
+  // contact-core.mjs también llega al navegador y no nombra archivos; contact.mjs, que lee business.json, sí.
+  const { contactFromBusiness } = await import('../src/lib/contact.mjs');
+  assert.equal(contactFromBusiness(business).whatsappUrl('Hola'), whatsappUrl('Hola'));
+  for (const [changes, reason] of [
+    [{ whatsappDisplay: '+52 1 221 400 2218' }, /whatsappDisplay \(«\+52 1 221 400 2218»\) y whatsappDigits \(«5212214002219»\) no son el mismo número/],
+    [{ whatsappDisplay: undefined }, /falta whatsappDisplay/],
+    [{ email: 'sin-arroba' }, /email no tiene forma/],
+  ]) {
+    assert.throws(() => contactFromBusiness({ ...business, ...changes }), error => reason.test(error.message) && /src\/data\/business\.json/.test(error.message) && error.cause instanceof Error, JSON.stringify(changes));
+  }
+});
