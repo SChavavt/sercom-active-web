@@ -1,0 +1,21 @@
+---
+// PROVISIONAL: la reemplaza quien construya «Cotizar mi lista» (qué enviar, plantillas y nota de adjuntos).
+// Las dos acciones ya son las definitivas: abren WhatsApp o el correo con la plantilla de lista.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { contactLinks } from '../../lib/contact.mjs';
+import { routes } from '../../lib/site-data.mjs';
+
+const list = contactLinks.list();
+---
+<BaseLayout title="Cotizar mi lista">
+  <PageHeader
+    title="Cotizar mi lista"
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Cotizar mi lista' }]}
+    lead="¿Ya tienes marcas, códigos o cantidades? Envíanos tu lista y preparamos la cotización."
+  >
+    <ActionRow href={list.whatsapp} primary icon="whatsapp">Enviar mi lista por WhatsApp</ActionRow>
+    <ActionRow href={list.mailto} icon="mail">Enviar mi lista por correo</ActionRow>
+  </PageHeader>
+</BaseLayout>

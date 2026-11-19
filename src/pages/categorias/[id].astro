@@ -1,0 +1,22 @@
+---
+// PROVISIONAL: una página por categoría pública (hoy solo en la vista previa). La reemplaza quien construya
+// las páginas de categoría.
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { categoryIcon } from '../../lib/icons.ts';
+import { getCategory, paths, routes } from '../../lib/site-data.mjs';
+
+export const getStaticPaths = (() => paths.categoryIds.map(id => ({ params: { id } }))) satisfies GetStaticPaths;
+
+const category = getCategory(Astro.params.id ?? '');
+if (!category) throw new Error(`Categoría desconocida: ${Astro.params.id}`);
+---
+<BaseLayout title={category.name}>
+  <PageHeader
+    title={category.name}
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Catálogo', href: routes.catalog }, { label: category.name }]}
+    icon={categoryIcon(category.id)}
+    lead={category.summary || undefined}
+  />
+</BaseLayout>

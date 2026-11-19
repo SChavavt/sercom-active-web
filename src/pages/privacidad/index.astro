@@ -1,0 +1,9 @@
+---
+// PROVISIONAL: el texto del aviso de privacidad todavía no está aprobado. La reemplaza quien lo redacte.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { routes } from '../../lib/site-data.mjs';
+---
+<BaseLayout title="Privacidad">
+  <PageHeader title="Privacidad" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Privacidad' }]} />
+</BaseLayout>

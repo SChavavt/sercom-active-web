@@ -1,0 +1,13 @@
+---
+// PROVISIONAL: la reemplaza quien construya la solicitud especial («Ayúdame a encontrarlo»).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { routes } from '../../lib/site-data.mjs';
+---
+<BaseLayout title="Solicitud especial">
+  <PageHeader
+    title="Ayúdame a encontrarlo"
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Solicitud especial' }]}
+    lead="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
+  />
+</BaseLayout>

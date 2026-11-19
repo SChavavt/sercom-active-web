@@ -1,0 +1,15 @@
+---
+// PROVISIONAL: una página por marca de «Marcas que manejamos». La reemplaza quien construya las páginas de marca.
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { getBrand, paths, routes } from '../../lib/site-data.mjs';
+
+export const getStaticPaths = (() => paths.brandIds.map(id => ({ params: { id } }))) satisfies GetStaticPaths;
+
+const brand = getBrand(Astro.params.id ?? '');
+if (!brand) throw new Error(`Marca desconocida: ${Astro.params.id}`);
+---
+<BaseLayout title={brand.name}>
+  <PageHeader title={brand.name} breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href: routes.brands }, { label: brand.name }]} />
+</BaseLayout>

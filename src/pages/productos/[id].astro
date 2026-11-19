@@ -1,0 +1,26 @@
+---
+// PROVISIONAL: una página por producto público (hoy solo los ejemplos de la vista previa). La reemplaza quien
+// construya la ficha de producto. Un ejemplo siempre lleva la etiqueta «Ejemplo».
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { EXAMPLE_TAG, getCategory, getProduct, paths, routes } from '../../lib/site-data.mjs';
+
+export const getStaticPaths = (() => paths.productIds.map(id => ({ params: { id } }))) satisfies GetStaticPaths;
+
+const product = getProduct(Astro.params.id ?? '');
+if (!product) throw new Error(`Producto desconocido: ${Astro.params.id}`);
+const category = product.categoryIds[0] ? getCategory(product.categoryIds[0]) : undefined;
+---
+<BaseLayout title={product.name}>
+  <PageHeader
+    title={product.name}
+    breadcrumbs={[
+      { label: 'Inicio', href: routes.home },
+      { label: 'Catálogo', href: routes.catalog },
+      ...(category ? [{ label: category.name, href: category.url }] : []),
+      { label: product.name },
+    ]}
+    tag={product.isExample ? EXAMPLE_TAG : undefined}
+  />
+</BaseLayout>

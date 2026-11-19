@@ -1,0 +1,11 @@
+---
+// PROVISIONAL: la reemplaza quien construya la página de contacto (atención personal y preguntas frecuentes).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ContactData from '../../components/ContactData.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { routes } from '../../lib/site-data.mjs';
+---
+<BaseLayout title="Contacto">
+  <PageHeader title="Contacto" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Contacto' }]} />
+  <ContactData />
+</BaseLayout>

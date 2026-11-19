@@ -1,0 +1,9 @@
+---
+// PROVISIONAL: la reemplaza quien construya la página de marcas.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { routes } from '../../lib/site-data.mjs';
+---
+<BaseLayout title="Marcas que manejamos">
+  <PageHeader title="Marcas que manejamos" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Marcas' }]} />
+</BaseLayout>

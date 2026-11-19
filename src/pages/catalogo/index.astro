@@ -1,0 +1,14 @@
+---
+// PROVISIONAL: página mínima para que la navegación y la revisión de enlaces funcionen. La reemplaza quien
+// construya el catálogo (búsqueda, barra lateral, retícula y estados vacíos; ver docs/diseno.md).
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { routes } from '../../lib/site-data.mjs';
+---
+<BaseLayout title="Catálogo">
+  <PageHeader
+    title="Catálogo"
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Catálogo' }]}
+    lead="Explora por categoría o por marca. Los productos se muestran sin precio: la cotización se prepara según lo que necesitas."
+  />
+</BaseLayout>
