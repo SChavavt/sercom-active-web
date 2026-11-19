@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { CHECKS, RULES, scanDist } from '../scripts/scan-dist.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
-import { loadProjectData, makeTree, removeTree, ROOT } from './helpers.mjs';
+import { loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
 
 const data = await loadProjectData();
 const ROBOTS = 'User-agent: *\nDisallow: /\n';
@@ -1159,6 +1159,17 @@ test('--rules dice los límites de las dos lecturas y no promete más de lo que 
   for (const id of ['R-RULE-12', 'R-PUB-03']) {
     for (const item of ['&Tab;', '&NewLine;', '&centerdot;', 'no se reconoce', 'a propósito']) assert.ok(docs(id).includes(item), `${id}: ${item}`);
   }
+});
+
+test('--rules nombra «representante» en R-RULE-07 y todo <iframe> en R-RULE-11', async () => {
+  // Los dos disparadores existen (no cambian) y el texto de cada regla los dice.
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<p>Habla con un representante de ventas</p>') })), ['R-RULE-07']);
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<iframe src="https://www.youtube-nocookie.com/embed/x" title="Video del fabricante"></iframe>') })), ['R-RULE-11']);
+  // El texto que imprime --rules (R-RULE-11 solo aplica sin --in-person y no está en RULES).
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  const entry = (id, title) => printed.split(/\n(?=R-|BUILD)/).find(block => block.startsWith(id) && block.includes(title)) ?? '';
+  assert.match(entry('R-RULE-07', 'oficial'), /^R-RULE-07 .*«oficial», «autorizado», distribuidor, sucursal o representante\n[^]*La palabra «representante» \(y «representantes»\) falla siempre/);
+  assert.match(entry('R-RULE-11', 'mapa'), /Cualquier <iframe> falla mientras la atención presencial no esté confirmada, porque el escáner no distingue un mapa de otra inserción: un video del fabricante se da como enlace/);
 });
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
