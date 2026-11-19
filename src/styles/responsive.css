@@ -192,7 +192,7 @@
   body { padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px)); }      /* espacio para la barra fija: la última línea del pie queda visible */
   html { scroll-padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px) + var(--s-4)); }   /* el elemento que recibe el foco no queda bajo la barra fija */
   .sheet { margin-bottom: 0; padding: 0; }
-  .preview__text { padding-inline: var(--pad); font-size: 0.78125rem; }
+  .site-notice__text { padding-inline: var(--pad); font-size: 0.78125rem; }
   .utility { justify-content: flex-start; }
   .utility__hours { display: none; }
 
@@ -381,7 +381,7 @@
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
 @media print {
-  .preview, .dock, .masthead__btn, .skip-link { display: none !important; }
+  .site-notice, .dock, .masthead__btn, .skip-link { display: none !important; }
   .site-header { position: static; }
 }
 
@@ -403,7 +403,7 @@
   /* campos, botones, filas de acción y bloques sólidos */
   :where(input:not([type="hidden"]), button, select, textarea, .btn, .action, .tag, .monogram, .entry__go, .faq__sign,
     .brand--all, .band__body, .band__action, .masthead__cta, .masthead__nav, .masthead__search, .catpanel, .dock__link,
-    .skip-link, .preview) {
+    .skip-link, .site-notice) {
     outline: var(--line) solid CanvasText;
   }
 

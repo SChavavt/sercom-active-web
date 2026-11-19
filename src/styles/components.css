@@ -4,9 +4,9 @@
    Cada bloque corresponde a un componente de src/components/ (ver docs/diseno.md).
    ========================================================================== */
 
-/* 4.1 Aviso de vista previa (solo compilaciones de vista previa) ------------- */
-.preview { background: var(--ink); color: var(--white); }
-.preview__text {                                          /* mismos márgenes que la lámina (layout.css) */
+/* 4.1 Aviso de arriba: vista previa, o sitio en preparación hasta el lanzamiento */
+.site-notice { background: var(--ink); color: var(--white); }
+.site-notice__text {                                      /* mismos márgenes que la lámina (layout.css) */
   --sheet-w: min(100% - var(--edge-left) - var(--edge-right), var(--sheet-max));
   width: var(--sheet-w);
   margin-left: clamp(var(--edge-left), (100% - var(--sheet-w)) / 2, 100% - var(--sheet-w) - var(--edge-right));

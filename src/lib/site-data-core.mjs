@@ -14,6 +14,11 @@ export { routes };
 
 /** Aviso que lleva cada página de una compilación de vista previa. */
 export const PREVIEW_NOTICE = 'Vista previa para revisión. Los productos que aparecen son ejemplos de diseño, no artículos reales.';
+/**
+ * Aviso que lleva cada página de la compilación de producción hasta el lanzamiento (R-RULE-12, F.21). Se retira a
+ * propósito al publicar, junto con `noindex` (BaseLayout.astro); el escáner lo exige antes y lo prohíbe con --launch.
+ */
+export const DEVELOPMENT_NOTICE = 'Sitio en preparación · Versión inicial para revisión';
 /** Etiqueta visible de cada producto de ejemplo. */
 export const EXAMPLE_TAG = 'Ejemplo';
 /** Marca de todos los productos de ejemplo. Nunca es una marca real. */

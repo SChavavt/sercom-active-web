@@ -12,7 +12,7 @@ import catalog from '../data/catalog.json' with { type: 'json' };
 import brandRecords from '../data/brands.json' with { type: 'json' };
 import { createSiteData } from './site-data-core.mjs';
 
-export { EXAMPLE_TAG, PREVIEW_NOTICE } from './site-data-core.mjs';
+export { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from './site-data-core.mjs';
 export { routes } from './routes.mjs';
 
 if (typeof document !== 'undefined') {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { CHECKS, RULES, scanDist } from '../scripts/scan-dist.mjs';
-import { EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
+import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 import { loadProjectData, makeTree, removeTree, ROOT } from './helpers.mjs';
 
 const data = await loadProjectData();
@@ -12,17 +12,31 @@ const WHATSAPP = `https://wa.me/${data.business.whatsappDigits}`;
 // Título de la portada (R-COPY-15): el nombre del negocio y titleLabel, de business.json.
 const HOME_TITLE = `${data.business.name} · ${data.business.titleLabel}`;
 
-/** Página mínima que cumple todas las reglas. */
-function page(body = '<h1>Inicio</h1>', { head = '', notice = false, lang = 'es-MX', robots = '<meta name="robots" content="noindex, nofollow">', skip = '<a href="#contenido">Saltar al contenido</a>', title = HOME_TITLE } = {}) {
+// Lugar del aviso de arriba en una página de prueba. `site()` lo llena según el modo de la revisión: en producción
+// antes del lanzamiento, el aviso de sitio en preparación (R-RULE-12); en la vista previa y con --launch, nada. Así
+// cada prueba falla solo por lo que prueba.
+const NOTICE_SLOT = '<!--aviso-->';
+const DEVELOPMENT_NOTICE_HTML = `<aside class="site-notice" aria-label="Aviso de sitio en preparación"><p class="site-notice__text"><strong>${DEVELOPMENT_NOTICE.split(' · ')[0]}</strong> · ${DEVELOPMENT_NOTICE.split(' · ').slice(1).join(' · ')}</p></aside>`;
+/** Llena el lugar del aviso de cada página de `files` según el modo de la revisión. */
+const site = (files, { preview = false, launch = false } = {}) => Object.fromEntries(Object.entries(files).map(([path, content]) => [
+  path, typeof content === 'string' ? content.replaceAll(NOTICE_SLOT, preview || launch ? '' : DEVELOPMENT_NOTICE_HTML) : content,
+]));
+
+/**
+ * Página mínima que cumple todas las reglas. `notice`: 'auto' (el aviso del modo, ver `site`), 'preview' (el aviso
+ * de vista previa) o 'none' (ningún aviso).
+ */
+function page(body = '<h1>Inicio</h1>', { head = '', notice = 'auto', lang = 'es-MX', robots = '<meta name="robots" content="noindex, nofollow">', skip = '<a href="#contenido">Saltar al contenido</a>', title = HOME_TITLE } = {}) {
+  const top = { auto: NOTICE_SLOT, preview: `<p class="aviso">${PREVIEW_NOTICE}</p>`, none: '' }[notice];
   return `<!doctype html><html lang="${lang}"><head><meta charset="UTF-8">${robots}<title>${title}</title>${head}</head>`
-    + `<body>${notice ? `<p class="aviso">${PREVIEW_NOTICE}</p>` : ''}${skip}<main id="contenido">${body}</main></body></html>`;
+    + `<body>${skip}${top}<main id="contenido">${body}</main></body></html>`;
 }
-const previewPage = (body, options) => page(body, { ...options, notice: true });
+const previewPage = (body, options) => page(body, { ...options, notice: 'preview' });
 const exampleCard = (example, tag = true) => `<article><h2>${example.name}</h2><p>${example.brandName} · ${example.code}</p>${tag ? `<span class="tag">${EXAMPLE_TAG}</span>` : ''}</article>`;
 
 /** Escanea un sitio temporal. `files` se suma a un sitio mínimo válido (index.html y robots.txt). */
 async function scan(files = {}, options = {}) {
-  const directory = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page(), ...files });
+  const directory = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page(), ...files }, options));
   try {
     return await scanDist(directory, { data, ...options });
   } finally {
@@ -270,6 +284,43 @@ test('R-RULE-12: noindex en cada página, robots.txt bloqueado y sin sitemap has
   await assert.rejects(scan({}, { launch: true, preview: true }), /se excluyen/);
 });
 
+test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación, visible en cada página de producción hasta el lanzamiento', async () => {
+  // Antes del lanzamiento: cada página de producción lo muestra; la que no lo lleva falla.
+  assert.deepEqual(failures(await scan({ 'contacto/index.html': page('<h1>Contacto</h1>') })), []);
+  const missing = await scan({ 'contacto/index.html': page('<h1>Contacto</h1>', { notice: 'none' }), 'marcas/index.html': page('<h1>Marcas</h1>', { notice: 'none' }) });
+  assert.deepEqual(failures(missing).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html'], ['R-RULE-12', 'marcas/index.html']]);
+  // Escondido no cuenta: en un comentario, en un script, en un atributo o en un estilo.
+  for (const hidden of [`<!-- ${DEVELOPMENT_NOTICE} -->`, `<script>var aviso=${JSON.stringify(DEVELOPMENT_NOTICE)};</script>`,
+    `<div aria-label="${DEVELOPMENT_NOTICE}"></div>`, `<img src="/aviso.svg" alt="${DEVELOPMENT_NOTICE}">`, `<div title="${DEVELOPMENT_NOTICE}" data-aviso="${DEVELOPMENT_NOTICE}"></div>`,
+    `<style>.x::before{content:"${DEVELOPMENT_NOTICE}"}</style>`]) {
+    assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${hidden}`, { notice: 'none' }) })), ['R-RULE-12'], hidden);
+  }
+  // Visible con otro marcado, con entidades o con los acentos descompuestos sigue siendo el aviso.
+  for (const shown of [`<p>${DEVELOPMENT_NOTICE}</p>`, '<div><b>Sitio en preparaci&oacute;n</b> &middot; <span>Versión inicial para revisión</span></div>',
+    `<p>${DEVELOPMENT_NOTICE.normalize('NFD')}</p>`, '<p>Sitio en preparación\n   · Versión inicial\npara revisión</p>']) {
+    assert.deepEqual(failures(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${shown}`, { notice: 'none' }) })), [], shown);
+  }
+  // Incompleto o con otras palabras en medio no es el aviso.
+  for (const broken of ['<p>Sitio en preparación</p>', '<p>Versión inicial para revisión</p>', '<p>Sitio en preparación</p><p>Catálogo · Versión inicial para revisión</p>']) {
+    assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${broken}`, { notice: 'none' }) })), ['R-RULE-12'], broken);
+  }
+
+  // Con --launch se exige lo contrario: una página que todavía lo muestra falla (R-PUB-03).
+  const launched = files => ({ 'robots.txt': 'User-agent: *\nAllow: /\n', 'index.html': page('<h1>Inicio</h1>', { robots: '' }), ...files });
+  assert.deepEqual(failures(await scan(launched({}), { launch: true })), []);
+  const still = await scan(launched({ 'contacto/index.html': page(`<h1>Contacto</h1>${DEVELOPMENT_NOTICE_HTML}`, { robots: '' }) }), { launch: true });
+  assert.deepEqual(failures(still).map(finding => [finding.id, finding.file]), [['R-PUB-03', 'contacto/index.html']]);
+  // En un comentario ya no se ve: no cuenta.
+  assert.deepEqual(failures(await scan(launched({ 'contacto/index.html': page(`<h1>Contacto</h1><!-- ${DEVELOPMENT_NOTICE} -->`, { robots: '' }) }), { launch: true })), []);
+
+  // La vista previa lleva solo su propio aviso: el de sitio en preparación visible falla (R-RULE-12); escondido no cuenta.
+  const preview = { preview: true };
+  assert.deepEqual(failures(await scan({ 'index.html': previewPage() }, preview)), []);
+  const both = await scan({ 'index.html': previewPage(), 'contacto/index.html': previewPage(`<h1>Contacto</h1>${DEVELOPMENT_NOTICE_HTML}`) }, preview);
+  assert.deepEqual(failures(both).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html']]);
+  assert.deepEqual(failures(await scan({ 'index.html': previewPage(`<h1>Inicio</h1><!-- ${DEVELOPMENT_NOTICE} --><script>var a=${JSON.stringify(DEVELOPMENT_NOTICE)}</script>`) }, preview)), []);
+});
+
 test('R-RULE-12 y R-PUB-03: robots.txt revisa cada grupo de buscadores, no solo el de «*»', async () => {
   // Antes del lanzamiento, un buscador con su propio grupo obedece ese grupo: si no bloquea todo, el sitio queda abierto para él.
   for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nAllow: /\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow:\n',
@@ -359,8 +410,9 @@ test('R-RULE-03 en vista previa: aviso en cada página y etiqueta «Ejemplo» en
   // Falta el aviso en una página, aunque no muestre ejemplos.
   const withoutNotice = await scan({ ...home, 'contacto/index.html': page('<h1>Contacto</h1>') }, options);
   assert.deepEqual(failures(withoutNotice).map(finding => [finding.id, finding.file]), [['R-RULE-03', 'contacto/index.html']]);
-  // El aviso escondido en un comentario o en un script no cuenta.
+  // El aviso escondido en un comentario, en un script o en un atributo no cuenta.
   assert.deepEqual(failedIds(await scan({ 'index.html': page(`<h1>Inicio</h1><!-- ${PREVIEW_NOTICE} --><script>var aviso=${JSON.stringify(PREVIEW_NOTICE)}</script>`) }, options)), ['R-RULE-03']);
+  assert.deepEqual(failedIds(await scan({ 'index.html': page(`<h1>Inicio</h1><div aria-label="${PREVIEW_NOTICE}" title="${PREVIEW_NOTICE}"></div>`) }, options)), ['R-RULE-03']);
   // Un ejemplo sin etiqueta, o tres ejemplos con dos etiquetas.
   assert.deepEqual(failedIds(await scan({ ...home, 'catalogo/index.html': previewPage(exampleCard(first, false)) }, options)), ['R-RULE-03']);
   const missingOne = await scan({ ...home, 'catalogo/index.html': previewPage(exampleCard(first) + exampleCard(second) + exampleCard(third, false)) }, options);
@@ -852,8 +904,8 @@ test('cada regla está documentada y conserva su identificador', () => {
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
   const cli = (...args) => spawnSync(process.execPath, ['scripts/scan-dist.mjs', ...args], { cwd: ROOT, encoding: 'utf8' });
-  const clean = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page() });
-  const dirty = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page('<p>Sitio oficial, todo a $10</p>') });
+  const clean = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page() }));
+  const dirty = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page('<p>Sitio oficial, todo a $10</p>') }));
   const empty = await makeTree({ 'robots.txt': ROBOTS });
   try {
     const ok = cli(clean);
@@ -873,7 +925,7 @@ test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay n
     assert.equal(cli(clean, '--otra-opcion').status, 2);
     assert.equal(cli(clean, '--preview', '--launch').status, 2);
     // --strict: un aviso (WARN) también hace fallar la revisión.
-    const warned = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page('<p>Guante EN 388. Arnés certificado.</p>') });
+    const warned = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page('<p>Guante EN 388. Arnés certificado.</p>') }));
     try {
       const lenient = cli(warned);
       assert.equal(lenient.status, 0, lenient.stdout);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSiteData, EXAMPLE_TAG, PREVIEW_NOTICE, routes } from '../src/lib/site-data-core.mjs';
+import { createSiteData, DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE, routes } from '../src/lib/site-data-core.mjs';
 import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
@@ -249,14 +249,21 @@ test('textos fijos de la vista previa', () => {
   assert.equal(EXAMPLE_TAG, 'Ejemplo');
 });
 
+test('aviso de sitio en preparación de la compilación de producción, hasta el lanzamiento', () => {
+  assert.equal(DEVELOPMENT_NOTICE, 'Sitio en preparación · Versión inicial para revisión');
+  // Nunca se confunde con el de la vista previa: cada compilación lleva solo el suyo.
+  assert.ok(!PREVIEW_NOTICE.includes(DEVELOPMENT_NOTICE) && !DEVELOPMENT_NOTICE.includes(PREVIEW_NOTICE));
+});
+
 // --- Módulo de entrada que usan las páginas -----------------------------------------------------------------
 // Astro define la constante __CATALOG_PREVIEW__ al compilar; aquí se define a mano antes de cargar el módulo.
-const EXPORTS = ['EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
+const EXPORTS = ['DEVELOPMENT_NOTICE', 'EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
 
 test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', async () => {
   globalThis.__CATALOG_PREVIEW__ = false;
   const site = await import('../src/lib/site-data.mjs?produccion');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
+  assert.equal(site.DEVELOPMENT_NOTICE, DEVELOPMENT_NOTICE);
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
   assert.equal(site.categories.length, 0);

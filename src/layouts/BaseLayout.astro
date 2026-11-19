@@ -1,8 +1,9 @@
 ---
 // Plantilla de todas las páginas: <head> común (idioma es-MX, título, descripción, noindex, canónica solo
 // si se conoce la dirección del sitio y nunca en la 404, iconos, precarga de la fuente), enlace «Saltar al
-// contenido», aviso de vista previa (solo en esa compilación), la lámina con encabezado, <main id="contenido">
-// y pie, y la barra fija del celular. Importa la hoja global una sola vez.
+// contenido», el aviso de arriba (SiteNotice: el de vista previa en esa compilación; en producción, el de sitio en
+// preparación hasta el lanzamiento), la lámina con encabezado, <main id="contenido"> y pie, y la barra fija del
+// celular. Importa la hoja global una sola vez.
 //
 // Uso:  <BaseLayout title="Catálogo" description="…"> …bloques de la página… </BaseLayout>
 // El contenido va directo dentro de <main>: cada bloque es una fila de la lámina (ver docs/diseno.md).
@@ -11,9 +12,9 @@ import fontLatin from '../assets/fonts/archivo-latin-wdth-normal.woff2?url';
 import { contactDetails } from '../lib/contact.mjs';
 import { isPreview } from '../lib/site-data.mjs';
 import Dock from '../components/Dock.astro';
-import PreviewBanner from '../components/PreviewBanner.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import SiteHeader from '../components/SiteHeader.astro';
+import SiteNotice from '../components/SiteNotice.astro';
 
 interface Props {
   /** Nombre de la página («Catálogo»). El título queda «Catálogo · Sercom Active». Sin él: el de la portada,
@@ -42,8 +43,6 @@ const canonical = hasCanonical && Astro.site ? new URL(Astro.url.pathname, Astro
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
-    {/* El sitio no está lanzado: ninguna página se indexa (se retira a propósito al publicar). */}
-    <meta name="robots" content="noindex, nofollow" />
     {canonical && <link rel="canonical" href={canonical} />}
     <meta name="theme-color" content="#ffffff" />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -51,10 +50,16 @@ const canonical = hasCanonical && Astro.site ? new URL(Astro.url.pathname, Astro
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="preload" href={fontLatin} as="font" type="font/woff2" crossorigin />
     <script is:inline>document.documentElement.classList.add('js');</script>
+    {/* El sitio no está lanzado: ninguna página se indexa (se retira a propósito al publicar, junto con el aviso
+        de sitio en preparación de abajo). */}
+    <meta name="robots" content="noindex, nofollow" />
   </head>
   <body>
     <a class="skip-link" href="#contenido">Saltar al contenido</a>
-    {isPreview && <PreviewBanner />}
+    {isPreview && <SiteNotice kind="preview" />}
+    {/* El sitio no está lanzado: cada página de producción lleva el aviso «Sitio en preparación» (se retira a
+        propósito al publicar, junto con el noindex de arriba: se borra esta línea; la vista previa conserva el suyo). */}
+    {!isPreview && <SiteNotice kind="development" />}
     <div class="sheet">
       <SiteHeader />
       <main id="contenido" tabindex="-1">
