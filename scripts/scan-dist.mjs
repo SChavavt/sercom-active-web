@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 // Escáner de reglas duras sobre un sitio ya compilado (HTML, JS, CSS y JSON de dist/).
 //
-// Uso:  node scripts/scan-dist.mjs [carpeta] [--preview] [--launch] [--in-person] [--rules]
+// Uso:  node scripts/scan-dist.mjs [carpeta] [--preview] [--launch] [--in-person] [--strict] [--rules]
 //   carpeta       carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
 //   --preview     la compilación es la vista previa de diseño: los ejemplos se permiten, pero cada página
 //                 debe llevar el aviso de vista previa y cada ejemplo su etiqueta «Ejemplo»
 //   --launch      la compilación es la versión pública aprobada: `noindex` y el bloqueo de robots.txt deben haberse retirado
 //   --in-person   la atención presencial fue confirmada: se permiten dirección, «Visítanos» y mapa
+//   --strict      un WARN también hace fallar la revisión. `npm run verify` y el alojamiento lo usan para la
+//                 compilación de producción: en la etapa 1 la lista de normas y certificaciones debe estar vacía
 //   --rules       imprime la lista de reglas y termina
 //
 // Solo compara patrones de texto y datos del proyecto. No ve imágenes ni diseño, y no puede saber si una
 // afirmación tiene evidencia: un resultado limpio es necesario, no suficiente. Termina con código 1 si hay
-// algún FAIL y con 2 si la carpeta no existe o está vacía. Los WARN se listan para revisión manual.
+// algún FAIL (o algún WARN con --strict) y con 2 si la carpeta no existe o está vacía. Sin --strict, los WARN
+// se listan para revisión manual.
 //
 // Los identificadores (R-RULE-xx…) son los de la lista de requisitos del proyecto. Cada regla lleva su
 // explicación en el campo `doc`; las comprobaciones que no son un patrón están documentadas en `CHECKS`.
@@ -431,9 +434,9 @@ function printRules() {
 
 async function main(argv) {
   const flags = argv.filter(arg => arg.startsWith('--'));
-  const unknown = flags.filter(flag => !['--preview', '--launch', '--in-person', '--rules'].includes(flag));
+  const unknown = flags.filter(flag => !['--preview', '--launch', '--in-person', '--strict', '--rules'].includes(flag));
   if (unknown.length) {
-    console.error(`Opción no reconocida: ${unknown.join(', ')}\nUso: node scripts/scan-dist.mjs [carpeta] [--preview] [--launch] [--in-person] [--rules]`);
+    console.error(`Opción no reconocida: ${unknown.join(', ')}\nUso: node scripts/scan-dist.mjs [carpeta] [--preview] [--launch] [--in-person] [--strict] [--rules]`);
     return 2;
   }
   if (flags.includes('--rules')) {
@@ -441,6 +444,7 @@ async function main(argv) {
     return 0;
   }
   const options = { preview: flags.includes('--preview'), launch: flags.includes('--launch'), inPerson: flags.includes('--in-person') };
+  const strict = flags.includes('--strict');
   if (options.preview && options.launch) {
     console.error('--preview y --launch se excluyen: los ejemplos nunca se lanzan.');
     return 2;
@@ -462,10 +466,12 @@ async function main(argv) {
   }
   for (const finding of result.findings) console.log(`${finding.level}  ${finding.id.padEnd(10)} ${finding.file}  ${finding.message}`);
   const fails = result.findings.filter(finding => finding.level === 'FAIL').length;
-  const mode = `${options.preview ? 'vista previa' : 'producción'}${options.launch ? ' + lanzamiento' : ''}${options.inPerson ? ' + atención presencial' : ''}`;
-  console.log(`${result.findings.length ? '\n' : ''}Reglas · ${target} · modo ${mode}: ${result.files} archivos, ${result.pages} páginas HTML, ${fails} FAIL, ${result.findings.length - fails} WARN.`);
+  const warnings = result.findings.length - fails;
+  const mode = `${options.preview ? 'vista previa' : 'producción'}${options.launch ? ' + lanzamiento' : ''}${options.inPerson ? ' + atención presencial' : ''}${strict ? ' + estricto' : ''}`;
+  console.log(`${result.findings.length ? '\n' : ''}Reglas · ${target} · modo ${mode}: ${result.files} archivos, ${result.pages} páginas HTML, ${fails} FAIL, ${warnings} WARN.`);
+  if (strict && warnings) console.log('Con --strict los WARN también fallan: retira cada mención o, si tiene evidencia, documenta la decisión antes de relajar la opción.');
   console.log('Solo patrones de texto y datos del proyecto: no sustituye la revisión visual ni comprueba que una afirmación tenga evidencia.');
-  return fails ? 1 : 0;
+  return fails || (strict && warnings) ? 1 : 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

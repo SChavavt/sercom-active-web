@@ -328,6 +328,19 @@ test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay n
     assert.equal(cli(`${clean}-no-existe`).status, 2);
     assert.equal(cli(clean, '--otra-opcion').status, 2);
     assert.equal(cli(clean, '--preview', '--launch').status, 2);
+    // --strict: un aviso (WARN) también hace fallar la revisión.
+    const warned = await makeTree({ 'robots.txt': ROBOTS, 'index.html': page('<p>Guante EN 388. Arnés certificado.</p>') });
+    try {
+      const lenient = cli(warned);
+      assert.equal(lenient.status, 0, lenient.stdout);
+      assert.match(lenient.stdout, /0 FAIL, 2 WARN\./);
+      const strict = cli(warned, '--strict');
+      assert.equal(strict.status, 1, strict.stdout + strict.stderr);
+      assert.match(strict.stdout, /modo producción \+ estricto: .* 0 FAIL, 2 WARN\./);
+      assert.equal(cli(clean, '--strict').status, 0);
+    } finally {
+      await removeTree(warned);
+    }
     const rules = cli('--rules');
     assert.equal(rules.status, 0);
     for (const id of ['R-RULE-01', 'R-RULE-08', 'R-RULE-29', 'R-RULE-12', 'R-RULE-14', 'BUILD']) assert.ok(rules.stdout.includes(id), id);

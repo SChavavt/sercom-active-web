@@ -56,7 +56,8 @@ test('«npm run verify» compila los dos modos y revisa las dos salidas', () => 
   assert.deepEqual(steps, [
     'npm run build:preview',
     'npm run build',
-    'node scripts/scan-dist.mjs dist',
+    // Producción con --strict: en la etapa 1 la lista de avisos (normas, certificaciones) debe estar vacía.
+    'node scripts/scan-dist.mjs dist --strict',
     'node scripts/scan-dist.mjs dist-preview --preview',
     'node scripts/check-links.mjs dist',
     'node scripts/check-links.mjs dist-preview',
@@ -78,7 +79,7 @@ test('ningún archivo del repositorio activa la vista previa en una compilación
 
   const vercel = await readJson('vercel.json');
   // El alojamiento publica dist/ solo si la salida pasa el escáner de reglas y el verificador de enlaces.
-  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist && node scripts/check-links.mjs dist');
+  assert.equal(vercel.buildCommand, 'npm run check && npm test && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/check-links.mjs dist');
   assert.equal(vercel.outputDirectory, 'dist');
   const committed = [await readText('vercel.json'), await readText('.env.example'), await readText('.github/workflows/quality.yml')];
   for (const text of committed) assert.doesNotMatch(text, /CATALOG_PREVIEW|build:preview(?!\b.*verify)|catalog-preview/);

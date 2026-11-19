@@ -13,7 +13,7 @@
     "build:preview": "npm run validate:catalog && node scripts/catalog-preview.mjs build",
     "scan:dist": "node scripts/scan-dist.mjs",
     "check:links": "node scripts/check-links.mjs",
-    "verify": "npm run build:preview && npm run build && node scripts/scan-dist.mjs dist && node scripts/scan-dist.mjs dist-preview --preview && node scripts/check-links.mjs dist && node scripts/check-links.mjs dist-preview",
+    "verify": "npm run build:preview && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/scan-dist.mjs dist-preview --preview && node scripts/check-links.mjs dist && node scripts/check-links.mjs dist-preview",
     "preview": "astro preview"
   },
   "dependencies": { "astro": "7.4.13" },
