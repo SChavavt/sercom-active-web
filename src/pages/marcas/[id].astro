@@ -1,10 +1,12 @@
 ---
 // Página de marca (/marcas/{id}/): una por cada marca de «Marcas que manejamos», en los dos modos.
 // Bloque de título con el nombre como H1 (texto, nunca un logotipo) y, en la columna lateral, «Sitio del
-// fabricante» (si la marca lo tiene; abre otra pestaña) y la fila «Contactar por WhatsApp».
+// fabricante» (si la marca lo tiene; abre otra pestaña) y, solo con productos, la fila sólida «Contactar por
+// WhatsApp». «Contactar por WhatsApp» aparece una sola vez en la página.
 //   - Con productos: la misma barra lateral y retícula del catálogo (CatalogListing), con la marca marcada.
-//   - Sin productos (hoy, todas): estado vacío con WhatsApp, «Marcas que manejamos» para pasar a otra marca
-//     y la nota de disponibilidad.
+//   - Sin productos (hoy, todas): estado vacío con WhatsApp (la única acción de WhatsApp), «Marcas que
+//     manejamos» con la marca actual marcada para pasar a otra, y la nota de disponibilidad. Sin productos y
+//     sin sitio del fabricante el bloque de título no tiene celda lateral: el título ocupa la fila entera.
 // Ninguna frase sobre la disponibilidad del portafolio de la marca ni sobre una relación con ella (R-CAT-12);
 // un proveedor (`kind: supplier`) no recibe un texto distinto. Al final, la banda de solicitud especial.
 import type { GetStaticPaths } from 'astro';
@@ -31,17 +33,23 @@ const list = productsByBrand(brand.id);
 const hasProducts = list.length > 0;
 const whatsapp = contactLinks.brand(brand.name).whatsapp;
 const description = `${brand.name}, una de las marcas que manejamos. ${contactDetails.locationLabel}.`;
+const hasLinks = brand.manufacturerLinks.length > 0;
+const crumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href: routes.brands }, { label: brand.name }];
 ---
 <BaseLayout title={brand.name} description={description}>
-  <PageHeader title={brand.name} breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href: routes.brands }, { label: brand.name }]}>
-    {brand.manufacturerLinks.length > 0 && (
-      <div class="catalog-brand__links">
-        {brand.manufacturerLinks.map(link => <MoreLink href={link.url} external>{link.label}</MoreLink>)}
-      </div>
-    )}
-    {/* Una sola acción sólida por pantalla: sin productos, la del estado vacío de abajo. */}
-    <ActionRow href={whatsapp} primary={hasProducts} icon="whatsapp">Contactar por WhatsApp</ActionRow>
-  </PageHeader>
+  {hasLinks || hasProducts ? (
+    <PageHeader title={brand.name} breadcrumbs={crumbs}>
+      {hasLinks && (
+        <div class="catalog-brand__links">
+          {brand.manufacturerLinks.map(link => <MoreLink href={link.url} external>{link.label}</MoreLink>)}
+        </div>
+      )}
+      {/* Sin productos, la única acción de WhatsApp es la del estado vacío de abajo. */}
+      {hasProducts && <ActionRow href={whatsapp} primary icon="whatsapp">Contactar por WhatsApp</ActionRow>}
+    </PageHeader>
+  ) : (
+    <PageHeader title={brand.name} breadcrumbs={crumbs} />
+  )}
 
   {hasProducts ? (
     <CatalogListing products={list} categories={categories} brands={brands} currentBrandId={brand.id} />
