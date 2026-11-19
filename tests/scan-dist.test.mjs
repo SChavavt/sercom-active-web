@@ -1105,6 +1105,22 @@ test('--rules dice qué lectura de la página usa cada revisión de los avisos d
   }
 });
 
+test('--rules dice los límites de las dos lecturas y no promete más de lo que hace el escáner', () => {
+  const docs = id => CHECKS.filter(([check]) => check === id).map(([, doc]) => doc).join('\n');
+  // El texto que se muestra: lo que no modela, y que entonces un aviso que no se muestra puede contar como mostrado.
+  for (const id of ['R-RULE-03', 'R-RULE-12']) {
+    assert.doesNotMatch(docs(id), /no puede saberlo, el aviso cuenta como no mostrado/, id);
+    for (const item of ['no es un analizador de HTML', 'SVG', 'MathML', '<text>', 'CDATA', '<annotation>', 'display="none"', 'visibility="hidden"',
+      'var(', '&semi;', 'elemento de formato', '<select>', 'doble escape de <script>', 'puede contar como mostrado', 'a propósito']) {
+      assert.ok(docs(id).includes(item), `${id}: ${item}`);
+    }
+  }
+  // Todo el texto de los elementos: un aviso escrito con entidades poco comunes no se reconoce.
+  for (const id of ['R-RULE-12', 'R-PUB-03']) {
+    for (const item of ['&Tab;', '&NewLine;', '&centerdot;', 'no se reconoce', 'a propósito']) assert.ok(docs(id).includes(item), `${id}: ${item}`);
+  }
+});
+
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
   const cli = (...args) => spawnSync(process.execPath, ['scripts/scan-dist.mjs', ...args], { cwd: ROOT, encoding: 'utf8' });
   const clean = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page() }));

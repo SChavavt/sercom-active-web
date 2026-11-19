@@ -88,15 +88,19 @@ const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).repl
 // ---------------------------------------------------------------------------------------------------
 // Las dos lecturas de una página para sus avisos de arriba
 // ---------------------------------------------------------------------------------------------------
-// El marcado se recorre como lo trocea un navegador (`htmlTokens`): etiquetas que respetan las comillas de sus valores
-// («data-x="a>b"» no termina en «>»), comentarios (también los falsos «<?…>», «<!…>» y «</» seguido de algo que no es
-// una letra, que el analizador de HTML convierte en comentarios), y elementos cuyo contenido es texto hasta su propia
-// etiqueta de cierre (<script>, <style>, <textarea>, <title>, <iframe>…): «<textarea></div></textarea>» no cierra nada.
+// El marcado se recorre con un troceador sencillo (`htmlTokens`), no con un analizador de HTML: etiquetas que respetan
+// las comillas de sus valores («data-x="a>b"» no termina en «>»), comentarios (también los falsos «<?…>», «<!…>» y «</»
+// seguido de algo que no es una letra, que el analizador de HTML convierte en comentarios), y elementos cuyo contenido
+// es texto hasta su propia etiqueta de cierre (<script>, <style>, <textarea>, <title>, <iframe>…):
+// «<textarea></div></textarea>» no cierra nada.
 // Con eso se leen dos textos:
 //   - `shownText`, el texto que se muestra a todos, para las revisiones que EXIGEN un aviso;
 //   - `allElementText`, todo el texto de los elementos, oculto o no, para las que lo PROHÍBEN (el contenido de <noscript>,
 //     <textarea>, <title>, <iframe>… se lee tal cual y además como marcado).
-// Cuando el escáner no puede saberlo, un aviso exigido cuenta como no mostrado y uno prohibido como presente.
+// Las dos reconocen las formas comunes de esconder un aviso, no todo lo que hace un navegador: lo que no modelan está
+// escrito sobre cada una y en --rules (SHOWN_TEXT_DOC, ALL_TEXT_DOC). En esos casos un aviso que no se muestra puede
+// contar como mostrado, y uno escrito con entidades poco comunes no se reconoce: es ocultarlo a propósito, y contra eso
+// no protege un patrón (docs/datos-y-modos.md, sección 6).
 const INLINE_ELEMENT = /^(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/i;
 const VOID_ELEMENT = /^(?:area|base|br|col|embed|hr|img|input|keygen|link|meta|param|source|track|wbr)$/i;
 // Su contenido es texto hasta su etiqueta de cierre (en HTML; dentro de <svg> o <math> solo <script> y <style>).
@@ -118,7 +122,8 @@ const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0
 /**
  * ¿Un atributo style esconde el contenido del elemento? display:none, visibility:hidden o collapse, content-visibility:hidden,
  * con o sin !important, en mayúsculas o minúsculas, con escapes de CSS, y leyendo cada declaración sin sus comentarios
- * (que separan como un espacio: «display:none» seguido de un comentario vacío sigue siendo «display:none»).
+ * (que separan como un espacio: «display:none» seguido de un comentario vacío sigue siendo «display:none»). No resuelve
+ * variables de CSS («display:var(--x,none)») ni las entidades con nombre que `decodeEntities` no conoce («&semi;»).
  */
 function hiddenByStyle(style) {
   const css = style.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, ' ');
@@ -269,6 +274,8 @@ const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).
  * veces: tal cual, como el texto que es, y además como marcado, igual que el de cualquier otro elemento. Así el aviso
  * real envuelto en uno de ellos («<noscript><aside…><strong>Sitio en preparación</strong> · …») sigue en la página,
  * como lo encontraba el escáner antes de las dos lecturas, sin perder lo que la lectura tal cual encuentra.
+ * Límite: de las entidades con nombre solo se decodifican las de NAMED_ENTITIES; un aviso cuyas propias palabras se
+ * escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce.
  */
 function allElementText(html) {
   return comparableText(elementTextPieces(html, []));
@@ -295,9 +302,16 @@ function elementTextPieces(html, pieces) {
  * <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado (salvo su primer
  * <summary>), <title>, <desc> y <metadata> de un SVG, y todo elemento con hidden, popover, aria-hidden="true" (no se
  * muestra a quien usa un lector de pantalla) o con display:none, visibility:hidden o collapse o
- * content-visibility:hidden en su style. Un elemento sigue abierto hasta su propia etiqueta de cierre, como en el
- * navegador: una etiqueta de cierre no sale de <template>, <object> o del <title> de un SVG, y «/>» no cierra un
- * elemento de HTML. Una regla de una hoja de estilo que esconda el aviso no se ve aquí (la revisa check-markup).
+ * content-visibility:hidden en su style. Un elemento sigue abierto hasta su propia etiqueta de cierre: una etiqueta de
+ * cierre no sale de <template>, <object> o del <title> de un SVG, y «/>» no cierra un elemento de HTML. Una regla de
+ * una hoja de estilo que esconda el aviso no se ve aquí (la revisa check-markup).
+ * Límites: no es un analizador de HTML. Fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta
+ * como mostrado todo el texto de un SVG o de MathML, aunque no se dibuje (texto suelto fuera de <text>, una sección
+ * CDATA, <annotation> o un elemento con display="none" o visibility="hidden" como atributos de presentación); no
+ * resuelve variables de CSS ni entidades con
+ * nombre poco comunes en un style; y no repite las reparaciones del analizador del navegador (un elemento de formato
+ * oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>,
+ * el doble escape de <script>). En esos casos un aviso que no se muestra puede contar como mostrado.
  */
 function shownText(html) {
   const pieces = [];
@@ -739,8 +753,8 @@ const PRODUCTION_RULES = [
 ];
 
 // Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
-const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML; cuando el escáner no puede saberlo, el aviso cuenta como no mostrado. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
-const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan';
+const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS o una entidad con nombre poco común en el style («display:var(--x,none)», «display:none&semi;»), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan. De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…): un aviso cuyas propias palabras se escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce; escribirlo así es ocultarlo a propósito';
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
