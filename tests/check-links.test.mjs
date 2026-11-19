@@ -70,6 +70,17 @@ test('un sitio con enlaces correctos no tiene problemas', async () => {
   assert.ok(result.internal >= 25);
 });
 
+test('una página a la que nada enlaza no es un problema: así es la de un producto retirado', async () => {
+  // Nada del sitio enlaza a la página de un retirado (R-STATE-04); se llega con la dirección guardada. Sus propios
+  // enlaces sí se revisan.
+  const retired = page('<h1>Producto de prueba retirado</h1><a href="/catalogo/">Catálogo</a><a href="https://wa.me/5212214002219?text=Hola">Consultar alternativas</a>');
+  const result = await check({ ...SITE, 'productos/retirado/index.html': retired });
+  assert.deepEqual(result.problems, []);
+  assert.equal(result.pages, 5);
+  const broken = await check({ ...SITE, 'productos/retirado/index.html': retired.replace('/catalogo/', '/catalogo-antiguo/') });
+  assert.deepEqual(broken.problems.map(problem => [problem.kind, problem.file]), [['roto', 'productos/retirado/index.html']]);
+});
+
 test('enlaces y recursos internos sin destino', async () => {
   await assertEach('roto', [
     '<a href="/no-existe/">Página</a>', '<a href="/catalogo/guante/">Producto</a>', '<a href="no-existe/">Relativo</a>', '<a href="/Catalogo/">Mayúscula</a>',
