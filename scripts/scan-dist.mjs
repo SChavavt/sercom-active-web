@@ -85,62 +85,240 @@ function visibleText(html) {
 const INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)\b[^>]*>/gi;
 /** Texto visible con las etiquetas en línea retiradas sin dejar espacio. */
 const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).replace(INLINE_TAG, '').replace(/<[^>]+>/g, ' '))));
-// Una etiqueta de inicio o de cierre: [etiqueta, «/» si cierra, nombre]. Los valores entre comillas pueden llevar «>»
-// («data-x="a>b"»): la etiqueta no termina ahí.
-const TAG = /<(\/?)([a-zA-Z][^\s"'>/]*)(?:"[^"]*"|'[^']*'|[^'">])*>/g;
+// ---------------------------------------------------------------------------------------------------
+// Las dos lecturas de una página para sus avisos de arriba
+// ---------------------------------------------------------------------------------------------------
+// El marcado se recorre como lo trocea un navegador (`htmlTokens`): etiquetas que respetan las comillas de sus valores
+// («data-x="a>b"» no termina en «>»), comentarios (también los falsos «<?…>», «<!…>» y «</» seguido de algo que no es
+// una letra, que el analizador de HTML convierte en comentarios), y elementos cuyo contenido es texto hasta su propia
+// etiqueta de cierre (<script>, <style>, <textarea>, <title>, <iframe>…): «<textarea></div></textarea>» no cierra nada.
+// Con eso se leen dos textos:
+//   - `shownText`, el texto que se muestra a todos, para las revisiones que EXIGEN un aviso;
+//   - `allElementText`, todo el texto de los elementos, oculto o no, para las que lo PROHÍBEN.
+// Cuando el escáner no puede saberlo, un aviso exigido cuenta como no mostrado y uno prohibido como presente.
 const INLINE_ELEMENT = /^(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/i;
-const VOID_ELEMENT = /^(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i;
-// Elementos cuyo contenido el visitante no ve nunca en la página (el <title> es el de la pestaña o el de un SVG; el
-// de <noscript> solo aparece sin JavaScript). El de <title> y <textarea> es texto: termina en su primera etiqueta de cierre.
-const NEVER_SHOWN = /^(?:head|title|template|textarea|noscript)$/i;
-const RAW_TEXT = /^(?:title|textarea)$/i;
-const HIDDEN_STYLE = /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*(?:hidden|collapse))\s*(?:!\s*important\s*)?(?:;|$)/i;
-/** ¿La etiqueta de inicio esconde su contenido? hidden, aria-hidden="true", display:none o visibility:hidden en su style, un <dialog> cerrado. */
-function hidesContent(name, tag) {
-  if (NEVER_SHOWN.test(name)) return true;
-  const attributes = new Map(attributesOf(tag).map(([key, value]) => [key.toLowerCase(), value]));
-  if (/^dialog$/i.test(name) && !attributes.has('open')) return true;
-  return attributes.has('hidden') || attributes.get('aria-hidden')?.trim().toLowerCase() === 'true' || HIDDEN_STYLE.test(attributes.get('style') ?? '');
-}
-/** Posición tras la etiqueta que cierra el elemento `name` abierto antes de `from` (o el final, si no cierra). */
-function elementEnd(html, name, from) {
-  const tags = new RegExp(TAG.source, 'g');
-  tags.lastIndex = from;
-  let depth = 1;
-  for (let match; (match = tags.exec(html));) {
-    if (match[2].toLowerCase() !== name.toLowerCase()) continue;
-    if (match[1]) depth -= 1;
-    else if (!RAW_TEXT.test(name) && !match[0].endsWith('/>')) depth += 1;
-    if (depth === 0) return tags.lastIndex;
-  }
-  return html.length;
-}
-/** El marcado sin los elementos que no se ven (`hidesContent`), con todo su contenido. */
-function withoutHiddenElements(html) {
-  const tags = new RegExp(TAG.source, 'g');
-  let result = '';
-  let kept = 0;
-  for (let match; (match = tags.exec(html));) {
-    const [tag, closing, name] = match;
-    if (closing || VOID_ELEMENT.test(name) || tag.endsWith('/>') || !hidesContent(name, tag)) continue;
-    const end = elementEnd(html, name, tags.lastIndex);
-    result += `${html.slice(kept, match.index)} `;
-    kept = end;
-    tags.lastIndex = end;
-  }
-  return result + html.slice(kept);
-}
+const VOID_ELEMENT = /^(?:area|base|br|col|embed|hr|img|input|keygen|link|meta|param|source|track|wbr)$/i;
+// Su contenido es texto hasta su etiqueta de cierre (en HTML; dentro de <svg> o <math> solo <script> y <style>).
+const RAW_TEXT_ELEMENT = /^(?:script|style|textarea|title|xmp|iframe|noembed|noframes|noscript|plaintext)$/i;
+// Su contenido nunca es texto de la página, en ninguna de las dos lecturas.
+const CODE_ELEMENT = /^(?:script|style)$/i;
+// Una etiqueta de cierre no sale de estos elementos sin cerrarlos antes (el «ámbito» del analizador de HTML).
+const SCOPE_BOUNDARY = /^(?:applet|caption|html|table|td|th|marquee|object|template|foreignobject|desc|title|mi|mo|mn|ms|mtext|annotation-xml)$/i;
+// Elementos cuyo contenido el visitante no ve nunca en la página: el <head> (el <title> es el de la pestaña o el de un
+// SVG), <template>, <textarea> (su texto es el valor del campo), <noscript> (solo sin JavaScript), los contenedores cuyo
+// contenido un navegador no dibuja (<iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>) y <rp>,
+// que solo se ve sin soporte de rubí.
+const NEVER_SHOWN = /^(?:head|title|template|textarea|noscript|iframe|noembed|noframes|datalist|video|audio|canvas|rp)$/i;
+// Dentro de un SVG tampoco se dibujan <desc> ni <metadata>.
+const NEVER_SHOWN_IN_SVG = /^(?:desc|metadata|title)$/i;
+
+/** Decodifica los escapes de CSS de un texto («\68 idden» es «hidden», «\:» es «:»). */
+const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0-9a-f])/gi, (escape, hex, character) => (hex ? codePoint(hex, 16) ?? '' : character));
 /**
- * Lo que una página muestra como texto, para buscar sus avisos: el contenido de los elementos (las etiquetas en línea
- * no separan palabras), en forma comparable y en minúsculas. Un comentario, un script, un estilo o un atributo no
- * cuentan (tampoco un valor con «>»), ni el contenido de un elemento que no se ve (`withoutHiddenElements`): el
- * <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o un elemento con hidden, aria-hidden="true" o
- * display:none / visibility:hidden en su style. El aviso tiene que estar a la vista. Una regla de una hoja de estilo
- * que lo esconda no se ve aquí.
+ * ¿Un atributo style esconde el contenido del elemento? display:none, visibility:hidden o collapse, content-visibility:hidden,
+ * con o sin !important, en mayúsculas o minúsculas, con escapes de CSS, y leyendo cada declaración sin sus comentarios
+ * (que separan como un espacio: «display:none» seguido de un comentario vacío sigue siendo «display:none»).
  */
-const elementText = html => oneLine(fold(decodeEntities(withoutHiddenElements(withoutScripts(html))
-  .replace(TAG, (_tag, _closing, name) => (INLINE_ELEMENT.test(name) ? '' : ' '))
-  .replace(/<![^>]*>/g, ' ')))).toLowerCase();
+function hiddenByStyle(style) {
+  const css = style.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, ' ');
+  for (const declaration of css.split(';')) {
+    const colon = declaration.indexOf(':');
+    if (colon < 0) continue;
+    const property = unescapeCss(declaration.slice(0, colon)).trim().toLowerCase();
+    const value = unescapeCss(declaration.slice(colon + 1)).replace(/!\s*important\s*$/i, '').trim().toLowerCase();
+    if (property === 'display' && value === 'none') return true;
+    if (property === 'visibility' && (value === 'hidden' || value === 'collapse')) return true;
+    if (property === 'content-visibility' && value === 'hidden') return true;
+  }
+  return false;
+}
+
+/** Lee los atributos de una etiqueta desde `index` como el analizador de HTML: [atributos, posición tras «>», «/>»]. */
+function readAttributes(html, index) {
+  const attributes = new Map();
+  let position = index;
+  const { length } = html;
+  const skip = pattern => {
+    while (position < length && pattern.test(html[position])) position += 1;
+  };
+  while (position < length) {
+    skip(/[\s/]/);
+    if (html[position] === '>') return [attributes, position + 1, html[position - 1] === '/'];
+    if (position >= length) break;
+    // El nombre: hasta un espacio, «/», «>» o «=» (un «=» al principio forma parte del nombre).
+    const start = position;
+    position += 1;
+    while (position < length && !/[\s/>=]/.test(html[position])) position += 1;
+    const name = html.slice(start, position).toLowerCase();
+    skip(/\s/);
+    let value = '';
+    if (html[position] === '=') {
+      position += 1;
+      skip(/\s/);
+      const quote = html[position];
+      if (quote === '"' || quote === "'") {
+        const end = html.indexOf(quote, position + 1);
+        if (end < 0) break;
+        value = html.slice(position + 1, end);
+        position = end + 1;
+      } else {
+        const valueStart = position;
+        while (position < length && !/[\s>]/.test(html[position])) position += 1;
+        value = html.slice(valueStart, position);
+      }
+    }
+    if (!attributes.has(name)) attributes.set(name, decodeEntities(value));
+  }
+  // Una etiqueta sin cerrar al final del documento no es una etiqueta (el navegador la descarta).
+  return [attributes, length, false, true];
+}
+
+/**
+ * Trocea un documento HTML: { type: 'text', text, raw? } (raw: el contenido de un elemento de RAW_TEXT_ELEMENT, con su
+ * nombre en `name`), { type: 'start', name, attributes, selfClosing, foreign } y { type: 'end', name }. Los comentarios
+ * no producen nada. `foreign` dice si la etiqueta está dentro de <svg> o <math>.
+ * @param {string} html
+ */
+function* htmlTokens(html) {
+  const { length } = html;
+  let index = 0;
+  let foreign = 0; // profundidad dentro de <svg> o <math>
+  while (index < length) {
+    const open = html.indexOf('<', index);
+    if (open < 0) {
+      yield { type: 'text', text: html.slice(index) };
+      return;
+    }
+    if (open > index) yield { type: 'text', text: html.slice(index, open) };
+    index = open;
+    const next = html[index + 1] ?? '';
+    if (html.startsWith('<!--', index)) {
+      // Comentario: «<!-->» y «<!--->» también terminan.
+      const short = html.slice(index + 4).match(/^-?>/);
+      if (short) { index += 4 + short[0].length; continue; }
+      const end = html.slice(index + 4).search(/--!?>/);
+      index = end < 0 ? length : index + 4 + end + html.slice(index + 4 + end).match(/^--!?>/)[0].length;
+      continue;
+    }
+    if (foreign && html.startsWith('<![CDATA[', index)) {
+      // Dentro de un SVG o de MathML, una sección CDATA es texto.
+      const end = html.indexOf(']]>', index + 9);
+      yield { type: 'text', text: html.slice(index + 9, end < 0 ? length : end) };
+      index = end < 0 ? length : end + 3;
+      continue;
+    }
+    if (next === '!' || next === '?' || (next === '/' && index + 2 < length && !/[a-zA-Z>]/.test(html[index + 2]))) {
+      // Comentario falso: hasta el primer «>».
+      const end = html.indexOf('>', index + 2);
+      index = end < 0 ? length : end + 1;
+      continue;
+    }
+    if (next === '/' && html[index + 2] === '>') { index += 3; continue; } // «</>»: no es nada
+    const closing = next === '/';
+    const nameStart = index + (closing ? 2 : 1);
+    if (!/[a-zA-Z]/.test(html[nameStart] ?? '')) {
+      yield { type: 'text', text: '<' };
+      index += 1;
+      continue;
+    }
+    let nameEnd = nameStart;
+    while (nameEnd < length && !/[\s/>]/.test(html[nameEnd])) nameEnd += 1;
+    const name = html.slice(nameStart, nameEnd).toLowerCase();
+    const [attributes, after, selfClosing, unfinished] = readAttributes(html, nameEnd);
+    if (unfinished) return;
+    index = after;
+    if (closing) {
+      if (foreign && /^(?:svg|math)$/.test(name)) foreign -= 1;
+      yield { type: 'end', name };
+      continue;
+    }
+    yield { type: 'start', name, attributes, selfClosing, foreign: foreign > 0 };
+    if (/^(?:svg|math)$/.test(name) && !selfClosing) foreign += 1;
+    const raw = foreign ? CODE_ELEMENT.test(name) && !selfClosing : RAW_TEXT_ELEMENT.test(name);
+    if (raw) {
+      // El contenido es texto hasta «</nombre» seguido de un espacio, «/» o «>» (<plaintext>: hasta el final).
+      const end = name === 'plaintext' ? -1 : html.slice(index).search(new RegExp(`</${name}[\\s/>]`, 'i'));
+      const stop = end < 0 ? length : index + end;
+      yield { type: 'text', text: html.slice(index, stop), raw: true, name };
+      if (end < 0) return;
+      const close = html.indexOf('>', stop);
+      index = close < 0 ? length : close + 1;
+      yield { type: 'end', name };
+    }
+  }
+}
+
+/** ¿La etiqueta de inicio esconde su contenido a alguien? (`shownText`) */
+function hidesContent({ name, attributes, foreign }) {
+  if (foreign ? NEVER_SHOWN_IN_SVG.test(name) : NEVER_SHOWN.test(name)) return true;
+  if (name === 'dialog' && !attributes.has('open')) return true;
+  if (name === 'object' && (attributes.get('data') ?? '').trim() !== '') return true;
+  return attributes.has('hidden') || attributes.has('popover') || attributes.get('aria-hidden')?.trim().toLowerCase() === 'true'
+    || hiddenByStyle(attributes.get('style') ?? '');
+}
+
+/** Texto comparable de las piezas de una lectura: entidades decodificadas, forma comparable, una línea y minúsculas. */
+const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).toLowerCase();
+
+/**
+ * Todo el texto de los elementos de una página, oculto o no, para las revisiones que prohíben un aviso (R-PUB-03 con
+ * --launch, R-RULE-12 en la vista previa): el aviso tiene que haberse quitado, no escondido. Un comentario (también uno
+ * falso), un script, un estilo o un atributo no son texto de un elemento. Las etiquetas en línea no separan palabras.
+ */
+function allElementText(html) {
+  const pieces = [];
+  for (const token of htmlTokens(html)) {
+    if (token.type === 'text') pieces.push(token.raw && CODE_ELEMENT.test(token.name) ? ' ' : token.text);
+    else pieces.push(INLINE_ELEMENT.test(token.name) ? '' : ' ');
+  }
+  return comparableText(pieces);
+}
+
+/**
+ * Lo que una página muestra a todos como texto, para las revisiones que exigen un aviso (R-RULE-12 antes del
+ * lanzamiento, R-RULE-03 en la vista previa). Además de lo que no cuenta en `allElementText`, no cuenta el contenido de
+ * un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>,
+ * <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado (salvo su primer
+ * <summary>), <title>, <desc> y <metadata> de un SVG, y todo elemento con hidden, popover, aria-hidden="true" (no se
+ * muestra a quien usa un lector de pantalla) o con display:none, visibility:hidden o collapse o
+ * content-visibility:hidden en su style. Un elemento sigue abierto hasta su propia etiqueta de cierre, como en el
+ * navegador: una etiqueta de cierre no sale de <template>, <object> o del <title> de un SVG, y «/>» no cierra un
+ * elemento de HTML. Una regla de una hoja de estilo que esconda el aviso no se ve aquí (la revisa check-markup).
+ */
+function shownText(html) {
+  const pieces = [];
+  /** @type {{ name: string, hidden: boolean, closedDetails: boolean, summary: boolean }[]} */
+  const stack = [];
+  const top = () => stack[stack.length - 1];
+  for (const token of htmlTokens(html)) {
+    if (token.type === 'text') {
+      const parent = top();
+      const hidden = (parent?.hidden ?? false) || (parent?.closedDetails ?? false);
+      pieces.push(hidden || (token.raw && CODE_ELEMENT.test(token.name)) ? ' ' : token.text);
+      continue;
+    }
+    pieces.push(INLINE_ELEMENT.test(token.name) ? '' : ' ');
+    if (token.type === 'start') {
+      if (token.foreign ? token.selfClosing : VOID_ELEMENT.test(token.name)) continue;
+      const parent = top();
+      // Hijo de un <details> cerrado: solo su primer <summary> se ve.
+      const firstSummary = parent?.closedDetails && token.name === 'summary' && !parent.summary;
+      if (firstSummary) parent.summary = true;
+      const hidden = (parent?.hidden ?? false) || ((parent?.closedDetails ?? false) && !firstSummary) || hidesContent(token);
+      stack.push({ name: token.name, hidden, closedDetails: token.name === 'details' && !token.attributes.has('open'), summary: false });
+      continue;
+    }
+    // Etiqueta de cierre: cierra el elemento abierto más cercano con ese nombre, salvo que antes haya un límite de ámbito.
+    for (let depth = stack.length - 1; depth >= 0; depth -= 1) {
+      if (stack[depth].name === token.name) {
+        stack.length = depth;
+        break;
+      }
+      if (SCOPE_BOUNDARY.test(stack[depth].name)) break;
+    }
+  }
+  return comparableText(pieces);
+}
 // Etiquetas dentro del texto de un script («t.innerHTML="Solicitud <b>enviada</b>"»). El nombre debe ir seguido de un
 // espacio, «/» o «>», y la etiqueta no puede contener «<», para no confundirlas con comparaciones («i<a.length»).
 const SCRIPT_INLINE_TAG = /<\/?(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)(?=[\s/>])[^<>]*>/gi;
@@ -546,12 +724,17 @@ const PRODUCTION_RULES = [
     'Las mismas marcas en el texto visible, aunque una etiqueta las separe («de<br>ejemplo», «EJ-<span>1001</span>»).'),
 ];
 
+// Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
+const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML; cuando el escáner no puede saberlo, el aviso cuenta como no mostrado. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template>, <noscript>, <textarea> o un <details> cerrado; solo un comentario, un script, un estilo o un atributo no cuentan';
+
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
   ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa. Los códigos también se buscan escritos con otro separador o sin él («EJ1001», «ej 1001»).'],
-  ['R-RULE-03', 'Vista previa: cada página muestra el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran. Mostrar es estar en el texto de los elementos: un comentario, un script, un estilo o un atributo (aunque su valor lleve «>») no cuentan, ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o uno con hidden, aria-hidden="true" o display:none / visibility:hidden en su style.'],
+  ['R-RULE-03', `Vista previa: cada página muestra a todos el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran. El aviso se busca en el texto que se muestra (${SHOWN_TEXT_DOC}).`],
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
-  ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra el aviso «${DEVELOPMENT_NOTICE}» (en el texto de los elementos: un comentario, un script, un estilo o un atributo no cuentan, ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, un <dialog> cerrado o uno con hidden, aria-hidden="true" o display:none / visibility:hidden en su style). La vista previa lleva solo su propio aviso: una página suya que muestra el de sitio en preparación falla. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero, ninguna página lleva noindex y ninguna muestra el aviso.`],
+  ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra a todos el aviso «${DEVELOPMENT_NOTICE}», buscado en el texto que se muestra (${SHOWN_TEXT_DOC}). La vista previa lleva solo su propio aviso: una página suya que lleva el de sitio en preparación falla, también oculto (${ALL_TEXT_DOC}).`],
+  ['R-PUB-03', `Con --launch se exige lo contrario de R-RULE-12: ningún grupo de robots.txt bloquea el sitio entero, ninguna página lleva noindex y ninguna lleva el aviso «${DEVELOPMENT_NOTICE}», tampoco oculto: al lanzar el aviso se quita de la página, no se esconde (${ALL_TEXT_DOC}).`],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
@@ -888,7 +1071,7 @@ export async function scanDist(directory, options = {}) {
   const knownNumbers = new Set([digits, `52${localNumber}`, localNumber, `1${localNumber}`]);
   const addressNeedle = oneLine(stripAccents(String(business.address ?? ''))).toLowerCase();
   const noticeNeedle = stripAccents(PREVIEW_NOTICE).toLowerCase();
-  // Los avisos de arriba, como se buscan en el texto de los elementos (`shownNotice`).
+  // Los avisos de arriba, como se buscan en el texto de los elementos (`shownText` y `allElementText`).
   const previewNotice = oneLine(fold(PREVIEW_NOTICE)).toLowerCase();
   const developmentNotice = oneLine(fold(DEVELOPMENT_NOTICE)).toLowerCase();
   const pages = files.filter(file => /\.html?$/i.test(file));
@@ -1004,13 +1187,15 @@ export async function scanDist(directory, options = {}) {
     const noindex = [...markup.matchAll(/<meta\b[^>]*>/gi)].some(match => /^robots$/i.test(attribute(match[0], 'name') ?? '') && /\bnoindex\b/i.test(attribute(match[0], 'content') ?? ''));
     if (!launch && !noindex) add('FAIL', 'R-RULE-12', file, 'falta <meta name="robots" content="noindex, nofollow"> antes del lanzamiento');
     if (launch && noindex) add('FAIL', 'R-PUB-03', file, 'noindex sigue presente en la versión de lanzamiento');
-    // R-RULE-12 y R-PUB-03: el aviso de sitio en preparación, visible (texto de los elementos, ver `elementText`),
-    // en cada página de producción hasta el lanzamiento; nunca con --launch, y nunca en la vista previa, que lleva el suyo.
-    const pageText = elementText(raw);
-    const showsDevelopmentNotice = pageText.includes(developmentNotice);
-    if (preview && showsDevelopmentNotice) add('FAIL', 'R-RULE-12', file, `la vista previa muestra el aviso «${DEVELOPMENT_NOTICE}»: lleva solo su propio aviso`);
-    if (!preview && !launch && !showsDevelopmentNotice) add('FAIL', 'R-RULE-12', file, `falta el aviso visible «${DEVELOPMENT_NOTICE}» antes del lanzamiento`);
-    if (launch && showsDevelopmentNotice) add('FAIL', 'R-PUB-03', file, `el aviso «${DEVELOPMENT_NOTICE}» sigue en la versión de lanzamiento`);
+    // R-RULE-12 y R-PUB-03: el aviso de sitio en preparación. Se exige mostrado a todos (`shownText`) en cada página de
+    // producción hasta el lanzamiento. Se prohíbe en la página, oculto o no (`allElementText`), con --launch y en la vista
+    // previa, que lleva el suyo: al lanzar se quita, no se esconde.
+    const pageText = shownText(raw);
+    const elementsText = allElementText(raw);
+    const hasDevelopmentNotice = elementsText.includes(developmentNotice);
+    if (preview && hasDevelopmentNotice) add('FAIL', 'R-RULE-12', file, `la vista previa lleva el aviso «${DEVELOPMENT_NOTICE}» (oculto o no): lleva solo su propio aviso`);
+    if (!preview && !launch && !pageText.includes(developmentNotice)) add('FAIL', 'R-RULE-12', file, `falta el aviso visible «${DEVELOPMENT_NOTICE}» antes del lanzamiento`);
+    if (launch && hasDevelopmentNotice) add('FAIL', 'R-PUB-03', file, `el aviso «${DEVELOPMENT_NOTICE}» sigue en la versión de lanzamiento (oculto o no): debe quitarse`);
 
     // R-PUB-04: la página 404 no tiene dirección canónica (se entrega en cualquier dirección desconocida).
     if (path === '404.html') {
@@ -1059,6 +1244,7 @@ export async function scanDist(directory, options = {}) {
     // R-RULE-03, vista previa: aviso en cada página y etiqueta en cada ejemplo.
     if (preview) {
       const plain = stripAccents(shown).toLowerCase();
+      // El aviso de vista previa se exige mostrado a todos (`shownText`).
       if (!pageText.includes(previewNotice)) add('FAIL', 'R-RULE-03', file, 'página de vista previa sin el aviso visible de vista previa');
       const shownExamples = new Set();
       for (const example of examples) {

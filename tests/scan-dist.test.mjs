@@ -324,8 +324,10 @@ test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación, visible en cada p
 // El aviso dentro de algo que el visitante no ve: un atributo que contiene «>», un elemento oculto (hidden,
 // aria-hidden="true", display:none o visibility:hidden en su style), <template>, <textarea>, <noscript>, un
 // <dialog> cerrado, el <head> (el <title>) o un <title> de SVG.
-const hiddenNotices = notice => [
-  `<div data-x="a>${notice}"></div>`, `<div data-x='a>${notice}'></div>`, `<img alt="x>${notice}" src="/a.svg">`,
+// En un atributo no es texto de ningún elemento: tampoco está en la página para las revisiones que prohíben el aviso.
+const attributeNotices = notice => [`<div data-x="a>${notice}"></div>`, `<div data-x='a>${notice}'></div>`, `<img alt="x>${notice}" src="/a.svg">`];
+// Dentro de un elemento que no se ve: no se muestra, pero sigue en la página.
+const hiddenElementNotices = notice => [
   `<aside hidden><p>${notice}</p></aside>`, `<aside class="site-notice" HIDDEN=""><p>${notice}</p></aside>`, `<p hidden="hidden">${notice}</p>`,
   `<aside aria-hidden="true"><p>${notice}</p></aside>`, `<div style="display:none"><p>${notice}</p></div>`, `<div style="color: red; DISPLAY : none !important"><p>${notice}</p></div>`,
   `<div style="visibility:hidden"><p>${notice}</p></div>`, `<div style='visibility: collapse'><p>${notice}</p></div>`,
@@ -334,25 +336,136 @@ const hiddenNotices = notice => [
   // Anidado: el elemento oculto cierra en su propia etiqueta de cierre, no en la primera del mismo nombre.
   `<div hidden><div><p>Otro</p></div><p>${notice}</p></div>`,
 ];
+const hiddenNotices = notice => [...attributeNotices(notice), ...hiddenElementNotices(notice)];
 // Elementos visibles junto a otros ocultos: el aviso sigue a la vista.
 const shownNotices = notice => [
   `<div hidden><div><p>Otro</p></div></div><aside><p>${notice}</p></aside>`, `<input type="hidden" name="a"><p>${notice}</p>`, `<input hidden><p>${notice}</p>`,
   `<p data-hidden="1" class="hidden-x">${notice}</p>`, `<p aria-hidden="false">${notice}</p>`, `<p style="display:block" title="a>b">${notice}</p>`,
   `<dialog open><p>${notice}</p></dialog>`, `<p>Uno &lt; dos</p><p>${notice}</p>`, `<p data-x="a>b">${notice}</p>`, `<br/><hr /><p>${notice}</p>`,
 ];
+// Un sitio listo para el lanzamiento (sin noindex y con robots.txt abierto) con `body` en contacto/.
+const launchedSite = body => ({ 'robots.txt': 'User-agent: *\nAllow: /\n', 'index.html': page('<h1>Inicio</h1>', { robots: '' }),
+  'contacto/index.html': page(`<h1>Contacto</h1>${body}`, { robots: '' }) });
 
-test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación escondido en un elemento que no se ve no cuenta', async () => {
+test('R-RULE-12 y R-PUB-03: el aviso de sitio en preparación escondido en un elemento que no se ve no cuenta como mostrado', async () => {
   for (const hidden of hiddenNotices(DEVELOPMENT_NOTICE)) {
-    // Antes del lanzamiento falta; con --launch no falla (no se ve); en la vista previa no falla (no se ve).
+    // Antes del lanzamiento falta: no se ve.
     assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${hidden}`, { notice: 'none' }) })), ['R-RULE-12'], hidden);
-    assert.deepEqual(failures(await scan({ 'robots.txt': 'User-agent: *\nAllow: /\n', 'index.html': page('<h1>Inicio</h1>', { robots: '' }),
-      'contacto/index.html': page(`<h1>Contacto</h1>${hidden}`, { robots: '' }) }, { launch: true })), [], hidden);
+  }
+  for (const hidden of attributeNotices(DEVELOPMENT_NOTICE)) {
+    // En un atributo no está en el texto de la página: con --launch y en la vista previa no falla.
+    assert.deepEqual(failures(await scan(launchedSite(hidden), { launch: true })), [], hidden);
     assert.deepEqual(failures(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${hidden}`) }, { preview: true })), [], hidden);
+  }
+  for (const hidden of hiddenElementNotices(DEVELOPMENT_NOTICE)) {
+    // Escondido sigue en la página: con --launch falla R-PUB-03 y en la vista previa R-RULE-12 (ver la prueba siguiente).
+    assert.deepEqual(failedIds(await scan(launchedSite(hidden), { launch: true })), ['R-PUB-03'], hidden);
+    assert.deepEqual(failedIds(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${hidden}`) }, { preview: true })), ['R-RULE-12'], hidden);
   }
   // Solo en el <title> de la página tampoco cuenta.
   assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page('<h1>Contacto</h1>', { notice: 'none', title: DEVELOPMENT_NOTICE }) })), ['R-RULE-12']);
   for (const shown of shownNotices(DEVELOPMENT_NOTICE)) {
     assert.deepEqual(failures(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${shown}`, { notice: 'none' }) })), [], shown);
+  }
+});
+
+// I-09: las revisiones que prohíben el aviso de sitio en preparación (R-PUB-03 con --launch y R-RULE-12 en la vista
+// previa) leen todo el texto de los elementos, oculto o no: al lanzar, el aviso se quita de la página, no se esconde.
+// Las que lo exigen (R-RULE-12 antes del lanzamiento) leen solo el texto que se muestra a todos.
+const forbiddenNotices = {
+  'aria-hidden="true" en el aside': DEVELOPMENT_NOTICE_HTML.replace('<aside ', '<aside aria-hidden="true" '),
+  'aria-hidden="true" en un antecesor': `<div aria-hidden="true"><div>${DEVELOPMENT_NOTICE_HTML}</div></div>`,
+  hidden: DEVELOPMENT_NOTICE_HTML.replace('<aside ', '<aside hidden '),
+  'display:none en su style': DEVELOPMENT_NOTICE_HTML.replace('<aside ', '<aside style="display:none" '),
+  '<template>': `<template>${DEVELOPMENT_NOTICE_HTML}</template>`,
+  '<details> cerrado': `<details><summary>Más</summary>${DEVELOPMENT_NOTICE_HTML}</details>`,
+};
+for (const [label, body] of Object.entries(forbiddenNotices)) {
+  test(`R-PUB-03 y R-RULE-12: el aviso de sitio en preparación escondido (${label}) sigue en la página`, async () => {
+    // Con --launch: el aviso debe haberse quitado, no escondido.
+    const launched = await scan(launchedSite(body), { launch: true });
+    assert.deepEqual(failures(launched).map(finding => [finding.id, finding.file]), [['R-PUB-03', 'contacto/index.html']]);
+    // En la vista previa, que lleva solo su propio aviso.
+    const preview = await scan({ 'index.html': previewPage(), 'contacto/index.html': previewPage(`<h1>Contacto</h1>${body}`) }, { preview: true });
+    assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html']]);
+    // En producción antes del lanzamiento no se muestra a todos: falta.
+    const before = await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${body}`, { notice: 'none' }) });
+    assert.deepEqual(failures(before).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html']]);
+  });
+}
+
+test('R-PUB-03 y R-RULE-12: un comentario, un script, un estilo o un atributo con el aviso no lo ponen en la página', async () => {
+  for (const body of [`<!-- ${DEVELOPMENT_NOTICE} -->`, `<script>var aviso=${JSON.stringify(DEVELOPMENT_NOTICE)};</script>`, `<style>.x::before{content:"${DEVELOPMENT_NOTICE}"}</style>`,
+    `<div title="${DEVELOPMENT_NOTICE}" data-aviso="${DEVELOPMENT_NOTICE}"></div>`, `<input value="${DEVELOPMENT_NOTICE}">`, `<?${DEVELOPMENT_NOTICE}>`, `</ ${DEVELOPMENT_NOTICE}>`]) {
+    assert.deepEqual(failures(await scan(launchedSite(body), { launch: true })), [], body);
+    assert.deepEqual(failures(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${body}`) }, { preview: true })), [], body);
+  }
+});
+
+// I-10: más formas de no mostrar un aviso exigido. Con cada una, el único aviso de la página no cuenta como mostrado.
+const unshownNotices = notice => ({
+  '<details> cerrado (todo menos su <summary>)': `<details><summary>Más</summary><aside><p>${notice}</p></aside></details>`,
+  '<details> cerrado sin <summary>': `<details><p>${notice}</p></details>`,
+  '<details> cerrado, texto suelto': `<details><summary>Más</summary>${notice}</details>`,
+  '<summary> que no es el primero': `<details><summary>Más</summary><summary>${notice}</summary></details>`,
+  'popover': `<aside popover><p>${notice}</p></aside>`,
+  'popover="manual"': `<div popover="manual"><p>${notice}</p></div>`,
+  'content-visibility: hidden': `<aside style="content-visibility: hidden"><p>${notice}</p></aside>`,
+  'display:none con un comentario de CSS': `<aside style="display:none/**/"><p>${notice}</p></aside>`,
+  'display con un comentario de CSS antes del valor': `<aside style="display:/* oculto */ none"><p>${notice}</p></aside>`,
+  'visibility con un escape de CSS': `<aside style="visibility:\\68 idden"><p>${notice}</p></aside>`,
+  '<iframe>': `<iframe>${notice}</iframe>`,
+  '<noembed>': `<noembed>${notice}</noembed>`,
+  '<noframes>': `<noframes>${notice}</noframes>`,
+  '<datalist>': `<datalist id="lista"><option>${notice}</option></datalist>`,
+  '<video>': `<video><p>${notice}</p></video>`,
+  '<audio>': `<audio><p>${notice}</p></audio>`,
+  '<canvas>': `<canvas><p>${notice}</p></canvas>`,
+  '<object> con data': `<object data="/a.svg" type="image/svg+xml"><p>${notice}</p></object>`,
+  '<desc> de SVG': `<svg><desc>${notice}</desc></svg>`,
+  '<metadata> de SVG': `<svg><metadata><p>${notice}</p></metadata></svg>`,
+  '<rp>': `<ruby>Aviso<rp>${notice}</rp><rt>a</rt></ruby>`,
+  'comentario <?…>': `<?${notice}>`,
+  'comentario </ …>': `</ ${notice}>`,
+  'comentario </1…>': `</1${notice}>`,
+  '<textarea> que «cierra» el elemento oculto': `<div hidden><textarea></div></textarea>${notice}</div>`,
+  '<title> de SVG que «cierra» el elemento oculto': `<div hidden><svg><title></div></title></svg>${notice}</div>`,
+  '<iframe> que «cierra» el elemento oculto': `<div hidden><iframe></div></iframe>${notice}</div>`,
+  '<template> que «cierra» el elemento oculto': `<div hidden><template></div></template>${notice}</div>`,
+  'etiqueta con «/>» que no cierra un elemento de HTML': `<div hidden/>${notice}</div>`,
+});
+for (const label of Object.keys(unshownNotices(''))) {
+  test(`R-RULE-12 y R-RULE-03: un aviso exigido escondido así no cuenta como mostrado: ${label}`, async () => {
+    // `inPerson`: sin la regla R-RULE-11, que prohíbe todo <iframe> (un mapa); aquí solo cuenta el aviso.
+    const production = unshownNotices(DEVELOPMENT_NOTICE)[label];
+    assert.deepEqual(failedIds(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${production}`, { notice: 'none' }) }, { inPerson: true })), ['R-RULE-12'], production);
+    const preview = unshownNotices(PREVIEW_NOTICE)[label];
+    assert.deepEqual(failedIds(await scan({ 'index.html': page(`<h1>Inicio</h1>${preview}`, { notice: 'none' }) }, { preview: true, inPerson: true })), ['R-RULE-03'], preview);
+  });
+}
+
+test('R-RULE-12 y R-RULE-03: el aviso sigue mostrado junto a esos elementos o con sus formas visibles', async () => {
+  const controls = notice => [
+    `<details open><summary>Más</summary><p>${notice}</p></details>`,
+    `<details><summary>${notice}</summary><p>Detalle</p></details>`,
+    `<details><summary><span>${notice}</span></summary></details>`,
+    `<div popover><p>Otro</p></div><aside><p>${notice}</p></aside>`,
+    `<aside style="content-visibility: visible"><p>${notice}</p></aside>`,
+    `<aside style="content-visibility: auto; display: block"><p>${notice}</p></aside>`,
+    `<object><p>${notice}</p></object>`,
+    `<object data=""><p>${notice}</p></object>`,
+    `<video controls></video><p>${notice}</p>`,
+    `<svg><title>Icono</title><desc>Icono</desc></svg><p>${notice}</p>`,
+    `<ruby>Aviso<rp>(</rp><rt>a</rt><rp>)</rp></ruby><p>${notice}</p>`,
+    `<p>${notice}</p><?php echo 1 ?>`,
+    `<iframe title="x"></iframe><textarea></textarea><p>${notice}</p>`,
+    `<p data-x="<?x>">${notice}</p>`,
+  ];
+  for (const shown of controls(DEVELOPMENT_NOTICE)) {
+    assert.deepEqual(failures(await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${shown}`, { notice: 'none' }) }, { inPerson: true })), [], shown);
+  }
+  for (const shown of controls(PREVIEW_NOTICE)) {
+    assert.deepEqual(failures(await scan({ 'index.html': page(`<h1>Inicio</h1>${shown}`, { notice: 'none' }) }, { preview: true, inPerson: true })), [], shown);
   }
 });
 
@@ -946,6 +1059,21 @@ test('cada regla está documentada y conserva su identificador', () => {
     assert.ok(documented.has(id), id);
   }
   for (const [, doc] of CHECKS) assert.ok(doc.length > 30);
+});
+
+test('--rules dice qué lectura de la página usa cada revisión de los avisos de arriba', () => {
+  const docs = id => CHECKS.filter(([check]) => check === id).map(([, doc]) => doc).join('\n');
+  // Las que exigen un aviso leen el texto que se muestra, y listan lo que no cuenta como mostrado.
+  for (const id of ['R-RULE-03', 'R-RULE-12']) {
+    assert.match(docs(id), /texto que se muestra/, id);
+    for (const item of ['aria-hidden="true"', 'popover', '<details> cerrado salvo su primer <summary>', 'content-visibility:hidden', '<iframe>', '<noembed>', '<noframes>',
+      '<datalist>', '<video>', '<audio>', '<canvas>', '<object> con data', '<desc>', '<metadata>', '<rp>', '«<?…>»', '«</ …>»', 'comentarios o escapes de CSS', '<textarea>']) {
+      assert.ok(docs(id).includes(item), `${id}: ${item}`);
+    }
+  }
+  // Las que lo prohíben leen todo el texto de los elementos, oculto o no.
+  assert.match(docs('R-RULE-12'), /La vista previa lleva solo su propio aviso: [^\n]*también oculto \(en todo el texto de los elementos, oculto o no/);
+  assert.match(docs('R-PUB-03'), /tampoco oculto[^\n]*en todo el texto de los elementos, oculto o no/);
 });
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
