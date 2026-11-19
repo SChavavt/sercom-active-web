@@ -626,6 +626,13 @@ test('R-RULE-10: un plazo de respuesta con una cifra', async () => {
   for (const text of promises) assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
   await assertNoneFails(['<p>Precio en 24 horas</p>', '<p>La disponibilidad y el tiempo de entrega se confirman al cotizar.</p>', '<label>Fecha requerida:</label>', '<label>Entrega en (ciudad o código postal):</label>',
     '<p>Horario: lunes a viernes de 9 a 18 horas</p>', '<p>Usa el respirador un máximo de 8 horas</p>', '<p>Cambia el filtro cada 40 horas</p>', '<p>No recibirás nada en 24 horas sin pedirlo.</p>']);
+  // Después de «que», «y», «para» o una coma empieza otra oración: el plazo ya no es el de la respuesta.
+  await assertNoneFails(['<p>Recibes guantes de nitrilo que se cambian en 4 horas de uso.</p>', '<p>Recibes un extintor que se recarga en 1 hora.</p>', '<p>Te cotizamos el equipo que usas en 8 horas de turno.</p>',
+    '<p>Te enviamos la lista para que la revises en 5 minutos.</p>', '<p>Recibes el arnés y lo ajustas en 2 minutos.</p>', '<p>Recibes un respirador que protege en 8 horas de jornada.</p>', '<p>Te enviamos el casco, que se ajusta en 2 minutos.</p>',
+    // Una duración de uso («de turno», «de uso», «de jornada») tampoco es un plazo de respuesta.
+    '<p>Respondemos tus dudas sobre el uso en 8 horas de turno.</p>', '<p>Te cotizamos filtros para trabajar en 40 horas de uso.</p>']);
+  // El segundo verbo de la frase sigue contando por sí mismo.
+  await assertEachFails('R-RULE-10', ['<p>Te respondemos y cotizamos en 24 horas</p>']);
 });
 
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
