@@ -421,6 +421,10 @@
   .masthead__nav-link::after { forced-color-adjust: none; background: CanvasText; }
   .catpanel__link[aria-current] { border-left: 4px solid CanvasText; }
   .masthead__cta[aria-current="page"], .dock__link[aria-current="page"] { border-bottom: 4px solid CanvasText; }
+  /* los cuadros azules de la marca actual, del enlace actual del pie y de la categoría actual del catálogo: sin
+     esto el fondo pasa al color del sistema y el cuadro se confunde con su celda. La hoja del catálogo se carga
+     después de esta y pinta su cuadro con la misma especificidad: aquí va con su enlace para ganarle */
+  .brand__mark, .footer__mark, .catalog-nav__link > .catalog-nav__mark { forced-color-adjust: none; background: CanvasText; }
   .masthead__search-hint { color: GrayText; }            /* la copia del placeholder, con el color del placeholder del sistema */
 
   /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
