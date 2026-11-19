@@ -1,0 +1,30 @@
+---
+// Borrador del mensaje (`.draft`): una celda con el título «Así empieza tu mensaje» y el texto que abrirán
+// los botones de WhatsApp y de correo, con sus saltos de línea, sobre renglones de filete suave.
+// Es texto plano: no es un formulario ni se edita aquí (el cliente lo edita en su propia aplicación).
+//
+//   <DraftMessage text={contactLinks.list().text} id="borrador-title" class="span-4 span-md-12" />
+//
+// `data-draft-text` marca el párrafo para que un script de la página pueda reescribirlo con `textContent`
+// (solicitud especial con búsqueda). Estilos: src/styles/pages/atencion.css.
+import '../styles/pages/atencion.css';
+
+interface Props {
+  /** Texto del mensaje, con saltos de línea `\n`. */
+  text: string;
+  /** id del título. */
+  id: string;
+  /** Título; por omisión «Así empieza tu mensaje». */
+  title?: string;
+  /** Nivel del título; 3 por omisión (bajo el H2 de su sección). */
+  headingLevel?: 2 | 3;
+  class?: string;
+}
+
+const { text, id, title = 'Así empieza tu mensaje', headingLevel = 3, class: className } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+---
+<div class:list={['draft', className]}>
+  <Heading class="draft__title eyebrow label" id={id}>{title}</Heading>
+  <p class="draft__text" data-draft-text>{text}</p>
+</div>

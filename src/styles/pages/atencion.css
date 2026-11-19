@@ -1,0 +1,69 @@
+/* ==========================================================================
+   Páginas de atención: Cotizar mi lista, Solicitud especial, Contacto, Privacidad y 404,
+   y los componentes que comparten (ItemRegister, DraftMessage).
+   Lo importan esas páginas y los dos componentes (Vite lo incluye una sola vez).
+   Mismas reglas que la hoja global: celdas blancas sobre la lámina azul, filetes por huecos de 1 px,
+   dentro de una celda solo el filete suave; solo variables de tokens.css y fonts.css.
+   Puntos de corte: 1099 (tableta) y 699 (celular), con max-width.
+   ========================================================================== */
+
+/* --- Registro numerado (ItemRegister) ------------------------------------- */
+.item-register { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.item-register__row {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 13rem) minmax(0, 1fr);
+  align-items: baseline;
+  align-content: center;
+  column-gap: var(--s-6);
+  min-height: 76px;
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+}
+.item-register__num {                       /* el número de los pasos, a tamaño pequeño */
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  line-height: 1;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+.item-register__label { font-size: 1.125rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; }
+.item-register__text { color: var(--grey-700); text-wrap: pretty; }
+
+/* --- Borrador del mensaje (DraftMessage) ----------------------------------- */
+.draft { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
+.draft__text {
+  /* renglones de filete suave: uno cada línea de texto, como una hoja rayada */
+  --draft-line: 2rem;
+  border-top: var(--line) solid var(--rule-soft);
+  background: repeating-linear-gradient(to bottom, transparent 0 calc(var(--draft-line) - 1px), var(--rule-soft) calc(var(--draft-line) - 1px) var(--draft-line));
+  line-height: var(--draft-line);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* --- Piezas comunes de las páginas del grupo ------------------------------- */
+/* Una fila de dos partes: columna de celdas (registro y su cierre) y la celda del borrador */
+.atencion__col { display: flex; flex-direction: column; gap: var(--line); }
+.atencion__col > :last-child { flex: 1; }
+.atencion__enough { padding: var(--s-6) var(--pad); background: var(--surface); font-size: 1.0625rem; text-wrap: pretty; }
+
+/* Celda lateral con una entrada breve arriba y una fila de acción abajo (como PageHeader) */
+.atencion__side { display: flex; flex-direction: column; gap: var(--line); }
+.atencion__intro { flex: 1; padding: var(--s-9) var(--pad) var(--s-7); background: var(--surface); }
+.atencion__intro .t-lead { max-width: 30ch; }
+
+@media (max-width: 1099px) {
+  .atencion__intro { padding: var(--s-7) var(--pad); }
+}
+
+@media (max-width: 699px) {
+  .item-register__row { grid-template-columns: 1.75rem minmax(0, 1fr); row-gap: 2px; column-gap: var(--s-4); min-height: 0; padding: var(--s-4) var(--pad); }
+  .item-register__num { grid-row: span 2; font-size: 1.75rem; }
+  .item-register__label { font-size: 1.0625rem; }
+  .item-register__text { grid-column: 2; font-size: 0.9375rem; line-height: 1.45; }
+  .draft { padding: var(--s-6) var(--pad) var(--s-7); }
+  .draft__text { font-size: 0.9375rem; }
+  .atencion__enough { padding: var(--s-5) var(--pad); font-size: 1rem; }
+}
