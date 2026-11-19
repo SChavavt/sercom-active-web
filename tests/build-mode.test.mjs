@@ -198,6 +198,19 @@ function skipTypeArguments(code, start) {
 }
 // Toda mención de `import.meta.glob`, con espacios o sin ellos alrededor de los puntos y la siga lo que la siga.
 const GLOB_MENTION = /import\s*\.\s*meta\s*\.\s*glob/g;
+// `new URL('…', import.meta.url)` con un texto o una plantilla escritos tal cual: Vite copia ese archivo a la salida
+// (uno pequeño, en línea como `data:`), así que es una carga como un import.
+const NEW_URL_ASSET = /\bnew\s+URL\s*\(\s*(["'`])((?:(?!\1)[^\\\n]|\\.)*)\1\s*,\s*import\s*\.\s*meta\s*\.\s*url\b/g;
+/**
+ * Archivo (o patrón) al que apunta la ruta de un `new URL(…, import.meta.url)`, resuelto desde la raíz del proyecto:
+ * «/…» desde la raíz y cualquier otra ruta desde la carpeta del archivo (aquí «data/x.json» es relativa, no un
+ * paquete). Una dirección con esquema («https:», «data:») no es un archivo del proyecto: `undefined`.
+ */
+function resolveAssetUrl(path, value) {
+  const file = value.replace(/[?#].*$/, '');
+  if (!file || /^[a-z][a-z\d+.-]*:/i.test(file) || file.startsWith('//')) return undefined;
+  return file.startsWith('/') ? posix.normalize(file) : posix.join(posix.dirname(`/${path}`), file);
+}
 /**
  * Patrones de `import.meta.glob(…)` y de `import(\`…${x}…\`)` (que Vite convierte en un patrón) en el código de un
  * archivo, resueltos desde la raíz del proyecto como lo hace Vite: «/…» desde la raíz, «./…» y «../…» desde la
@@ -269,6 +282,12 @@ function loadPatterns(path, code) {
     }
     const pattern = template[1].replace(/\$\{[^}]*\}/g, '*');
     patterns.push(pattern.startsWith('/') ? posix.normalize(pattern) : posix.join(posix.dirname(`/${path}`), pattern));
+  }
+  // `new URL(\`…${x}…\`, import.meta.url)`, que Vite también convierte en un patrón (desde la carpeta del archivo).
+  for (const match of code.matchAll(NEW_URL_ASSET)) {
+    if (match[1] !== '`') continue; // Texto escrito tal cual: lo revisa `dataLoads`.
+    const target = resolveAssetUrl(path, match[2].replace(/\$\{[^}]*\}/g, '*'));
+    if (target) patterns.push(target);
   }
   return patterns;
 }
@@ -463,15 +482,20 @@ const globReaches = (pattern, directory) => {
 };
 /**
  * Archivos de src/data/ o de research/ que carga un código, leído sin comentarios: cada especificador de `import`,
- * `export … from` e `import()` que apunta a ellos, y «patrón <…>» por cada patrón de `import.meta.glob` o de
- * `import()` con plantilla que puede alcanzarlos (también «?», un patrón que no se puede revisar). Un patrón negado
- * («!../data/**») excluye la carpeta que cubre entera.
+ * `export … from` e `import()` y cada ruta de `new URL('…', import.meta.url)` que apunta a ellos, y «patrón <…>» por
+ * cada patrón de `import.meta.glob`, de `import()` o de `new URL(…, import.meta.url)` con plantilla que puede
+ * alcanzarlos (también «?», un patrón que no se puede revisar). Un patrón negado («!../data/**») excluye la carpeta
+ * que cubre entera. `readFile` y las demás lecturas del disco las rechaza la prueba del disco (arriba); un `fetch` no
+ * se revisa: en el navegador solo alcanza lo que está en la salida, y src/data/ no se copia a ella.
  * @param {string} path Ruta del archivo («src/pages/x.astro»).
  * @param {string} text Contenido del archivo.
  */
 function dataLoads(path, text) {
   const code = stripComments(text).replace(TYPE_ONLY, '');
-  const loads = [...code.matchAll(LOAD_SPECIFIER)].map(match => resolveSpecifier(path, match[2])).filter(target => target && inDataDirectory(target));
+  const loads = [
+    ...[...code.matchAll(LOAD_SPECIFIER)].map(match => resolveSpecifier(path, match[2])),
+    ...[...code.matchAll(NEW_URL_ASSET)].filter(match => match[1] !== '`').map(match => resolveAssetUrl(path, match[2])),
+  ].filter(target => target && inDataDirectory(target));
   const patterns = loadPatterns(path, code);
   const excluded = directory => patterns.some(pattern => pattern.startsWith('!') && pattern.endsWith('/**') && posix.matchesGlob(`${directory}/archivo`, pattern.slice(1)));
   for (const pattern of patterns.filter(item => !item.startsWith('!'))) {
@@ -503,6 +527,12 @@ test('solo los módulos de la capa de datos cargan archivos de src/data/ o de re
     ['src/lib/datos.mjs', "export const datos = import.meta.glob(['/src/**', '!/src/data/preview/**']);", ['patrón /src/**']],
     ['src/lib/datos.mjs', 'export const cargar = nombre => import(`../data/${nombre}.json`);', ['patrón /src/data/*.json']],
     ['src/lib/datos.mjs', 'export const cargar = ruta => import(ruta);', ['patrón ?']],
+    // `new URL('…', import.meta.url)`: Vite copia el archivo a la salida (un JSON pequeño, en línea como data:) y la
+    // página lo publica entero, borradores incluidos. Con una plantilla, Vite lo convierte en un patrón.
+    ['src/pages/contacto/index.astro', "<script>\n  const url = new URL('../../data/catalog.json', import.meta.url);\n  fetch(url).then(r => r.json());\n</script>", ['/src/data/catalog.json']],
+    ['src/components/Crudo.astro', '<script>\n  const url = new URL("../data/brands.json" , import . meta . url);\n</script>', ['/src/data/brands.json']],
+    ['src/lib/datos.mjs', 'export const url = new URL(`../data/${nombre}.json`, import.meta.url);', ['patrón /src/data/*.json']],
+    ['src/pages/sonda.astro', "---\nconst url = new URL('/research/Sercom_Active_Fuentes_Catalogos.json', import.meta.url);\n---", ['/research/Sercom_Active_Fuentes_Catalogos.json']],
   ];
   for (const [path, code, loads] of misuse) {
     assert.deepEqual(dataLoads(path, code), loads, code);
@@ -518,6 +548,9 @@ test('solo los módulos de la capa de datos cargan archivos de src/data/ o de re
     ['src/components/Tarjeta.astro', "---\nconst iconos = import.meta.glob('../assets/icons/*.svg', { eager: true, query: '?raw' });\n---"],
     ['src/lib/datos.mjs', "export const iconos = import.meta.glob(['/src/**/*.svg', '!/src/data/**']);"],
     ['src/pages/contacto/index.astro', '<p>Los datos salen de catalog.json, de brands.json y de business.json.</p>'],
+    // Una dirección de la página o del sitio, no un archivo del proyecto.
+    ['src/components/PageLinkScript.astro', '<script>\n  const destino = new URL(path, window.location.href);\n  const otra = new URL(\'https://example.com/data/catalog.json\', import.meta.url);\n</script>'],
+    ['src/lib/iconos.mjs', "export const logo = new URL('../assets/logo.svg', import.meta.url);"],
   ];
   for (const [path, code] of harmless) assert.deepEqual(dataLoads(path, code), [], code);
 
