@@ -371,3 +371,43 @@
   .preview, .dock, .masthead__btn, .skip-link { display: none !important; }
   .site-header { position: static; }
 }
+
+/* 6.8 Colores forzados (contraste alto de Windows y similares)
+   El navegador cambia los colores por los del sistema y quita fondos y sombras: el azul de los filetes desaparece,
+   y con él las líneas entre celdas, los bloques sólidos y las marcas de ubicación hechas con sombra. Aquí vuelven
+   como contornos y bordes del color del texto del sistema (CanvasText). Los selectores van en :where() (sin
+   especificidad), así el anillo de foco y cualquier regla propia de un componente siguen ganando.
+   Fuera de este modo nada de este bloque se aplica. */
+@media (forced-colors: active) {
+  /* celdas: todo hijo de una retícula de la lámina (contenedores con huecos de 1 px sobre el azul del filete) */
+  :where(.sheet, .site-header, .masthead, .catpanel__list, .sheet > main, .section, .grid12, .site-footer, .dock,
+    .page-head__side, .hero__side, .plate, .register, .brands, .products, .data, .steps, .faq, .item-register,
+    .catalog-nav__groups, .catalog-nav__folds, .catalog-grid__list, .catalog-search__form,
+    .producto__body, .producto__part, .producto__list, .producto__chips, .producto__docs, .producto__actions,
+    .atencion__col, .atencion__side, .privacidad, .nf__main) > :where(:not(.vh, script, style, template)) {
+    outline: var(--line) solid CanvasText;
+  }
+  /* campos, botones, filas de acción y bloques sólidos */
+  :where(input:not([type="hidden"]), button, select, textarea, .btn, .action, .tag, .monogram, .entry__go, .faq__sign,
+    .brand--all, .band__body, .band__action, .masthead__cta, .masthead__nav, .masthead__search, .catpanel, .dock__link,
+    .skip-link, .preview) {
+    outline: var(--line) solid CanvasText;
+  }
+
+  /* iconos: cada componente les da su color (azul o blanco) y un SVG conserva ese color en este modo; con el ajuste
+     automático toman el del texto que acompañan y no quedan, por ejemplo, blancos sobre un fondo de sistema blanco */
+  :where(.icon) { forced-color-adjust: auto; }
+
+  /* ubicación actual: la barra bajo el enlace se pinta con el color del texto; las barras hechas con sombra
+     (filas de tableta y celular, categoría actual, bloque Cotizar en /cotizar/) pasan a borde */
+  .nav__link::after, .dock__link[aria-current="page"]::after { forced-color-adjust: none; background: CanvasText; }
+  .catpanel__link[aria-current] { border-left: 4px solid CanvasText; }
+  .masthead__cta[aria-current="page"] { border-bottom: 4px solid CanvasText; }
+
+  /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
+  .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }
+}
+@media (forced-colors: active) and (max-width: 1099px) {
+  :where(.nav__list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
+  .nav__link[aria-current] { border-left: 4px solid CanvasText; }
+}
