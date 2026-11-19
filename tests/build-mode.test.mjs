@@ -164,19 +164,62 @@ function splitTopLevel(code, start) {
   return { parts: [...parts, part], end: -1 };
 }
 /**
+ * Salta el tipo genérico `<…>` que empieza en `start` (un «<»): cuenta los «<» y «>» anidados (sin el «>» de una
+ * flecha «=>»), salta los textos entre comillas y sigue los paréntesis, corchetes y llaves. Devuelve la posición
+ * siguiente al «>» que lo cierra, o -1 si no se cierra.
+ */
+function skipTypeArguments(code, start) {
+  let angles = 0;
+  let brackets = 0;
+  for (let index = start; index < code.length; index += 1) {
+    const character = code[index];
+    if (`"'\``.includes(character)) {
+      let end = index + 1;
+      while (end < code.length && code[end] !== character) end += code[end] === '\\' ? 2 : 1;
+      if (end >= code.length) return -1;
+      index = end;
+    } else if ('([{'.includes(character)) {
+      brackets += 1;
+    } else if (')]}'.includes(character)) {
+      if (brackets === 0) return -1;
+      brackets -= 1;
+    } else if (character === '<') {
+      angles += 1;
+    } else if (character === '>' && code[index - 1] !== '=') {
+      angles -= 1;
+      if (angles === 0) return brackets === 0 ? index + 1 : -1;
+    }
+  }
+  return -1;
+}
+// Toda mención de `import.meta.glob`, con espacios o sin ellos alrededor de los puntos y la siga lo que la siga.
+const GLOB_MENTION = /import\s*\.\s*meta\s*\.\s*glob/g;
+/**
  * Patrones de `import.meta.glob(…)` y de `import(\`…${x}…\`)` (que Vite convierte en un patrón) en el código de un
  * archivo, resueltos desde la raíz del proyecto como lo hace Vite: «/…» desde la raíz, «./…» y «../…» desde la
- * carpeta del archivo o desde la opción `base`. Lo que no se puede revisar se devuelve como «?»: un argumento que no
- * es un texto escrito tal cual, unas opciones que no son un objeto escrito tal cual (con una opción desconocida, una
- * expansión o un `base` calculado) y un patrón que no empieza con «/», «./» ni «../» (uno que empieza con «**», un alias).
+ * carpeta del archivo o desde la opción `base`. Cada mención de `import.meta.glob` da sus patrones o «?»: nunca
+ * nada. Lo que no se puede revisar se devuelve como «?»: una mención que no es una llamada (un alias como
+ * `const g = import.meta.glob`, una mención en un comentario o en un texto, `import.meta.globEager`), un tipo
+ * genérico `<…>` que no se cierra, un argumento que no es un texto escrito tal cual, unas opciones que no son un
+ * objeto escrito tal cual (con una opción desconocida, una expansión o un `base` calculado) y un patrón que no
+ * empieza con «/», «./» ni «../» (uno que empieza con «**», un alias).
  * @param {string} path Ruta del archivo («src/pages/x.astro»).
  * @param {string} code Código del archivo.
  */
 function loadPatterns(path, code) {
   const directory = posix.dirname(`/${path}`);
   const patterns = [];
-  for (const match of code.matchAll(/import\.meta\.glob\s*(?:<[^>]*>)?\s*\(/g)) {
-    const { parts, end } = splitTopLevel(code, match.index + match[0].length);
+  for (const match of code.matchAll(GLOB_MENTION)) {
+    // Después de la mención: espacios, un tipo genérico opcional (`<Record<string, unknown>>`), espacios y «(».
+    let index = match.index + match[0].length;
+    while (/\s/.test(code[index] ?? '')) index += 1;
+    if (code[index] === '<') index = skipTypeArguments(code, index);
+    while (index >= 0 && /\s/.test(code[index] ?? '')) index += 1;
+    if (index < 0 || code[index] !== '(') {
+      patterns.push('?');
+      continue;
+    }
+    const { parts, end } = splitTopLevel(code, index + 1);
     const [first = '', options, ...extra] = parts.map(part => part.trim());
     if (end < 0 || extra.some(Boolean)) {
       patterns.push('?');
@@ -259,10 +302,26 @@ test('ningún import.meta.glob ni import() con patrón puede cargar el archivo d
     ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('@datos/**/*.json');"],
     ['src/lib/otra.mjs', 'const datos = await import(`../data/${carpeta}/${nombre}.json`);'],
     ['src/lib/otra.mjs', 'const datos = await import(ruta);'],
+    // Con un tipo genérico que lleva otro dentro, una función flecha o un objeto: se salta el `<…>` completo.
+    ['src/pages/sondas/g.astro', "---\nconst modulos = import.meta.glob<Record<string, unknown>>('../../data/**/*.json', { eager: true });\n---"],
+    ['src/pages/sondas/g.astro', "const modulos = import.meta.glob<{ default: Array<unknown> }>('../../data/**/*.json');"],
+    ['src/pages/sondas/g.astro', "const modulos = import.meta.glob<() => Promise<unknown>>('../../data/**/*.json');"],
+    ['src/pages/sondas/g.astro', "const modulos = import . meta . glob < Record<string, { default: unknown }> > ('../../data/*/*.json');"],
+    // Toda mención que no es una llamada que se pueda revisar falla: un alias, un genérico sin cerrar, una mención en
+    // un comentario o en un texto.
+    ['src/pages/sondas/g.astro', "const g = import.meta.glob;\nconst modulos = g('../../data/*/*.json', { eager: true });"],
+    ['src/pages/sondas/g.astro', "const modulos = import.meta.glob<Record<string, unknown>('../../data/*/*.json');"],
+    ['src/pages/sondas/g.astro', "const modulos = import.meta.globEager('../icons/*.svg');"],
+    ['src/lib/notas.mjs', '// Los iconos se cargan con import.meta.glob.\nexport const nota = 1;'],
+    ['src/lib/notas.mjs', "export const nota = 'Se cargan con import.meta.glob';"],
   ];
   for (const [path, code] of misuse) assert.deepEqual(examplesLoaders([[path, code]]), [path], code);
   const harmless = [
     ['src/pages/muestra.astro', "const iconos = import.meta.glob('../icons/*.svg', { eager: true, query: '?raw' });"],
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob<Record<string, string>>('../icons/*.svg', { eager: true, query: '?raw', import: 'default' });"],
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob<{ default: Array<string> }>('../icons/*.svg');"],
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob<() => Promise<string>>('../icons/*.svg');"],
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob<{ nombre: '>' }>('../icons/*.svg');"],
     ['src/pages/muestra.astro', "const iconos = import.meta.glob('./**/*.svg', { base: '../icons', eager: true });"],
     ['src/pages/muestra.astro', "const datos = import.meta.glob(['../data/*.json', '!../data/preview/**']);"],
     ['src/pages/muestra.astro', "// Sin la carpeta de ejemplos:\nconst datos = import.meta.glob(['../data/**/*.json', '!../data/preview/**'], { eager: true });"],
@@ -270,7 +329,7 @@ test('ningún import.meta.glob ni import() con patrón puede cargar el archivo d
   ];
   for (const [path, code] of harmless) assert.deepEqual(examplesLoaders([[path, code]]), [], code);
 
-  assert.deepEqual(examplesLoaders(rawSources), [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
+  assert.deepEqual(examplesLoaders(rawSources), [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa, o hay una mención de import.meta.glob que no se puede revisar (un alias, un genérico sin cerrar, o una mención en un comentario o en un texto, que también se rechaza)');
 });
 
 // Colecciones de contenido de Astro. Sus cargadores (`glob()` y `file()` de «astro/loaders») leen archivos de src/ con un
