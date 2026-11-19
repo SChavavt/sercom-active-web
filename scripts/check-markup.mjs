@@ -1230,6 +1230,9 @@ export const CHECKS = [
   // - Otras formas de quitar el aviso de la vista (opacity: 0, alto cero, sacarlo de la pantalla, un color igual al
   //   fondo) no se reconocen. Las declaraciones escritas directamente en un @starting-style anidado no cuentan: solo
   //   dan el punto de partida de una transición.
+  // - Las declaraciones escritas directamente en un @scope que no está dentro de una regla
+  //   («@scope (.site-notice) { display: none }») no se leen: ocultan el aviso y pasan. Con una regla dentro del
+  //   @scope («:scope { … }», «& { … }») sí se reportan.
   // Como todas las protecciones, busca errores escritos de forma directa, no un ocultamiento hecho a propósito.
   {
     id: 'I-04',
