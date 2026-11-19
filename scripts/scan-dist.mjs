@@ -191,8 +191,13 @@ const FALSE_CONFIRMATION = new RegExp([
 // Precios: símbolo o código de moneda junto a una cifra, la palabra de un precio seguida de una cifra y vocabulario
 // de oferta. Un prefijo de moneda de una a tres mayúsculas antes de «$» («MX$350», «US$ 25») también es un precio.
 const PRICE_WORD = '\\b(?:precio|costo|importe|monto|tarifa)s?';
-// Una cifra seguida de una unidad de cantidad es una cantidad, no un precio («precio por volumen: 100 piezas»).
-const NOT_QUANTITY = '(?![\\d.,]*\\s*(?:piezas?|pzas?|pz|pares?|cajas?|unidad(?:es)?|paquetes?|rollos?|metros?|mts?|litros?|lts?|kg|kilos?|gramos?|ml|cm|mm|juegos?|kits?|bultos?|docenas?|galones?|tramos?|frascos?|bolsas?|sobres?|cubetas?)\\b)';
+// Una cantidad no es un precio: un número entero (sin decimales) seguido de una unidad en plural y sin otra cifra
+// después en la misma frase («precio por volumen: 100 piezas o más»). «35 pza», «35.50 pieza», «3 pares por 250» o
+// «12 piezas 1,500» siguen siendo precios. Se aplica justo después de la primera cifra.
+const QUANTITY_UNIT = '(?:piezas|pzas|pzs|pares|cajas|unidades|paquetes|rollos|metros|mts|litros|lts|kilos|gramos|juegos|kits|bultos|docenas|galones|tramos|frascos|bolsas|sobres|cubetas)';
+const NOT_QUANTITY = `(?!\\d*(?:,\\d{3})*\\s*${QUANTITY_UNIT}\\b(?![^.!?;\\d]*\\d))`;
+// Palabras que, entre «precio por|con|de|para» y una cifra, hacen de la cifra un dato del producto («Precio para talla 9»).
+const NOT_PRICE_NOUN = '(?!(?:modelo|talla|tipo|clase|serie|nivel|numero|calibre|norma)\\b)';
 /**
  * Patrón de R-RULE-01. En el código de un script (`code: true`) un «$» pegado a una letra, a otro «$» o a «=» es
  * código («$2», «a$1», «x=$1»), no un precio, y un prefijo en mayúsculas solo cuenta si no es parte de un
@@ -209,8 +214,11 @@ const pricePattern = ({ code }) => new RegExp([
   new RegExp(`${PRICE_WORD}(?:\\s+[a-z0-9]+){0,4}\\s*:\\s*\\$?\\s?\\d${NOT_QUANTITY}`),
   // «Precio 350», «Precio unitario 350.00»; no «Precios y cotización 2026».
   new RegExp(`${PRICE_WORD}(?:\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)[a-z]+){0,2}\\s+\\$?\\s?\\d${NOT_QUANTITY}`),
-  // «Precio por pieza 350.00», «Precio con IVA 350», «Precio de mayoreo 300»: «por», «con», «de» o «para» y una palabra antes de la cifra.
-  new RegExp(`${PRICE_WORD}\\s+(?:por|con|de|para)\\s+[a-z]+\\s+\\$?\\s?\\d${NOT_QUANTITY}`),
+  // «Precio por pieza 350.00», «Precio con IVA 350», «Precio de mayoreo 300»: «por», «con», «de» o «para» y una palabra
+  // antes de la cifra; no un porcentaje («Precio con IVA 16%») ni una talla, una serie o un modelo («Precio para talla 9»).
+  new RegExp(`${PRICE_WORD}\\s+(?:por|con|de|para)\\s+${NOT_PRICE_NOUN}[a-z]+\\s+\\$?\\s?\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
+  // «Precio de 350»; no un año («El precio de 2026 lo confirma Sercom») ni una cantidad («el precio de 12 pares»).
+  new RegExp(`${PRICE_WORD}\\s+de\\s+\\$?\\s?(?!(?:19|20)\\d\\d\\b)\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
   /\bprecios? (?:desde|de lista|especial|mayoreo)|\bdescuentos?\b|\ben oferta\b|\bofertas? (?:especial(?:es)?|del mes|de la semana)\b|\bpromoci[oó]n(?:es)?\b|\brebajas?\b/,
 ].map(part => part.source).join('|'), 'i');
 const PUBLIC_PRICE = pricePattern({ code: true });

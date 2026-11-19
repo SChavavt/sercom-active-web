@@ -519,9 +519,22 @@ test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabr
 });
 
 test('R-RULE-01: una cifra seguida de una unidad de cantidad no es un precio', async () => {
-  await assertNoneFails(['<p>Cotiza precio por volumen: 100 piezas o más</p>', '<p>Precio por volumen: 12 pares</p>', '<p>Tarifa de envío: 3 cajas</p>', '<p>Precio de mayoreo 50 pzas. en adelante</p>']);
+  await assertNoneFails(['<p>Cotiza precio por volumen: 100 piezas o más</p>', '<p>Precio por volumen: 12 pares</p>', '<p>Tarifa de envío: 3 cajas</p>', '<p>Precio de mayoreo 50 pzas. en adelante</p>',
+    '<p>Precio por volumen 100 pzas</p>', '<p>Pregunta el precio de 12 pares</p>', '<p>El precio de 2026 lo confirma Sercom</p>']);
   // La misma frase con una cifra que no es una cantidad sigue siendo un precio.
   await assertEachFails('R-RULE-01', ['<p>Precio por volumen: 100</p>', '<p>Precio por volumen: 100 pesos</p>', '<p>Precio: 100.00 por pieza</p>', '<p>Precio por pieza 35 MXN</p>']);
+  // Solo es una cantidad un número entero seguido de una unidad en plural, sin otra cifra en la misma frase: «35 pza»,
+  // «35.50 pieza» o «3 pares por 250» son la forma de escribir un precio por unidad.
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio: 35 pza</p>', '<p>Precio 35 pza</p>', '<p>Precio: 35.50 pieza</p>', '<p>Precio: 3 pares por 250</p>', '<p>Precio: 12 piezas 1,500</p>', '<p>Precio: 120 caja</p>',
+    '<p>Precio: 45 metro</p>', '<p>Precio: 1 pieza 35.00</p>', '<p>Precio: 10 piezas = 350</p>', '<p>Precio: 100 piezas o más, 30 c/u</p>', '<p>Precio: 3 cajas por 900</p>',
+    '<p>Precio de mayoreo: 6 pares 900</p>', '<p>Costo: 1 kit 1500</p>', '<p>Precio: 350 kg</p>', '<p>Precio de 350</p>',
+  ]);
+});
+
+test('R-RULE-01: un porcentaje, una talla, una serie o un modelo después de «precio por|con|de|para» no son un precio', async () => {
+  await assertNoneFails(['<p>El precio con IVA 16% se confirma al cotizar</p>', '<p>Precio para talla 9 al cotizar</p>', '<p>Precio de serie 6000: se cotiza</p>', '<p>Precio por modelo 3M al cotizar</p>']);
+  await assertEachFails('R-RULE-01', ['<p>Precio con IVA 350</p>', '<p>Precio para mayoristas 300</p>', '<p>Precio de mayoreo 300</p>']);
 });
 
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
