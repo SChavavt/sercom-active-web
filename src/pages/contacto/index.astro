@@ -1,0 +1,57 @@
+---
+// Contacto (/contacto/). Título con las dos acciones (WhatsApp y correo con el mensaje general); el bloque
+// de atención personal de la portada como cuerpo (monograma, entrada, «Atención comercial en Puebla» y las
+// filas de datos); las tres formas de pedir ayuda, empezando por las que llevan a escribir; y las
+// preguntas frecuentes (src/lib/ayuda.ts, el mismo texto de la portada).
+// Sin domicilio, sin mapa, sin «Visítanos» y sin fotografía. Se ve igual en los dos modos.
+// Textos: brief de páginas «atencion», sección 3, y brief de diseño 6.2.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import ContactData from '../../components/ContactData.astro';
+import EntryCard from '../../components/EntryCard.astro';
+import Faq from '../../components/Faq.astro';
+import Monogram from '../../components/Monogram.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import SectionHead from '../../components/SectionHead.astro';
+import { faqs, helpEntry } from '../../lib/ayuda.ts';
+import { contactDetails, contactLinks } from '../../lib/contact.mjs';
+import { routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/atencion.css';
+
+const general = contactLinks.general();
+const entries = [helpEntry('quoteList'), helpEntry('specialRequest'), helpEntry('catalog')];
+---
+<BaseLayout
+  title="Contacto"
+  description={`Escribe por WhatsApp o por correo a ${contactDetails.contactName}. ${contactDetails.locationLabel}.`}
+>
+  <PageHeader title="Contacto" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Contacto' }]}>
+    <ActionRow href={general.whatsapp} primary icon="whatsapp">Contactar por WhatsApp</ActionRow>
+    <ActionRow href={general.mailto} icon="mail">Escribir por correo</ActionRow>
+  </PageHeader>
+
+  <section class="section" aria-labelledby="atencion-title">
+    <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
+      <Monogram slot="side" />
+    </SectionHead>
+    <div class="grid12">
+      <div class="contact__intro contacto__intro cell span-5">
+        <p class="t-lead">Cuéntame qué necesita tu empresa y revisamos las opciones disponibles para cotizar.</p>
+        <p class="contacto__place label">{contactDetails.locationLabel}</p>
+      </div>
+      <ContactData class="contact__data span-7" />
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="ayuda-title">
+    <SectionHead title="¿Cómo podemos ayudarte?" id="ayuda-title" />
+    <div class="grid12">
+      {entries.map(entry => <EntryCard href={entry.href} icon={entry.icon} title={entry.title} kicker={entry.kicker} text={entry.text} />)}
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="preguntas-title">
+    <SectionHead title="Preguntas frecuentes" id="preguntas-title" />
+    <Faq items={faqs} />
+  </section>
+</BaseLayout>

@@ -1,0 +1,71 @@
+/* ==========================================================================
+   1. Variables (tokens): color, tamaños, espacios y composición
+   Parte de la hoja global del sitio (entrada: global.css). Guía: docs/diseno.md.
+   Familia, pilas de respaldo, pesos y anchos tipográficos vienen de fonts.css (kit tipográfico).
+   Paleta cerrada: tinta #19171A, azul Sercom #0067B0, blanco, sus tintes y sombras, y grises neutros.
+   ========================================================================== */
+:root {
+  /* Colores de la marca (medidos en el logotipo) */
+  --ink: #19171A;
+  --blue: #0067B0;
+  --white: #FFFFFF;
+
+  /* Sombras y tintes del azul */
+  --blue-800: #00406E;          /* presionado */
+  --blue-700: #00548F;          /* al pasar sobre azul sólido */
+  --blue-300: #99C2DF;
+  --blue-200: #C8DFEE;          /* filete suave dentro de una celda */
+  --blue-100: #E6F0F7;          /* línea del rayado, tinte presionado */
+  --blue-050: #F3F8FC;          /* tinte al pasar, superficie de marcador */
+
+  /* Grises neutros (solo texto) */
+  --grey-700: #46464C;          /* texto secundario, 9.4:1 sobre blanco */
+  --grey-600: #5A5B62;          /* texto terciario y marcadores de campo, 6.8:1 sobre blanco */
+  --grey-300: #C9CACE;          /* texto y bordes deshabilitados (reservado: no hay controles deshabilitados) */
+
+  /* Funciones */
+  --rule: var(--blue);          /* el filete */
+  --rule-soft: var(--blue-200);
+  --surface: var(--white);
+  --surface-tint: var(--blue-050);
+  --focus: var(--ink);
+
+  /* Tamaños de letra del diseño (familia, pilas, pesos y anchos vienen de fonts.css) */
+  --h1: clamp(2.25rem, 5.6vw, 5rem);                 /* 72 px a 1280 · 80 px desde 1430 (tableta y celular lo redefinen en responsive.css) */
+  --h2: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);     /* 44 px desde 1130 · 36 px a 768 (el celular usa el tamaño del kit) */
+  --h3: 1.25rem;                                     /* 20 px: títulos de listas y pasos */
+  --h3-lg: 1.75rem;                                  /* 28 px: tarjetas de entrada */
+  --lead: var(--type-lead-size);                     /* de 17 a 19 px */
+  --body: var(--type-body-size);                     /* 16 px */
+  --small: var(--type-small-size);                   /* 14 px */
+  --label: var(--type-label-size);                   /* 12.5 px en mayúsculas */
+  --label-sm: 0.71875rem;                            /* 11.5 px en mayúsculas: etiquetas, índices */
+
+  /* Escala de espacios (base de 4 px) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --s-10: 56px;
+  --s-11: 64px;
+  --s-12: 80px;
+
+  /* Composición */
+  --sheet-max: 1296px;          /* ancho de la lámina */
+  --margin: 72px;               /* margen blanco fuera de la lámina */
+  --pad: 32px;                  /* relleno horizontal de una celda */
+  --line: 1px;                  /* grosor del filete */
+  --section-top: 80px;          /* aire sobre el título de una sección */
+  --utility-h: 36px;
+  --masthead-h: 84px;
+
+  /* Forma, profundidad, movimiento */
+  --radius: 0;
+  --shadow-overlay: 0 28px 48px -20px rgba(25, 23, 26, 0.34);   /* solo para paneles que flotan sobre la página */
+  --ease: 150ms ease;
+}

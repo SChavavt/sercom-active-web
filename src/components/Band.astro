@@ -1,0 +1,35 @@
+---
+// Banda azul sólida (`.band`): la llamada a la acción fuerte de una página. Título y texto en blanco sobre
+// azul en 8 columnas; en las otras 4, pictograma y un botón blanco. En la portada lleva a la solicitud especial.
+import type { IconName } from '../lib/icons.ts';
+import Button from './Button.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  title: string;
+  /** id del título, para aria-labelledby de la sección. */
+  id: string;
+  text?: string;
+  action: { href: string; label: string };
+  /** Pictograma de 72 px sobre el botón (se oculta en tableta y celular). Por omisión `zoom-question`. */
+  icon?: IconName;
+  /** 2 por omisión; 1 si la banda es el título de la página: el H1 toma entonces el tamaño de los títulos de
+   *  página interior (`.band__title--page`: 44 px en computadora, 28 en celular) en lugar del de un H2. */
+  headingLevel?: 1 | 2;
+}
+
+const { title, id, text, action, icon = 'zoom-question', headingLevel = 2 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h1' | 'h2';
+const headingClass = headingLevel === 1 ? 't-h2 band__title--page' : 't-h2';
+---
+<div class="band grid12">
+  <div class="band__body span-8">
+    <Heading class={headingClass} id={id}>{title}</Heading>
+    {text && <p class="band__text">{text}</p>}
+    <slot />
+  </div>
+  <div class="band__action span-4">
+    <Icon name={icon} class="band__icon icon--fine" />
+    <Button href={action.href} variant="inverse" block iconEnd="arrow-right">{action.label}</Button>
+  </div>
+</div>

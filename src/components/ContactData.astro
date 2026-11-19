@@ -1,0 +1,41 @@
+---
+// Datos de contacto (`.data`): filas WhatsApp, Correo y Horario con los datos de business.json.
+// Los enlaces abren WhatsApp o el correo con el mensaje general (o el que se pase); nunca hay confirmación.
+// Va en una celda de la lámina, por ejemplo `class="contact__data span-7"` junto a la intro de 5 columnas.
+import { contactDetails, contactLinks } from '../lib/contact.mjs';
+import EmailAddress from './EmailAddress.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Enlace de WhatsApp; por omisión el mensaje general. */
+  whatsappHref?: string;
+  /** Enlace de correo; por omisión el mensaje general. */
+  mailHref?: string;
+  /** Filas adicionales al final (texto plano), por ejemplo la atención comercial en Puebla. */
+  extraRows?: readonly { key: string; value: string }[];
+  class?: string;
+}
+
+const general = contactLinks.general();
+const { whatsappHref = general.whatsapp, mailHref = general.mailto, extraRows = [], class: className } = Astro.props;
+---
+<dl class:list={['data', className]}>
+  <div class="data__row">
+    <dt class="data__key label">WhatsApp</dt>
+    <dd class="data__value"><a class="data__link" href={whatsappHref}><span class="t-code">{contactDetails.whatsappDisplay}</span><Icon name="arrow-up-right" /></a></dd>
+  </div>
+  <div class="data__row">
+    <dt class="data__key label">Correo</dt>
+    <dd class="data__value"><a class="data__link" href={mailHref}><EmailAddress /><Icon name="arrow-up-right" /></a></dd>
+  </div>
+  <div class="data__row">
+    <dt class="data__key label">Horario</dt>
+    <dd class="data__value data__value--text">{contactDetails.hoursText}</dd>
+  </div>
+  {extraRows.map(row => (
+    <div class="data__row">
+      <dt class="data__key label">{row.key}</dt>
+      <dd class="data__value data__value--text">{row.value}</dd>
+    </div>
+  ))}
+</dl>

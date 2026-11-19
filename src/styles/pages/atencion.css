@@ -1,0 +1,144 @@
+/* ==========================================================================
+   Páginas de atención: Cotizar mi lista, Solicitud especial, Contacto, Privacidad y 404,
+   y los componentes que comparten (ItemRegister, DraftMessage).
+   Lo importan esas páginas y los dos componentes (Vite lo incluye una sola vez).
+   Mismas reglas que la hoja global: celdas blancas sobre la lámina azul, filetes por huecos de 1 px,
+   dentro de una celda solo el filete suave; solo variables de tokens.css y fonts.css.
+   Puntos de corte: 1099 (tableta) y 699 (celular), con max-width.
+   ========================================================================== */
+
+/* --- Registro numerado (ItemRegister) ------------------------------------- */
+.item-register { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.item-register__row {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 13rem) minmax(0, 1fr);
+  align-items: baseline;
+  align-content: center;
+  column-gap: var(--s-6);
+  min-height: 76px;
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+}
+.item-register__num {                       /* el número de los pasos, a tamaño pequeño */
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  line-height: 1;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+.item-register__label { font-size: 1.125rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; }
+.item-register__text { color: var(--grey-700); text-wrap: pretty; }
+
+/* --- Borrador del mensaje (DraftMessage) ----------------------------------- */
+.draft { display: flex; flex-direction: column; gap: var(--s-5); padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
+.draft__text { border-top: var(--line) solid var(--rule-soft); overflow-wrap: anywhere; }
+.draft__line {                              /* una línea del mensaje sobre su renglón de filete suave */
+  display: block;
+  min-height: 2rem;
+  padding: 4px 0 3px;
+  border-bottom: var(--line) solid var(--rule-soft);
+  line-height: 1.5;
+}
+
+/* --- Piezas comunes de las páginas del grupo ------------------------------- */
+/* Una fila de dos partes: columna de celdas (registro y su cierre) y la celda del borrador */
+.atencion__col { display: flex; flex-direction: column; gap: var(--line); }
+.atencion__col > :last-child { flex: 1; }
+.atencion__enough { padding: var(--s-6) var(--pad); background: var(--surface); font-size: 1.0625rem; text-wrap: pretty; }
+
+/* Celda lateral con una entrada breve arriba y una fila de acción abajo (como PageHeader) */
+.atencion__side { display: flex; flex-direction: column; gap: var(--line); }
+.atencion__intro { flex: 1; padding: var(--s-9) var(--pad) var(--s-7); background: var(--surface); }
+.atencion__intro .t-lead { max-width: 30ch; }
+
+@media (max-width: 1099px) {
+  .atencion__intro { padding: var(--s-7) var(--pad); }
+}
+
+@media (max-width: 699px) {
+  .item-register__row { grid-template-columns: 1.75rem minmax(0, 1fr); row-gap: 2px; column-gap: var(--s-4); min-height: 0; padding: var(--s-4) var(--pad); }
+  .item-register__num { grid-row: span 2; font-size: 1.75rem; }
+  .item-register__label { font-size: 1.0625rem; }
+  .item-register__text { grid-column: 2; font-size: 0.9375rem; line-height: 1.45; }
+  .draft { padding: var(--s-6) var(--pad) var(--s-7); }
+  .draft__text { font-size: 0.9375rem; }
+  .draft__line { min-height: 1.875rem; }
+  .atencion__enough { padding: var(--s-5) var(--pad); font-size: 1rem; }
+}
+
+/* --- Solicitud especial ----------------------------------------------------- */
+/* Ruta de navegación sobre la banda: una fila delgada */
+.solicitud__crumbs { padding: var(--s-5) var(--pad); }
+/* Celda junto a la acción de correo: la nota de los borradores y, encima, la de la búsqueda cuando llega una */
+.solicitud__notes { display: flex; flex-direction: column; justify-content: center; }
+/* La búsqueda la escribe el cliente: un término largo sin espacios se parte dentro de la nota en lugar de
+   salirse de la celda y desplazar la página de lado */
+.solicitud__notes [data-search-note] { overflow-wrap: anywhere; }
+/* En computadora la nota va a la izquierda y la acción a la derecha; en el marcado la acción va primero */
+@media (min-width: 1100px) {
+  .solicitud__notes { grid-column: 1 / span 8; grid-row: 1; }
+  .solicitud__mail { grid-column: 9 / span 4; grid-row: 1; }
+}
+
+@media (max-width: 1099px) {
+  .solicitud__crumbs { padding-block: var(--s-2); }
+}
+
+/* --- Contacto --------------------------------------------------------------- */
+/* La ubicación como etiqueta con el cuadro azul, igual que en la franja de servicio */
+.contacto__place { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+.contacto__place::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--blue); }
+
+/* --- Privacidad: filas de etiqueta y texto (4 + 8 columnas, como «Cómo funciona») --- */
+.privacidad { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.privacidad__key { padding: var(--s-7) var(--pad); font-size: var(--h3); font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; text-wrap: balance; }
+.privacidad__value { padding: var(--s-7) var(--pad); font-size: var(--lead); line-height: var(--type-lead-leading); text-wrap: pretty; }
+.privacidad__value p { max-width: 64ch; }
+.privacidad__link { color: var(--blue); font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.privacidad__link:hover { text-decoration-thickness: 2px; }
+/* La dirección pasa entera al renglón siguiente si cabe ahí; solo si no cabe se parte después de «@» */
+.privacidad__link .email { display: inline-block; text-decoration: inherit; }
+
+@media (max-width: 1099px) {
+  .privacidad__link { padding-block: 13px; }        /* objetivo táctil de 44 px sin cambiar el renglón */
+  .privacidad__row { row-gap: 0; }                 /* etiqueta y texto forman una sola celda */
+  .privacidad__key, .privacidad__value { grid-column: span 12; }
+  .privacidad__key { padding-bottom: var(--s-2); }
+  .privacidad__value { padding-top: 0; }
+}
+@media (max-width: 699px) {
+  .privacidad__key { padding-top: var(--s-6); font-size: 1.125rem; }
+  .privacidad__value { padding-bottom: var(--s-6); }
+}
+
+/* --- 404: el número en el estilo de los pasos, el mensaje y dos filas de acción --- */
+.nf__num {
+  padding: var(--s-7) var(--pad);
+  font-family: var(--font-heading);
+  font-size: 9rem;
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  letter-spacing: var(--type-h1-tracking);
+  line-height: 0.9;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+.nf__main { display: flex; flex-direction: column; gap: var(--line); }
+.nf__body { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-5); min-height: 248px; padding: var(--s-7) var(--pad) var(--s-8); }
+.nf__title { margin-top: auto; max-width: 22ch; }
+.nf__text { max-width: 52ch; color: var(--grey-700); }
+
+@media (max-width: 1359px) {
+  .nf__num { font-size: 8rem; }
+}
+@media (max-width: 1099px) {
+  .nf__num { font-size: 5.5rem; }
+  .nf__body { min-height: 0; padding: var(--s-8) var(--pad) var(--s-7); }
+}
+@media (max-width: 699px) {
+  .nf__num { padding: var(--s-6) var(--pad) var(--s-1); font-size: 4rem; line-height: 1; }
+  .nf__body { padding: var(--s-4) var(--pad) var(--s-7); gap: var(--s-4); }
+  .nf__row { row-gap: 0; }                 /* número y mensaje forman una sola celda */
+}

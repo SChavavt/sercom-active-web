@@ -1,35 +1,136 @@
 ---
+// Inicio. Vista previa: idéntica a la maqueta aprobada («Lámina técnica»). Producción (sin categorías ni
+// productos aprobados): portada sin placa, aviso «Estamos preparando el catálogo» y las tres entradas
+// arriba; desaparecen las secciones de categorías y de productos. Todo se decide con los datos.
+// Textos: brief, sección 6.2.
 import BaseLayout from '../layouts/BaseLayout.astro';
-import business from '../data/business.json';
-const whatsapp = `https://wa.me/${business.whatsappDigits}?text=${encodeURIComponent('Hola, Yosmara. Me interesa solicitar información y una cotización de Sercom Active.')}`;
+import ActionRow from '../components/ActionRow.astro';
+import Band from '../components/Band.astro';
+import BrandCells from '../components/BrandCells.astro';
+import Button from '../components/Button.astro';
+import CategoryPlate from '../components/CategoryPlate.astro';
+import CategoryRegister from '../components/CategoryRegister.astro';
+import ContactData from '../components/ContactData.astro';
+import EntryCard from '../components/EntryCard.astro';
+import Faq from '../components/Faq.astro';
+import Monogram from '../components/Monogram.astro';
+import Note from '../components/Note.astro';
+import ProductGrid from '../components/ProductGrid.astro';
+import SectionHead from '../components/SectionHead.astro';
+import Steps from '../components/Steps.astro';
+import { faqs, helpEntries } from '../lib/ayuda.ts';
+import { contactDetails, contactLinks } from '../lib/contact.mjs';
+import { brands, categories, featuredProducts, routes } from '../lib/site-data.mjs';
+
+const hasCategories = categories.length > 0;
+const featured = featuredProducts(8);
+
+// Las tres formas de pedir ayuda: los textos viven una sola vez en src/lib/ayuda.ts (helpEntries).
+const entries = helpEntries.map(({ href, icon, title, kicker, text }) => ({ href, icon, title, kicker, text }));
+
+const { contactFirstName } = contactDetails;
+const steps = [
+  'Explora o cuéntanos qué necesitas',
+  `${contactFirstName} revisa opciones, disponibilidad y condiciones`,
+  'Recibes tu cotización por WhatsApp o correo',
+];
 ---
-<BaseLayout title="Sercom Active · Atención en Puebla" description="Atención comercial de Sercom Active en Puebla. Comparte tu requerimiento y revisaremos opciones para cotizar.">
-  <div class="development-note">Sitio en preparación · Versión inicial para revisión</div>
-  <header class="shell header">
-    <a class="wordmark" href="/" aria-label="Sercom Active, inicio">Sercom<span>Active</span></a>
-    <a href="#contacto">Contacto en Puebla <span aria-hidden="true">↗</span></a>
-  </header>
-  <main id="contenido" class="shell hero">
-    <section class="intro">
-      <p class="eyebrow">{business.locationLabel}</p>
-      <h1>Equipo de protección y soluciones para tu empresa.</h1>
-      <p class="lead">Cuéntanos qué necesitas. Te ayudamos a buscar opciones y preparar una cotización para tu requerimiento.</p>
-      <a class="button" href={whatsapp} target="_blank" rel="noopener noreferrer">Consultar por WhatsApp <span aria-hidden="true">↗</span></a>
-      <p class="supporting">¿Buscas un producto o material especial? Comparte la descripción, marca o modelo y la cantidad que necesitas.</p>
-    </section>
-    <aside id="contacto" class="contact-card">
-      <p class="eyebrow">Atención personal</p>
-      <h2>{business.contactName}</h2>
-      <div class="contact-item"><span>WhatsApp</span><a href={whatsapp} target="_blank" rel="noopener noreferrer">{business.whatsappDisplay}</a></div>
-      <div class="contact-item"><span>Correo</span><a href={`mailto:${business.email}`}>{business.email}</a></div>
-      <div class="contact-item"><span>Horario · Puebla</span><p>{business.hoursText}</p></div>
-      <p class="contact-footnote">Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</p>
-    </aside>
-  </main>
-  <section class="shell next-step" aria-labelledby="catalogo-en-preparacion">
-    <p class="eyebrow">Próximamente</p>
-    <h2 id="catalogo-en-preparacion">Un catálogo para explorar nuestras opciones.</h2>
-    <p>Estamos preparando la consulta por categorías y marcas. Mientras tanto, podemos atender tu solicitud directamente.</p>
+<BaseLayout>
+  {/* 1. Portada */}
+  <section class="section hero" aria-labelledby="hero-title">
+    <div class="grid12">
+      <div class="hero__head cell span-8">
+        <p class="eyebrow label">Atención personal en Puebla</p>
+        <h1 class="hero__title t-h1" id="hero-title"><span>Equipo de protección </span><span>y soluciones para </span><span>tu empresa.</span></h1>
+      </div>
+      <div class="hero__side span-4">
+        <div class="hero__lead"><p class="t-lead">Explora nuestras categorías y marcas. En Sercom Active te ayudamos a buscar opciones y preparar una cotización según lo que necesitas.</p></div>
+        <ActionRow href={routes.catalog} primary>Explorar catálogo</ActionRow>
+        <ActionRow href={routes.quoteList}>Cotizar mi lista</ActionRow>
+      </div>
+    </div>
+    {hasCategories ? (
+      <CategoryPlate categories={categories} />
+    ) : (
+      <Fragment>
+        <Note class="hero__notice">Estamos preparando el catálogo</Note>
+        <div class="grid12">
+          {entries.map(entry => <EntryCard {...entry} headingLevel={2} />)}
+        </div>
+      </Fragment>
+    )}
   </section>
-  <footer class="shell footer"><strong>{business.name}</strong><span>Atención comercial en Puebla</span></footer>
+
+  {hasCategories && (
+    <Fragment>
+      {/* 2. Tres formas de pedir ayuda */}
+      <section class="section" aria-labelledby="ayuda-title">
+        <SectionHead title="¿Cómo podemos ayudarte?" id="ayuda-title" />
+        <div class="grid12">
+          {entries.map(entry => <EntryCard {...entry} />)}
+        </div>
+      </section>
+
+      {/* 3. Categorías */}
+      <section class="section" id="categorias" aria-labelledby="categorias-title">
+        <SectionHead title="Explora nuestras categorías" id="categorias-title" />
+        <CategoryRegister categories={categories} />
+      </section>
+    </Fragment>
+  )}
+
+  {/* 4. Marcas */}
+  <section class="section" id="marcas" aria-labelledby="marcas-title">
+    <SectionHead title="Marcas que manejamos" id="marcas-title" />
+    <BrandCells brands={brands} allLink={{ href: routes.brands, label: 'Ver todas las marcas' }} />
+    <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
+  </section>
+
+  {/* 5. Selección de productos */}
+  {featured.length > 0 && (
+    <section class="section" id="productos" aria-labelledby="productos-title">
+      <SectionHead title="Productos del catálogo" id="productos-title" more={{ href: routes.catalog, label: 'Ver todo el catálogo' }} />
+      <ProductGrid products={featured} />
+    </section>
+  )}
+
+  {/* 6. Solicitud especial */}
+  <section class="section" aria-labelledby="especial-title">
+    <Band
+      title="¿Buscas algo que no aparece en el catálogo?"
+      id="especial-title"
+      text="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
+      action={{ href: routes.specialRequest, label: 'Ayúdame a encontrarlo' }}
+    />
+  </section>
+
+  {/* 7. Atención personal */}
+  <section class="section" id="atencion" aria-labelledby="atencion-title">
+    <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
+      <Monogram slot="side" />
+    </SectionHead>
+    <div class="grid12">
+      <div class="contact__intro cell span-5">
+        <p class="t-lead">Cuéntame qué necesita tu empresa y revisamos las opciones disponibles para cotizar.</p>
+        <Button href={contactLinks.general().whatsapp} icon="whatsapp">Contactar por WhatsApp</Button>
+      </div>
+      <ContactData class="contact__data span-7" />
+    </div>
+  </section>
+
+  {/* 8. Cómo funciona */}
+  <section class="section" aria-labelledby="funciona-title">
+    <SectionHead
+      title="Cómo funciona"
+      id="funciona-title"
+      aside={`Reunimos opciones de distintas marcas para facilitar la búsqueda de equipo de protección y suministros. Comparte tu requerimiento con ${contactFirstName} y revisaremos productos, disponibilidad y condiciones para cotizar.`}
+    />
+    <Steps steps={steps} />
+  </section>
+
+  {/* 9. Preguntas frecuentes */}
+  <section class="section" id="preguntas" aria-labelledby="preguntas-title">
+    <SectionHead title="Preguntas frecuentes" id="preguntas-title" />
+    <Faq items={faqs} />
+  </section>
 </BaseLayout>

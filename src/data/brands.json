@@ -1,0 +1,21 @@
+[
+  { "id": "ansell", "name": "Ansell", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.ansell.com/mx/es/industrial" }] },
+  { "id": "3m", "name": "3M", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.3m.com.mx/3M/es_MX/p/c/epp/i/seguridad/seguridad-personal/" }] },
+  { "id": "duramil", "name": "Duramil", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://duramil.com.mx/catalogo/" }] },
+  { "id": "alto", "name": "ALTO", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://ecommerce.alturasegura.com.mx/" }] },
+  { "id": "uvex", "name": "UVEX", "kind": "brand", "manufacturerLinks": [] },
+  { "id": "lakeland", "name": "Lakeland", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.lakeland.com/es-la/product-catalogs/" }] },
+  { "id": "mcr-safety", "name": "MCR Safety", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.mcrsafety.com.mx/" }] },
+  { "id": "infra", "name": "INFRA", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://grupoinfra.com/librerias-y-descargas" }] },
+  { "id": "espomega", "name": "Espomega", "kind": "supplier", "manufacturerLinks": [] },
+  { "id": "moldex", "name": "Moldex", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.moldex.com/es/resources/marketing-sales-resources/literatura-downloads/" }] },
+  { "id": "msa", "name": "MSA", "kind": "brand", "manufacturerLinks": [] },
+  { "id": "herhild", "name": "Herhild", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://herhild.com/catalogo/" }] },
+  { "id": "dry-pro", "name": "Dry Pro", "kind": "brand", "manufacturerLinks": [] },
+  { "id": "jyrsa", "name": "JYRSA", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://jyrsa.com/catalogo/" }] },
+  { "id": "golden-eagle", "name": "Golden Eagle", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.goldeneagle.com.mx/producto/" }] },
+  { "id": "hawk", "name": "HAWK", "kind": "brand", "manufacturerLinks": [] },
+  { "id": "derma-care", "name": "Derma Care", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://dermacare.mx/" }] },
+  { "id": "dupont", "name": "DuPont", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://www.dupont.mx/personal-protective-equipment.html" }] },
+  { "id": "mr-seguridad", "name": "MR Seguridad", "kind": "brand", "manufacturerLinks": [{ "label": "Sitio del fabricante", "url": "https://mrseguridad.com/" }] }
+]

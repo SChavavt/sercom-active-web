@@ -1,0 +1,614 @@
+/* ==========================================================================
+   4. Componentes compartidos
+   Parte de la hoja global del sitio (entrada: global.css). Guía: docs/diseno.md.
+   Cada bloque corresponde a un componente de src/components/ (ver docs/diseno.md).
+   ========================================================================== */
+
+/* 4.1 Aviso de vista previa (solo compilaciones de vista previa) ------------- */
+.preview { background: var(--ink); color: var(--white); }
+.preview__text {                                          /* mismos márgenes que la lámina (layout.css) */
+  --sheet-w: min(100% - var(--edge-left) - var(--edge-right), var(--sheet-max));
+  width: var(--sheet-w);
+  margin-left: clamp(var(--edge-left), (100% - var(--sheet-w)) / 2, 100% - var(--sheet-w) - var(--edge-right));
+  padding: 9px calc(var(--pad) + var(--line));
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* 4.2 Encabezado: franja de servicio + cabecera (el cajetín de la lámina) --- */
+.site-header {
+  position: sticky;
+  /* la franja de servicio se desplaza; la cabecera se queda. --utility-shift es el alto real de la franja
+     (lo mide SiteHeader): crece si el texto se agranda o se espacia */
+  top: calc(-1 * (var(--utility-shift, var(--utility-h)) + var(--line)));
+  z-index: 50;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--line);
+  background: var(--rule);
+  box-shadow: 0 var(--line) 0 var(--rule);
+}
+
+.utility {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;                                       /* con texto agrandado o espaciado los grupos bajan de línea */
+  justify-content: space-between;
+  gap: var(--s-1) var(--s-6);
+  min-height: var(--utility-h);
+  padding: var(--s-1) var(--pad);
+  background: var(--surface);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  color: var(--grey-700);
+}
+.utility__group { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-5); min-width: 0; }
+.utility__item { display: flex; align-items: center; gap: var(--s-2); white-space: nowrap; }
+.utility__item + .utility__item::before { content: ""; width: var(--line); height: 14px; margin-right: calc(var(--s-5) - var(--s-2)); background: var(--rule); }
+.utility__place { color: var(--ink); font-size: var(--label-sm); }
+.utility__place::before { content: ""; width: 8px; height: 8px; background: var(--blue); }
+.utility__link { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--ink); text-decoration: none; }
+.utility__link:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.utility .icon { color: var(--blue); }
+
+.masthead { min-height: var(--masthead-h); }               /* mínimo, no fijo: con texto espaciado la cabecera crece */
+.masthead > * { background: var(--surface); }
+
+.masthead__logo { display: flex; align-items: center; padding-left: var(--pad); }
+.masthead__logo:focus-visible { outline-offset: -3px; }
+.masthead__logo img { width: 156px; height: 59px; }        /* logo.svg sin margen propio: proporción 2.656 */
+
+.masthead__nav { display: flex; min-width: 0; }
+.masthead__nav-list { display: flex; flex: 1; flex-wrap: wrap; justify-content: space-between; padding: 0 var(--s-3); }   /* si no caben, los enlaces bajan de línea */
+.masthead__nav-list > li { display: flex; }
+.masthead__nav-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--s-3);
+  font-size: 0.96875rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  list-style: none;
+}
+.masthead__nav-link::after {
+  content: "";
+  position: absolute;
+  left: var(--s-3);
+  right: var(--s-3);
+  bottom: 0;
+  height: 4px;
+  background: var(--blue);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform var(--ease);
+}
+.masthead__nav-link:hover::after,
+.masthead__nav-link[aria-current]::after,                         /* página actual ("page") y su sección ("true") */
+.masthead__nav-cat[open] > .masthead__nav-link::after { transform: none; }
+.masthead__nav-link:focus-visible { outline-offset: -3px; }
+.masthead__nav-link .icon { color: var(--blue); transition: transform var(--ease); }
+.masthead__nav-cat { display: flex; }
+.masthead__nav-cat[open] > .masthead__nav-link .icon { transform: rotate(180deg); }
+.masthead__nav-list > .masthead__nav-item--quote { display: none; }        /* en computadora esta entrada es el bloque azul al final de la cabecera */
+
+/* Panel de categorías: una pequeña placa que cuelga de la cabecera */
+.catpanel {
+  position: absolute;
+  top: 100%;
+  left: calc(-1 * var(--line));
+  right: calc(-1 * var(--line));
+  margin-top: var(--line);
+  padding: 0 var(--line) var(--line);
+  background: var(--rule);
+  box-shadow: var(--shadow-overlay);
+}
+.catpanel__all { grid-column: span var(--catpanel-all-span, 4); }      /* completa la última fila (lo calcula SiteHeader) */
+.catpanel__link {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  height: 100%;
+  min-height: 76px;
+  padding: var(--s-3) var(--s-5);
+  background: var(--surface);
+  font-size: 0.9375rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-decoration: none;
+}
+.catpanel__link .icon { color: var(--blue); }
+/* Una palabra que no cabe puede ocupar el relleno derecho; si tampoco cabe ahí, se parte antes que salir de su celda
+   (con texto espaciado). El tope solo baja el mínimo de una palabra más ancha que ese espacio: con el texto normal
+   las líneas no cambian. 28px + gap: el icono de la categoría. */
+.catpanel__link > span { max-width: calc(100% - 28px - var(--s-3) + var(--s-5)); overflow-wrap: break-word; }
+.catpanel__link:hover { background: var(--surface-tint); }
+.catpanel__link--all { justify-content: space-between; padding-inline: var(--pad); background: var(--surface-tint); }
+.catpanel__link--all:hover { background: var(--blue-100); }
+.catpanel__link[aria-current] { box-shadow: inset 4px 0 var(--blue); font-weight: 700; }      /* la categoría actual */
+
+.masthead__search { display: flex; align-items: center; min-width: 0; padding: 0 var(--s-2) 0 var(--s-5); }
+.masthead__search:focus-within { outline: 3px solid var(--focus); outline-offset: -3px; }
+.masthead__search-field { position: relative; display: flex; flex: 1; min-width: 0; font-size: 0.9375rem; }   /* el campo toma de aquí su tamaño de letra */
+.masthead__search-input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.masthead__search-input:focus { outline: none; }
+.masthead__search-input::placeholder { color: var(--grey-600); opacity: 1; }
+.masthead__search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+/* Copia del placeholder: invisible, en una línea, sirve para medir; con .is-long (SiteHeader: el placeholder no cabe)
+   se ve en lugar del placeholder y baja a dos líneas dentro de la celda. Desaparece en cuanto el campo tiene texto. */
+.masthead__search-hint { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; color: var(--grey-600); visibility: hidden; pointer-events: none; }
+.masthead__search-hint > span { flex: none; white-space: nowrap; }
+.masthead__search-field.is-long .masthead__search-hint { overflow: visible; visibility: visible; }
+.masthead__search-field.is-long .masthead__search-hint > span { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: break-word; }
+.masthead__search-input:not(:placeholder-shown) + .masthead__search-hint,
+.masthead__search-input:not(:placeholder-shown) + .masthead__search-hint > span { visibility: hidden; }   /* también en la línea: no depende de la herencia */
+.masthead__search-btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: var(--blue); }
+.masthead__search-btn:hover { background: var(--surface-tint); }
+.masthead__search-btn:focus-visible { outline-offset: -3px; }
+
+.masthead__wa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--blue);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.masthead__wa .label { font-size: 0.65625rem; letter-spacing: 0.06em; color: var(--ink); }
+.masthead__wa:hover { background: var(--surface-tint); }
+
+.masthead__cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  padding: 0 var(--s-4);
+  background: var(--blue);
+  color: var(--white);
+  font-weight: var(--type-button-weight);
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--ease);
+}
+.masthead__cta:hover { background: var(--blue-700); }
+.masthead__cta:active { background: var(--blue-800); }
+.masthead__cta[aria-current="page"] { box-shadow: inset 0 -4px 0 var(--white); }   /* en /cotizar/: la barra blanca equivale a la azul bajo el enlace actual */
+
+.masthead__btn { display: none; }                 /* botones de búsqueda y menú: solo tableta y celular */
+
+/* 4.3 Botones ---------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  min-height: 52px;
+  padding: var(--s-3) var(--s-6);                 /* el texto que no cabe en una línea pasa a dos y el botón crece */
+  border: var(--line) solid var(--blue);
+  border-radius: var(--radius);
+  background: var(--blue);
+  color: var(--white);
+  font-size: var(--type-button-size);
+  font-weight: var(--type-button-weight);
+  line-height: 1.2;
+  text-align: center;
+  text-decoration: none;
+  text-wrap: balance;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+}
+.btn:hover { background: var(--blue-700); border-color: var(--blue-700); }
+.btn:active { background: var(--blue-800); border-color: var(--blue-800); }
+.btn--inverse { background: var(--white); border-color: var(--white); color: var(--ink); }
+.btn--inverse:hover { background: var(--blue-100); border-color: var(--blue-100); }
+.btn--inverse:active { background: var(--blue-200); border-color: var(--blue-200); }
+.btn--block { display: flex; width: 100%; }
+
+/* Fila de acción: un botón que ocupa toda una fila de la lámina (portada) */
+.action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 68px;
+  padding: 0 var(--pad);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.action .icon { color: var(--blue); transition: transform var(--ease); }
+.action:hover { background: var(--surface-tint); }
+.action:hover .icon { transform: translateX(4px); }
+.action--primary { background: var(--blue); color: var(--white); }
+.action--primary .icon { color: var(--white); }
+.action--primary:hover { background: var(--blue-700); }
+.action--primary:active { background: var(--blue-800); }
+
+/* Enlace de texto con flecha */
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  min-height: 44px;
+  color: var(--blue);
+  font-weight: var(--type-button-weight);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.more .icon { transition: transform var(--ease); }
+.more:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.more:hover .icon { transform: translateX(4px); }
+
+/* 4.4 Antetítulo y etiqueta -------------------------------------------------- */
+.eyebrow { display: flex; align-items: center; gap: 10px; color: var(--blue); }
+.eyebrow::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--blue); }
+
+.tag {
+  display: inline-block;
+  padding: 4px 8px 3px;
+  background: var(--ink);
+  color: var(--white);
+  font-family: var(--font-label);
+  font-size: var(--label-sm);
+  font-weight: var(--type-label-weight);
+  font-stretch: var(--type-label-width);
+  letter-spacing: var(--type-label-tracking);
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+/* 4.5 Cabeza de sección: título pesado apoyado en el filete azul ------------- */
+.sec-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-7);
+  padding: var(--section-top) var(--pad) 14px;
+  background: var(--surface);
+}
+.sec-head__more { margin-bottom: -6px; }
+
+/* 4.6 Mosaico de categoría (placa de la portada) ---------------------------- */
+.tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
+  row-gap: var(--s-4);
+  width: 100%;
+  min-height: 144px;
+  padding: var(--s-5) var(--s-3) 18px var(--pad);      /* borde izquierdo en el borde de texto; el nombre puede llegar a 12 px del derecho */
+  background: var(--surface);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.tile__icon { width: 64px; height: 64px; margin-left: -3px; color: var(--blue); }
+.tile__num { margin-right: var(--s-2); color: var(--grey-600); font-size: var(--label-sm); font-variant-numeric: tabular-nums; }
+.tile__name { grid-column: 1 / -1; align-self: end; font-size: 1.125rem; font-weight: 700; line-height: 1.2; letter-spacing: -0.005em; }
+.tile:hover { background: var(--surface-tint); }
+.tile:hover .tile__name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-color: var(--blue); }
+
+.tile--wide {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: 1fr;
+  align-items: center;
+  column-gap: var(--s-5);
+  padding-inline: var(--pad);
+  background: var(--surface-tint);
+}
+.tile--wide .tile__icon { margin-left: 0; }
+.tile--wide .tile__name { grid-column: auto; align-self: center; font-size: 1.25rem; }
+.tile--wide .tile__kicker { display: block; margin-bottom: 6px; color: var(--blue); }
+.tile--wide .tile__go { color: var(--blue); transition: transform var(--ease); }
+.tile--wide:hover { background: var(--blue-100); }
+.tile--wide:hover .tile__go { transform: translateX(4px); }
+
+/* 4.7 Tarjeta de entrada (tres formas de pedir ayuda) ----------------------- */
+.entry {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 328px;
+  padding: var(--s-7) var(--pad) var(--s-8);
+  background: var(--surface);
+  transition: background-color var(--ease);
+}
+.entry__icon { width: 56px; height: 56px; margin: 0 0 var(--s-8) -2px; color: var(--blue); }
+.entry__body { margin-top: auto; }
+.entry__title { font-size: var(--h3-lg); font-weight: 700; line-height: 1.12; letter-spacing: -0.012em; }
+.entry__title a { text-decoration: none; }
+.entry__title a::after { content: ""; position: absolute; inset: 0; }
+.entry__title a:focus-visible { outline: none; }
+.entry__title a:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; }
+.entry__kicker { margin-top: var(--s-3); color: var(--blue); }
+.entry__text { margin-top: var(--s-4); max-width: calc(100% - var(--s-6)); min-height: 4.65em; color: var(--grey-700); text-wrap: pretty; }   /* tres líneas reservadas: los títulos de las tres tarjetas comparten línea base */
+.entry__go {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  background: var(--blue);
+  color: var(--white);
+  pointer-events: none;                 /* decorativa: el clic pasa al enlace de la tarjeta que está debajo */
+  transition: background-color var(--ease);
+}
+.entry__go .icon { transition: transform var(--ease); }
+.entry:hover { background: var(--surface-tint); }
+.entry:hover .entry__go { background: var(--blue-700); }
+.entry:hover .entry__go .icon { transform: translateX(3px); }
+
+/* 4.8 Fila de registro (categorías con sus subcategorías) ------------------- */
+.register { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--register-rows, 5), auto); grid-auto-flow: column; gap: var(--line); }
+.register > li { display: flex; }
+.register__link {
+  display: grid;
+  grid-template-columns: 2ch 48px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--s-6);
+  width: 100%;
+  min-height: 108px;
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.register__num { color: var(--grey-600); font-size: var(--label-sm); font-variant-numeric: tabular-nums; }
+.register__icon { width: 48px; height: 48px; color: var(--blue); }
+.register__sub { margin-top: 3px; font-size: 0.9375rem; line-height: 1.4; color: var(--grey-700); text-wrap: pretty; }
+.register__go { color: var(--blue); transition: transform var(--ease); }
+.register__link:hover { background: var(--surface-tint); }
+.register__link:hover .register__go { transform: translateX(4px); }
+
+/* 4.9 Celda de marca (nombres en texto, un solo tratamiento) ---------------- */
+.brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  min-height: 76px;
+  padding: 0 var(--pad);
+  background: var(--surface);
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.008em;
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.brand .icon { color: var(--blue-300); transition: transform var(--ease), color var(--ease); }
+.brand:hover { background: var(--surface-tint); }
+.brand:hover .icon { color: var(--blue); transform: translateX(4px); }
+.brand--all { background: var(--blue); color: var(--white); font-size: 1.125rem; letter-spacing: 0; }
+.brand--all .icon { color: var(--white); }
+.brand--all:hover { background: var(--blue-700); }
+.brand--all:hover .icon { color: var(--white); }
+/* Marca de la página actual (BrandCells con currentId): el cuadro azul en el margen; el nombre no se mueve */
+.brand[aria-current="page"] { position: relative; }
+.brand__mark { position: absolute; top: 50%; left: calc((var(--pad) - 10px) / 2); width: 10px; height: 10px; margin-top: -5px; background: var(--blue); }
+
+/* Fila de nota bajo una retícula */
+.note { display: flex; align-items: center; gap: var(--s-3); padding: 14px var(--pad); background: var(--surface); color: var(--grey-700); }
+.note .icon { color: var(--blue); }
+
+/* 4.10 Tarjeta de producto --------------------------------------------------- */
+.product { position: relative; display: flex; flex-direction: column; background: var(--surface); }
+.product__media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  /* marcador mientras no hay fotos: rayado de corte, como en un plano técnico */
+  background: repeating-linear-gradient(135deg, var(--blue-050) 0 7px, var(--blue-100) 7px 8px);
+  border-bottom: var(--line) solid var(--rule-soft);
+}
+.product__plate {
+  display: grid;
+  place-items: center;
+  width: 44%;
+  aspect-ratio: 1;
+  background: var(--surface);
+  outline: var(--line) solid var(--blue);
+  color: var(--blue);
+}
+.product__plate .icon { width: 58%; height: 58%; }
+/* sobre la fotografía; no recibe clics: la tarjeta entera sigue abriendo la ficha */
+.product__media .tag { position: absolute; z-index: 1; top: var(--s-4); left: var(--pad); pointer-events: none; }
+.product__body { display: flex; flex: 1; flex-direction: column; padding: var(--s-5) var(--pad) var(--s-5); }
+.product__cat { color: var(--blue); font-size: var(--label-sm); }
+.product__name { margin-top: var(--s-2); min-height: 2.5em; padding-bottom: var(--s-3); font-size: 1.125rem; }
+.product__meta { margin-top: auto; color: var(--grey-700); }
+/* El código es lo que el cliente pide al cotizar: nunca se corta. Pasa entero al renglón siguiente si cabe ahí;
+   si no cabe ni solo, se parte dentro de la tarjeta, después de un guion o, si no hay, en cualquier carácter. */
+.product__meta .t-code { display: inline-block; max-width: 100%; color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
+.product__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--line) solid var(--rule-soft); }
+.product__action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  min-height: 52px;
+  padding: 0 var(--s-5) 0 var(--pad);
+  font-size: 0.9375rem;
+  font-weight: var(--type-button-weight);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.product__action .icon { color: var(--blue); transition: transform var(--ease); }
+.product__action--sheet::after { content: ""; position: absolute; inset: 0; }                 /* toda la tarjeta abre la ficha */
+.product__action--sheet:focus-visible { outline: none; }
+.product__action--sheet:focus-visible::after { outline: 3px solid var(--focus); outline-offset: -3px; }
+.product__action--quote { position: relative; z-index: 1; padding-left: var(--s-5); border-left: var(--line) solid var(--rule-soft); color: var(--blue); }
+.product__action--quote:hover { background: var(--blue); color: var(--white); }
+.product__action--quote:hover .icon { color: var(--white); }
+.product__action--quote:focus-visible { outline-offset: -3px; }
+.product:hover .product__action--sheet .icon { transform: translateX(4px); }
+.product:hover .product__name { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-color: var(--blue); }
+
+/* 4.11 Banda: el bloque azul sólido ----------------------------------------- */
+.band { background: var(--blue-300); color: var(--white); }       /* el filete entre sus dos celdas, en un tinte que se lee sobre azul */
+.band > * { background: var(--blue); }
+.band :focus-visible { outline-color: var(--white); }
+.band__body { padding: var(--s-11) var(--pad); }
+.band__title--page { font-size: var(--type-title-size); line-height: var(--type-title-leading); }   /* Band con headingLevel={1}: título de la página */
+.band__text { margin-top: var(--s-5); max-width: 58ch; font-size: 1.125rem; line-height: 1.5; text-wrap: pretty; }
+.band__action { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s-7); padding: var(--s-11) var(--pad); }
+.band__icon { width: 72px; height: 72px; }
+
+/* 4.12 Lista de datos (hoja de contacto) ------------------------------------ */
+.data { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); background: var(--rule); }
+.data__row { display: grid; grid-template-columns: 148px minmax(0, 1fr); align-items: center; column-gap: var(--s-6); min-height: 76px; padding: var(--s-4) var(--pad); background: var(--surface); }
+.data__key { color: var(--grey-600); }
+.data__value { font-size: 1.25rem; font-weight: 650; line-height: 1.3; }
+.data__value--text { font-size: 1.0625rem; font-weight: 400; }
+.data__link { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 44px; text-decoration: none; overflow-wrap: anywhere; }
+.data__link .icon { color: var(--blue); }
+.data__link:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+/* Dirección de correo (EmailAddress): solo se parte justo después de «@» */
+.email__part { white-space: nowrap; }
+
+/* 4.13 Pasos ----------------------------------------------------------------- */
+.step { position: relative; display: flex; flex-direction: column; gap: var(--s-7); min-height: 216px; padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
+.step__num {
+  font-family: var(--font-heading);
+  font-size: 4rem;
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  line-height: 0.9;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+}
+.step__text { max-width: 26ch; }                          /* alineado arriba: las primeras líneas de los tres pasos comparten línea base */
+.step__next { position: absolute; top: var(--s-7); right: var(--pad); color: var(--blue); }
+
+/* 4.14 Acordeón (details) ---------------------------------------------------- */
+.faq { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.faq__item { background: var(--surface); }
+.faq__q { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); min-height: 84px; padding: var(--s-4) var(--pad); list-style: none; transition: background-color var(--ease); }
+.faq__q:hover { background: var(--surface-tint); }
+.faq__q:focus-visible { outline-offset: -3px; }
+.faq__sign { display: grid; place-items: center; flex: none; width: 44px; height: 44px; outline: var(--line) solid var(--blue); outline-offset: -1px; color: var(--blue); }
+.faq__sign .icon--minus { display: none; }
+.faq__item[open] .faq__sign { background: var(--blue); color: var(--white); }
+.faq__item[open] .faq__sign .icon--plus { display: none; }
+.faq__item[open] .faq__sign .icon--minus { display: block; }
+.faq__a { max-width: calc(68ch + 2 * var(--pad)); padding: 0 var(--pad) var(--s-7); font-size: 1.0625rem; color: var(--grey-700); text-wrap: pretty; }
+
+/* 4.15 Pie de página --------------------------------------------------------- */
+.site-footer { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: var(--line); }
+.footer__cell { padding: var(--s-9) var(--pad) var(--s-9); background: var(--surface); }
+.footer__logo { display: inline-block; }
+.footer__logo img { width: 194px; height: 73px; }
+.footer__title { margin-bottom: var(--s-4); color: var(--blue); }
+.footer__links a { display: block; padding: 5px 0; font-size: 0.9375rem; line-height: 1.4; text-decoration: none; }
+.footer__links a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+/* Enlace a la página actual: el cuadro azul de la fila actual, en el margen de la celda (el texto no se mueve);
+   en la fila legal, alineada a la derecha, va antes del texto */
+.footer__mark { flex: none; width: 10px; height: 10px; background: var(--blue); }
+.footer__links a[aria-current="page"] { position: relative; }
+.footer__links .footer__mark { position: absolute; top: 50%; left: calc((var(--pad) + 10px) / -2); margin-top: -5px; }
+.footer__legal .footer__mark { margin-right: var(--s-2); }
+.footer__contact { display: grid; gap: var(--s-2); font-size: 0.9375rem; line-height: 1.45; }
+.footer__contact a { display: inline-flex; align-items: center; gap: var(--s-2); padding: 3px 0; text-decoration: none; overflow-wrap: anywhere; }
+.footer__contact a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+.footer__contact .icon { color: var(--blue); }
+.footer__hours { color: var(--grey-700); }
+.footer__signoff { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s-9); padding: var(--section-top) var(--pad) var(--s-5); background: var(--surface); }
+.footer__tagline { color: var(--blue); font-family: var(--font-heading); font-size: var(--h1); font-weight: 500; font-stretch: var(--type-h1-width); letter-spacing: var(--type-h1-tracking); line-height: 1; }
+.footer__about { max-width: 30ch; padding-bottom: 6px; color: var(--grey-700); text-wrap: balance; }
+.footer__notes { display: grid; gap: var(--s-1); padding: var(--s-5) var(--pad); background: var(--surface); color: var(--grey-700); }
+.footer__legal { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); min-height: 52px; padding: 0 var(--pad); background: var(--surface); }
+.footer__legal a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 3px; }
+.footer__legal a:hover { color: var(--blue); }
+
+/* 4.16 Barra fija: WhatsApp y cotizar siempre a mano en el celular --------- */
+.dock { display: none; }
+
+/* 4.17 Componentes sin dibujo en la maqueta ------------------------------------
+   Diseñados dentro del mismo sistema: celdas blancas sobre la lámina, filete azul de 1 px,
+   esquinas rectas y las variables tipográficas del kit. */
+
+/* Título de página interior (PageHeader): el H1 usa el tamaño del kit para páginas interiores */
+.t-title {
+  font-family: var(--font-heading);
+  font-size: var(--type-title-size);
+  font-weight: var(--type-h1-weight);
+  font-stretch: var(--type-h1-width);
+  letter-spacing: var(--type-h1-tracking);
+  line-height: var(--type-title-leading);
+  text-wrap: balance;
+}
+.page-head__main { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-5); min-height: 248px; padding: var(--s-7) var(--pad) var(--s-8); }
+.page-head__title { margin-top: auto; max-width: 22ch; }              /* el título se apoya en el filete, como en las secciones */
+.page-head__icon { width: 64px; height: 64px; margin-top: var(--s-3); margin-left: -3px; color: var(--blue); }
+.page-head__side { display: flex; flex-direction: column; gap: var(--line); }
+.page-head__intro { flex: 1; padding: var(--s-9) var(--pad) var(--s-7); background: var(--surface); }
+.page-head__intro .t-lead { color: var(--ink); }
+.page-head__fill { flex: 1; min-height: var(--s-8); background: var(--surface); }
+
+/* Ruta de navegación (Breadcrumbs): una etiqueta; los separadores son diagonales grises */
+.crumbs { color: var(--grey-600); }
+.crumbs__list { display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--s-1); }
+.crumbs__item { display: flex; align-items: center; }
+.crumbs__sep { margin: 0 10px; color: var(--grey-300); }      /* al final del elemento anterior, oculta al lector */
+.crumbs__link { display: inline-flex; align-items: center; min-height: 32px; color: var(--blue); text-decoration: none; }
+.crumbs__link:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.crumbs [aria-current="page"] { color: var(--ink); }
+
+/* Estado vacío (EmptyState): una celda de ancho completo; pictograma, dos frases y una acción */
+.empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--s-7);
+  padding: var(--s-9) var(--pad);
+  background: var(--surface);
+}
+.empty__icon { width: 64px; height: 64px; color: var(--blue); }
+.empty__title { font-size: var(--h3-lg); font-weight: 700; line-height: 1.15; letter-spacing: -0.012em; text-wrap: balance; }
+.empty__text { margin-top: var(--s-2); max-width: 60ch; font-size: 1.0625rem; color: var(--grey-700); text-wrap: pretty; }
+
+/* Fotografía real de producto: sobre blanco, completa, sin recortar. Va encima del área, sin ocupar lugar en
+   ella: el área conserva su proporción con una foto vertical, horizontal o cuadrada y la foto se contiene. */
+.product__media--photo { background: var(--surface); }
+.product__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+
+/* Celdas de marca altas (página de marcas) */
+.brands--lg .brand { min-height: 96px; }
+/* Número de productos bajo el nombre de la marca (BrandCells con `counts`) */
+.brand__count { display: block; margin-top: var(--s-2); color: var(--grey-600); font-size: var(--label-sm); }
+/* Celda blanca que completa la última fila de marcas (BrandCells) */
+.brands__fill { background: var(--surface); }
+
+/* Etiqueta junto al título de una página interior */
+.page-head__tag { margin-top: var(--s-2); }
+
+/* Celdas de relleno de las retículas (GridFill: ProductGrid, CategoryPlate, CategoryRegister y Steps): blancas,
+   con el ancho de computadora en --fill-lg; el de tableta, el de celular y data-hide (los puntos de corte donde
+   una celda no hace falta) se aplican en 6.5 de responsive.css. Hijos directos de su retícula, como las
+   celdas reales. */
+.grid12 > .grid-fill,
+.register > .grid-fill { grid-column: span var(--fill-lg); background: var(--surface); }
+

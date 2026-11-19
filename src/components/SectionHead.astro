@@ -1,0 +1,41 @@
+---
+// Cabeza de sección (`.sec-head`): el título pesado apoyado en el filete azul, con mucho aire arriba.
+// - Por omisión: título y, a la derecha, un enlace `more` opcional («Ver todo el catálogo»).
+// - `eyebrow`: antetítulo azul con el cuadro sólido; el slot `side` pone algo a la derecha (el monograma).
+// - `aside`: un párrafo a la derecha en su propia celda de 8 columnas (sección «Cómo funciona»).
+// `id` es el del título: úsalo en `aria-labelledby` de la <section>.
+import MoreLink from './MoreLink.astro';
+
+interface Props {
+  title: string;
+  id: string;
+  /** Nivel del título; 2 por omisión. */
+  level?: 2 | 3;
+  eyebrow?: string;
+  more?: { href: string; label: string };
+  aside?: string;
+}
+
+const { title, id, level = 2, eyebrow, more, aside } = Astro.props;
+const Heading = `h${level}` as 'h2' | 'h3';
+const hasSide = Astro.slots.has('side');
+---
+{aside ? (
+  <header class="steps-head grid12">
+    <div class="sec-head span-4"><Heading class="sec-head__title t-h2" id={id}>{title}</Heading></div>
+    <div class="sec-head sec-head--aside span-8"><p>{aside}</p></div>
+  </header>
+) : (
+  <header class:list={['sec-head', { 'sec-head--contact': eyebrow || hasSide }]}>
+    {eyebrow ? (
+      <div>
+        <p class="eyebrow label">{eyebrow}</p>
+        <Heading class="sec-head__title t-h2" id={id}>{title}</Heading>
+      </div>
+    ) : (
+      <Heading class="sec-head__title t-h2" id={id}>{title}</Heading>
+    )}
+    {more && <MoreLink class="sec-head__more" href={more.href}>{more.label}</MoreLink>}
+    {hasSide && <slot name="side" />}
+  </header>
+)}

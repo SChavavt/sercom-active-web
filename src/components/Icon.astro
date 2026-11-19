@@ -1,0 +1,25 @@
+---
+// Icono del kit (src/assets/icons/icons.json) impreso como SVG en línea: hereda el color del texto
+// (`currentColor`) y solo los iconos que una página usa llegan a su HTML.
+// Decorativo por omisión (aria-hidden y focusable="false"). Con `label` se anuncia como imagen con ese nombre:
+// úsalo solo cuando el icono es el único contenido de un control o transmite información por sí mismo.
+import type { HTMLAttributes } from 'astro/types';
+import { getIcon, type IconName } from '../lib/icons.ts';
+
+interface Props extends Omit<HTMLAttributes<'svg'>, 'name'> {
+  /** Nombre del kit, por ejemplo `arrow-right`, `whatsapp` o `cat-manos`. */
+  name: IconName;
+  /** Tamaño y peso: `icon--16`, `icon--18`, `icon--24`, `icon--28` (20 px por omisión), `icon--art`, `icon--fine`. */
+  class?: string;
+  /** Nombre accesible. Sin él, el icono es decorativo. */
+  label?: string;
+}
+
+const { name, class: className, label, ...attrs } = Astro.props;
+const icon = getIcon(name);
+---
+{label ? (
+  <svg class:list={['icon', className]} viewBox={icon.viewBox} role="img" aria-label={label} focusable="false" {...attrs} set:html={icon.body} />
+) : (
+  <svg class:list={['icon', className]} viewBox={icon.viewBox} aria-hidden="true" focusable="false" {...attrs} set:html={icon.body} />
+)}

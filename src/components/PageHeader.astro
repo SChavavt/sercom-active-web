@@ -1,0 +1,47 @@
+---
+// Bloque de título de las páginas interiores: la misma división que la portada.
+//   celda de 8 columnas: ruta de navegación (como etiqueta) o antetítulo, pictograma y etiqueta opcionales
+//   y el H1 de la página;
+//   celda de 4 columnas: `lead` (entrada) arriba y, debajo, lo que llegue por el slot (normalmente
+//   ActionRow con la acción clave). Sin `lead` ni slot, el título ocupa las doce columnas.
+// Debe ser el primer bloque dentro de <BaseLayout>; la página lleva un solo H1 (este).
+import type { IconName } from '../lib/icons.ts';
+import Breadcrumbs, { type Crumb } from './Breadcrumbs.astro';
+import Icon from './Icon.astro';
+import Tag from './Tag.astro';
+
+interface Props {
+  title: string;
+  /** Ruta desde Inicio. El último elemento es esta página (sin enlace). */
+  breadcrumbs?: readonly Crumb[];
+  /** Antetítulo azul en lugar de la ruta (por ejemplo «Error 404»). */
+  eyebrow?: string;
+  /** Etiqueta junto al título; «Ejemplo» en la ficha de un producto de ejemplo. */
+  tag?: string;
+  /** Pictograma de 64 px sobre el título (por ejemplo el de la categoría). */
+  icon?: IconName;
+  /** Entrada de la página, en la celda de 4 columnas. */
+  lead?: string;
+  /** id del H1; por omisión `titulo`. */
+  id?: string;
+}
+
+const { title, breadcrumbs, eyebrow, tag, icon, lead, id = 'titulo' } = Astro.props;
+const hasActions = Astro.slots.has('default');
+const hasSide = Boolean(lead) || hasActions;
+---
+<section class="page-head grid12" aria-labelledby={id}>
+  <div class:list={['page-head__main', 'cell', hasSide ? 'span-8' : 'span-12']}>
+    {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
+    {eyebrow && <p class="eyebrow label">{eyebrow}</p>}
+    {icon && <Icon name={icon} class="page-head__icon icon--fine" />}
+    {tag && <Tag class="page-head__tag">{tag}</Tag>}
+    <h1 class="page-head__title t-title" id={id}>{title}</h1>
+  </div>
+  {hasSide && (
+    <div class="page-head__side span-4">
+      {lead ? <div class="page-head__intro"><p class="t-lead">{lead}</p></div> : <div class="page-head__fill" aria-hidden="true"></div>}
+      {hasActions && <slot />}
+    </div>
+  )}
+</section>

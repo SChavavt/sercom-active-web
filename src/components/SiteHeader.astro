@@ -1,0 +1,249 @@
+---
+// Encabezado del sitio: franja de servicio (Puebla, horario, WhatsApp y correo) y la cabecera de la lámina
+// (logotipo, navegación con el panel Categorías, búsqueda, WhatsApp y el bloque sólido «Cotizar mi lista»),
+// con los botones Buscar y Menú de tableta y celular.
+// Lo que depende de los datos se decide aquí, nunca con un interruptor escrito a mano:
+//   - sin categorías públicas (producción hoy) no hay entrada «Categorías» ni panel;
+//   - sin productos públicos no hay campo de búsqueda ni botón Buscar.
+// La página actual se marca con aria-current="page" (y "true" en su sección: una marca en «Marcas», una categoría
+// en «Categorías», una ficha en «Catálogo»); la marca se ve a todos los anchos (ver components.css y responsive.css).
+// El script es mejora progresiva: sin JavaScript la navegación y la búsqueda quedan visibles y
+// «Categorías» funciona como <details> nativo.
+import logo from '../assets/brand/logo.svg';
+import { contactDetails, contactLinks } from '../lib/contact.mjs';
+import { SEARCH_PARAM } from '../lib/search.mjs';
+import { categories, products, routes } from '../lib/site-data.mjs';
+import Icon from './Icon.astro';
+import { categoryIcon } from '../lib/icons.ts';
+
+const path = Astro.url.pathname;
+const hasCategories = categories.length > 0;
+const hasSearch = products.length > 0;
+const whatsapp = contactLinks.general().whatsapp;
+
+// Prefijo de las fichas de producto («/productos/»): una ficha está dentro de la sección Catálogo.
+const inProducts = path.startsWith(routes.product('').slice(0, -1));
+/** aria-current para un enlace: "page" en su propia página, "true" dentro de su sección. */
+function current(href: string): 'page' | 'true' | undefined {
+  if (path === href) return 'page';
+  if (href !== routes.home && path.startsWith(href)) return 'true';
+  if (href === routes.catalog && inProducts) return 'true';
+  return undefined;
+}
+// Prefijo de las páginas de categoría («/categorias/»), sacado de routes para no escribir la ruta aquí.
+const inCategories = path.startsWith(routes.category('').slice(0, -1));
+// La celda «Ver todo el catálogo» completa la última fila del panel (cada categoría ocupa 2 columnas).
+const allSpan = 12 - ((categories.length * 2) % 12);
+// Nombre del campo de búsqueda, su placeholder y la copia que lo sustituye cuando no cabe en una línea.
+const searchHint = 'Buscar por producto, marca o código';
+---
+<header class="site-header">
+  <div class="utility">
+    <ul class="utility__group">
+      <li class="utility__item utility__place label">{contactDetails.locationLabel}</li>
+      <li class="utility__item utility__hours"><Icon name="clock" class="icon--16" />{contactDetails.hoursShortText}</li>
+    </ul>
+    <ul class="utility__group utility__contact">
+      <li class="utility__item"><a class="utility__link" href={whatsapp}><Icon name="whatsapp" class="icon--16" /><span class="vh">WhatsApp </span><span class="t-code">{contactDetails.whatsappDisplay}</span></a></li>
+      <li class="utility__item"><a class="utility__link" href={contactLinks.general().mailto}><Icon name="mail" class="icon--16" />{contactDetails.email}</a></li>
+    </ul>
+  </div>
+
+  {/* Los botones Buscar y Menú van antes de la navegación y de la búsqueda: al abrir un panel con el teclado, el
+     siguiente Tab entra en él. En tableta y celular el CSS deja el botón Menú al final de la fila. */}
+  <div class:list={['masthead', 'grid12', { 'masthead--no-search': !hasSearch }]}>
+    <a class="masthead__logo span-2" href={routes.home} aria-current={current(routes.home)}><img src={logo.src} width="156" height="59" alt={contactDetails.businessName} /></a>
+
+    {hasSearch && (
+      <button class="masthead__btn masthead__btn--search" type="button" aria-expanded="false" aria-controls="buscador" data-toggle="search">
+        <Icon name="search" class="icon--open" /><Icon name="close" class="icon--close" />
+        <span class="label">Buscar</span>
+      </button>
+    )}
+    <button class="masthead__btn masthead__btn--menu" type="button" aria-expanded="false" aria-controls="menu" data-toggle="menu">
+      <Icon name="menu" class="icon--open" /><Icon name="close" class="icon--close" />
+      <span class="label" data-label-closed="Menú" data-label-open="Cerrar">Menú</span>
+    </button>
+
+    <nav class:list={['masthead__nav', hasSearch ? 'span-4' : 'span-7']} id="menu" aria-label="Principal">
+      <ul class="masthead__nav-list">
+        <li><a class="masthead__nav-link" href={routes.catalog} aria-current={current(routes.catalog)}>Catálogo</a></li>
+        {hasCategories && (
+          <li>
+            <details class="masthead__nav-cat">
+              <summary class="masthead__nav-link" aria-current={inCategories ? 'true' : undefined}>Categorías<Icon name="chevron-down" class="icon--16" /></summary>
+              <div class="catpanel">
+                <ul class="catpanel__list grid12">
+                  {categories.map(category => (
+                    <li class="span-2"><a class="catpanel__link cell-link" href={category.url} aria-current={current(category.url)}><Icon name={categoryIcon(category.id)} class="icon--28 icon--art" /><span>{category.name}</span></a></li>
+                  ))}
+                  <li class="catpanel__all" style={`--catpanel-all-span: ${allSpan}`}><a class="catpanel__link catpanel__link--all cell-link" href={routes.catalog}><span>Ver todo el catálogo</span><Icon name="arrow-right" /></a></li>
+                </ul>
+              </div>
+            </details>
+          </li>
+        )}
+        <li><a class="masthead__nav-link" href={routes.brands} aria-current={current(routes.brands)}>Marcas</a></li>
+        <li class="masthead__nav-item--quote"><a class="masthead__nav-link" href={routes.quoteList} aria-current={current(routes.quoteList)}>Cotizar mi lista</a></li>
+        <li><a class="masthead__nav-link" href={routes.contact} aria-current={current(routes.contact)}>Contacto</a></li>
+      </ul>
+    </nav>
+
+    {hasSearch && (
+      <form class="masthead__search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
+        <label class="vh" for="q">{searchHint}</label>
+        <span class="masthead__search-field">
+          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} autocomplete="off" enterkeyhint="search" />
+          <span class="masthead__search-hint" aria-hidden="true"><span>{searchHint}</span></span>
+        </span>
+        <button class="masthead__search-btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>
+      </form>
+    )}
+
+    <a class="masthead__wa" href={whatsapp}><Icon name="whatsapp" class="icon--24" /><span class="label">WhatsApp</span></a>
+    <a class="masthead__cta span-2" href={routes.quoteList} aria-current={current(routes.quoteList)}><Icon name="clipboard-list" /><span>Cotizar mi lista</span></a>
+  </div>
+</header>
+
+<script>
+  // Mejora progresiva del encabezado (tableta y celular: menú y búsqueda; computadora: panel Categorías).
+  // Escape cierra lo que esté abierto y devuelve el foco a su control. El menú, la búsqueda y el panel de
+  // computadora también se cierran con un clic fuera o cuando el foco sale de ellos (y de su botón); el menú
+  // abierto termina sobre la barra fija.
+  const desktop = window.matchMedia('(min-width: 1100px)');
+  const menuButton = document.querySelector<HTMLButtonElement>('[data-toggle="menu"]');
+  const searchButton = document.querySelector<HTMLButtonElement>('[data-toggle="search"]');
+  const nav = document.getElementById('menu');
+  const search = document.getElementById('buscador');
+  const categoriesPanel = document.querySelector<HTMLDetailsElement>('.masthead__nav-cat');
+  const dock = document.querySelector<HTMLElement>('.dock');
+
+  const isOpen = (button: HTMLButtonElement | null) => button?.getAttribute('aria-expanded') === 'true';
+  const dockHeight = () => (dock && getComputedStyle(dock).display !== 'none' ? dock.offsetHeight : 0);
+
+  /** Ajusta el alto del menú abierto para que termine sobre la barra fija, esté donde esté el encabezado. */
+  function fit() {
+    if (!nav) return;
+    if (desktop.matches || !isOpen(menuButton)) {
+      nav.style.maxHeight = '';
+      return;
+    }
+    // Sin alto mínimo: el panel nunca pasa debajo de la barra fija (se desplaza por dentro).
+    nav.style.maxHeight = `${Math.max(0, window.innerHeight - nav.getBoundingClientRect().top - dockHeight())}px`;
+    keepFocusInMenu();
+  }
+
+  /** Si el panel cambió de alto o de lugar con el foco dentro (Tab muy rápido mientras la página se desplaza), el
+      elemento con foco vuelve a quedar entero a la vista desplazando el panel, nunca la página. */
+  function keepFocusInMenu() {
+    const active = document.activeElement;
+    if (!nav || !isOpen(menuButton) || !(active instanceof HTMLElement) || !nav.contains(active)) return;
+    // El borde inferior visible es el del panel o, si es más alto, el de la barra fija (o el de la ventana).
+    const box = nav.getBoundingClientRect();
+    const top = box.top + nav.clientTop;
+    const bottom = Math.min(box.bottom, window.innerHeight - dockHeight());
+    const item = active.getBoundingClientRect();
+    if (item.bottom > bottom) nav.scrollTop += item.bottom - bottom;
+    else if (item.top < top) nav.scrollTop -= top - item.top;
+  }
+
+  function setOpen(button: HTMLButtonElement | null, panel: HTMLElement | null, open: boolean) {
+    if (!button || !panel) return;
+    button.setAttribute('aria-expanded', String(open));
+    panel.classList.toggle('is-open', open);
+    const label = button.querySelector<HTMLElement>('[data-label-open]');
+    if (label) label.textContent = label.getAttribute(open ? 'data-label-open' : 'data-label-closed');
+    fit();
+  }
+
+  // Alto real de la franja de servicio y de la cabecera. Con texto agrandado o espaciado crecen; la cabecera fija
+  // (components.css) y el margen de desplazamiento (base.css) usan estas medidas en lugar de los altos del diseño.
+  const utility = document.querySelector<HTMLElement>('.utility');
+  const masthead = document.querySelector<HTMLElement>('.masthead');
+  if (utility && masthead && 'ResizeObserver' in window) {
+    const measure = new ResizeObserver(() => {
+      const root = document.documentElement.style;
+      root.setProperty('--utility-shift', `${utility.getBoundingClientRect().height}px`);
+      root.setProperty('--masthead-shift', `${masthead.getBoundingClientRect().height}px`);
+      fit();
+    });
+    measure.observe(utility);
+    measure.observe(masthead);
+  }
+
+  // Texto de ayuda del buscador: si el placeholder no cabe en una línea (texto espaciado o agrandado, o un campo
+  // estrecho), el campo muestra en su lugar la copia de .masthead__search-hint, que puede ocupar dos líneas. Cuando
+  // cabe, y siempre sin JavaScript, queda el placeholder de siempre.
+  const searchField = search?.querySelector<HTMLElement>('.masthead__search-field');
+  const searchInput = searchField?.querySelector<HTMLInputElement>('input');
+  const searchHint = searchField?.querySelector<HTMLElement>('.masthead__search-hint > span');
+  if (searchField && searchInput && searchHint && 'ResizeObserver' in window) {
+    const placeholder = searchInput.placeholder;
+    const fitHint = () => {
+      searchField.classList.remove('is-long');      // la copia vuelve a medir su ancho en una línea
+      const long = searchInput.clientWidth > 0 && searchHint.getBoundingClientRect().width > searchInput.clientWidth + 0.5;
+      searchField.classList.toggle('is-long', long);
+      // Un espacio: el campo vacío sigue con :placeholder-shown, que oculta la copia en cuanto hay texto (components.css).
+      searchInput.placeholder = long ? ' ' : placeholder;
+    };
+    const watchHint = new ResizeObserver(fitHint);
+    watchHint.observe(searchInput);
+    watchHint.observe(searchHint);
+  }
+
+  window.addEventListener('scroll', fit, { passive: true });
+  // Con movimiento reducido toda propiedad tiene una transición de 0.01 ms (responsive.css): el alto nuevo se aplica
+  // un cuadro después, y es entonces cuando hay que volver a mirar el foco.
+  nav?.addEventListener('transitionend', event => { if (event.target === nav && event.propertyName === 'max-height') keepFocusInMenu(); });
+  window.addEventListener('resize', fit);
+
+  menuButton?.addEventListener('click', () => {
+    const open = !isOpen(menuButton);
+    setOpen(searchButton, search, false);
+    setOpen(menuButton, nav, open);
+  });
+
+  searchButton?.addEventListener('click', () => {
+    const open = !isOpen(searchButton);
+    setOpen(menuButton, nav, false);
+    setOpen(searchButton, search, open);
+    if (open) search?.querySelector('input')?.focus();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (categoriesPanel?.open) {
+      categoriesPanel.open = false;
+      categoriesPanel.querySelector('summary')?.focus();
+    } else if (isOpen(menuButton)) {
+      setOpen(menuButton, nav, false);
+      menuButton?.focus();
+    } else if (isOpen(searchButton)) {
+      setOpen(searchButton, search, false);
+      searchButton?.focus();
+    }
+  });
+
+  /** Panel de tableta y celular con su botón: se cierra si el foco o un clic quedan fuera de los dos. */
+  const panels = [[menuButton, nav], [searchButton, search]] as const;
+  const outside = (target: EventTarget | null, button: HTMLElement | null, panel: HTMLElement | null) =>
+    target instanceof Node && !panel?.contains(target) && !button?.contains(target);
+
+  document.addEventListener('click', event => {
+    if (categoriesPanel?.open && desktop.matches && event.target instanceof Node && !categoriesPanel.contains(event.target)) categoriesPanel.open = false;
+    if (desktop.matches) return;
+    for (const [button, panel] of panels) if (isOpen(button) && outside(event.target, button, panel)) setOpen(button, panel, false);
+  });
+  for (const [button, panel] of panels) {
+    // Sin relatedTarget (la ventana pierde el foco) el panel sigue abierto.
+    const leave = (event: FocusEvent) => {
+      if (!desktop.matches && isOpen(button) && outside(event.relatedTarget, button, panel)) setOpen(button, panel, false);
+    };
+    button?.addEventListener('focusout', leave);
+    panel?.addEventListener('focusout', leave);
+  }
+  categoriesPanel?.addEventListener('focusout', event => {
+    const next = event.relatedTarget;
+    if (categoriesPanel.open && desktop.matches && next instanceof Node && !categoriesPanel.contains(next)) categoriesPanel.open = false;
+  });
+</script>

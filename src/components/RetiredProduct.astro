@@ -1,0 +1,89 @@
+---
+// Página informativa de un producto retirado (R-STATE-04). Es un componente de la ficha de producto
+// (src/pages/productos/[id].astro), que la imprime en la misma dirección del producto: quien guardó el enlace,
+// escaneó una cotización o conserva un mensaje no llega a un 404, sabe que el producto salió del catálogo y puede
+// pedir una alternativa. La página imprime antes la ruta y después «Más productos…», con la regla de la ficha.
+//
+// La hoja en dos partes, como la ficha:
+//   - en 7 columnas, el marco con el pictograma de la categoría sobre el rayado (el genérico si el producto no tiene
+//     una categoría pública), nunca una fotografía; la etiqueta «Ejemplo» en el ejemplo de la vista previa;
+//   - en 5 columnas, la categoría (si es pública) y el nombre (H1), las filas Marca y Código (sin la que no tenga
+//     dato), el aviso «Producto retirado» y las dos acciones para consultar alternativas.
+// Después, la banda de solicitud especial de los listados (CatalogBand).
+// Sin unidad de venta, resumen, características, variantes, documentación, aviso de disponibilidad ni acciones de
+// cotizar: nadie mantiene ya esos datos (lo no confirmado se omite) y el producto no se cotiza.
+// Estilos: src/styles/pages/producto.css (clases producto__…, las del aviso producto__retired…).
+import type { ContactLinkPair } from '../types/contact.ts';
+import type { PublicBrand, PublicCategory, PublicRetiredProduct } from '../types/site.ts';
+import { categoryIcon } from '../lib/icons.ts';
+import { EXAMPLE_TAG } from '../lib/site-data.mjs';
+import ActionRow from './ActionRow.astro';
+import CatalogBand from './CatalogBand.astro';
+import Icon from './Icon.astro';
+import Tag from './Tag.astro';
+
+interface Props {
+  product: PublicRetiredProduct;
+  /** Su primera categoría pública; sin ella no hay enlace de categoría y el pictograma es el genérico. */
+  category?: PublicCategory;
+  /** La marca, si tiene página; el ejemplo no la tiene. */
+  brand?: PublicBrand;
+  /** `contactLinks.retired(…)`: el mensaje para consultar alternativas. */
+  alternatives: ContactLinkPair;
+  /** Ruta del producto cuando la compilación no conoce la dirección del sitio (la agrega PageLinkScript). */
+  pageLink?: string;
+}
+
+const { product, category, brand, alternatives, pageLink } = Astro.props;
+---
+<section class="producto grid12" aria-labelledby="titulo">
+  <div class="producto__media span-7 span-md-12">
+    <div class="producto__frame">
+      {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
+      <span class="producto__plate"><Icon name={categoryIcon(category?.id ?? '')} class="icon--fine" /></span>
+    </div>
+  </div>
+
+  <div class="producto__body span-5 span-md-12">
+    <div class="producto__head cell">
+      {category && <a class="producto__cat label" href={category.url}>{category.name}</a>}
+      <h1 class="producto__title t-title" id="titulo">{product.name}</h1>
+    </div>
+
+    {(product.brandName || product.code) && (
+      <dl class="data producto__data">
+        {product.brandName && (
+          <div class="data__row">
+            <dt class="data__key label">Marca</dt>
+            <dd class="data__value">
+              {brand ? (
+                <a class="data__link" href={brand.url}><span>{product.brandName}</span><Icon name="arrow-right" /></a>
+              ) : (
+                product.brandName
+              )}
+            </dd>
+          </div>
+        )}
+        {product.code && (
+          <div class="data__row">
+            <dt class="data__key label">Código</dt>
+            <dd class="data__value"><span class="producto__code t-code">{product.code}</span></dd>
+          </div>
+        )}
+      </dl>
+    )}
+
+    <div class="producto__retired cell">
+      <p class="producto__retired-label eyebrow label">Producto retirado</p>
+      <p class="producto__retired-lead">Este producto ya no forma parte del catálogo.</p>
+      <p class="producto__retired-text">Dinos qué necesitas y revisamos alternativas.</p>
+    </div>
+
+    <div class="producto__actions">
+      <ActionRow href={alternatives.whatsapp} primary icon="whatsapp" data-page-link={pageLink}>Consultar alternativas</ActionRow>
+      <ActionRow href={alternatives.mailto} icon="mail" data-page-link={pageLink}>Consultar por correo</ActionRow>
+    </div>
+  </div>
+</section>
+
+<CatalogBand />
