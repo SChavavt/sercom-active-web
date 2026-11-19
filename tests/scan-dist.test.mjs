@@ -958,7 +958,14 @@ test('R-RULE-01: «con IVA», «sin IVA» o «IVA incluido» después de un dato
   // versión anterior a la ronda 2 las marcaba.
   const data = ['Emitimos CFDI 4.0 con IVA trasladado.', 'Uso de CFDI G03 con IVA desglosado.', 'Guante calibre 15 con IVA desglosado en la cotización.',
     'Norma EN 388 con IVA desglosado al cotizar', 'Talla 9 con IVA', 'Modelo 2200 con IVA', 'Versión 4.0 con IVA', 'Serie 6000 IVA incluido', 'Guante calibre 15 sin IVA',
-    'Nivel 4 con IVA', 'Clase 2 con IVA desglosado', 'Talla No. 9 sin IVA'];
+    'Nivel 4 con IVA', 'Clase 2 con IVA desglosado', 'Talla No. 9 sin IVA',
+    // Las mismas palabras con dos puntos, «#», «N°» o «Nº», en plural (también con una lista de cifras), abreviadas
+    // («Mod.»), la norma escrita con su año («EN 388:2016»), una talla con fracción o un intervalo («9 1/2», «9/10») y el
+    // modelo después de una marca de brands.json («3M 6200»).
+    'Talla: 9 con IVA', 'Modelo: 2200 con IVA', 'Calibre: 15 con IVA', 'Modelo #2200 con IVA', 'Modelo N° 2200 con IVA', 'Modelo Nº 2200 con IVA', 'Mod. 2200 con IVA',
+    'Tallas 9 con IVA', 'Tallas 8, 9 y 10 con IVA desglosado', 'Modelos 2200 con IVA', 'Normas EN 388 y EN 407 con IVA desglosado',
+    'Norma EN 388:2016 con IVA desglosado al cotizar', 'Norma EN ISO 374-1:2016 con IVA desglosado', 'ISO 9001:2015 con IVA desglosado', 'Norma ANSI/ISEA 105 con IVA desglosado',
+    'Talla 9 1/2 con IVA', 'Talla 9/10 con IVA', 'Respirador 3M 6200 con IVA desglosado', 'Cotiza el respirador 3M 6200 con IVA desglosado.', 'Guante Ansell 11-840 con IVA'];
   for (const text of data) {
     const ids = failedIds(await scan({ 'pagina/index.html': page(`<p>${text}</p>`) }));
     assert.ok(!ids.includes('R-RULE-01'), `${text}: ${ids}`);
@@ -970,9 +977,14 @@ test('R-RULE-01: «con IVA», «sin IVA» o «IVA incluido» después de un dato
     '<p>Talla 9 a 350 con IVA</p>', '<p>Guante talla 9, 350 con IVA</p>', '<p>Modelo 2200: 350 con IVA</p>', '<p>Guante calibre 15 a 25.50 con IVA</p>',
     // «+ IVA» y «más IVA» siguen como en la ronda 1, también después de un dato.
     '<p>Modelo 2200 + IVA</p>',
+    // Dos puntos o una coma después de una palabra que no es un dato, o después de la cifra del dato, y una palabra entre
+    // el dato en plural y la cifra: la cifra es un importe.
+    '<p>Casco: 350 con IVA</p>', '<p>Talla 9, 350 IVA incluido</p>', '<p>Tallas 9 a 350 con IVA</p>', '<p>Modelos 2200: 350 con IVA</p>', '<p>Modelo #2200: 350 con IVA</p>',
+    '<p>Casco 350 con el IVA</p>', '<p>Casco 350 IVA incluida</p>', '<p>CFDI 4.0: 350 con IVA</p>',
   ]);
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
   assert.match(printed, /no una cifra pegada a una letra ni la que sigue a un dato del producto[^\n]*«Talla 9 con IVA», «Modelo 2200 con IVA»/);
+  assert.match(printed, /«Talla: 9», «Modelo #2200», «Modelo N° 2200», «Mod\. 2200»[^\n]*«Tallas 8, 9 y 10»[^\n]*«EN 388:2016»[^\n]*«Talla 9 1\/2»[^\n]*«Respirador 3M 6200 con IVA»[^\n]*«Talla 9, 350 IVA incluido»/);
 });
 
 test('R-RULE-01: después de «precio de» solo el nombre de una marca que empieza con una cifra no es un precio', async () => {
@@ -983,6 +995,11 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
     '<p>Precio de 99c/u</p>', '<p>Costo de 3m</p>', '<p>Precio de 3MM</p>', '<p>Tarifa de 3M2</p>', '<p>Precio unitario de 350k</p>', '<p>Precio unitario de 2x1</p>',
     // La marca seguida de una cifra: la cifra es el precio.
     '<p>Precio de 3M 350</p>', '<p>Precio de 3M-350</p>', '<p>Precio de marca 3M 350</p>',
+    // Con cualquier otra cosa entre la marca y la cifra, en la misma frase (f37334b también las detectaba).
+    '<p>Precio de 3M, 350</p>', '<p>Precio de 3M desde 350</p>', '<p>Precio de 3M a 350</p>', '<p>Precio de 3M en 350</p>', '<p>Precio de 3M (350)</p>',
+    '<p>Precio de 3M — 350</p>', '<p>Precio de 3M – 350</p>', '<p>Precio de 3M · 350</p>', '<p>Precio de 3M/350</p>', '<p>Precio de 3M=350</p>', '<p>Precio de 3M,350</p>',
+    '<p>Precio de 3M.350</p>', '<p>Precio de 3M_350</p>', '<p>Precio de 3M$</p>', '<p>Precio unitario de 3M desde 350</p>', '<p>Precio de marca 3M (350)</p>',
+    '<p>Los precios de 3M van desde 350</p>', '<p>Precio de 3M<br>350</p>',
   ]);
   // La marca escrita como la escribe (con su mayúscula y como palabra completa) es un nombre. «Los precios de 3M…» y
   // «Precio de 3M: a cotizar» fallaban en f37334b: son texto de marca y no dicen ningún precio (la única excepción a
@@ -990,7 +1007,10 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
   await assertNoneFails([
     '<p>El precio vigente de 3M se confirma al cotizar.</p>', '<p>Los precios de 3M se confirman al cotizar.</p>', '<p>Precio de 3M: a cotizar</p>',
     '<p>Los precios actuales de 3M y Ansell se confirman al cotizar.</p>', '<p>El costo real de 3M se confirma al cotizar.</p>', '<p>Precio unitario de 3M: a cotizar</p>',
-    '<p>Precio de marca 3M</p>', '<p>Precio de <b>3M</b>: a cotizar</p>',
+    '<p>Precio de marca 3M</p>', '<p>Precio de <b>3M</b>: a cotizar</p>', '<p>Precio de 3M, a cotizar</p>', '<p>Precio de 3M (a cotizar)</p>',
+    '<p>Precio de 3M®: a cotizar</p>', '<p>Precio de 3M — consulta disponibilidad</p>',
+    // La cifra de la frase siguiente no es de la marca.
+    '<p>Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.</p>',
   ]);
   // Cada marca de brands.json cuyo nombre empieza con una cifra está en la excepción: una marca nueva así se nota aquí.
   const figureBrands = data.brands.map(brand => brand.name).filter(name => /^\d/.test(name));
@@ -1005,6 +1025,7 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
   assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<p>Precio de 4Safe: a cotizar</p>') })), ['R-RULE-01']);
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
   assert.match(printed, /«Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí/);
+  assert.match(printed, /la marca seguida de una cifra en la misma frase, con lo que sea en medio[^\n]*«Precio de 3M desde 350», «Precio de 3M \(350\)»/);
 });
 
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
