@@ -13,7 +13,10 @@ const packageJson = await readJson('package.json');
 const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path}`);
 // Código sin comentarios: los comentarios pueden nombrar archivos que el código no importa.
 // («//» solo cuenta como comentario al inicio de la línea o después de un espacio, para no cortar «https://…».)
-const stripComments = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+// Un texto entre comillas se salta entero: «'../data/**/*.json'» lleva «/**/», que no es un comentario. Las comillas
+// simples y dobles no pasan de una línea, así que un apóstrofo suelto del texto de una página solo afecta a su línea.
+const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
+const stripComments = text => text.replace(COMMENT_OR_STRING, (match, string, before) => string ?? before ?? '');
 const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/.test(path)).map(async path => [path, await readText(path)])));
 const sources = new Map([...rawSources].map(([path, text]) => [path, stripComments(text)]));
 const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);
@@ -121,31 +124,104 @@ test('el archivo de ejemplos solo se carga dentro de la rama de vista previa de 
 
 // Archivo de ejemplos, tal como lo vería un patrón de Vite resuelto desde la raíz del proyecto.
 const EXAMPLES_FILE = '/src/data/preview/example-products.json';
+// Opciones de `import.meta.glob` que conoce Vite 8. Solo `base` cambia los archivos que se cargan.
+const GLOB_OPTIONS = new Set(['as', 'eager', 'import', 'query', 'exhaustive', 'base', 'caseSensitive']);
+const PLAIN_STRING = /^(["'])((?:(?!\1)[^\\])*)\1$|^`([^`$\\]*)`$/;
+/** Valor de un texto escrito tal cual («'…'», «"…"» o «`…`» sin `${}`), o `undefined`. */
+const plainString = text => {
+  const match = text.trim().match(PLAIN_STRING);
+  return match ? match[2] ?? match[3] : undefined;
+};
+/**
+ * Divide en el nivel superior (fuera de paréntesis, llaves, corchetes y textos) el contenido de una llamada o de un
+ * literal. Devuelve también el índice donde se cierra el contenido, o -1 si no se cierra.
+ */
+function splitTopLevel(code, start) {
+  const parts = [];
+  let depth = 0;
+  let part = '';
+  for (let index = start; index < code.length; index += 1) {
+    const character = code[index];
+    if (`"'\``.includes(character)) {
+      let end = index + 1;
+      while (end < code.length && code[end] !== character) end += code[end] === '\\' ? 2 : 1;
+      part += code.slice(index, end + 1);
+      index = end;
+    } else if ('([{'.includes(character)) {
+      depth += 1;
+      part += character;
+    } else if (')]}'.includes(character)) {
+      if (depth === 0) return { parts: [...parts, part], end: index };
+      depth -= 1;
+      part += character;
+    } else if (character === ',' && depth === 0) {
+      parts.push(part);
+      part = '';
+    } else {
+      part += character;
+    }
+  }
+  return { parts: [...parts, part], end: -1 };
+}
 /**
  * Patrones de `import.meta.glob(…)` y de `import(\`…${x}…\`)` (que Vite convierte en un patrón) en el código de un
- * archivo, resueltos desde la raíz del proyecto. Un `import()` cuyo argumento no es un texto escrito tal cual no se
- * puede revisar y se devuelve como «?».
+ * archivo, resueltos desde la raíz del proyecto como lo hace Vite: «/…» desde la raíz, «./…» y «../…» desde la
+ * carpeta del archivo o desde la opción `base`. Lo que no se puede revisar se devuelve como «?»: un argumento que no
+ * es un texto escrito tal cual, unas opciones que no son un objeto escrito tal cual (con una opción desconocida, una
+ * expansión o un `base` calculado) y un patrón que no empieza con «/», «./» ni «../» (uno que empieza con «**», un alias).
  * @param {string} path Ruta del archivo («src/pages/x.astro»).
- * @param {string} code Código sin comentarios.
+ * @param {string} code Código del archivo.
  */
 function loadPatterns(path, code) {
   const directory = posix.dirname(`/${path}`);
-  const resolvePattern = pattern => {
-    const negated = pattern.startsWith('!');
-    const body = negated ? pattern.slice(1) : pattern;
-    const absolute = body.startsWith('/') ? posix.normalize(body) : posix.join(directory, body);
-    return negated ? `!${absolute}` : absolute;
-  };
   const patterns = [];
-  for (const match of code.matchAll(/import\.meta\.glob\s*(?:<[^>]*>)?\s*\(\s*(\[[^\]]*\]|["'`][^"'`]*["'`]|[^,)]*)/g)) {
-    const literals = [...match[1].matchAll(/["'`]([^"'`]*)["'`]/g)].map(literal => literal[1]);
-    patterns.push(...(literals.length ? literals.map(resolvePattern) : ['?']));
+  for (const match of code.matchAll(/import\.meta\.glob\s*(?:<[^>]*>)?\s*\(/g)) {
+    const { parts, end } = splitTopLevel(code, match.index + match[0].length);
+    const [first = '', options, ...extra] = parts.map(part => part.trim());
+    if (end < 0 || extra.some(Boolean)) {
+      patterns.push('?');
+      continue;
+    }
+    // Las opciones: un objeto escrito tal cual, con claves conocidas y un `base` escrito tal cual.
+    let base = directory;
+    if (options) {
+      const entries = options.startsWith('{') && options.endsWith('}') ? splitTopLevel(options, 1).parts.map(entry => entry.trim()).filter(Boolean) : undefined;
+      const pairs = entries?.map(entry => entry.match(/^(?:(["'])(\w+)\1|(\w+))\s*:\s*([\s\S]+)$/));
+      if (!pairs || pairs.some(pair => !pair || !GLOB_OPTIONS.has(pair[2] ?? pair[3]))) {
+        patterns.push('?');
+        continue;
+      }
+      const baseOption = pairs.find(pair => (pair[2] ?? pair[3]) === 'base');
+      if (baseOption) {
+        const value = plainString(baseOption[4]);
+        if (value === undefined) {
+          patterns.push('?');
+          continue;
+        }
+        base = value.startsWith('/') ? posix.normalize(value) : posix.join(directory, value);
+      }
+    }
+    const resolvePattern = pattern => {
+      const negated = pattern.startsWith('!');
+      const body = negated ? pattern.slice(1) : pattern;
+      if (body.startsWith('/')) return `${negated ? '!' : ''}${posix.normalize(body)}`;
+      if (body.startsWith('./') || body.startsWith('../')) return `${negated ? '!' : ''}${posix.join(base, body)}`;
+      return negated ? undefined : '?';
+    };
+    const literals = first.startsWith('[') && first.endsWith(']') ? splitTopLevel(first, 1).parts.map(entry => entry.trim()).filter(Boolean).map(plainString) : [plainString(first)];
+    if (literals.some(literal => literal === undefined)) patterns.push('?');
+    else patterns.push(...literals.map(resolvePattern).filter(Boolean));
   }
   for (const match of code.matchAll(/(?<![\w$.])import\s*\(\s*([^)]*)\)/g)) {
     const argument = match[1].trim();
     if (/^(["'])[^"'`]*\1(?:\s*,|$)/.test(argument)) continue; // Texto escrito tal cual: lo revisa la prueba de las menciones.
     const template = argument.match(/^`([^`]*)`/);
-    patterns.push(template ? resolvePattern(template[1].replace(/\$\{[^}]*\}/g, '*')) : '?');
+    if (!template) {
+      patterns.push('?');
+      continue;
+    }
+    const pattern = template[1].replace(/\$\{[^}]*\}/g, '*');
+    patterns.push(pattern.startsWith('/') ? posix.normalize(pattern) : posix.join(posix.dirname(`/${path}`), pattern));
   }
   return patterns;
 }
@@ -153,26 +229,48 @@ function loadPatterns(path, code) {
 const reachesExamples = patterns => patterns.some(pattern => pattern === '?')
   || (patterns.some(pattern => !pattern.startsWith('!') && posix.matchesGlob(EXAMPLES_FILE, pattern))
     && !patterns.some(pattern => pattern.startsWith('!') && posix.matchesGlob(EXAMPLES_FILE, pattern.slice(1))));
+/**
+ * Archivos cuyo código tiene un patrón de carga que alcanza el archivo de ejemplos. Se lee el código sin comentarios y
+ * también el archivo tal cual, por si quitar los comentarios cambiara un patrón. @param {Iterable<[string, string]>} files
+ */
+const examplesLoaders = files => [...files]
+  .filter(([path, text]) => reachesExamples(loadPatterns(path, stripComments(text))) || reachesExamples(loadPatterns(path, text)))
+  .map(([path]) => path);
 
 test('ningún import.meta.glob ni import() con patrón puede cargar el archivo de ejemplos', () => {
-  // La comprobación reconoce las formas que esquivan la búsqueda por nombre.
+  // La comprobación reconoce las formas que esquivan la búsqueda por nombre, revisadas igual que los archivos reales.
   const misuse = [
-    ['src/pages/muestra.astro', "const datos = import.meta.glob('../data/*/*.json', { eager: true });"],
+    ['src/pages/muestra.astro', "---\nconst datos = import.meta.glob('../data/*/*.json', { eager: true });\n---"],
     ['src/pages/muestra.astro', "const datos = import.meta.glob(['../data/**/*.json', '!../data/catalog.json']);"],
     ['src/components/Tarjeta.astro', "const datos = import.meta.glob('/src/**/*.json');"],
+    // Un patrón recursivo lleva «/**/», que no es un comentario.
+    ['src/pages/sondas/rec.astro', "---\nconst modulos = import.meta.glob('../../data/**/*.json', { eager: true, import: 'default' });\n---\n<p>{JSON.stringify(modulos)}</p>"],
+    ['src/pages/sondas/abs.astro', "---\nconst modulos = import.meta.glob('/src/data/**/*.json', { eager: true, import: 'default' });\n---"],
+    ['src/lib/todos-los-datos.mjs', "// Todos los JSON de datos, para depurar.\nexport const datos = import.meta.glob('../data/**/*.json', { eager: true, import: 'default' });"],
+    ['src/pages/sondas/css.astro', "---\nconst modulos = import.meta.glob('../../data/*/*.json', { eager: true });\n---\n<style>\n  /* espacio entre bloques */\n  p { margin: 0; }\n</style>"],
+    // La opción `base` de Vite: los patrones relativos se resuelven desde ella.
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('**/*.json', { base: '../../data', eager: true, import: 'default' });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('./**/*.json', { base: '../../data', eager: true });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('./preview/*.json', { base: '/src/data' });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('./*/*.json', { base: carpeta });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('../icons/*.svg', { ...opciones });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('../icons/*.svg', opciones);"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('../icons/*.svg', { eager: true, raiz: '../../data' });"],
+    ['src/pages/sondas/base.astro', "const modulos = import.meta.glob('@datos/**/*.json');"],
     ['src/lib/otra.mjs', 'const datos = await import(`../data/${carpeta}/${nombre}.json`);'],
     ['src/lib/otra.mjs', 'const datos = await import(ruta);'],
   ];
-  for (const [path, code] of misuse) assert.ok(reachesExamples(loadPatterns(path, code)), code);
+  for (const [path, code] of misuse) assert.deepEqual(examplesLoaders([[path, code]]), [path], code);
   const harmless = [
     ['src/pages/muestra.astro', "const iconos = import.meta.glob('../icons/*.svg', { eager: true, query: '?raw' });"],
+    ['src/pages/muestra.astro', "const iconos = import.meta.glob('./**/*.svg', { base: '../icons', eager: true });"],
     ['src/pages/muestra.astro', "const datos = import.meta.glob(['../data/*.json', '!../data/preview/**']);"],
+    ['src/pages/muestra.astro', "// Sin la carpeta de ejemplos:\nconst datos = import.meta.glob(['../data/**/*.json', '!../data/preview/**'], { eager: true });"],
     ['src/lib/site-data.mjs', "const datos = (await import('../data/preview/example-products.json', { with: { type: 'json' } })).default;"],
   ];
-  for (const [path, code] of harmless) assert.equal(reachesExamples(loadPatterns(path, code)), false, code);
+  for (const [path, code] of harmless) assert.deepEqual(examplesLoaders([[path, code]]), [], code);
 
-  const offenders = [...sources].filter(([path, code]) => reachesExamples(loadPatterns(path, code))).map(([path]) => path);
-  assert.deepEqual(offenders, [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
+  assert.deepEqual(examplesLoaders(rawSources), [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
 });
 
 // Colecciones de contenido de Astro. Sus cargadores (`glob()` y `file()` de «astro/loaders») leen archivos de src/ con un
