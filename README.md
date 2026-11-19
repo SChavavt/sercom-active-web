@@ -38,7 +38,7 @@ Se necesita Node.js 24 y npm. Las versiones están fijadas en `package-lock.json
 | `npm test` | Ejecuta las pruebas automáticas. |
 | `npm run build` | Genera la versión de producción en `dist/`. |
 | `npm run build:preview` | Genera la vista previa con ejemplos en `dist-preview/`. |
-| `npm run preview` | Sirve localmente `dist/` ya generada. Solo corre uno a la vez; se detiene con Ctrl+C o, si quedó en segundo plano (al ejecutarlo sin terminal), con `npx astro preview stop`. |
+| `npm run preview` | Sirve localmente `dist/` ya generada. Solo corre uno a la vez; se detiene con Ctrl+C o, si quedó en segundo plano (con `--background`, o porque Astro detectó que lo ejecuta un agente automatizado), con `npx astro preview stop`. |
 | `npm run verify` | Genera las dos versiones y revisa en ambas las reglas del sitio, los enlaces y el marcado. |
 | `npm run scan:dist`, `npm run check:links`, `npm run check:markup` | Cada revisión por separado sobre `dist/`. |
 
