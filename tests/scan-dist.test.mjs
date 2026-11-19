@@ -909,6 +909,28 @@ test('R-RULE-01: una cifra con IVA incluido, con o sin IVA, I.V.A.; una cifra pe
   assert.match(printed, /el nombre de una marca de brands\.json que empieza con una cifra[^\n]*no es una cifra: «El precio vigente de 3M»/);
 });
 
+test('R-RULE-01: «con IVA», «sin IVA» o «IVA incluido» después de un dato del producto no es un precio', async () => {
+  // Una cifra que es un dato: una versión o un uso del CFDI, un calibre, una norma, una talla, un modelo. Ninguna
+  // versión anterior a la ronda 2 las marcaba.
+  const data = ['Emitimos CFDI 4.0 con IVA trasladado.', 'Uso de CFDI G03 con IVA desglosado.', 'Guante calibre 15 con IVA desglosado en la cotización.',
+    'Norma EN 388 con IVA desglosado al cotizar', 'Talla 9 con IVA', 'Modelo 2200 con IVA', 'Versión 4.0 con IVA', 'Serie 6000 IVA incluido', 'Guante calibre 15 sin IVA',
+    'Nivel 4 con IVA', 'Clase 2 con IVA desglosado', 'Talla No. 9 sin IVA'];
+  for (const text of data) {
+    const ids = failedIds(await scan({ 'pagina/index.html': page(`<p>${text}</p>`) }));
+    assert.ok(!ids.includes('R-RULE-01'), `${text}: ${ids}`);
+  }
+  // Una cifra que no sigue a un dato sigue siendo un precio, también después de un dato y de un signo o una palabra.
+  await assertEachFails('R-RULE-01', [
+    '<p>Casco 350 con IVA</p>', '<p>Casco 350 sin IVA</p>', '<p>Casco 350.00 con IVA</p>', '<p>Casco 350 IVA incluido</p>', '<p>Casco 350 + I.V.A.</p>',
+    '<p>Casco 350 más I.V.A.</p>', '<p>Casco 350 más el IVA</p>', '<p>Casco 1,200.00 con IVA</p>', '<p>Guante 25.50 sin IVA</p>', '<p>Talla 9: 350 con IVA</p>',
+    '<p>Talla 9 a 350 con IVA</p>', '<p>Guante talla 9, 350 con IVA</p>', '<p>Modelo 2200: 350 con IVA</p>', '<p>Guante calibre 15 a 25.50 con IVA</p>',
+    // «+ IVA» y «más IVA» siguen como en la ronda 1, también después de un dato.
+    '<p>Modelo 2200 + IVA</p>',
+  ]);
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.match(printed, /no una cifra pegada a una letra ni la que sigue a un dato del producto[^\n]*«Talla 9 con IVA», «Modelo 2200 con IVA»/);
+});
+
 test('R-RULE-01: después de «precio de» solo el nombre de una marca que empieza con una cifra no es un precio', async () => {
   // Una cifra pegada a letras sigue siendo un precio (f37334b las detectaba): una oferta, un importe abreviado, una
   // unidad o el nombre de la marca escrito de otra forma.
