@@ -580,8 +580,14 @@ const business = await readJson('src/data/business.json');
 const CONTACT_CODE = /^src\/(?:pages|components|layouts|lib)\//;
 const foldAccents = text => text.normalize('NFD').replace(/\p{M}/gu, '');
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** Cifras con cualquier separador de un teléfono entre ellas («221 400 2219», «(221) 400-2219», «221.400.2219»). */
-const digitsPattern = digits => `(?<!\\d)${[...digits].join('[\\s().+-]*')}(?!\\d)`;
+// Un espacio o un guion de Unicode: los espacios (\s ya los incluye todos, también el duro y el fino), las rayas y
+// guiones (\p{Pd}: el guion que no se parte, la raya, el guion de cifra…) y el signo menos.
+const SPACE_OR_DASH = '[\\s\\p{Pd}\\u2212]';
+/**
+ * Cifras con cualquier separador de un teléfono entre ellas («221 400 2219», «(221) 400-2219», «221.400.2219»), y
+ * con cualquier espacio o guion de Unicode, que no cuentan al comparar las cifras («221‑400‑2219», «221 400 2219»).
+ */
+const digitsPattern = digits => `(?<!\\d)${[...digits].join(`(?:${SPACE_OR_DASH}|[().+])*`)}(?!\\d)`;
 /**
  * Patrones de los datos de contacto de un business.json. El nombre completo y el correo no distinguen mayúsculas ni
  * acentos. El nombre de pila se busca como palabra completa y con su mayúscula inicial, como se escribe un nombre: si
@@ -594,19 +600,36 @@ const contactPatterns = record => [
   ['nombre de pila', new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(foldAccents(record.contactFirstName))}(?![\\p{L}\\p{N}])`, 'u')],
   // También partido como lo dibuja EmailAddress («ventas.puebla@» y el dominio en otro elemento).
   ['correo', new RegExp(`${escapeRegExp(record.email)}|${escapeRegExp(record.email.split('@')[0])}@`, 'i')],
-  ['teléfono como se muestra', new RegExp(record.whatsappDisplay.split(/\s+/).map(escapeRegExp).join('\\s*'))],
-  ['cifras del teléfono', new RegExp(`${digitsPattern(record.whatsappDigits)}|${digitsPattern(record.whatsappDigits.slice(-10))}`)],
+  ['teléfono como se muestra', new RegExp(record.whatsappDisplay.split(/\s+/).map(escapeRegExp).join(`${SPACE_OR_DASH}*`), 'u')],
+  ['cifras del teléfono', new RegExp(`${digitsPattern(record.whatsappDigits)}|${digitsPattern(record.whatsappDigits.slice(-10))}`, 'u')],
 ];
-// Las formas de mantener un número o un nombre en una línea: las entidades del espacio duro (&nbsp;, &#160;, &#xA0;),
-// del espacio duro fino (U+202F) y del espacio de cifra (U+2007) se leen como un espacio, y la unión de palabras (U+2060,
-// &NoBreak;) como nada. Esos caracteres escritos tal cual ya son espacios para «\s», salvo la unión de palabras. Un «@»
-// escrito como entidad («ventas.puebla&#64;…») o el correo partido por una etiqueta antes del «@» no se buscan: no son
-// la forma de escribir un dato, sino de esconderlo (docs/datos-y-modos.md, sección 6).
-const SPACE_ENTITY = /&(?:nbsp|NonBreakingSpace|#0*160|#x0*a0|#0*8239|#x0*202f|#0*8199|#x0*2007);/gi;
-const WORD_JOINER = /\u2060|&(?:NoBreak|#0*8288|#x0*2060);/gi;
+// Las formas de mantener un número o un nombre en una línea, escritas tal cual o como entidad: se decodifican las
+// entidades con nombre y las numéricas (decimales o hexadecimales, con punto y coma o sin él) de los espacios y de los
+// guiones («&nbsp;», también «&nbsp» sin punto y coma como lo lee el navegador, «&thinsp;», «&ensp;», «&emsp;», «&#32;»,
+// «&#x20;», «&#8201;», «&#8209;», «&ndash;»…), y después cualquier espacio o guion de Unicode cuenta como separador:
+// entre las palabras del nombre (\s) y entre las cifras del teléfono (SPACE_OR_DASH), donde no cuenta al comparar las
+// cifras. La unión de palabras (U+2060, &NoBreak;) y el espacio de ancho cero (U+200B) se quitan. Un «@» escrito como
+// entidad («ventas.puebla&#64;…») o el correo partido por una etiqueta antes del «@» no se buscan: no son la forma de
+// escribir un dato, sino de esconderlo (docs/datos-y-modos.md, sección 6).
+const SPACE_OR_DASH_NAMES = {
+  nbsp: '\u00a0', nonbreakingspace: '\u00a0', ensp: '\u2002', emsp: '\u2003', emsp13: '\u2004', emsp14: '\u2005', numsp: '\u2007', puncsp: '\u2008',
+  thinsp: '\u2009', thinspace: '\u2009', hairsp: '\u200a', verythinspace: '\u200a', mediumspace: '\u205f', hyphen: '\u2010', dash: '\u2010',
+  ndash: '\u2013', mdash: '\u2014', horbar: '\u2015', minus: '\u2212',
+};
+const NAMED_SPACE_OR_DASH = new RegExp(`&nbsp;?|&(${Object.keys(SPACE_OR_DASH_NAMES).join('|')});`, 'gi');
+const NUMERIC_ENTITY = /&#(?:x([0-9a-f]+)|(\d+));?/gi;
+const IS_SPACE_OR_DASH = new RegExp(`^${SPACE_OR_DASH}$`, 'u');
+const decodeSpacesAndDashes = text => text
+  .replace(NAMED_SPACE_OR_DASH, (_entity, name) => (name ? SPACE_OR_DASH_NAMES[name.toLowerCase()] : '\u00a0'))
+  .replace(NUMERIC_ENTITY, (entity, hex, decimal) => {
+    const code = Number.parseInt(hex ?? decimal, hex ? 16 : 10);
+    const character = code <= 0x10ffff ? String.fromCodePoint(code) : '';
+    return IS_SPACE_OR_DASH.test(character) ? character : entity;
+  });
+const WORD_JOINER = /[\u2060\u200b]|&(?:NoBreak|ZeroWidthSpace|#0*8288|#x0*2060|#0*8203|#x0*200b);/gi;
 /** Datos de contacto que un código lleva escritos, leído sin comentarios y sin acentos. */
 const contactLiterals = (text, record = business) => {
-  const code = foldAccents(stripComments(text)).replace(SPACE_ENTITY, ' ').replace(WORD_JOINER, '');
+  const code = decodeSpacesAndDashes(foldAccents(stripComments(text)).replace(WORD_JOINER, ''));
   return contactPatterns(record).filter(([, pattern]) => pattern.test(code)).map(([label]) => label);
 };
 
@@ -637,12 +660,33 @@ test('ninguna página, componente, plantilla ni módulo lleva escritos los datos
     ['<p>221&nbsp;400&nbsp;2219</p>', ['cifras del teléfono']],
     ['<p>221&NoBreak;400\u20602219</p>', ['cifras del teléfono']],
     ['<p>Yosmara&nbsp;del Rocío Torres Pérez</p>', ['nombre', 'nombre de pila']],
+    // Con las demás marcas que mantienen el número en una línea: el guion que no se parte (U+2011, también como entidad),
+    // la raya y el guion de cifra, los espacios finos y anchos escritos como entidad, «&#32;» y «&nbsp» sin punto y coma.
+    ['<p>221\u2011400\u20112219</p>', ['cifras del teléfono']],
+    ['<p>221&#8209;400&#8209;2219</p>', ['cifras del teléfono']],
+    ['<p>221&#x2011;400&#x2011;2219</p>', ['cifras del teléfono']],
+    ['<p>221\u2013400\u20132219</p>', ['cifras del teléfono']],
+    ['<p>221\u2012400\u20122219</p>', ['cifras del teléfono']],
+    ['<p>221&ndash;400&mdash;2219</p>', ['cifras del teléfono']],
+    ['<p>+52\u20111\u2011221\u2011400\u20112219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52&thinsp;1&thinsp;221&thinsp;400&thinsp;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>221&ensp;400&ensp;2219</p>', ['cifras del teléfono']],
+    ['<p>221&emsp;400&emsp;2219</p>', ['cifras del teléfono']],
+    ['<p>+52&#32;1&#32;221&#32;400&#32;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>221&#x20;400&#x20;2219</p>', ['cifras del teléfono']],
+    ['<p>221&#8201;400&#8201;2219</p>', ['cifras del teléfono']],
+    ['<p>221&hairsp;400&#x2009;2219</p>', ['cifras del teléfono']],
+    ['<p>+52&nbsp1&nbsp221&nbsp400&nbsp2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>221&nbsp400&nbsp2219</p>', ['cifras del teléfono']],
+    ['<p>Yosmara&nbspdel Rocío Torres Pérez</p>', ['nombre', 'nombre de pila']],
   ];
   for (const [code, labels] of misuse) assert.deepEqual(contactLiterals(code, REVIEWED_CONTACT), labels, code);
   const harmless = [
     '---\n// Saluda a Yosmara del Rocío Torres Pérez con los datos de business.json (ventas.puebla@sercomactive.com).\nimport { contactDetails } from \'../lib/contact.mjs\';\n---\n<!-- +52 1 221 400 2219 -->',
     '<p>Te atiende {contactDetails.name}.</p><a href={contactLinks.whatsapp}>{contactDetails.whatsappDisplay}</a>',
-    '<p>Modelo 2214002218, talla 9.</p>', '<p>Los Yosmarales</p>',
+    '<p>Modelo 2214002218, talla 9.</p>', '<p>Los Yosmarales</p>', '<p>Modelo 221&ndash;400 y talla 2219.</p>',
+    // Límites documentados: un «@» escrito como entidad y el correo partido por una etiqueta antes del «@» no se buscan.
+    '<p>ventas.puebla&#64;sercomactive.com</p>', '<p>ventas.<b></b>puebla@sercomactive.com</p>',
   ];
   for (const code of harmless) assert.deepEqual(contactLiterals(code, REVIEWED_CONTACT), [], code);
   // Un nombre de pila que también es una palabra común: en minúsculas no cuenta; con mayúscula, sí.
