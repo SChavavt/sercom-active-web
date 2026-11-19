@@ -141,7 +141,7 @@
   .register__link .t-h3 { font-size: 1.0625rem; }
   .register__sub { font-size: 0.875rem; }
 
-  .brand { min-height: 64px; padding: 0 var(--s-3) 0 var(--pad); font-size: 1.125rem; }
+  .brand { min-height: 64px; padding: var(--s-3) var(--s-3) var(--s-3) var(--pad); font-size: 1.125rem; }
   .brand .icon { display: none; }
   .brand--all { font-size: 1rem; }
   .brand--all .icon { display: block; }
@@ -229,7 +229,7 @@
   .register__link { min-height: 88px; padding: var(--s-4) var(--s-4) var(--s-4) var(--pad); }
 
   .brands > li { grid-column: span 6; }
-  .brand { min-height: 60px; padding: 0 var(--pad); }
+  .brand { min-height: 60px; padding: var(--s-2) var(--pad); }      /* 8 px: «Ver todas las marcas» en dos renglones cabe en los 60 px */
   .brand .icon { display: none; }
   .brand--all .icon { display: block; }
   .note { align-items: flex-start; }
@@ -351,7 +351,7 @@
   .empty__action { grid-column: 1; width: 100%; }
   .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
   .brands__fill--even { display: none; }        /* dos marcas por fila: con un número par no falta ninguna celda */
-  .brands--lg .brand { min-height: 72px; }      /* página de marcas: dos por fila, diez filas */
+  .brands--lg .brand { min-height: 72px; padding-block: var(--s-3); }      /* página de marcas: dos por fila, diez filas */
   .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-sm); }
   .grid12 > .grid-fill[data-hide~="sm"], .register > .grid-fill[data-hide~="sm"] { display: none; }   /* GridFill */
   /* ruta de tres o más elementos: la página actual sale de la vista (sigue para el lector) y con ella su diagonal */

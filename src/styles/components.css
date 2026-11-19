@@ -381,6 +381,11 @@
 .register__link:hover .register__go { transform: translateX(4px); }
 
 /* 4.9 Celda de marca (nombres en texto, un solo tratamiento) ---------------- */
+/* El enlace llena su celda: si otra celda de la fila crece (un nombre largo), esta crece con ella y el azul del
+   fondo nunca queda a la vista debajo del enlace. */
+.brands > li { display: flex; }
+/* Alto mínimo fijo para los nombres de un renglón y aire arriba y abajo para un nombre largo, que hace crecer la
+   celda en lugar de tocar los filetes (con los nombres reales el alto mínimo manda y la celda no cambia). */
 .brand {
   display: flex;
   align-items: center;
@@ -388,7 +393,7 @@
   gap: var(--s-3);
   width: 100%;
   min-height: 76px;
-  padding: 0 var(--pad);
+  padding: var(--s-3) var(--pad);
   background: var(--surface);
   font-size: 1.375rem;
   font-weight: 700;
@@ -596,7 +601,7 @@
 .product__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
 /* Celdas de marca altas (página de marcas) */
-.brands--lg .brand { min-height: 96px; }
+.brands--lg .brand { min-height: 96px; padding-block: var(--s-4); }
 /* Número de productos bajo el nombre de la marca (BrandCells con `counts`) */
 .brand__count { display: block; margin-top: var(--s-2); color: var(--grey-600); font-size: var(--label-sm); }
 /* Celda blanca que completa la última fila de marcas (BrandCells) */
