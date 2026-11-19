@@ -17,7 +17,10 @@ const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path
 // simples y dobles no pasan de una línea, así que un apóstrofo suelto del texto de una página solo afecta a su línea.
 const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
 const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, before) => string ?? before ?? '');
-const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/.test(path)).map(async path => [path, await readText(path)])));
+// Tipos de archivo que leen las pruebas de las fuentes (ejemplos, colecciones, disco, capa de datos, datos de contacto):
+// las páginas y componentes .astro, los scripts y las hojas de estilo. No leen Markdown, MDX ni HTML.
+const SOURCE_FILE = /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/;
+const rawSources = new Map(await Promise.all(sourceFiles.filter(path => SOURCE_FILE.test(path)).map(async path => [path, await readText(path)])));
 const sources = new Map([...rawSources].map(([path, text]) => [path, stripComments(text)]));
 const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);
 const { bin: astroBinField } = JSON.parse(await readFile(astroPackage, 'utf8'));
@@ -431,6 +434,15 @@ test('el código de src/ no lee el disco ni importa módulos de Node', () => {
     assert.deepEqual(nodeBuiltinsOf(code), [], code);
   }
 
+  // require() con la ruta de un archivo de datos escrita tal cual, en un módulo .cjs, .js o .mjs o en el frontmatter de
+  // una página: todos son tipos que esta prueba lee, y require() falla siempre.
+  for (const [path, code] of [['src/lib/datos.cjs', "const catalogo = require('../data/catalog.json');\nmodule.exports = catalogo.categories;"],
+    ['src/lib/datos.js', 'const catalogo = require("../data/catalog.json");'], ['src/lib/datos.mjs', "export const marcas = require('../data/brands.json');"],
+    ['src/pages/contacto/index.astro', "---\nconst negocio = require('../../data/business.json');\n---\n<p>{negocio.contactName}</p>"]]) {
+    assert.ok(SOURCE_FILE.test(path), path);
+    assert.match(stripComments(code), DISK_ACCESS, `${path}: ${code}`);
+  }
+
   // El código del sitio lee los datos con import de JSON, que las pruebas anteriores pueden revisar; nunca del disco.
   const diskReaders = [...sources].filter(([, code]) => DISK_ACCESS.test(code)).map(([path]) => path);
   assert.deepEqual(diskReaders, [], 'el código de src/ lee archivos del disco');
@@ -585,9 +597,16 @@ const contactPatterns = record => [
   ['teléfono como se muestra', new RegExp(record.whatsappDisplay.split(/\s+/).map(escapeRegExp).join('\\s*'))],
   ['cifras del teléfono', new RegExp(`${digitsPattern(record.whatsappDigits)}|${digitsPattern(record.whatsappDigits.slice(-10))}`)],
 ];
+// Las formas de mantener un número o un nombre en una línea: las entidades del espacio duro (&nbsp;, &#160;, &#xA0;),
+// del espacio duro fino (U+202F) y del espacio de cifra (U+2007) se leen como un espacio, y la unión de palabras (U+2060,
+// &NoBreak;) como nada. Esos caracteres escritos tal cual ya son espacios para «\s», salvo la unión de palabras. Un «@»
+// escrito como entidad («ventas.puebla&#64;…») o el correo partido por una etiqueta antes del «@» no se buscan: no son
+// la forma de escribir un dato, sino de esconderlo (docs/datos-y-modos.md, sección 6).
+const SPACE_ENTITY = /&(?:nbsp|NonBreakingSpace|#0*160|#x0*a0|#0*8239|#x0*202f|#0*8199|#x0*2007);/gi;
+const WORD_JOINER = /\u2060|&(?:NoBreak|#0*8288|#x0*2060);/gi;
 /** Datos de contacto que un código lleva escritos, leído sin comentarios y sin acentos. */
 const contactLiterals = (text, record = business) => {
-  const code = foldAccents(stripComments(text));
+  const code = foldAccents(stripComments(text)).replace(SPACE_ENTITY, ' ').replace(WORD_JOINER, '');
   return contactPatterns(record).filter(([, pattern]) => pattern.test(code)).map(([label]) => label);
 };
 
@@ -608,6 +627,16 @@ test('ninguna página, componente, plantilla ni módulo lleva escritos los datos
     ['<a href="https://wa.me/5212214002219">WhatsApp</a>', ['cifras del teléfono']],
     ['<p>Llámanos al (221) 400-2219.</p>', ['cifras del teléfono']],
     ['<a href="tel:2214002219">Teléfono</a>', ['cifras del teléfono']],
+    // Con los espacios que mantienen el número o el nombre en una línea.
+    ['<p>+52&nbsp;1&nbsp;221&nbsp;400&nbsp;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52&#160;1&#160;221&#160;400&#160;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52&#xA0;1&#xA0;221&#xA0;400&#xA0;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52\u00a01\u00a0221\u00a0400\u00a02219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52\u202f1\u202f221\u202f400\u202f2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>+52&#8239;1&#x202F;221&nbsp;400&#8199;2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<p>221&nbsp;400&nbsp;2219</p>', ['cifras del teléfono']],
+    ['<p>221&NoBreak;400\u20602219</p>', ['cifras del teléfono']],
+    ['<p>Yosmara&nbsp;del Rocío Torres Pérez</p>', ['nombre', 'nombre de pila']],
   ];
   for (const [code, labels] of misuse) assert.deepEqual(contactLiterals(code, REVIEWED_CONTACT), labels, code);
   const harmless = [
@@ -624,6 +653,19 @@ test('ninguna página, componente, plantilla ni módulo lleva escritos los datos
   const written = [...sources].filter(([path]) => CONTACT_CODE.test(path))
     .flatMap(([path, code]) => contactLiterals(code).map(label => `${path}: ${label}`));
   assert.deepEqual(written, [], 'un archivo lleva escrito un dato de contacto: se toma de business.json con contact.mjs (contactDetails, contactLinks)');
+});
+
+// Astro publica como página también un archivo Markdown, MDX o HTML de src/pages/, y ninguna prueba de las fuentes lo
+// lee: «Escríbele a Yosmara.» en src/pages/nota.md, o la importación de un archivo de datos en una página .mdx, pasarían.
+// Hoy todas las páginas son .astro (src/pages/ no tiene otro tipo). Antes de agregar una de otro tipo, las pruebas de las
+// fuentes tienen que leerlo.
+test('src/pages/ solo tiene páginas de los tipos que leen las pruebas de las fuentes', () => {
+  for (const path of ['src/pages/nota.md', 'src/pages/nota.mdx', 'src/pages/nota.markdown', 'src/pages/nota.html', 'src/pages/contacto/index.md']) assert.ok(!SOURCE_FILE.test(path), path);
+  for (const path of ['src/pages/index.astro', 'src/pages/marcas/[id].astro', 'src/pages/feed.json.ts', 'src/pages/datos.mjs']) assert.ok(SOURCE_FILE.test(path), path);
+  const pages = sourceFiles.filter(path => path.startsWith('src/pages/'));
+  assert.ok(pages.length > 0);
+  const unread = pages.filter(path => !SOURCE_FILE.test(path));
+  assert.deepEqual(unread, [], 'una página de src/pages/ es de un tipo que las pruebas de las fuentes no leen (capa de datos, datos de contacto, ejemplos, disco): antes de agregarla, haz que esas pruebas lean ese tipo (SOURCE_FILE en tests/build-mode.test.mjs) y que revisen su contenido');
 });
 
 test('los módulos para el navegador no importan datos ni usan APIs de Node o de Astro', () => {
