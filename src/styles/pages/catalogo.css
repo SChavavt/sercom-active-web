@@ -252,10 +252,14 @@
 
 @media (max-width: 699px) {
   .catalog-categories--odd .register::after { display: none; }
-  .catalog-search__field { grid-column: span 9; gap: var(--s-3); padding-right: var(--s-2); }
-  .catalog-search__field .icon { display: none; }       /* el botón ya dice «Buscar»: el campo gana ancho */
+  /* Con «Buscar» al lado, en celulares de menos de 386 px el campo mide menos que su texto de ayuda
+     («Buscar por producto, marca o código») y lo corta. El campo toma la fila completa y «Buscar» va debajo,
+     a todo lo ancho: el texto de ayuda se lee completo y el botón queda grande para el pulgar. */
+  .catalog-search__form { row-gap: var(--line); }
+  .catalog-search__field { grid-column: span 12; gap: var(--s-3); padding-right: var(--s-2); }
   .catalog-search__input { font-size: 1rem; }
-  .catalog-search__submit { grid-column: span 3; }
+  .catalog-search__submit { grid-column: span 12; min-height: 52px; }
   /* En el celular la línea de resultados pasa a dos líneas antes de cortarse */
   .catalog-search__count { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; white-space: normal; overflow-wrap: anywhere; }
 }
+
