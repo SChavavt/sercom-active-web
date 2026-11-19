@@ -34,6 +34,8 @@ Las consultas de proveedores son trabajos separados de las visitas del cliente. 
 
 Usar npm y Node.js 24; mantener el lockfile. Antes de proponer cualquier cambio de datos o de código, ejecutar `npm run check`, `npm test` y `npm run verify`; los tres deben pasar. Las pruebas deben cubrir riesgos del flujo, no replicar detalles del diseño. Varias fijan los datos de hoy (19 marcas, ningún producto real, categorías en borrador, el contacto, las órdenes de `verify` y `vercel.json`): qué pruebas cambian con cada cambio de datos está en `docs/datos-y-modos.md` (6.2). Las comprobaciones no reemplazan la revisión visual y funcional en el navegador.
 
+El texto debe caber con el espaciado de WCAG 1.4.12 y con la letra agrandada a 125 %, 150 % y 200 %: un componente nuevo o un texto más largo se revisa también así, y no lleva alto fijo donde haya texto (las pocas excepciones están en 11.4). Las reglas de la letra agrandada (consultas de contenedor con umbrales en `rem`) y la revisión que cualquiera puede repetir están en `docs/diseno.md` (11.4 y 15).
+
 Ningún control que no haga nada: todo lo que se ve funciona, y lo que corresponde a un paso posterior no se dibuja. Sin JavaScript cada página sigue siendo usable. Un script del navegador no importa `site-data.mjs`, `contact.mjs` ni archivos `.json`.
 
 El contacto abre WhatsApp o correo; abrir una aplicación no prueba que el mensaje se envió. La cotización del paso 2 debe ofrecer copiar el resumen y soportar listas largas. No simular confirmaciones de recepción.
