@@ -175,6 +175,21 @@ test('U-07: «|=» con un valor que, seguido de un guion, empieza una clase reti
   assert.deepEqual(await check({ '_astro/pagina.css': '[class|="nav_"]{x:0}[class|=na]{x:0}[class|="NAV-"]{x:0}[class|="masthead__nav"]{x:0}' }, { ids: ['U-07'] }), []);
 });
 
+test('U-07: «^=» y «*=» con una palabra que termina en guion y empieza en un límite se leen como «|=»', async () => {
+  // «[class^="nav-"]» selecciona class="nav--open": la palabra «nav-» empieza la clase y nav--… es del bloque .nav.
+  for (const css of ['[class^="nav-"] { display: none }', '[class*=" nav-"]{display:none}', '[class^="search-"]{x:0}', '[class^="nav--"]{x:0}',
+    '[class*="x nav-"]{x:0}', '[class*=" search-"]{x:0}', '[class^="NAV-" i]{x:0}', '[class^="x nav-"]{x:0}',
+    // «nav_» empieza nav__list: ya fallaba y sigue fallando.
+    '[class^="nav_"]{x:0}']) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  // Sin límite a la izquierda, sin el guion de una familia retirada o con otras mayúsculas (sin «i») no es una clase retirada.
+  const near = '[class^="navy"]{x:0}[class*="masthead__nav"]{x:0}[class^="masthead"]{x:0}[class^="NAV-"]{x:0}[class^="na-"]{x:0}[class*="catalog-nav-"]{x:0}'
+    + '[class^="search-x"]{x:0}[class$="nav-"]{x:0}[class*="anav-"]{x:0}[class^="masthead__nav-"]{x:0}[class*=" -"]{x:0}[class^="x-nav-"]{x:0}[class^="x nav- y"]{x:0}';
+  assert.deepEqual(await check({ '_astro/pagina.css': near }, { ids: ['U-07'] }), []);
+});
+
 test('U-07: un selector de atributo con espacio de nombres (*|, |, ns|) se lee igual', async () => {
   for (const css of ['[*|class~=nav]{display:none}', '[|class~=nav]{x:0}', '[svg|class="search"]{x:0}', '[*|CLASS*=" search"]{x:0}']) {
     const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });

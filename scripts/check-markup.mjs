@@ -411,7 +411,7 @@ export const isRetiredClass = name => RETIRED_HEADER_BLOCKS.some(block => name =
  * Con «^=», «$=» y «*=» cada palabra del valor se lee según lo que tiene a cada lado: un espacio (dentro del valor) o
  * el borde que fija el operador («^=» el principio del atributo, «$=» el final) es un límite de palabra; el borde
  * libre del valor puede seguir con cualquier letra. Una palabra con límite a ambos lados es entera; con límite solo
- * a la izquierda es el principio de una clase («[class*=" na"]», en «x nav»); solo a la derecha, su final
+ * a la izquierda es el principio de una clase («[class*=" na"]», en «x nav»; «[class^="nav-"]», en «nav--open»); solo a la derecha, su final
  * («[class*="av "]», en «nav x»); sin ninguno, cualquier parte («[class*=av]»). Un valor de puros espacios cabe en
  * « nav ».
  * @param {{ operator: string | null, value: string | null, insensitive: boolean }} attribute
@@ -440,7 +440,9 @@ export function classAttributeCouldMatch({ operator, value, insensitive }, { isW
     const right = index < words.length - 1 || endBound;
     if (isWhole(word)) return true;
     if (left && right) return false;
-    if (left) return names.some(name => name.startsWith(word));
+    // Con límite solo a la izquierda empieza una clase: un nombre empieza con ella o, como con «|=», la palabra seguida
+    // de «-x» es de una familia abierta («[class^="nav-"]» en «nav--open»).
+    if (left) return names.some(name => name.startsWith(word)) || isWhole(`${word}-x`);
     if (right) return names.some(name => name.endsWith(word));
     return names.some(name => name.includes(word));
   });
