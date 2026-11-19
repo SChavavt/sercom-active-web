@@ -220,6 +220,15 @@ export function createContact(settings) {
   const firstName = clean(settings?.contactFirstName);
   const business = clean(settings?.name);
   if (!/^\d{8,15}$/.test(digits)) throw new Error('Contacto: whatsappDigits debe contener solo dígitos (de 8 a 15).');
+  // El número que muestran las páginas (whatsappDisplay) y el que abren los enlaces (whatsappDigits) son el mismo:
+  // las mismas cifras, con los espacios y signos que se quieran para mostrarlo. Se revisa aquí porque contact.mjs
+  // llama a createContact con business.json al cargarse, y toda página que muestra el número o un enlace pasa por
+  // contact.mjs: si no coinciden, la compilación se detiene.
+  const display = clean(settings?.whatsappDisplay);
+  if (!display) throw new Error('Contacto: falta whatsappDisplay, el número que muestran las páginas; sus cifras deben ser las de whatsappDigits.');
+  if (display.replace(/\D/g, '') !== digits) {
+    throw new Error(`Contacto: whatsappDisplay («${display}») y whatsappDigits («${digits}») no son el mismo número: las páginas mostrarían uno y los enlaces abrirían otro. Corrige uno de los dos en los datos del negocio.`);
+  }
   if (!/^[^\s@?&#%]+@[^\s@?&#%]+\.[^\s@?&#%]+$/.test(email)) throw new Error('Contacto: email no tiene forma de dirección de correo.');
   if (!firstName || !business) throw new Error('Contacto: faltan contactFirstName o name.');
 

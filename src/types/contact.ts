@@ -9,6 +9,8 @@ export interface ContactSettings {
   email: string;
   /** Número de WhatsApp tal como se usa en `wa.me`: solo dígitos, sin normalizar. */
   whatsappDigits: string;
+  /** Número tal como lo muestran las páginas («+52 1 221 400 2219»): sus cifras son exactamente `whatsappDigits`. */
+  whatsappDisplay: string;
 }
 
 /** Datos de contacto que las páginas muestran. No incluye la dirección: no se publica hasta confirmar la atención presencial. */

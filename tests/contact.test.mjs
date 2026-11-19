@@ -77,7 +77,7 @@ test('el mensaje general y el de producto abren con la misma línea', () => {
   const opening = messages.general();
   assert.equal(messages.product(product).split('\n')[0], opening);
   assert.equal(messages.product({}).split('\n')[0], opening);
-  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
+  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000', whatsappDisplay: '+52 1 55 0000 0000' });
   assert.equal(other.messages.product(product).split('\n')[0], other.messages.general());
   // El asunto del correo general no cambia.
   assert.equal(subjects.general(), 'Solicitud de cotización');
@@ -209,7 +209,7 @@ test('mensaje para consultar alternativas a un producto retirado, con y sin enla
   assert.equal(withPageLink(built.whatsapp, retiredUrl), complete.whatsapp);
   assert.equal(withPageLink(built.mailto, retiredUrl), complete.mailto);
   // El saludo, el negocio, el número y el correo salen de los datos que recibe createContact.
-  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
+  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000', whatsappDisplay: '+52 1 55 0000 0000' });
   assert.equal(other.messages.retired(retired).split('\n')[0], 'Hola, Persona. Busco una alternativa a un producto que ya no está en el catálogo de Negocio de prueba.');
   assert.match(other.contactLinks.retired(retired).whatsapp, /^https:\/\/wa\.me\/5215500000000\?text=/);
   assert.match(other.contactLinks.retired(retired).mailto, /^mailto:prueba@example\.invalid\?subject=Consulta%20de%20alternativas%3A%20/);
@@ -369,13 +369,13 @@ test('el recorte a 200 caracteres no parte un emoji ni deja caracteres sueltos q
 });
 
 test('createContact usa los datos que recibe y rechaza datos de contacto mal formados', () => {
-  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
+  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000', whatsappDisplay: '+52 1 55 0000 0000' });
   assert.equal(other.messages.general(), 'Hola, Persona. Quiero solicitar una cotización con Negocio de prueba.');
   assert.equal(other.whatsappUrl('Hola'), 'https://wa.me/5215500000000?text=Hola');
   assert.equal(other.mailtoUrl({ subject: 'Hola' }), 'mailto:prueba@example.invalid?subject=Hola');
   assert.equal(buildWhatsappUrl('5215500000000', 'Hola'), 'https://wa.me/5215500000000?text=Hola');
   assert.equal(buildMailtoUrl('prueba@example.invalid', { body: 'a\nb' }), 'mailto:prueba@example.invalid?body=a%0D%0Ab');
-  const valid = { name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' };
+  const valid = { name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000', whatsappDisplay: '+52 1 55 0000 0000' };
   for (const whatsappDigits of ['+52 1 55 0000 0000', '52-1-55', '', undefined, '123']) {
     assert.throws(() => createContact({ ...valid, whatsappDigits }), /whatsappDigits debe contener solo dígitos/, String(whatsappDigits));
   }
@@ -403,4 +403,28 @@ test('requestDescription: una búsqueda que no muestra nada (U+200D, U+00AD, U+F
     assert.equal(withRequestDescription(links.whatsapp, query), withRequestDescription(links.whatsapp, ''), JSON.stringify(query));
   }
   assert.equal(requestDescription('casco\u200D'), 'casco\u200D');
+});
+
+test('el número que muestran las páginas y el que abren los enlaces son las mismas cifras (whatsappDisplay y whatsappDigits)', () => {
+  // Los datos de hoy pasan: «+52 1 221 400 2219» son las cifras de 5212214002219.
+  assert.equal(business.whatsappDisplay.replace(/\D/g, ''), business.whatsappDigits);
+  assert.doesNotThrow(() => createContact(business));
+  const valid = { name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000', whatsappDisplay: '+52 1 55 0000 0000' };
+  assert.doesNotThrow(() => createContact(valid));
+  // Otros espacios u otra puntuación con las mismas cifras pasan.
+  for (const whatsappDisplay of ['5215500000000', '+52 (1) 55-0000-0000', '+52 1 55 0000 0000', ' +52 1 55 0000 0000 ', '+52.1.55.0000.0000']) {
+    assert.doesNotThrow(() => createContact({ ...valid, whatsappDisplay }), whatsappDisplay);
+  }
+  // Una cifra cambiada, una de más o de menos, o el número «normalizado» sin el 1, fallan con los dos campos nombrados.
+  for (const whatsappDisplay of ['+52 1 55 0000 0001', '+52 1 55 0000 00000', '+52 1 55 0000 000', '+52 55 0000 0000', '+52 1 221 400 2219']) {
+    assert.throws(() => createContact({ ...valid, whatsappDisplay }), /whatsappDisplay.*whatsappDigits.*no son el mismo número/, whatsappDisplay);
+  }
+  // El de los datos del sitio, con una cifra cambiada, también.
+  assert.throws(() => createContact({ ...business, whatsappDisplay: '+52 1 221 400 2218' }), /«\+52 1 221 400 2218».*«5212214002219»/);
+  // Sin el número que se muestra (falta, vacío o sin cifras) no hay con qué comparar: falla.
+  for (const whatsappDisplay of [undefined, null, '', '   ', 'WhatsApp']) {
+    assert.throws(() => createContact({ ...valid, whatsappDisplay }), /whatsappDisplay/, String(whatsappDisplay));
+  }
+  const withoutDisplay = Object.fromEntries(Object.entries(valid).filter(([key]) => key !== 'whatsappDisplay'));
+  assert.throws(() => createContact(/** @type {any} */ (withoutDisplay)), /falta whatsappDisplay/);
 });
