@@ -54,7 +54,7 @@
 .masthead__logo:focus-visible { outline-offset: -3px; }
 .masthead__logo img { width: 156px; height: 59px; }        /* logo.svg sin margen propio: proporción 2.656 */
 
-.masthead__nav { display: flex; }
+.masthead__nav { display: flex; min-width: 0; }
 .nav__list { display: flex; flex: 1; justify-content: space-between; padding: 0 var(--s-3); }
 .nav__list > li { display: flex; }
 .nav__link {

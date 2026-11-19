@@ -26,6 +26,13 @@
   .tile--wide .tile__name { font-size: 1.1875rem; }
   .brand { font-size: 1.25rem; }
 }
+/* Con búsqueda la navegación tiene 4 columnas: hasta 1199 px sus enlaces se aprietan para no invadir la celda
+   de búsqueda (sin búsqueda tiene 7 columnas y no cambia) */
+@media (min-width: 1100px) and (max-width: 1199px) {
+  .masthead:not(.masthead--no-search) .nav__list { padding-inline: var(--s-1); }
+  .masthead:not(.masthead--no-search) .nav__link { padding-inline: 6px; font-size: 0.875rem; }
+  .masthead:not(.masthead--no-search) .nav__link::after { left: 6px; right: 6px; }
+}
 
 /* 6.2 Tableta y celular: la navegación se pliega y las filas se reacomodan (revisado a 768) */
 @media (max-width: 1099px) {
