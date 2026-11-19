@@ -606,9 +606,15 @@ test('R-RULE-29: colores de la paleta anterior en setProperty, constantes y clav
     '<svg><rect><animate attributeName="fill" values="#fff;#0e2a3e"/></rect></svg>', '<table bordercolor="#0e2a3e"><tr><td>x</td></tr></table>',
     '<table bgcolor="#0e2a3e"><tr><td>x</td></tr></table>', '<font color="#00a6e4">x</font>',
   ]);
+  // El segundo argumento de setProperty sea cual sea el primero, los valores de un objeto o una lista de colores y «by» de <animate>.
+  for (const content of ["el.style.setProperty(nombre,'#0e2a3e');", "const colores={fondo:'#0e2a3e'};", "const palette=['#0e2a3e','#fff'];", "const paleta=['#0e2a3e'];", "const tema={fondo:'#0e2a3e'};"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect><animate attributeName="fill" by="#0e2a3e"/></rect></svg>' })), ['R-RULE-29']);
   // Un ancla, un identificador o un dato con forma de color, fuera de un nombre de color, siguen limpios.
-  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<svg><a href="#00a6e9"><text>x</text></a></svg>']);
-  for (const [path, content] of [['datos.json', '{"x":"#0e2a40"}'], ['_astro/app.js', 'const ancla="#00a6e9";'], ['_astro/app.js', "el.style.setProperty('--ancho','12px');location.hash='#00a6e9';"]]) {
+  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<svg><a href="#00a6e9"><text>x</text></a></svg>', '<svg><set attributeName="href" to="#00a6e9"/></svg>']);
+  for (const [path, content] of [['datos.json', '{"x":"#0e2a40"}'], ['_astro/app.js', 'const ancla="#00a6e9";'], ['_astro/app.js', "el.style.setProperty('--ancho','12px');location.hash='#00a6e9';"],
+    ['_astro/app.js', "const marca={id:'#0e2a3e'};"], ['_astro/app.js', "const primary={label:'Cotizar',href:'#00a6e9'};"]]) {
     assert.deepEqual(failures(await scan({ [path]: content })), [], content);
   }
 });

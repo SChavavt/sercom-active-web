@@ -468,7 +468,7 @@ export const CHECKS = [
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea dos o tres veces), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
-  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from y values de <animate> y <set>, un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, primary, accent, brand, marca, navy, azul, theme, tema…) o el segundo argumento de setProperty. Ninguna página declara <meta name="color-scheme"> con dark.'],
+  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
@@ -643,27 +643,34 @@ function contactSources(raw, extension) {
 const COLOR_NAME = /^(?:style|fill|stroke|text|link|vlink|alink|[\w-]*colou?r)$/i;
 // En un script o un JSON, un valor asignado a una propiedad, una clave o una constante cuyo nombre dice color
 // («el.style.color="#…"», «{"fill":"#…"}», «const NAVY='#…'», «{primary:'#…'}»).
-const COLOR_WORDS = 'colou?r|background|fill|stroke|border|shadow|outline|bg|primary|secondary|accent|brand|marca|navy|cyan|cian|azul|theme|tema';
+const COLOR_WORDS = 'colou?r|background|fill|stroke|border|shadow|outline|bg|fondo|primary|secondary|accent|brand|marca|navy|cyan|cian|azul|palette|paleta|theme|tema';
 // El valor termina en una comilla, «;», «{» o «}»: en «tema={primary:'#…'}» también se lee la clave de dentro.
 const SCRIPT_COLOR = new RegExp(`(?:${COLOR_WORDS})[\\w-]*["'\`]?\\s*[:=,]\\s*["'\`]?([^"'\`;{}]*)`, 'gi');
-// El valor de `setProperty('--variable', '#…')`, cualquiera que sea el nombre de la variable.
-const SET_PROPERTY = /\bsetProperty\s*\(\s*(["'`])[^"'`]*\1\s*,\s*["'`]?([^"'`)]*)/g;
+// Un objeto o una lista bajo un nombre que dice color o paleta («colores={fondo:'#…'}», «palette=['#…','#fff']»): se
+// leen todos sus valores (con un nivel de anidación).
+const SCRIPT_COLOR_GROUP = /(?:colou?r|palette|paleta|theme|tema)[\w-]*["'`]?\s*[:=]\s*[{[](?:[^{}[\]]|[{[][^{}[\]]*[}\]])*[}\]]/gi;
+// El segundo argumento de `setProperty(…, '#…')`, cualquiera que sea el primero («'--marca'», «nombre»).
+const SET_PROPERTY = /\bsetProperty\s*\(\s*[^,()]*,\s*["'`]?([^"'`)]*)/g;
 /**
  * Lo que R-RULE-29 lee como color: una hoja de estilo entera; en HTML y SVG, los estilos, los atributos de color,
- * los valores `to`, `from` y `values` de <animate> y <set>, y el `content` de un <meta> de color (theme-color); en un
- * script o un JSON, los valores de las propiedades, claves y constantes de color y el segundo argumento de
- * `setProperty`. Un ancla («#00a6e9»), un identificador o un dato que se parece a un color no lo son. Los colores
+ * los valores `to`, `from`, `by` y `values` de <animate> y <set> (salvo los que animan un enlace), y el `content` de
+ * un <meta> de color (theme-color); en un script o un JSON, los valores de las propiedades, claves y constantes de
+ * color, todos los valores de un objeto o una lista de colores («colores={…}», «palette=[…]») y el segundo argumento
+ * de `setProperty`. Un ancla («#00a6e9»), un identificador o un dato que se parece a un color no lo son. Los colores
  * exactos de la paleta anterior se buscan además en todo el archivo (regla R-RULE-29 de `raw`).
  * @param {string} raw
  * @param {string} extension
  */
 function colorSources(raw, extension) {
   if (extension === '.css') return raw;
-  const scriptColors = code => [...code.matchAll(SCRIPT_COLOR), ...code.matchAll(SET_PROPERTY)].map(match => match[0]).join('\n');
+  const scriptColors = code => [...code.matchAll(SCRIPT_COLOR), ...code.matchAll(SCRIPT_COLOR_GROUP), ...code.matchAll(SET_PROPERTY)].map(match => match[0]).join('\n');
   if (!/^\.(?:html?|svg|xml)$/.test(extension)) return scriptColors(raw);
   const markup = withoutScripts(raw);
   const meta = [...markup.matchAll(/<meta\b[^>]*>/gi)].filter(match => /color/i.test(attribute(match[0], 'name') ?? '')).map(match => attribute(match[0], 'content') ?? '');
-  const animations = [...markup.matchAll(/<(?:animate|animateColor|set)\b[^>]*>/gi)].flatMap(match => ['to', 'from', 'values'].map(name => attribute(match[0], name) ?? ''));
+  // Una animación de un enlace («<set attributeName="href" to="#ancla">») no lleva un color.
+  const animations = [...markup.matchAll(/<(?:animate|animateColor|set)\b[^>]*>/gi)]
+    .filter(match => !/href$/i.test(attribute(match[0], 'attributeName') ?? ''))
+    .flatMap(match => ['to', 'from', 'by', 'values'].map(name => attribute(match[0], name) ?? ''));
   const attributes = attributesOf(markup).filter(([name]) => COLOR_NAME.test(name)).map(([, value]) => value);
   return [inlineStyles(raw), scriptColors(inlineScripts(raw)), ...meta, ...animations, ...attributes].join('\n');
 }
