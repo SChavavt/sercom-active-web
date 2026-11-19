@@ -2,9 +2,11 @@
 // Pie del sitio: el lema «Tu mejor opción» y la descripción de la empresa, logotipo, enlaces, categorías,
 // contacto, las dos notas legales y el año. Sin categorías públicas (producción hoy) la columna de
 // categorías no se imprime y las otras tres ocupan 4 columnas cada una.
+// El enlace a la página actual lleva aria-current="page" y el cuadro azul de 10 px (`.footer__mark`).
 import logo from '../assets/brand/logo.svg';
 import { contactDetails, contactLinks } from '../lib/contact.mjs';
 import { categories, routes } from '../lib/site-data.mjs';
+import EmailAddress from './EmailAddress.astro';
 import Icon from './Icon.astro';
 
 const hasCategories = categories.length > 0;
@@ -33,14 +35,14 @@ const links = [
     <nav class:list={['footer__cell', 'footer__nav', span]} aria-labelledby="footer-nav-title">
       <h2 class="footer__title label" id="footer-nav-title">{contactDetails.businessName}</h2>
       <ul class="footer__links">
-        {links.map(link => <li><a href={link.href} aria-current={current(link.href)}>{link.label}</a></li>)}
+        {links.map(link => <li><a href={link.href} aria-current={current(link.href)}>{current(link.href) && <span class="footer__mark" aria-hidden="true"></span>}{link.label}</a></li>)}
       </ul>
     </nav>
     {hasCategories && (
       <nav class:list={['footer__cell', 'footer__cats', span]} aria-labelledby="footer-cats-title">
         <h2 class="footer__title label" id="footer-cats-title">Categorías</h2>
         <ul class="footer__links">
-          {categories.map(category => <li><a href={category.url} aria-current={current(category.url)}>{category.name}</a></li>)}
+          {categories.map(category => <li><a href={category.url} aria-current={current(category.url)}>{current(category.url) && <span class="footer__mark" aria-hidden="true"></span>}{category.name}</a></li>)}
         </ul>
       </nav>
     )}
@@ -49,7 +51,7 @@ const links = [
       <div class="footer__contact">
         <p class="footer__who"><strong>{contactDetails.contactName}</strong><br />{contactDetails.locationLabel}</p>
         <p><a href={general.whatsapp}><Icon name="whatsapp" class="icon--16" /><span class="vh">WhatsApp </span><span class="t-code">{contactDetails.whatsappDisplay}</span></a><br />
-        <a href={general.mailto}><Icon name="mail" class="icon--16" />{contactDetails.email}</a></p>
+        <a href={general.mailto}><Icon name="mail" class="icon--16" /><EmailAddress /></a></p>
         <p class="footer__hours">{contactDetails.hoursText}</p>
       </div>
     </div>
@@ -60,6 +62,6 @@ const links = [
   </div>
   <div class="footer__legal t-small">
     <p>© {year} {contactDetails.businessName}</p>
-    <a href={routes.privacy} aria-current={current(routes.privacy)}>Privacidad</a>
+    <a href={routes.privacy} aria-current={current(routes.privacy)}>{current(routes.privacy) && <span class="footer__mark" aria-hidden="true"></span>}Privacidad</a>
   </div>
 </footer>

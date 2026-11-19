@@ -191,7 +191,7 @@
 
 /* 3. Piezas propias de una página -------------------------------------------------------------------------- */
 
-/* 3.1 Marca: enlace «Sitio del fabricante» en la columna lateral del título, sobre la fila de WhatsApp */
+/* 3.1 Marca: enlace «Sitio del fabricante» en la columna lateral del título (sobre la fila de WhatsApp si hay productos) */
 .catalog-brand__links {
   display: flex;
   flex-direction: column;
@@ -206,12 +206,6 @@
 .catalog-related__head { display: flex; align-items: center; padding: var(--s-5) var(--pad); background: var(--surface); }
 .catalog-related__title { color: var(--blue); }
 .catalog-related__list { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-7); padding: var(--s-2) var(--pad); background: var(--surface); }
-
-/* 3.3 Catálogo sin productos pero con categorías: el registro (CategoryRegister) va en dos columnas hasta el
-   celular; con un número impar de categorías la segunda columna termina una celda antes. Esa celda se pinta
-   de blanco con un elemento generado, que la retícula coloca en el lugar libre. En el celular (una columna)
-   no hace falta. */
-.catalog-categories--odd .register::after { content: ""; background: var(--surface); }
 
 /* 4. Tableta y celular: la barra lateral se pliega en dos filas sobre las tarjetas ------------------------- */
 @media (max-width: 1099px) {
@@ -251,7 +245,6 @@
 }
 
 @media (max-width: 699px) {
-  .catalog-categories--odd .register::after { display: none; }
   /* Con «Buscar» al lado, en celulares de menos de 386 px el campo mide menos que su texto de ayuda
      («Buscar por producto, marca o código») y lo corta. El campo toma la fila completa y «Buscar» va debajo,
      a todo lo ancho: el texto de ayuda se lee completo y el botón queda grande para el pulgar. */

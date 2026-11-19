@@ -195,7 +195,7 @@
   .tile { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 1fr; align-items: center; column-gap: var(--s-3); min-height: 64px; padding: var(--s-3) var(--s-3) var(--s-3) var(--pad); }
   .tile__icon { width: 32px; height: 32px; }
   .tile__num { display: none; }
-  .tile__name { grid-column: auto; align-self: center; font-size: 1rem; }
+  .tile__name { grid-column: auto; align-self: center; font-size: 1rem; hyphens: auto; overflow-wrap: anywhere; }   /* con el espaciado de WCAG 1.4.12 una palabra larga se parte con guion (la página es es-MX) antes de salirse de la celda */
   .tile--wide { grid-template-columns: minmax(0, 1fr) auto; min-height: 84px; padding: var(--s-4) var(--pad); }
   .tile--wide .tile__icon { display: none; }
   .tile--wide .tile__name { font-size: 1.1875rem; }
@@ -305,11 +305,13 @@
 @media (min-width: 1100px) {
   /* sin búsqueda (no hay productos) la navegación ocupa 7 columnas: los enlaces se agrupan a la izquierda */
   .masthead--no-search .nav__list { justify-content: flex-start; gap: var(--s-5); padding-inline: var(--s-5); }
+  .grid12 > .grid-fill[data-hide~="lg"], .register > .grid-fill[data-hide~="lg"] { display: none; }   /* GridFill */
 }
 @media (min-width: 700px) and (max-width: 1099px) {
   /* pie sin columna de categorías: enlaces y contacto se reparten la fila */
   .site-footer--no-cats .footer__nav { grid-column: span 5; }
   .site-footer--no-cats .footer__reach { grid-column: span 7; }
+  .grid12 > .grid-fill[data-hide~="md"], .register > .grid-fill[data-hide~="md"] { display: none; }   /* GridFill */
 }
 @media (max-width: 1099px) {
   .page-head__main, .page-head__side { grid-column: span 12; }
@@ -320,6 +322,7 @@
   .crumbs__link { min-height: 44px; }                          /* objetivos táctiles */
   .empty { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-6); padding: var(--s-8) var(--pad); }
   .empty__action { grid-column: 2; justify-self: start; }
+  .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-md); }
 }
 @media (max-width: 699px) {
   .page-head__main { padding: var(--s-7) var(--pad) var(--s-5); }
@@ -331,6 +334,11 @@
   .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
   .brands__fill--even { display: none; }        /* dos marcas por fila: con un número par no falta ninguna celda */
   .brands--lg .brand { min-height: 72px; }      /* página de marcas: dos por fila, diez filas */
+  .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-sm); }
+  .grid12 > .grid-fill[data-hide~="sm"], .register > .grid-fill[data-hide~="sm"] { display: none; }   /* GridFill */
+  /* ruta de tres o más elementos: la página actual sale de la vista (sigue para el lector) y con ella su diagonal */
+  .crumbs__item:last-child:nth-child(n+3) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .crumbs__item:nth-last-child(2):nth-child(n+2) .crumbs__sep { display: none; }
 }
 
 /* 6.6 Columnas por ancho: una celda con `span-8 span-md-12 span-sm-12` ocupa 8 columnas en computadora

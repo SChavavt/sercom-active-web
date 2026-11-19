@@ -331,6 +331,7 @@
   height: 56px;
   background: var(--blue);
   color: var(--white);
+  pointer-events: none;                 /* decorativa: el clic pasa al enlace de la tarjeta que está debajo */
   transition: background-color var(--ease);
 }
 .entry__go .icon { transition: transform var(--ease); }
@@ -384,6 +385,9 @@
 .brand--all .icon { color: var(--white); }
 .brand--all:hover { background: var(--blue-700); }
 .brand--all:hover .icon { color: var(--white); }
+/* Marca de la página actual (BrandCells con currentId): el cuadro azul en el margen; el nombre no se mueve */
+.brand[aria-current="page"] { position: relative; }
+.brand__mark { position: absolute; top: 50%; left: calc((var(--pad) - 10px) / 2); width: 10px; height: 10px; margin-top: -5px; background: var(--blue); }
 
 /* Fila de nota bajo una retícula */
 .note { display: flex; align-items: center; gap: var(--s-3); padding: 14px var(--pad); background: var(--surface); color: var(--grey-700); }
@@ -410,12 +414,15 @@
   color: var(--blue);
 }
 .product__plate .icon { width: 58%; height: 58%; }
-.product__media .tag { position: absolute; top: var(--s-4); left: var(--pad); }
+/* sobre la fotografía; no recibe clics: la tarjeta entera sigue abriendo la ficha */
+.product__media .tag { position: absolute; z-index: 1; top: var(--s-4); left: var(--pad); pointer-events: none; }
 .product__body { display: flex; flex: 1; flex-direction: column; padding: var(--s-5) var(--pad) var(--s-5); }
 .product__cat { color: var(--blue); font-size: var(--label-sm); }
 .product__name { margin-top: var(--s-2); min-height: 2.5em; padding-bottom: var(--s-3); font-size: 1.125rem; }
 .product__meta { margin-top: auto; color: var(--grey-700); }
-.product__meta .t-code { color: var(--ink); }
+/* El código es lo que el cliente pide al cotizar: nunca se corta. Pasa entero al renglón siguiente si cabe ahí;
+   si no cabe ni solo, se parte dentro de la tarjeta, después de un guion o, si no hay, en cualquier carácter. */
+.product__meta .t-code { display: inline-block; max-width: 100%; color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
 .product__actions { display: grid; grid-template-columns: 1fr 1fr; border-top: var(--line) solid var(--rule-soft); }
 .product__action {
   display: flex;
@@ -445,6 +452,7 @@
 .band > * { background: var(--blue); }
 .band :focus-visible { outline-color: var(--white); }
 .band__body { padding: var(--s-11) var(--pad); }
+.band__title--page { font-size: var(--type-title-size); line-height: var(--type-title-leading); }   /* Band con headingLevel={1}: título de la página */
 .band__text { margin-top: var(--s-5); max-width: 58ch; font-size: 1.125rem; line-height: 1.5; text-wrap: pretty; }
 .band__action { display: flex; flex-direction: column; justify-content: space-between; gap: var(--s-7); padding: var(--s-11) var(--pad); }
 .band__icon { width: 72px; height: 72px; }
@@ -458,6 +466,9 @@
 .data__link { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); min-height: 44px; text-decoration: none; overflow-wrap: anywhere; }
 .data__link .icon { color: var(--blue); }
 .data__link:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+
+/* Dirección de correo (EmailAddress): solo se parte justo después de «@» */
+.email__part { white-space: nowrap; }
 
 /* 4.13 Pasos ----------------------------------------------------------------- */
 .step { position: relative; display: flex; flex-direction: column; gap: var(--s-7); min-height: 216px; padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
@@ -494,6 +505,12 @@
 .footer__title { margin-bottom: var(--s-4); color: var(--blue); }
 .footer__links a { display: block; padding: 5px 0; font-size: 0.9375rem; line-height: 1.4; text-decoration: none; }
 .footer__links a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+/* Enlace a la página actual: el cuadro azul de la fila actual, en el margen de la celda (el texto no se mueve);
+   en la fila legal, alineada a la derecha, va antes del texto */
+.footer__mark { flex: none; width: 10px; height: 10px; background: var(--blue); }
+.footer__links a[aria-current="page"] { position: relative; }
+.footer__links .footer__mark { position: absolute; top: 50%; left: calc((var(--pad) + 10px) / -2); margin-top: -5px; }
+.footer__legal .footer__mark { margin-right: var(--s-2); }
 .footer__contact { display: grid; gap: var(--s-2); font-size: 0.9375rem; line-height: 1.45; }
 .footer__contact a { display: inline-flex; align-items: center; gap: var(--s-2); padding: 3px 0; text-decoration: none; overflow-wrap: anywhere; }
 .footer__contact a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
@@ -536,7 +553,7 @@
 .crumbs { color: var(--grey-600); }
 .crumbs__list { display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--s-1); }
 .crumbs__item { display: flex; align-items: center; }
-.crumbs__item + .crumbs__item::before { content: "/"; margin: 0 10px; color: var(--grey-300); }
+.crumbs__sep { margin: 0 10px; color: var(--grey-300); }      /* al final del elemento anterior, oculta al lector */
 .crumbs__link { display: inline-flex; align-items: center; min-height: 32px; color: var(--blue); text-decoration: none; }
 .crumbs__link:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .crumbs [aria-current="page"] { color: var(--ink); }
@@ -554,9 +571,10 @@
 .empty__title { font-size: var(--h3-lg); font-weight: 700; line-height: 1.15; letter-spacing: -0.012em; text-wrap: balance; }
 .empty__text { margin-top: var(--s-2); max-width: 60ch; font-size: 1.0625rem; color: var(--grey-700); text-wrap: pretty; }
 
-/* Fotografía real de producto: sobre blanco, completa, sin recortar */
+/* Fotografía real de producto: sobre blanco, completa, sin recortar. Va encima del área, sin ocupar lugar en
+   ella: el área conserva su proporción con una foto vertical, horizontal o cuadrada y la foto se contiene. */
 .product__media--photo { background: var(--surface); }
-.product__img { width: 100%; height: 100%; object-fit: contain; }
+.product__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 
 /* Celdas de marca altas (página de marcas) */
 .brands--lg .brand { min-height: 96px; }
@@ -567,4 +585,11 @@
 
 /* Etiqueta junto al título de una página interior */
 .page-head__tag { margin-top: var(--s-2); }
+
+/* Celdas de relleno de las retículas (GridFill: ProductGrid, CategoryPlate, CategoryRegister y Steps): blancas,
+   con el ancho de computadora en --fill-lg; el de tableta, el de celular y data-hide (los puntos de corte donde
+   una celda no hace falta) se aplican en 6.5 de responsive.css. Hijos directos de su retícula, como las
+   celdas reales. */
+.grid12 > .grid-fill,
+.register > .grid-fill { grid-column: span var(--fill-lg); background: var(--surface); }
 

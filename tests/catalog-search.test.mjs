@@ -43,3 +43,17 @@ test('isActiveQuery y displayQuery', () => {
   assert.equal(displayQuery(undefined), '');
   assert.equal(displayQuery('x'.repeat(500)).length, 500);
 });
+
+test('displayQuery quita el carácter de reemplazo de una secuencia % mal formada (?q=%E0%A4%A)', () => {
+  // URLSearchParams decodifica «%E0%A4%A» como «�%A»: la página no debe mostrar «�».
+  const malformed = new URLSearchParams('q=%E0%A4%A').get('q');
+  assert.equal(malformed, '�%A');
+  assert.equal(displayQuery(malformed), '%A');
+  assert.equal(displayQuery('guan�te'), 'guan te');
+  assert.equal(displayQuery(' � guante � '), 'guante');
+  assert.equal(resultSummary(10, malformed), '10 resultados para “%A”');
+  // Una consulta que no es más que caracteres de reemplazo cuenta como vacía.
+  assert.equal(displayQuery('��'), '');
+  assert.equal(isActiveQuery('�'), false);
+  assert.equal(resultSummary(10, '� �'), '10 productos');
+});

@@ -81,11 +81,13 @@ export function filterProducts(products, query) {
 /**
  * Consulta tal como se muestra en la página: sin espacios al inicio o al final y con un solo espacio
  * entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
+ * Quita el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
+ * (`?q=%E0%A4%A` → «�%A»): nunca se muestra, y una consulta que no tiene otra cosa queda vacía.
  * @param {unknown} query
  * @returns {string}
  */
 export function displayQuery(query) {
-  return String(query ?? '').replace(/\s+/g, ' ').trim();
+  return String(query ?? '').replace(/\uFFFD/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /**
