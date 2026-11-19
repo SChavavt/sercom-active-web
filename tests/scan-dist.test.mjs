@@ -1034,7 +1034,12 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
     '<p>Precio de 3M: a cotizar</p><p>Respirador 3M 6200</p>', '<p>Los precios de 3M se confirman al cotizar. 12 modelos disponibles.</p>',
     // Otra mención de la marca en la misma frase cuenta como cifra (límite escrito).
     '<p>Precio de 3M: a cotizar, como todo 3M</p>',
+    // El número de un modelo después de la marca también es una cifra (límite escrito), con «de» como con «por», «para»
+    // o «con» («Solicita precio de 3M 6200» falla en cada versión; con «para», 0c4f8c2 también fallaba): se escribe
+    // «Pide el precio del respirador 3M 6200» o «Cotiza el 3M 6200».
+    '<p>Pide precio para 3M 6200</p>', '<p>Solicita precio de 3M 6200</p>',
   ]);
+  await assertNoneFails(['<p>Pide el precio del respirador 3M 6200.</p>', '<p>Cotiza el 3M 6200.</p>']);
   // La marca escrita como la escribe (con su mayúscula y como palabra completa) es un nombre. «Los precios de 3M…» y
   // «Precio de 3M: a cotizar» fallaban en f37334b: son texto de marca y no dicen ningún precio (la única excepción a
   // la decisión 2 de esta corrección).
@@ -1069,6 +1074,7 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
   assert.match(printed, /la marca seguida de una cifra en la misma frase, con lo que sea en medio[^\n]*«Precio de 3M desde 350», «Precio de 3M \(350\)»/);
   assert.match(printed, /unos puntos suspensivos \(«…» o dos o más puntos seguidos\) nunca terminan la frase/);
   assert.match(printed, /«Precio de 3M\. Desde 350» no falla[^\n]*Límite de la línea única/);
+  assert.match(printed, /el número de un modelo después de la marca también es una cifra: «Pide precio para 3M 6200» y «Solicita precio de 3M 6200» fallan; escribe «Pide el precio del respirador 3M 6200» o «Cotiza el 3M 6200»/);
 });
 
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
@@ -1416,6 +1422,31 @@ test('R-RULE-10: las promesas en la voz del sitio, el singular con un plazo, má
     'Te marcamos a la brevedad.', 'Lo estaremos contactando.', 'Te estamos contactando en breve.'].map(text => `<p>${text}</p>`));
 });
 
+test('R-RULE-10: la respuesta de un producto no es una respuesta nombrada; la respuesta al lector sí', async () => {
+  // La respuesta de un sensor, un botiquín o una brigada: limpias en f37334b y en 64705f7. «Respuesta inmediata del
+  // sensor en menos de 30 segundos.» es de los casos legítimos de la verificación de las guardas (ronda 2). Después de
+  // «de» o «con», «respuesta» es parte del nombre de otra cosa; «inmediata» con un complemento («del», «de la», «al»,
+  // «ante», «a» salvo «a tu» o «a su») es la del producto; y «en menos de» solo es un plazo con una cifra y minutos,
+  // horas o días.
+  await assertNoneFails([
+    'Respuesta inmediata del sensor en menos de 30 segundos.', 'Detector de gas con respuesta inmediata.', 'Botiquín de respuesta inmediata.',
+    'Kit de respuesta inmediata a derrames.', 'Extintor para respuesta inmediata ante incendios.', 'Sensor con tiempo de respuesta inmediato.',
+    'Lámpara con respuesta inmediata al encender.', 'Brigada de respuesta inmediata.', 'Detector con respuesta en menos de 10 segundos.',
+    'Alarma con respuesta en menos de 1 segundo.', 'Respuesta inmediata ante fugas.', 'Respuesta inmediata de la alarma.', 'Respuesta en menos de 30 segundos.',
+    'Detector con respuesta en 2 minutos.', 'Respirador con respuesta en minutos al cambio de cartucho.',
+  ].map(text => `<p>${text}</p>`));
+  // La respuesta al lector sigue fallando: sola, con «a tu» o «a su», y después de «de» o «con» con un plazo en horas o
+  // días o «el mismo día», como la cotización nombrada (ningún producto responde en horas).
+  await assertEachFails('R-RULE-10', [
+    'Respuesta inmediata.', 'Respuesta en 24 horas.', 'Respuesta en minutos.', 'Respuesta en menos de 1 hora.', 'Respuesta en menos de 30 minutos.',
+    'Respuesta inmediata a tu solicitud.', 'Respuesta inmediata por WhatsApp.', 'Damos respuesta inmediata.', 'Tiempo de respuesta inmediato.',
+    'Compromiso de respuesta en 24 horas.', 'Cotiza con respuesta en 24 horas.', 'Garantía de respuesta el mismo día.',
+  ].map(text => `<p>${text}</p>`));
+  // Límite escrito: después de «de» o «con», «inmediata», los minutos o un plazo sin cifra no cuentan, y «inmediata» con
+  // un complemento tampoco, aunque la respuesta sea la del vendedor.
+  await assertNoneFails(['Garantía de respuesta inmediata.', 'Cotiza con respuesta inmediata.', 'Respuesta inmediata del equipo de ventas.'].map(text => `<p>${text}</p>`));
+});
+
 test('R-RULE-10: miles de «respuesta» o «cotización» en una línea sin signos no hacen leer la línea entera desde cada una', async () => {
   // La negación de la respuesta nombrada se busca hasta 150 caracteres atrás. Sin ese límite, dieciséis mil «cotización»
   // seguidas (unos 180 KB sin un signo) tardaban unos 16 s, porque desde cada una se leía la línea hasta el principio.
@@ -1441,9 +1472,11 @@ test('R-RULE-10: --rules nombra cada plazo del patrón, y sus ejemplos y límite
     'ahorita', 'ahora mismo', 'inmediatamente', 'al instante', 'el mismo día', 'en el transcurso del día', 'en minutos', 'en cuestión de minutos']) {
     assert.ok(SOON_EXPRESSIONS.includes(expression), expression);
   }
-  // Y el patrón reconoce cada una, después y antes de un verbo, y como plazo de la respuesta nombrada.
+  // Y el patrón reconoce cada una, después y antes de un verbo, y como plazo de la respuesta nombrada; ahí, «en menos
+  // de» solo con una cifra y minutos, horas o días («Respuesta en menos de 1 hora», no «en menos de 30 segundos»).
   for (const expression of SOON_EXPRESSIONS) {
-    for (const text of [`Te respondo ${expression}.`, `${expression[0].toUpperCase()}${expression.slice(1)} te respondo.`, `Respuesta ${expression}.`]) {
+    const named = expression === 'en menos de' ? 'Respuesta en menos de 1 hora.' : `Respuesta ${expression}.`;
+    for (const text of [`Te respondo ${expression}.`, `${expression[0].toUpperCase()}${expression.slice(1)} te respondo.`, named]) {
       assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${text}</p>`) })), ['R-RULE-10'], text);
     }
   }
@@ -1451,12 +1484,14 @@ test('R-RULE-10: --rules nombra cada plazo del patrón, y sus ejemplos y límite
   // Los límites que nombra el texto no fallan, y los ejemplos de frases legítimas tampoco.
   const limits = ['Te respondo mañana', 'Te respondo al momento', 'Te respondo rápido', 'Respuesta rápida por WhatsApp', 'Atención inmediata por WhatsApp', 'Pronta respuesta',
     'Te marcamos a la brevedad', 'Lo estaremos contactando', 'Recíbela en 24 horas', 'Te estamos contactando en breve', 'Te iremos respondiendo', 'Les vamos a responder',
-    'Les responderemos', 'Responderemos a la brevedad', 'Escribimos en 24 horas', 'Cotizaremos en 24 horas', 'Si no encuentras tu talla, escríbeme: respuesta en 24 horas'];
+    'Les responderemos', 'Responderemos a la brevedad', 'Escribimos en 24 horas', 'Cotizaremos en 24 horas', 'Si no encuentras tu talla, escríbeme: respuesta en 24 horas',
+    'Garantía de respuesta inmediata', 'Cotiza con respuesta inmediata', 'Respuesta inmediata del equipo de ventas'];
   const legitimate = ['Te respondo dudas sobre tallas por WhatsApp', 'Escríbeme por WhatsApp y te respondo', 'Envíame tu lista y te cotizo', 'Envíame tu lista cuanto antes y te cotizo',
     'Cotizo de lunes a viernes de 9:00 a 18:00', 'Te atiendo en horario de atención', 'Mando la ficha técnica si el fabricante la publica', 'Recibe asesoría para elegir la talla',
     'Solicita tu cotización hoy mismo', 'Arma tu cotización en minutos', 'Respuesta en horario de atención', 'El mismo día puedes enviar tu lista por WhatsApp',
     'Voy a responder aquí las preguntas frecuentes', 'Te voy a pedir la talla', 'Mi contacto directo es WhatsApp', 'Llamo a esto calibre', 'Nos ponemos en contacto con el fabricante',
-    'Estamos en contacto con los fabricantes', 'Sin respuesta inmediata', 'No prometo una respuesta inmediata'];
+    'Estamos en contacto con los fabricantes', 'Sin respuesta inmediata', 'No prometo una respuesta inmediata', 'Respuesta inmediata del sensor en menos de 30 segundos',
+    'Botiquín de respuesta inmediata', 'Detector de gas con respuesta inmediata', 'Sensor con tiempo de respuesta inmediato', 'Detector con respuesta en menos de 10 segundos'];
   for (const text of [...limits, ...legitimate]) {
     assert.ok(doc.includes(`«${text}»`), `el texto nombra «${text}»`);
     assert.deepEqual(failures(await scan({ 'pagina/index.html': page(`<p>${text}.</p>`) })), [], text);
@@ -1467,7 +1502,8 @@ test('R-RULE-10: --rules nombra cada plazo del patrón, y sus ejemplos y límite
     'Te cotizamos en 24 hrs', 'Respondemos el mismo día', 'Daremos respuesta a tu solicitud en 24 horas', 'En 24 horas cotizaremos tu lista', 'Te respondo a la brevedad',
     'Te cotizo hoy mismo', 'Te atiendo de inmediato', 'Te contacto a la brevedad', 'Te llamo en breve', 'Te doy respuesta hoy mismo', 'Ahorita te respondo', 'Te vamos a estar contactando',
     'Te voy a estar escribiendo en breve', 'Respuesta inmediata', 'Respuesta en 24 horas', 'Respuesta el mismo día', 'Respuesta en minutos', 'Tiempo de respuesta: 24 horas',
-    'Tiempo de respuesta de 24 horas', 'Cotización en 24 horas', 'Tu cotización en 1 día hábil', 'Cotización el mismo día', 'A la brevedad responderemos', 'Solicita tu cotización en 24 horas'];
+    'Tiempo de respuesta de 24 horas', 'Cotización en 24 horas', 'Tu cotización en 1 día hábil', 'Cotización el mismo día', 'A la brevedad responderemos', 'Solicita tu cotización en 24 horas',
+    'Respuesta en menos de 1 hora', 'Respuesta inmediata a tu solicitud', 'Compromiso de respuesta en 24 horas'];
   for (const text of promises) {
     assert.ok(doc.includes(`«${text}»`), `el texto nombra «${text}»`);
     assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${text}.</p>`) })), ['R-RULE-10'], text);
