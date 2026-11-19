@@ -1209,6 +1209,28 @@ export const CHECKS = [
       return problems;
     },
   },
+  // I-04 · Qué reconoce y qué no.
+  // Reconoce, en el aviso, en lo que va dentro y en lo que lo contiene: hidden, popover, aria-hidden="true" y un
+  // style en línea con display:none, visibility:hidden o collapse, o content-visibility:hidden. En las hojas de la
+  // salida y en los <style> de cada página: una regla con esas mismas declaraciones cuyo sujeto puede ser uno de esos
+  // elementos (NOTICE_MARKUP.elements), escrita como sea: con escapes, con [class…], anidada en otra regla o con sus
+  // declaraciones directamente dentro de un @media, @supports, @layer, @container o @scope anidado. Solo se permite
+  // dentro de @media print; las demás condiciones no se evalúan (pueden cumplirse), así que una regla dentro de
+  // @media (min-width: …) o @supports cuenta siempre.
+  // Límites (lo que no ve, o ve de más):
+  // - Un valor que llega por una variable no se resuelve: «display: var(--x)» con «--x: none», o
+  //   «display: var(--nada, none)», ocultan el aviso y pasan. Es el mismo límite que el del escáner con lo que lee de
+  //   una página: lo que se calcula al mostrarla no se ve en el archivo.
+  // - Solo ve el marcado compilado: una clase o un atributo que un script pone en el aviso al cargar la página, con una
+  //   regla que no nombra las clases del aviso («.oculto { display: none }» y un script que pone .oculto en el
+  //   <aside>), pasa; lo que un script hace directamente (quitar el aviso, cambiar su style) tampoco se ve. Lo que los
+  //   scripts de hoy ponen (.js y variables en el style de <html>) está anotado en NOTICE_MARKUP.elements.
+  // - No lee el atributo media de <link> ni de <style>: una hoja que el navegador solo aplica al imprimir por ese
+  //   atributo se juzga como si se aplicara siempre (se reporta de más).
+  // - Otras formas de quitar el aviso de la vista (opacity: 0, alto cero, sacarlo de la pantalla, un color igual al
+  //   fondo) no se reconocen. Las declaraciones escritas directamente en un @starting-style anidado no cuentan: solo
+  //   dan el punto de partida de una transición.
+  // Como todas las protecciones, busca errores escritos de forma directa, no un ocultamiento hecho a propósito.
   {
     id: 'I-04',
     title: 'Nada oculta el aviso de arriba fuera de la impresión: ni hidden, popover, aria-hidden="true" o un estilo en línea en el aviso, en lo que va dentro o en lo que lo contiene, ni una regla de estilo que pueda seleccionarlos con display:none, visibility:hidden o collapse, o content-visibility:hidden; el aviso compilado no lleva elementos, clases ni atributos que la comprobación no conozca',
