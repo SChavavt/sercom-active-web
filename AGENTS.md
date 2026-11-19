@@ -4,35 +4,45 @@
 
 Crear un sitio profesional de Sercom Active para que clientes exploren categorías, marcas y modelos y contacten a Yosmara con un requerimiento claro. Prioridad: experiencia web de computadora; adaptar también celular y tableta. Leer `README.md`, `docs/ESTADO.md`, el plan maestro y `docs/arquitectura.md` antes de cambiar la arquitectura.
 
-El arranque es Astro/TypeScript estático con datos versionados. Cloudflare Pages es la recomendación de costo inicial; Vercel es una alternativa condicionada al plan comercial. Todavía no hay alojamiento elegido de forma definitiva, URL pública ni recursos provisionados. No añadir Supabase, login, pagos, panel o servidor por inercia.
+Cuatro pasos aprobados por el propietario (`docs/plan-de-trabajo.md`): (1) diseño y navegación completa, **construido y en revisión del propietario**; (2) buscador, filtros y «Mi cotización»; (3) catálogo piloto de 30 a 50 productos reales; (4) publicación y QR.
+
+Identidad (decisión del propietario): el sitio es de Sercom Active y se ve como su logotipo, con fondos blancos, tinta `#19171A` y azul `#0067B0`, diseño «Lámina técnica». Sin estilo oscuro y sin la paleta azul marino y celeste del plan maestro. Técnicamente es un proyecto aparte: no modifica `sercomactive.com` ni supone acceso a ese dominio. Guía de diseño: `docs/diseno.md`.
+
+Astro y TypeScript con salida estática y datos versionados. Alojamiento propuesto al lanzar: Cloudflare Pages Free en una cuenta del propietario o de Sercom; Vercel Hobby no se usa (uso comercial); Vercel Pro solo si se decide pagarlo. Todavía no hay alojamiento elegido, URL pública ni recursos provisionados. No añadir Supabase, login, pagos, panel o servidor por inercia.
 
 ## Datos confirmados
 
 - Contacto: Yosmara del Rocío Torres Pérez.
 - WhatsApp aportado: +52 1 221 400 2219; correo: ventas.puebla@sercomactive.com.
 - Horario: lunes a viernes de 9:00 a 18:00; sábado y domingo cerrado; America/Mexico_City.
-- Dirección aportada: C. 31-A Nte. 1024, Villa San Alejandro, 72090 Heroica Puebla de Zaragoza, Pue., México. Falta confirmar atención presencial; no anunciar visitas todavía.
+- Dirección aportada: C. 31-A Nte. 1024, Villa San Alejandro, 72090 Heroica Puebla de Zaragoza, Pue., México. Falta confirmar atención presencial; no anunciar visitas ni publicar la dirección todavía.
 - El enlace de WhatsApp está pendiente de prueba funcional por el negocio. Conservar el número aportado hasta comprobar cualquier normalización.
+
+Todo sale de `src/data/business.json`; cómo cambiarlo: `docs/datos-y-modos.md`.
 
 ## Datos de catálogo
 
 No fabricar productos, modelos, normas, fichas, testimonios ni inventario. El registro de investigación no es un feed, una autorización de uso ni una validación de todos los SKU. Excluir Guantes Internacionales/GISA incluso en documentos combinados. Espomega es un proveedor; no duplicar productos Derma Care por esa relación.
 
-Datos públicos sin precios ni costos. Usar `src/data/catalog.json`, `src/types/catalog.ts` y `src/lib/catalog-policy.mjs`. Conservar fuente, fecha de revisión y aprobación. Publicar solo `approved` mediante la proyección de campos públicos. Material incierto permanece en borrador. No exponer el registro completo de investigación ni metadatos internos en la salida web.
+Datos públicos sin precios ni costos. Usar `src/data/catalog.json`, `src/data/brands.json`, `src/types/catalog.ts` y `src/lib/catalog-policy.mjs`. Conservar fuente, fecha de revisión y aprobación. Publicar solo `approved` mediante la proyección de campos públicos. Material incierto permanece en borrador. No exponer el registro completo de investigación ni metadatos internos en la salida web.
+
+Dos compilaciones (`docs/datos-y-modos.md`): **producción** (`npm run build`, `dist/`) solo con lo aprobado y, hasta el lanzamiento, con el aviso «Sitio en preparación»; **vista previa** (`npm run build:preview`, `dist-preview/`) con productos de ejemplo marcados, solo para revisar el diseño. Los ejemplos nunca entran en `catalog.json` ni en producción, y la vista previa nunca se publica como sitio ni como dirección del QR.
 
 Las consultas de proveedores son trabajos separados de las visitas del cliente. Un error de descarga jamás borra productos. No activar tareas periódicas ni prometer actualizaciones automáticas antes de implementar y validar cada conector.
 
 ## Desarrollo
 
-Usar npm y Node.js 24; mantener el lockfile. Ejecutar `npm run check`, `npm test` y `npm run build` para cambios de datos o código. Las pruebas deben cubrir riesgos del flujo, no replicar detalles del diseño. La compilación no reemplaza la revisión visual y funcional antes de publicar.
+Usar npm y Node.js 24; mantener el lockfile. Antes de proponer cualquier cambio de datos o de código, ejecutar `npm run check`, `npm test` y `npm run verify`; los tres deben pasar. Las pruebas deben cubrir riesgos del flujo, no replicar detalles del diseño. Las comprobaciones no reemplazan la revisión visual y funcional en el navegador.
 
-El contacto abre WhatsApp o correo; abrir una aplicación no prueba que el mensaje se envió. Más adelante la cotización debe ofrecer copiar el resumen y soportar listas largas. No simular confirmaciones de recepción.
+Ningún control que no haga nada: todo lo que se ve funciona, y lo que corresponde a un paso posterior no se dibuja. Sin JavaScript cada página sigue siendo usable. Un script del navegador no importa `site-data.mjs`, `contact.mjs` ni archivos `.json`.
+
+El contacto abre WhatsApp o correo; abrir una aplicación no prueba que el mensaje se envió. La cotización del paso 2 debe ofrecer copiar el resumen y soportar listas largas. No simular confirmaciones de recepción.
 
 ## Publicación
 
-No modificar `sercomactive.com` ni otros repositorios/proyectos del usuario. El permiso actual cubre preparar el repositorio y planear la infraestructura. No comprar dominio, contratar planes ni crear cuentas para obtener cuotas. Mantener un estado revisable antes de la publicación comercial. Generar QR definitivo solo con una URL pública estable probada.
+No modificar `sercomactive.com` ni otros repositorios o proyectos del usuario. El permiso actual cubre preparar el repositorio y planear la infraestructura. No comprar dominio, contratar planes ni crear cuentas para obtener cuotas. Mantener un estado revisable antes de la publicación comercial. Generar el QR definitivo solo con una URL pública estable probada.
 
-El sitio mínimo está en desarrollo. `noindex` no restringe acceso. Al preparar el lanzamiento se debe revisar el contenido comercial, probar contactos, definir la URL y retirar los bloqueos de indexación deliberadamente.
+El sitio está en desarrollo: cada página lleva `noindex`, `robots.txt` bloquea el rastreo y producción muestra el aviso de sitio en preparación. `noindex` no restringe el acceso. Al preparar el lanzamiento se revisa el contenido comercial, se prueban los contactos, se define la URL y se retiran deliberadamente los bloqueos y el aviso (`docs/publicacion.md`).
 
 El repositorio es público por decisión del propietario. El plan y la investigación se incorporaron con su confirmación; no agregar secretos, documentos de clientes ni datos comerciales confidenciales.
 
