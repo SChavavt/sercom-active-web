@@ -126,7 +126,7 @@ Imprime un resumen (entidades del registro, productos, aprobados, retirados con 
 - `--preview`: la carpeta es la vista previa (exige el aviso de vista previa y la etiqueta «Ejemplo»).
 - `--strict`: un WARN también falla. Se usa en producción porque en la etapa actual la lista de normas, certificaciones y demás avisos debe estar vacía; cuando se publiquen normas con fuente (paso 3) se revisa esta opción.
 - `--launch`: versión pública (ver R-RULE-12 abajo).
-- `--in-person`: atención presencial confirmada; permite dirección y mapa.
+- `--in-person`: atención presencial confirmada; permite dirección, «Visítanos» y mapa.
 
 **Cómo lee la salida.** Antes de comparar, normaliza el contenido: decodifica entidades y `%XX`, lleva el texto a su forma compatible (NFKC: «＄» es «$»), quita los caracteres invisibles y los acentos, y lee el texto también con las etiquetas en línea retiradas («GI<span>SA</span>», «Pro<b>moción</b>», «Solicitud envi<span>ada</span>»). Las reglas de precios, «gratis», «oficial» y «autorizado», la marca excluida y las confirmaciones leen además los atributos (`data-*`), los scripts en línea, los archivos JS y JSON (con las cadenas partidas unidas, y el marcado que escriben leído también sin sus etiquetas: `t.innerHTML="Solicitud <b>enviada</b>"`) y las cadenas `content:` del CSS. No ejecuta scripts.
 
