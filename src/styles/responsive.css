@@ -33,6 +33,11 @@
   .masthead:not(.masthead--no-search) .nav__link { padding-inline: 6px; font-size: 0.875rem; }
   .masthead:not(.masthead--no-search) .nav__link::after { left: 6px; right: 6px; }
 }
+/* Con búsqueda, de 1360 a 1379 px los enlaces del diseño de 1440 miden hasta 4.5 px más que el interior de la lista:
+   con menos relleno lateral caben en una fila (la lista baja de línea solo cuando de verdad no caben) */
+@media (min-width: 1360px) and (max-width: 1379px) {
+  .masthead:not(.masthead--no-search) .nav__list { padding-inline: var(--s-2); }
+}
 
 /* 6.2 Tableta y celular: la navegación se pliega y las filas se reacomodan (revisado a 768) */
 @media (max-width: 1099px) {
