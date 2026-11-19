@@ -186,6 +186,16 @@ test('U-07: un selector de atributo con espacio de nombres (*|, |, ns|) se lee i
   assert.deepEqual(await check({ '_astro/pagina.css': '[*|class~=navy]{x:0}[*|data-x~=nav]{x:0}' }, { ids: ['U-07'] }), []);
 });
 
+test('U-07: una clase retirada en una regla anidada, también dentro de una regla condicional anidada, falla', async () => {
+  for (const css of ['.masthead { .nav { color: red } }', '.x { @media screen { .nav__link { color: red } } }', '.x{&.search{color:red}}',
+    '.x{color:red;@supports (display:grid){@layer y{[class~="search__input"]{x:0}}}}', '.x{.y{.nav--abierta{x:0}}}']) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  assert.deepEqual(cssSelectors('.masthead { .nav { color: red } } .x { @media screen { display: none; .nav__link { color: red } } }'), ['.masthead', '.nav', '.x', '.nav__link']);
+  assert.deepEqual(await check({ '_astro/pagina.css': '.masthead{.masthead__nav{color:red}@media screen{.navy{x:0}&.searchbox{x:0}}}' }, { ids: ['U-07'] }), []);
+});
+
 test('U-07: la cabecera que usa las clases genéricas o no usa las de su bloque falla', async () => {
   const cases = [
     [{ nav: 'nav' }, 2], [{ nav: 'masthead__nav nav' }, 1], [{ search: 'search' }, 2], [{ input: 'search__input' }, 2], [{ button: 'search__btn' }, 2], [{ nav: 'navegacion' }, 1],

@@ -183,17 +183,23 @@ export function cssSelectors(css) {
   }
   return selectors;
 }
+// Reglas condicionales que, anidadas en una regla de estilo, pueden llevar declaraciones para los selectores de fuera.
+const NESTED_GROUP_RULE = /^@(?:media|supports|layer|container|scope)\b/i;
 /**
  * Reglas de estilo de una hoja: sus selectores, sus declaraciones (sin los comentarios) y las reglas @ que la
  * contienen, de fuera hacia dentro («@media print»). Las reglas de @keyframes y @font-face no son reglas de estilo.
- * Una regla anidada dentro de otra lleva los selectores de las dos unidos («&» es el de fuera).
+ * Una regla anidada dentro de otra lleva los selectores de las dos unidos («&» es el de fuera). Las declaraciones
+ * escritas directamente dentro de una regla condicional anidada en una regla de estilo (@media, @supports, @layer,
+ * @container, @scope) son otra regla, con los selectores de fuera y las reglas @ que la contienen, ella incluida:
+ * «.a { @media screen { display: none } }» da { selectors: [".a"], conditions: ["@media screen"] }. Las de
+ * @starting-style no cuentan: solo dan el punto de partida de una transición, no el estilo del elemento.
  * @param {string} css
  * @returns {{ selectors: string[], declarations: string, conditions: string[] }[]}
  */
 export function cssRules(css) {
   /** @type {{ selectors: string[], declarations: string, conditions: string[] }[]} */
   const rules = [];
-  /** @type {({ at: string } | { rule: { selectors: string[], declarations: string, conditions: string[] } } | { skip: true })[]} */
+  /** @type {({ at: string } | { rule: { selectors: string[], declarations: string, conditions: string[] } } | { at: string, rule: { selectors: string[], declarations: string, conditions: string[] } } | { skip: true })[]} */
   const stack = [];
   let buffer = '';
   const top = () => stack[stack.length - 1];
@@ -215,7 +221,20 @@ export function cssRules(css) {
       if (current && 'rule' in current) current.rule.declarations += buffer.slice(0, buffer.lastIndexOf(';') + 1);
       buffer = '';
       if (prelude.startsWith('@')) {
-        stack.push(/^@(?:-\w+-)?(?:keyframes|font-face|counter-style|font-feature-values|property|page)\b/i.test(prelude) ? { skip: true } : { at: prelude.replace(/\s+/g, ' ') });
+        const at = prelude.replace(/\s+/g, ' ');
+        const parent = [...stack].reverse().find(entry => 'rule' in entry);
+        if (/^@(?:-\w+-)?(?:keyframes|font-face|counter-style|font-feature-values|property|page)\b/i.test(prelude) || stack.some(entry => 'skip' in entry)) {
+          stack.push({ skip: true });
+        } else if (parent && 'rule' in parent && NESTED_GROUP_RULE.test(prelude)) {
+          // Una regla condicional dentro de una regla de estilo («.a { @media screen { display: none } }»): sus
+          // declaraciones son de los selectores de fuera, con las condiciones reunidas hasta aquí.
+          const conditions = [...stack.flatMap(entry => ('at' in entry ? [entry.at] : [])), at];
+          const rule = { selectors: parent.rule.selectors, declarations: '', conditions };
+          rules.push(rule);
+          stack.push({ at, rule });
+        } else {
+          stack.push({ at });
+        }
       } else if (stack.some(entry => 'skip' in entry)) {
         stack.push({ skip: true });
       } else {

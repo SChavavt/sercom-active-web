@@ -209,3 +209,47 @@ test('la línea de comandos falla con un <style> que oculta el aviso y lo nombra
     await removeTree(bad);
   }
 });
+
+test('el lector de reglas da como regla las declaraciones escritas dentro de una regla condicional anidada', () => {
+  const rules = cssRules('.a{color:red;@media screen{display:none;.b{x:1}}@layer l{@supports (display:grid){y:2}}}@media print{.c{@media (min-width:0){z:3}}}.d{@starting-style{display:none}@keyframes k{from{w:0}}}');
+  assert.deepEqual(rules.map(rule => [rule.selectors, rule.declarations.replace(/\s+/g, ''), rule.conditions]), [
+    [['.a'], 'color:red;', []],
+    [['.a'], 'display:none;', ['@media screen']],
+    [['.a .b'], 'x:1', ['@media screen']],
+    [['.a'], '', ['@layer l']],
+    [['.a'], 'y:2', ['@layer l', '@supports (display:grid)']],
+    [['.c'], '', ['@media print']],
+    [['.c'], 'z:3', ['@media print', '@media (min-width:0)']],
+    [['.d'], '', []],
+  ]);
+});
+
+test('una regla que oculta el aviso desde una regla condicional anidada falla, a cualquier profundidad', async () => {
+  const cases = [
+    '.site-notice { @media (min-width: 0) { display: none } }', 'aside { @media screen { display: none } }',
+    '.site-notice { @supports (display: grid) { visibility: hidden } }', '.site-notice { color: red; @layer x { display: none } }',
+    '.site-notice{@container (min-width:0){display:none}}', '.site-notice{@scope (body){display:none}}', '.site-notice{@MEDIA screen{display:none}}',
+    // Dos y tres niveles, con reglas de estilo y condiciones de por medio.
+    '.site-notice{@media screen{@supports (display:grid){display:none}}}', 'aside{@media screen{@layer a{@supports (x:y){visibility:collapse}}}}',
+    'body{aside{@media (min-width:0){display:none}}}', 'body{@media screen{aside{@media (min-width:0){display:none}}}}', '.site-notice{&{@media screen{display:none}}}',
+    '.site-notice{.x{color:red}@media screen{display:none}}', '@media screen{.site-notice{@media (min-width:0){display:none}}}', 'p{@media screen{content-visibility:hidden}}',
+  ];
+  for (const css of cases) {
+    const problems = await check({ '_astro/otra.css': css });
+    assert.equal(problems.length, 1, `${css}\n${JSON.stringify(problems)}`);
+    assert.match(problems[0].message, /oculta el aviso/);
+    assert.match(problems[0].message, /dentro de @/);
+  }
+  const inline = await check({ 'pagina/index.html': page(NOTICE, '<style>.site-notice{@media screen{display:none}}</style>') });
+  assert.deepEqual(inline.map(problem => problem.file), ['pagina/index.html <style> 1']);
+});
+
+test('una regla anidada que oculta el aviso al imprimir, que oculta otra cosa o que solo cambia el color pasa', async () => {
+  const css = '.site-notice { @media print { display: none } }@media print { .site-notice { display: none } }.site-notice{@media print{@supports (display:grid){display:none}}}'
+    + '@media print{.site-notice{@media (min-width:0){display:none}}}.site-notice{@media only print{@layer x{visibility:hidden}}}'
+    + '.dock { @media (min-width: 700px) { display: none } }.site-notice { @media (min-width: 700px) { color: red; background: blue } }'
+    + '.site-notice { .site-notice__text { color: red } }.site-notice{@media screen{&::before{display:none}}}'
+    // @starting-style da el punto de partida de una transición: no oculta el aviso.
+    + '.site-notice{@starting-style{display:none}}.site-notice{@keyframes k{from{display:none}}}main{@media screen{aside{display:none}}}';
+  assert.deepEqual(await check({ '_astro/otra.css': css }), []);
+});
