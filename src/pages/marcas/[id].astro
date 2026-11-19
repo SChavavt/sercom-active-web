@@ -55,7 +55,7 @@ const description = `${brand.name}, una de las marcas que manejamos. ${contactDe
       />
       <section class="section" aria-labelledby="marcas-title">
         <SectionHead title="Marcas que manejamos" id="marcas-title" />
-        <BrandCells brands={brands} allLink={{ href: routes.brands, label: 'Ver todas las marcas' }} />
+        <BrandCells brands={brands} currentId={brand.id} allLink={{ href: routes.brands, label: 'Ver todas las marcas' }} />
         <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
       </section>
     </Fragment>

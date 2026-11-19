@@ -385,6 +385,9 @@
 .brand--all .icon { color: var(--white); }
 .brand--all:hover { background: var(--blue-700); }
 .brand--all:hover .icon { color: var(--white); }
+/* Marca de la página actual (BrandCells con currentId): el cuadro azul en el margen; el nombre no se mueve */
+.brand[aria-current="page"] { position: relative; }
+.brand__mark { position: absolute; top: 50%; left: calc((var(--pad) - 10px) / 2); width: 10px; height: 10px; margin-top: -5px; background: var(--blue); }
 
 /* Fila de nota bajo una retícula */
 .note { display: flex; align-items: center; gap: var(--s-3); padding: 14px var(--pad); background: var(--surface); color: var(--grey-700); }
@@ -501,6 +504,12 @@
 .footer__title { margin-bottom: var(--s-4); color: var(--blue); }
 .footer__links a { display: block; padding: 5px 0; font-size: 0.9375rem; line-height: 1.4; text-decoration: none; }
 .footer__links a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+/* Enlace a la página actual: el cuadro azul de la fila actual, en el margen de la celda (el texto no se mueve);
+   en la fila legal, alineada a la derecha, va antes del texto */
+.footer__mark { flex: none; width: 10px; height: 10px; background: var(--blue); }
+.footer__links a[aria-current="page"] { position: relative; }
+.footer__links .footer__mark { position: absolute; top: 50%; left: calc((var(--pad) + 10px) / -2); margin-top: -5px; }
+.footer__legal .footer__mark { margin-right: var(--s-2); }
 .footer__contact { display: grid; gap: var(--s-2); font-size: 0.9375rem; line-height: 1.45; }
 .footer__contact a { display: inline-flex; align-items: center; gap: var(--s-2); padding: 3px 0; text-decoration: none; overflow-wrap: anywhere; }
 .footer__contact a:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
