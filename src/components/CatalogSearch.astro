@@ -94,8 +94,9 @@ const { total } = Astro.props;
   }
 
   if (form && input) {
-    // Tal como se muestra (displayQuery): una secuencia % mal formada no llega al campo como «�», ni un carácter
-    // de control o de dirección; una consulta que no tiene otra cosa es como no tener búsqueda.
+    // Tal como se muestra (displayQuery), que es también lo que se busca: una secuencia % mal formada no llega al
+    // campo como «�», ni un carácter de control (los dos pasan a ser un espacio), de dirección o invisible (se quitan
+    // sin dejar espacio); una consulta sin nada visible es como no tener búsqueda.
     const initial = displayQuery(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
     if (initial) {
       input.value = initial;

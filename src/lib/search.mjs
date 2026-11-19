@@ -11,13 +11,18 @@ import { cleanQuery, normalizeCode, normalizeText } from './text.mjs';
 /** Nombre del parámetro de la URL que lleva la consulta: `/catalogo/?q=...`. */
 export const SEARCH_PARAM = 'q';
 
+// Una letra o una cifra que se ve: los rellenos del hangul (U+3164, U+115F, U+1160, U+FFA0) son letras que se ignoran
+// por omisión (\p{DI}) y no dibujan nada.
+const SEARCHABLE = /(?!\p{DI})[\p{L}\p{N}]/u;
+
 /**
- * Palabras de la consulta, ya normalizadas. Se descartan las que no tienen letras ni números.
+ * Palabras de la consulta limpia (`cleanQuery`, la misma que se muestra), ya normalizadas: el catálogo filtra sobre
+ * exactamente lo que muestra la línea de resultados. Se descartan las palabras sin ninguna letra ni cifra visible.
  * @param {unknown} query
  * @returns {string[]}
  */
 export function queryTokens(query) {
-  return normalizeText(query).split(' ').filter(token => normalizeCode(token) !== '');
+  return normalizeText(cleanQuery(query)).split(' ').filter(token => SEARCHABLE.test(normalizeCode(token)));
 }
 
 /**
@@ -81,10 +86,11 @@ export function filterProducts(products, query) {
 /**
  * Consulta tal como se muestra en la página (`cleanQuery`): sin espacios al inicio o al final y con un solo
  * espacio entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
- * Quita el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
- * (`?q=%E0%A4%A` → «�%A»), los controles, los de dirección (U+202E invertiría las palabras del sitio que
- * siguen al término), los invisibles y las mitades sueltas de un par sustituto (`encodeURIComponent` no
- * las acepta). Una consulta que no tiene otra cosa queda vacía.
+ * Quita sin dejar espacio los caracteres sin ancho: los de dirección (U+202E invertiría las palabras del sitio que
+ * siguen al término), los invisibles y el guion suave, así «gu<U+200B>ante» se muestra y se busca «guante».
+ * Cambia por un espacio el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
+ * (`?q=%E0%A4%A` → «�%A» → «%A»), los controles y las mitades sueltas de un par sustituto (`encodeURIComponent` no
+ * las acepta). Una consulta sin nada visible queda vacía.
  * @param {unknown} query
  * @returns {string}
  */
@@ -93,7 +99,7 @@ export function displayQuery(query) {
 }
 
 /**
- * ¿La consulta filtra algo? Solo cuando tiene al menos una palabra con letras o números.
+ * ¿La consulta filtra algo? Solo cuando su texto limpio (`cleanQuery`) tiene al menos una palabra con letras o números.
  * @param {unknown} query
  * @returns {boolean}
  */

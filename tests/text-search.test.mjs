@@ -147,14 +147,17 @@ const REMOVED = {
   'mitades sueltas de un par sustituto': ['\uD800', '\uD83E', '\uDBFF', '\uDC00', '\uDCA5', '\uDFFF'],
 };
 
+const SPACE_IN_WORD = new Set(['carácter de reemplazo', 'controles (Cc)', 'mitades sueltas de un par sustituto']);
+
 test('cleanQuery quita cada carácter de control, de dirección o invisible, al inicio, en medio y al final', () => {
   for (const [kind, characters] of Object.entries(REMOVED)) {
     for (const character of characters) {
       const code = `U+${character.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} (${kind})`;
       assert.equal(cleanQuery(`${character}guante`), 'guante', code);
       assert.equal(cleanQuery(`guante${character}`), 'guante', code);
-      // En medio deja un espacio: no une dos palabras ni deja una mitad pegada a otra.
-      assert.equal(cleanQuery(`guante${character}rojo`), 'guante rojo', code);
+      // En medio, el de reemplazo, un control o una mitad suelta dejan un espacio (suelen estar donde había un
+      // separador); los de dirección y los invisibles no tienen ancho y se quitan sin dejar espacio.
+      assert.equal(cleanQuery(`guante${character}rojo`), SPACE_IN_WORD.has(kind) ? 'guante rojo' : 'guanterojo', code);
       assert.equal(cleanQuery(`casco ${character} blanco`), 'casco blanco', code);
       assert.equal(cleanQuery(character), '', code);
       assert.equal(cleanQuery(`${character}${character} ${character}`), '', code);
@@ -205,7 +208,8 @@ test('cleanQuery deja vacía una consulta sin ninguna letra, cifra, símbolo ni 
   assert.equal(cleanQuery('می‌خواهم'), 'می‌خواهم');
   assert.equal(cleanQuery('👷🏽‍♀️'), '👷🏽‍♀️');
   assert.equal(cleanQuery('\u200Dguante'), '\u200Dguante');
-  assert.equal(cleanQuery('co\u00ADllar'), 'co\u00ADllar');
+  // El guion suave no tiene ancho: se quita sin dejar espacio, también en medio de una palabra.
+  assert.equal(cleanQuery('co\u00ADllar'), 'collar');
   // Un signo o un símbolo solos sí se ven: se muestran como los escribió la persona.
   for (const text of ['-', '¿?', '#', '$', '·', '❤️', '🇲🇽', '1️⃣']) assert.equal(cleanQuery(text), text, text);
 });

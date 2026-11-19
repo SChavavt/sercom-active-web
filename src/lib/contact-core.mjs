@@ -126,8 +126,9 @@ function addLinkLine(text, url) {
  * Para el navegador y la compilación: la descripción tal como entra en la línea «Descripción o uso» de una
  * solicitud especial (una sola línea, sin espacios sobrantes, hasta 200 caracteres). Cadena vacía si no hay
  * texto útil. Sirve para mostrar en la página exactamente lo que se agregó al borrador.
- * La limpia `cleanQuery`, la misma función que la búsqueda del catálogo (`displayQuery`): sin el carácter de
- * reemplazo, controles, caracteres de dirección, invisibles ni mitades sueltas de un par sustituto.
+ * La limpia `cleanQuery`, la misma función que la búsqueda del catálogo (`displayQuery`): los caracteres de dirección,
+ * los invisibles y el guion suave se quitan sin dejar espacio («gu<U+200B>ante» queda «guante»); el carácter de
+ * reemplazo, los controles y las mitades sueltas de un par sustituto pasan a ser un espacio.
  * Cuenta caracteres completos (puntos de código), no unidades de UTF-16: el recorte nunca parte un emoji.
  * @param {unknown} description
  * @returns {string}

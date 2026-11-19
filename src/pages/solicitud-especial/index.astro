@@ -94,9 +94,9 @@ const items = [
     import { requestDescription, withRequestDescription } from '../../lib/contact-core.mjs';
     import { SEARCH_PARAM } from '../../lib/search.mjs';
 
-    // requestDescription limpia la búsqueda como el catálogo (cleanQuery): sin el carácter de reemplazo de una
-    // secuencia % mal formada, controles, caracteres de dirección ni invisibles. Si no queda nada, la página es
-    // la de siempre.
+    // requestDescription limpia la búsqueda como el catálogo (cleanQuery): los caracteres de dirección, los invisibles
+    // y el guion suave se quitan sin dejar espacio; el carácter de reemplazo de una secuencia % mal formada y los
+    // controles pasan a ser un espacio. Si no queda nada visible, la página es la de siempre.
     const query = new URLSearchParams(window.location.search).get(SEARCH_PARAM);
     const description = requestDescription(query);
     if (description) {

@@ -58,7 +58,7 @@ test('las tres entradas de ayuda llevan a sus páginas', () => {
 });
 
 // Lo que no debe llegar nunca a la nota ni a los borradores (A-04).
-const REMOVED = /[�\p{Cc}؜‎‏‪-‮⁦-⁩​⁠﻿]|\p{Cs}/u;
+const REMOVED = /[\uFFFD\p{Cc}\u00AD\u061C\u200B\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]|\p{Cs}/u;
 const bodyOf = href => decodeURIComponent(href.slice(href.indexOf('body=') + 5));
 
 test('requestDescription quita los controles de dirección, los de Cc, los invisibles y las mitades de un par sustituto', () => {
@@ -90,8 +90,10 @@ test('la nota y el borrador muestran lo mismo que el catálogo, y los enlaces nu
 test('el límite de 200 cuenta caracteres completos, también después de quitar los de control', () => {
   assert.equal(requestDescription('🧤'.repeat(300)), '🧤'.repeat(200));
   assert.equal(Array.from(requestDescription('👷🏽‍♀️'.repeat(100))).length, 200);
-  // Cada U+202E pasa a ser un espacio: «a a a …», 200 caracteres sin espacio final.
-  const spaced = requestDescription('a‮'.repeat(300));
+  // Cada U+202E se quita sin dejar espacio: «aaa…», 200 caracteres. Cada control pasa a ser un espacio: «a a a …»,
+  // 200 caracteres sin espacio final.
+  assert.equal(requestDescription('a‮'.repeat(300)), 'a'.repeat(200));
+  const spaced = requestDescription('a\u0001'.repeat(300));
   assert.equal(Array.from(spaced).length, 199);
   assert.equal(spaced, Array(100).fill('a').join(' '));
   assert.equal(requestDescription(`${'‮'.repeat(50)}${'b'.repeat(250)}`), 'b'.repeat(200));
