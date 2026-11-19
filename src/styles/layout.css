@@ -5,9 +5,17 @@
    es una celda blanca; los huecos de 1 px entre celdas son los filetes. Ningún elemento dibuja su
    propio borde, así que las líneas nunca se duplican y siempre caen en la misma retícula.
    ========================================================================== */
+/* Márgenes laterales: nunca menores que las zonas seguras del equipo (muesca o esquinas redondas en horizontal, con
+   viewport-fit=cover). Sin zonas seguras valen var(--margin) y la lámina queda centrada como siempre; con una zona
+   segura de un solo lado, el margen de ese lado crece y la lámina se corre lo justo. */
+:root {
+  --edge-left: max(var(--margin), env(safe-area-inset-left, 0px));
+  --edge-right: max(var(--margin), env(safe-area-inset-right, 0px));
+}
 .sheet {
-  width: min(100% - 2 * var(--margin), var(--sheet-max));
-  margin: 0 auto var(--s-9);
+  --sheet-w: min(100% - var(--edge-left) - var(--edge-right), var(--sheet-max));
+  width: var(--sheet-w);
+  margin: 0 0 var(--s-9) clamp(var(--edge-left), (100% - var(--sheet-w)) / 2, 100% - var(--sheet-w) - var(--edge-right));
   padding: 0 var(--line) var(--line);
   background: var(--rule);
   display: grid;
