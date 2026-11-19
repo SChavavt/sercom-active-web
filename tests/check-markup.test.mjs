@@ -10,11 +10,13 @@ import { makeTree, removeTree, ROOT } from './helpers.mjs';
 
 /**
  * Cabecera de una página.
- * @param {{ search?: boolean, categories?: boolean, marks?: Record<string, string>, classes?: Record<string, string> }} [options]
+ * @param {{ search?: boolean, categories?: boolean, marks?: Record<string, string>, classes?: Record<string, string>, order?: string[] }} [options]
  *   `marks`: aria-current por entrada («nav:/marcas/», «nav:categorias», «cat:/categorias/manos/», «cta», «logo»).
  *   `classes`: clases de navegación, búsqueda, campo y botón.
+ *   `order`: orden de las piezas de la cabecera (por omisión el de SiteHeader).
  */
-function header({ search = true, categories = true, marks = {}, classes = {} } = {}) {
+const ORDER = ['logo', 'searchButton', 'menuButton', 'nav', 'form', 'wa', 'cta'];
+function header({ search = true, categories = true, marks = {}, classes = {}, order = ORDER } = {}) {
   const c = { nav: 'masthead__nav', search: 'masthead__search', input: 'masthead__search-input', button: 'masthead__search-btn', ...classes };
   const current = key => (marks[key] ? ` aria-current="${marks[key]}"` : '');
   const link = (href, label) => `<li><a class="nav__link" href="${href}"${current(`nav:${href}`)}>${label}</a></li>`;
@@ -33,9 +35,14 @@ function header({ search = true, categories = true, marks = {}, classes = {} } =
       + `<input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon"></svg></button></form>`
     : '';
   return `<header class="site-header"><div class="utility"><ul class="utility__group"><li class="utility__item">Puebla, México</li></ul></div>`
-    + `<div class="masthead grid12"><a class="masthead__logo span-2" href="/"${current('logo')}><img src="/logo.svg" width="156" height="59" alt="Sercom Active" /></a>`
-    + `${searchButton}${menuButton}${nav}${form}<a class="masthead__wa" href="https://wa.me/5212214002219">WhatsApp</a>`
-    + `<a class="masthead__cta span-2" href="/cotizar/"${current('cta')}><span>Cotizar mi lista</span></a></div></header>`;
+    + '<div class="masthead grid12">'
+    + order.map(piece => ({
+      logo: `<a class="masthead__logo span-2" href="/"${current('logo')}><img src="/logo.svg" width="156" height="59" alt="Sercom Active" /></a>`,
+      searchButton, menuButton, nav, form,
+      wa: '<a class="masthead__wa" href="https://wa.me/5212214002219">WhatsApp</a>',
+      cta: `<a class="masthead__cta span-2" href="/cotizar/"${current('cta')}><span>Cotizar mi lista</span></a>`,
+    })[piece]).join('')
+    + '</div></header>';
 }
 const dock = (marks = {}) => `<nav class="dock" aria-label="Acciones rápidas"><a class="dock__link" href="/cotizar/"${marks['dock:/cotizar/'] ? ` aria-current="${marks['dock:/cotizar/']}"` : ''}><span>Cotizar mi lista</span></a><a class="dock__link dock__link--wa" href="https://wa.me/5212214002219"><span>WhatsApp</span></a></nav>`;
 const page = (options = {}, body = '<h1>Página</h1>') => `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>Prueba</title></head><body><a class="skip-link" href="#contenido">Saltar al contenido</a>`
@@ -115,6 +122,35 @@ test('U-07: la cabecera que usa las clases genéricas o no usa las de su bloque 
   assert.equal((await check({ 'pagina/index.html': page({ search: false }) }, { ids: ['U-07'] })).length, 1);
   assert.deepEqual(await check({ 'pagina/index.html': page({ search: false }) }, { ids: ['U-07'], preview: false }), []);
   assert.equal((await check({ 'pagina/index.html': '<!doctype html><html><body><main>Sin cabecera</main></body></html>' }, { ids: ['U-07'] })).length, 1);
+});
+
+// ---------------------------------------------------------------------------------------------------
+// U-03: orden de la cabecera
+// ---------------------------------------------------------------------------------------------------
+
+test('U-03: botones antes de los paneles y orden de computadora correcto pasan, con y sin búsqueda', async () => {
+  assert.deepEqual(await check({ 'marcas/index.html': page() }, { ids: ['U-03'] }), []);
+  assert.deepEqual(await check({ 'index.html': page({ search: false, categories: false, marks: { logo: 'page' } }) }, { ids: ['U-03'], preview: false }), []);
+});
+
+test('U-03: un botón después de su panel, o un orden de computadora distinto, falla', async () => {
+  const cases = [
+    // El orden anterior a la corrección: Menú al final y Buscar antes de la navegación.
+    [['logo', 'searchButton', 'nav', 'form', 'wa', 'cta', 'menuButton'], 2],
+    [['logo', 'menuButton', 'nav', 'searchButton', 'form', 'wa', 'cta'], 1],
+    [['logo', 'searchButton', 'menuButton', 'form', 'nav', 'wa', 'cta'], 1],
+    [['logo', 'searchButton', 'menuButton', 'nav', 'form', 'cta', 'wa'], 1],
+    [['searchButton', 'menuButton', 'nav', 'logo', 'form', 'wa', 'cta'], 1],
+  ];
+  for (const [order, count] of cases) {
+    const problems = await check({ 'pagina/index.html': page({ order }) }, { ids: ['U-03'] });
+    assert.equal(problems.length, count, `${order.join(' ')} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  // Piezas que faltan: el botón Menú, o en vista previa la búsqueda con su botón.
+  assert.equal((await check({ 'pagina/index.html': page({ order: ['logo', 'searchButton', 'nav', 'form', 'wa', 'cta'] }) }, { ids: ['U-03'] })).length, 1);
+  assert.equal((await check({ 'pagina/index.html': page({ order: ['logo', 'menuButton', 'nav', 'form', 'wa', 'cta'] }) }, { ids: ['U-03'] })).length, 1);
+  assert.equal((await check({ 'pagina/index.html': page({ search: false }) }, { ids: ['U-03'] })).length, 1);
+  assert.equal((await check({ 'pagina/index.html': '<!doctype html><html><body><main>Sin cabecera</main></body></html>' }, { ids: ['U-03'] })).length, 1);
 });
 
 // ---------------------------------------------------------------------------------------------------

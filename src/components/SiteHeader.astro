@@ -43,6 +43,8 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     </ul>
   </div>
 
+  {/* Los botones Buscar y Menú van antes de la navegación y de la búsqueda: al abrir un panel con el teclado, el
+     siguiente Tab entra en él. En tableta y celular el CSS deja el botón Menú al final de la fila. */}
   <div class:list={['masthead', 'grid12', { 'masthead--no-search': !hasSearch }]}>
     <a class="masthead__logo span-2" href={routes.home} aria-current={current(routes.home)}><img src={logo.src} width="156" height="59" alt={contactDetails.businessName} /></a>
 
@@ -52,6 +54,10 @@ const allSpan = 12 - ((categories.length * 2) % 12);
         <span class="label">Buscar</span>
       </button>
     )}
+    <button class="masthead__btn masthead__btn--menu" type="button" aria-expanded="false" aria-controls="menu" data-toggle="menu">
+      <Icon name="menu" class="icon--open" /><Icon name="close" class="icon--close" />
+      <span class="label" data-label-closed="Menú" data-label-open="Cerrar">Menú</span>
+    </button>
 
     <nav class:list={['masthead__nav', hasSearch ? 'span-4' : 'span-7']} id="menu" aria-label="Principal">
       <ul class="nav__list">
@@ -87,18 +93,14 @@ const allSpan = 12 - ((categories.length * 2) % 12);
 
     <a class="masthead__wa" href={whatsapp}><Icon name="whatsapp" class="icon--24" /><span class="label">WhatsApp</span></a>
     <a class="masthead__cta span-2" href={routes.quoteList} aria-current={current(routes.quoteList)}><Icon name="clipboard-list" /><span>Cotizar mi lista</span></a>
-
-    <button class="masthead__btn masthead__btn--menu" type="button" aria-expanded="false" aria-controls="menu" data-toggle="menu">
-      <Icon name="menu" class="icon--open" /><Icon name="close" class="icon--close" />
-      <span class="label" data-label-closed="Menú" data-label-open="Cerrar">Menú</span>
-    </button>
   </div>
 </header>
 
 <script>
   // Mejora progresiva del encabezado (tableta y celular: menú y búsqueda; computadora: panel Categorías).
-  // Escape cierra lo que esté abierto y devuelve el foco a su control; el panel de computadora también se
-  // cierra con un clic fuera o cuando el foco sale de él; el menú abierto termina sobre la barra fija.
+  // Escape cierra lo que esté abierto y devuelve el foco a su control. El menú, la búsqueda y el panel de
+  // computadora también se cierran con un clic fuera o cuando el foco sale de ellos (y de su botón); el menú
+  // abierto termina sobre la barra fija.
   const desktop = window.matchMedia('(min-width: 1100px)');
   const menuButton = document.querySelector<HTMLButtonElement>('[data-toggle="menu"]');
   const searchButton = document.querySelector<HTMLButtonElement>('[data-toggle="search"]');
@@ -159,9 +161,24 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     }
   });
 
+  /** Panel de tableta y celular con su botón: se cierra si el foco o un clic quedan fuera de los dos. */
+  const panels = [[menuButton, nav], [searchButton, search]] as const;
+  const outside = (target: EventTarget | null, button: HTMLElement | null, panel: HTMLElement | null) =>
+    target instanceof Node && !panel?.contains(target) && !button?.contains(target);
+
   document.addEventListener('click', event => {
     if (categoriesPanel?.open && desktop.matches && event.target instanceof Node && !categoriesPanel.contains(event.target)) categoriesPanel.open = false;
+    if (desktop.matches) return;
+    for (const [button, panel] of panels) if (isOpen(button) && outside(event.target, button, panel)) setOpen(button, panel, false);
   });
+  for (const [button, panel] of panels) {
+    // Sin relatedTarget (la ventana pierde el foco) el panel sigue abierto.
+    const leave = (event: FocusEvent) => {
+      if (!desktop.matches && isOpen(button) && outside(event.relatedTarget, button, panel)) setOpen(button, panel, false);
+    };
+    button?.addEventListener('focusout', leave);
+    panel?.addEventListener('focusout', leave);
+  }
   categoriesPanel?.addEventListener('focusout', event => {
     const next = event.relatedTarget;
     if (categoriesPanel.open && desktop.matches && next instanceof Node && !categoriesPanel.contains(next)) categoriesPanel.open = false;

@@ -197,6 +197,44 @@ function headerParts(page) {
 /** @type {Check[]} */
 export const CHECKS = [
   {
+    id: 'U-03',
+    title: 'En la cabecera los botones Buscar y Menú van antes de la navegación y de la búsqueda; el orden de computadora es logotipo, navegación, búsqueda, WhatsApp y Cotizar mi lista',
+    page(page, options) {
+      const parts = headerParts(page);
+      if (!parts || !parts.masthead) return ['la página no tiene la cabecera del sitio (<header class="site-header"> con .masthead)'];
+      const problems = [];
+      const { menu, search, menuButton, searchButton } = parts;
+      if (!menu) problems.push('falta la navegación principal (#menu)');
+      if (!menuButton) problems.push('falta el botón Menú (data-toggle="menu")');
+      else if (menuButton.attributes.get('aria-controls') !== 'menu') problems.push('el botón Menú no controla #menu (aria-controls)');
+      if (options.preview && !search) problems.push('vista previa: falta el campo de búsqueda de la cabecera (#buscador)');
+      if (search && !searchButton) problems.push('hay búsqueda (#buscador) pero falta el botón Buscar (data-toggle="search")');
+      if (searchButton && !search) problems.push('hay botón Buscar pero falta la búsqueda (#buscador)');
+      if (searchButton && searchButton.attributes.get('aria-controls') !== 'buscador') problems.push('el botón Buscar no controla #buscador (aria-controls)');
+      const panels = [menu, search].filter(Boolean);
+      for (const [button, label] of [[menuButton, 'Menú'], [searchButton, 'Buscar']]) {
+        if (!button) continue;
+        for (const panel of panels) {
+          if (button.order > panel.order) problems.push(`el botón ${label} está después de ${describe(panel)}: al abrir un panel con el teclado, el siguiente Tab no entra en él`);
+        }
+      }
+      // Orden del teclado en computadora (los botones no se ven): logotipo, navegación, búsqueda, WhatsApp, cotizar.
+      const sequence = [
+        ['el logotipo', parts.elements.find(element => hasClass(element, 'masthead__logo'))],
+        ['la navegación', menu],
+        ['la búsqueda', search],
+        ['WhatsApp', parts.elements.find(element => hasClass(element, 'masthead__wa'))],
+        ['Cotizar mi lista', parts.elements.find(element => hasClass(element, 'masthead__cta'))],
+      ];
+      for (const [label, element] of sequence) if (!element && label !== 'la búsqueda') problems.push(`falta ${label} en la cabecera`);
+      const present = sequence.filter(([, element]) => element);
+      for (let i = 1; i < present.length; i++) {
+        if (present[i][1].order < present[i - 1][1].order) problems.push(`${present[i][0]} está antes que ${present[i - 1][0]}: el orden de computadora es logotipo, navegación, búsqueda, WhatsApp, Cotizar mi lista`);
+      }
+      return problems;
+    },
+  },
+  {
     id: 'U-07',
     title: 'La navegación y la búsqueda de la cabecera usan nombres de su bloque; ninguna regla global selecciona .nav, .search, .search__input ni .search__btn',
     sheet(sheet) {

@@ -63,6 +63,7 @@
   .masthead__btn[aria-expanded="true"] .icon { color: var(--white); }
   .masthead__btn .icon--close, .masthead__btn[aria-expanded="true"] .icon--open { display: none; }
   .masthead__btn[aria-expanded="true"] .icon--close { display: block; }
+  .masthead__btn--menu { order: 1; }      /* en el documento va antes de la navegación (orden del teclado); a la vista, al final */
   .masthead__wa { width: 88px; }
   .masthead__cta { padding: 0 var(--s-5); }
   .masthead__cta .icon { display: none; }
