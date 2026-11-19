@@ -215,6 +215,9 @@
 .catalog-related__head { display: flex; align-items: center; padding: var(--s-5) var(--pad); background: var(--surface); }
 .catalog-related__title { color: var(--blue); }
 .catalog-related__list { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-7); padding: var(--s-2) var(--pad); background: var(--surface); }
+/* Un nombre de marca que no cabe en la fila (uno largo, con el texto espaciado, en un celular angosto) baja a un segundo
+   renglón dentro de su enlace en lugar de empujar la página hacia un lado. El que cabe sigue en un renglón. */
+.catalog-related__list .more { max-width: 100%; white-space: normal; }
 
 /* 4. Tableta y celular: la barra lateral se pliega en dos filas sobre las tarjetas ------------------------- */
 @media (max-width: 1099px) {
