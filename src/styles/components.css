@@ -627,9 +627,6 @@
 /* Celda blanca que completa la última fila de marcas (BrandCells) */
 .brands__fill { background: var(--surface); }
 
-/* Etiqueta junto al título de una página interior */
-.page-head__tag { margin-top: var(--s-2); }
-
 /* Celdas de relleno de las retículas (GridFill: ProductGrid, CategoryPlate, CategoryRegister y Steps): blancas,
    con el ancho de computadora en --fill-lg; el de tableta, el de celular y data-hide (los puntos de corte donde
    una celda no hace falta) se aplican en 6.5 de responsive.css. Hijos directos de su retícula, como las
