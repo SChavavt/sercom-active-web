@@ -200,8 +200,13 @@
     --h2: var(--type-h2-size);        /* y los títulos de sección quedan en una línea */
   }
 
-  body { padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px)); }      /* espacio para la barra fija: la última línea del pie queda visible */
-  html { scroll-padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px) + var(--s-4)); }   /* el elemento que recibe el foco no queda bajo la barra fija */
+  /* Espacio para la barra fija: la última línea del pie queda visible y el elemento que recibe el foco no queda bajo
+     la barra. --dock-space es el alto real de la barra (lo mide SiteHeader): con la letra agrandada una etiqueta pasa
+     a dos renglones y la barra crece. Sin JavaScript vale lo que mide la barra con etiquetas de hasta dos renglones
+     (2 × 1.2 × 0.9375rem más el filete), nunca menos que los 57 px de siempre. */
+  :root { --dock-fallback: calc(max(57px, 2.25rem + var(--line)) + env(safe-area-inset-bottom, 0px)); }
+  body { padding-bottom: var(--dock-space, var(--dock-fallback)); }
+  html { scroll-padding-bottom: calc(var(--dock-space, var(--dock-fallback)) + var(--s-4)); }
   .sheet { margin-bottom: 0; padding: 0; }
   .site-notice__text { padding-inline: var(--pad); font-size: 0.78125rem; }
   .utility { justify-content: flex-start; }
@@ -313,8 +318,7 @@
     font-size: 0.9375rem;
     font-weight: var(--type-button-weight);
     line-height: 1.2;
-    text-decoration: none;
-    white-space: nowrap;
+    text-decoration: none;              /* la etiqueta puede pasar a dos renglones (letra agrandada): el enlace crece */
   }
   .dock__link .icon { color: var(--blue); }
   .dock__link--wa { background: var(--blue); color: var(--white); }

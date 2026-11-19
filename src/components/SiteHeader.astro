@@ -156,8 +156,9 @@ const searchHint = 'Buscar en el catálogo';
     fit();
   }
 
-  // Alto real de la franja de servicio y de la cabecera. Con texto agrandado o espaciado crecen; la cabecera fija
-  // (components.css) y el margen de desplazamiento (base.css) usan estas medidas en lugar de los altos del diseño.
+  // Alto real de la franja de servicio, de la cabecera y de la barra fija del celular. Con texto agrandado o espaciado
+  // crecen; la cabecera fija (components.css), el margen de desplazamiento (base.css) y el espacio que la página deja
+  // para la barra (responsive.css) usan estas medidas en lugar de los altos del diseño.
   const utility = document.querySelector<HTMLElement>('.utility');
   const masthead = document.querySelector<HTMLElement>('.masthead');
   if (utility && masthead && 'ResizeObserver' in window) {
@@ -165,10 +166,12 @@ const searchHint = 'Buscar en el catálogo';
       const root = document.documentElement.style;
       root.setProperty('--utility-shift', `${utility.getBoundingClientRect().height}px`);
       root.setProperty('--masthead-shift', `${masthead.getBoundingClientRect().height}px`);
+      if (dock) root.setProperty('--dock-space', `${dock.getBoundingClientRect().height}px`);
       fit();
     });
     measure.observe(utility);
     measure.observe(masthead);
+    if (dock) measure.observe(dock);
   }
 
   // Texto de ayuda del buscador: si el placeholder no cabe en una línea (texto espaciado o agrandado, o un campo
