@@ -84,6 +84,26 @@ export interface PublicProduct {
   readonly isExample: boolean;
 }
 
+/**
+ * Producto retirado que fue público (R-STATE-04): conserva una página informativa en su dirección, con solo lo que
+ * lo identifica. No está en `products`: ningún listado, conteo, búsqueda ni selección lo incluye.
+ */
+export interface PublicRetiredProduct {
+  readonly id: string;
+  /** `/productos/{id}/`, la misma dirección que tuvo. */
+  readonly url: string;
+  readonly name: string;
+  /** `null` en el ejemplo retirado de la vista previa. */
+  readonly brandId: string | null;
+  readonly brandName: string;
+  readonly code: string;
+  /** Solo sus categorías públicas en el modo actual; puede quedar vacía. */
+  readonly categoryIds: readonly string[];
+  readonly categoryNames: readonly string[];
+  /** `true` en el ejemplo retirado de la vista previa: la página muestra la etiqueta «Ejemplo». */
+  readonly isExample: boolean;
+}
+
 /** Identificadores para `getStaticPaths()` en el modo actual. */
 export interface SitePaths {
   readonly categoryIds: readonly string[];
@@ -101,6 +121,9 @@ export interface SiteData {
   getCategory(id: string): PublicCategory | undefined;
   getBrand(id: string): PublicBrand | undefined;
   getProduct(id: string): PublicProduct | undefined;
+  /** Retirados públicos en el modo actual, en el orden del catálogo (los ejemplos al final, solo en la vista previa). */
+  readonly retiredProducts: readonly PublicRetiredProduct[];
+  getRetiredProduct(id: string): PublicRetiredProduct | undefined;
   /** Productos de una categoría, en el orden del catálogo. Lista vacía si no existe o no es pública. */
   productsByCategory(id: string): PublicProduct[];
   /** Productos de una marca, en el orden del catálogo. Lista vacía si no existe. */
@@ -139,6 +162,8 @@ export interface ExampleProductRecord {
   summary: string;
   characteristics: string[];
   variants: { id: string; label: string; code: string }[];
+  /** `true`: ejemplo de producto retirado (solo tiene su página informativa; no entra en ningún listado). */
+  retired?: boolean;
 }
 
 /** Campos de un producto que usa la búsqueda. */

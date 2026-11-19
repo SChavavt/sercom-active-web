@@ -38,6 +38,17 @@ export interface PublishedProduct {
   image: { url: string; alt: string };
   documents: { label: string; url: string }[];
 }
+/**
+ * Campos públicos de un producto retirado que fue público (`getRetiredProducts`): solo lo que lo identifica.
+ * Descripción, características, unidad, variantes, imagen y documentos ya nadie los mantiene y no se publican.
+ */
+export interface PublishedRetiredProduct {
+  id: string;
+  brandId: string;
+  model: string;
+  name: string;
+  categoryIds: string[];
+}
 export interface Catalog {
   schemaVersion: 1;
   categories: Category[];

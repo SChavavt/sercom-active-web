@@ -4,7 +4,7 @@
 // Imprime todos los datos públicos y carga un script de navegador con los módulos aptos para el navegador.
 import { searchText } from '../../../../src/lib/search.mjs';
 import { contactLinks } from '../../../../src/lib/contact.mjs';
-import { brands, categories, featuredProducts, mode, products } from '../../../../src/lib/site-data.mjs';
+import { brands, categories, featuredProducts, mode, products, retiredProducts } from '../../../../src/lib/site-data.mjs';
 ---
 <!doctype html>
 <html lang="es-MX">
@@ -23,9 +23,12 @@ import { brands, categories, featuredProducts, mode, products } from '../../../.
         </li>
       ))}
     </ul>
+    <ul id="retirados">
+      {retiredProducts.map(retired => <li data-retired={retired.id}>{retired.brandName} {retired.code} {retired.name} ({retired.categoryNames.join(', ')})</li>)}
+    </ul>
     <p id="destacados">{featuredProducts(4).map(product => product.code).join(' ')}</p>
     <a id="cotizar" href={contactLinks.general().whatsapp}>Cotizar</a>
-    <script type="application/json" id="datos" set:html={JSON.stringify({ categories, brands, products })} />
+    <script type="application/json" id="datos" set:html={JSON.stringify({ categories, brands, products, retiredProducts })} />
     <script>
       import { withPageLink } from '../../../../src/lib/contact-core.mjs';
       import { matchesSearchText, SEARCH_PARAM } from '../../../../src/lib/search.mjs';

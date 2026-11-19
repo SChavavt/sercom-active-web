@@ -183,5 +183,23 @@
     "variants": [
       { "id": "unica", "label": "Única", "code": "EJ-1101-U" }
     ]
+  },
+  {
+    "id": "ejemplo-producto-retirado",
+    "name": "Producto de ejemplo retirado",
+    "brandName": "Marca de ejemplo",
+    "code": "EJ-1002",
+    "categoryIds": ["manos"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unica", "label": "Única", "code": "EJ-1002-U" }
+    ],
+    "retired": true
   }
 ]

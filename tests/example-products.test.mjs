@@ -7,6 +7,9 @@ import { allStrings, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples, registry } = await loadProjectData();
 const categoryIds = catalog.categories.map(category => category.id);
+// Los diez ejemplos de los listados y el ejemplo de producto retirado, que solo tiene su página informativa.
+const listed = examples.filter(example => example.retired !== true);
+const retired = examples.filter(example => example.retired === true);
 const context = { categoryIds, brands };
 
 const sizes = (code, from, to) => Array.from({ length: to - from + 1 }, (_, index) => [`Talla ${from + index}`, `${code}-${from + index}`]);
@@ -33,12 +36,20 @@ const mutated = change => {
 };
 const hasWord = (text, word) => new RegExp(`(?:^|[^a-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:[^a-z0-9]|$)`).test(text);
 
-test('el archivo contiene exactamente los diez ejemplos del diseño', () => {
-  assert.equal(examples.length, 10);
+test('el archivo contiene exactamente los diez ejemplos del diseño y un ejemplo retirado', () => {
+  assert.equal(examples.length, 11);
+  assert.equal(listed.length, 10);
   assert.deepEqual(
-    examples.map(example => [example.id, example.name, example.code, example.categoryIds[0], example.saleUnit, example.variants.map(variant => [variant.label, variant.code])]),
+    listed.map(example => [example.id, example.name, example.code, example.categoryIds[0], example.saleUnit, example.variants.map(variant => [variant.label, variant.code])]),
     EXPECTED,
   );
+  // El retirado va al final, con un código de ejemplo que ningún otro usa y una categoría.
+  assert.deepEqual(
+    retired.map(example => [example.id, example.name, example.brandName, example.code, example.categoryIds, example.retired]),
+    [['ejemplo-producto-retirado', 'Producto de ejemplo retirado', 'Marca de ejemplo', 'EJ-1002', ['manos'], true]],
+  );
+  assert.equal(examples.at(-1), retired[0]);
+  assert.ok(listed.every(example => !('retired' in example)));
   for (const example of examples) {
     assert.equal(example.categoryIds.length, 1, example.id);
     assert.equal(example.summary, SUMMARY, example.id);
@@ -54,7 +65,8 @@ test('cada ejemplo es inconfundible: id «ejemplo-», códigos «EJ-», nombre �
     assert.ok(example.code.startsWith('EJ-'), example.id);
     assert.ok(example.name.includes('de ejemplo'), example.id);
     assert.equal(example.brandName, 'Marca de ejemplo', example.id);
-    assert.deepEqual(Object.keys(example), ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants'], example.id);
+    const keys = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants'];
+    assert.deepEqual(Object.keys(example), example.retired === true ? [...keys, 'retired'] : keys, example.id);
     assert.ok(example.variants.length >= 1, example.id);
     for (const variant of example.variants) {
       assert.deepEqual(Object.keys(variant), ['id', 'label', 'code'], example.id);
@@ -66,7 +78,7 @@ test('cada ejemplo es inconfundible: id «ejemplo-», códigos «EJ-», nombre �
   }
   const codes = examples.flatMap(example => [example.code, ...example.variants.map(variant => variant.code)]);
   assert.equal(new Set(codes).size, codes.length, 'códigos repetidos');
-  assert.equal(codes.length, 35);
+  assert.equal(codes.length, 37);
   assert.equal(new Set(examples.map(example => example.id)).size, examples.length, 'ids repetidos');
 });
 
@@ -85,7 +97,7 @@ test('ningún campo de un ejemplo menciona una marca real del registro ni la mar
 
 test('las categorías de los ejemplos existen y cada categoría tiene un ejemplo', () => {
   for (const example of examples) for (const id of example.categoryIds) assert.ok(categoryIds.includes(id), `${example.id}: ${id}`);
-  assert.deepEqual(examples.map(example => example.categoryIds[0]), categoryIds);
+  assert.deepEqual(listed.map(example => example.categoryIds[0]), categoryIds);
 });
 
 test('los ejemplos no llevan normas, precios ni afirmaciones', () => {

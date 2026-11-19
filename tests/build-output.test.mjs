@@ -24,6 +24,9 @@ const MARKERS = /EJ-\d|marca de ejemplo|ejemplo-|de ejemplo/i;
 const MISUSE_CHUNK = /^_astro\/script-con-datos\./;
 
 const data = await loadProjectData();
+// Los diez ejemplos de los listados; el ejemplo retirado solo tiene su página informativa.
+const listedExamples = data.examples.filter(example => example.retired !== true);
+const retiredExamples = data.examples.filter(example => example.retired === true);
 // Todo lo que identifica a un ejemplo: ids, nombres, códigos, códigos de variante y textos.
 const fixtureTokens = [...new Set(data.examples.flatMap(example => [
   example.id, example.name, example.code, example.summary, ...example.characteristics, ...example.variants.map(variant => variant.code),
@@ -90,10 +93,11 @@ test('producción: la sonda imprime los datos reales y ningún ejemplo', () => {
   const index = files.get('index.html');
   assert.match(index, /<body data-mode="production" data-env-file="leido">/);
   for (const brand of data.brands) assert.ok(index.includes(`<li data-brand="${brand.id}">${brand.name}</li>`), brand.id);
-  assert.doesNotMatch(index, /data-product=|data-category=/);
+  assert.doesNotMatch(index, /data-product=|data-category=|data-retired=/);
   const json = JSON.parse(files.get('datos.json'));
   assert.equal(json.mode, 'production');
   assert.deepEqual(json.products, []);
+  assert.deepEqual(json.retiredProducts, []);
   assert.deepEqual(json.categories, []);
   assert.equal(json.brands.length, 19);
   // El script de la página trae la búsqueda y los enlaces, sin datos.
@@ -137,19 +141,28 @@ test('un archivo .env o un valor no reconocido no activan la vista previa', () =
   for (const [path, content] of files) for (const token of fixtureTokens) assert.ok(!content.includes(token), `${path} contiene «${token}»`);
 });
 
-test('vista previa (control): los mismos archivos sí contienen los diez ejemplos', () => {
+test('vista previa (control): los mismos archivos sí contienen los diez ejemplos y el retirado, cada uno en su lista', () => {
   const { files, output } = builds.preview;
   assert.match(output, /Vista previa de diseño \(CATALOG_PREVIEW\)/);
   const index = files.get('index.html');
   assert.match(index, /<body data-mode="preview"/);
   assert.equal(index.match(/data-product="ejemplo-/g).length, 10);
   assert.equal(index.match(/data-category="/g).length, 10);
-  for (const example of data.examples) {
+  for (const example of listedExamples) {
     for (const token of [example.id, example.name, example.code, ...example.variants.map(variant => variant.code)]) assert.ok(index.includes(token), token);
+  }
+  // El ejemplo retirado solo está en su lista, con solo lo que lo identifica.
+  assert.equal(retiredExamples.length, 1);
+  assert.deepEqual([...index.matchAll(/data-retired="([^"]+)"/g)].map(match => match[1]), retiredExamples.map(example => example.id));
+  for (const example of retiredExamples) {
+    assert.ok(!index.includes(`data-product="${example.id}"`), example.id);
+    for (const token of [example.name, example.code]) assert.ok(index.includes(token), token);
+    for (const variant of example.variants) assert.ok(!index.includes(variant.code), variant.code);
   }
   const json = JSON.parse(files.get('datos.json'));
   assert.equal(json.mode, 'preview');
-  assert.deepEqual(json.products.map(product => product.id), data.examples.map(example => example.id));
+  assert.deepEqual(json.products.map(product => product.id), listedExamples.map(example => example.id));
+  assert.deepEqual(json.retiredProducts.map(product => [product.id, product.isExample, product.brandId, Object.keys(product).length]), retiredExamples.map(example => [example.id, true, null, 9]));
   assert.ok(json.products.every(product => product.isExample === true && product.brandId === null));
   assert.equal(json.categories.length, 10);
   // Con la bandera activa, el script que importa el módulo de datos sí carga el archivo de ejemplos:
@@ -167,7 +180,7 @@ test('vista previa: la búsqueda del navegador sobre los data-search compilados 
   const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }));
   assert.equal(cards.length, 10);
   const found = location => cards.filter(card => matchesSearchText(card.search, new URL(location, 'https://sitio.example/').searchParams.get(SEARCH_PARAM))).map(card => card.id);
-  const all = data.examples.map(example => example.id);
+  const all = listedExamples.map(example => example.id);
   const expectations = [
     ['/catalogo/', all],
     ['/catalogo/?q=', all],

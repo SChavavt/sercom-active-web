@@ -423,6 +423,49 @@ test('R-RULE-14: solo se generan páginas de registros que pueden mostrarse', as
   assert.deepEqual(failedIds(await scan({ 'productos/guante-aprobado/index.html': page(), 'productos/guante-borrador/index.html': page() }, { data: withApproved })), ['R-RULE-14']);
 });
 
+test('R-RULE-14: un producto retirado tiene página solo si fue público, y el ejemplo retirado solo en la vista previa', async () => {
+  const approval = { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true };
+  const editorial = structuredClone(data.catalog);
+  editorial.products.push(
+    { id: 'guante-retirado', status: 'retired', approval },
+    { id: 'guante-retirado-sin-aprobacion', status: 'retired' },
+    { id: 'guante-retirado-sin-suministro', status: 'retired', approval: { ...approval, supplyConfirmed: false } },
+  );
+  const withRetired = { ...data, catalog: editorial };
+  // Producción: el retirado que fue público tiene su página; los que nunca lo fueron, no.
+  assert.deepEqual(failures(await scan({ 'productos/guante-retirado/index.html': page() }, { data: withRetired })), []);
+  for (const id of ['guante-retirado-sin-aprobacion', 'guante-retirado-sin-suministro']) {
+    const result = await scan({ 'productos/guante-retirado/index.html': page(), [`productos/${id}/index.html`]: page() }, { data: withRetired });
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-14', `productos/${id}`]], id);
+  }
+  // Si ya hay páginas de producto, no puede faltar la del retirado público.
+  const approved = structuredClone(editorial);
+  approved.categories[0].status = 'approved';
+  approved.products.push({ id: 'guante-aprobado', status: 'approved' });
+  const missing = await scan({ 'productos/guante-aprobado/index.html': page() }, { data: { ...data, catalog: approved } });
+  assert.deepEqual(failures(missing).map(finding => finding.message), ['falta la página de producto «guante-retirado»']);
+
+  // Vista previa: el ejemplo retirado tiene su página, y no puede faltar.
+  const retiredExamples = data.examples.filter(example => example.retired === true);
+  assert.deepEqual(retiredExamples.map(example => example.id), ['ejemplo-producto-retirado']);
+  const options = { preview: true };
+  const home = { 'index.html': previewPage('<h1>Inicio</h1>') };
+  const productPages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
+  assert.deepEqual(failures(await scan({ ...home, ...productPages }, options)), []);
+  const { 'productos/ejemplo-producto-retirado/index.html': _retired, ...withoutRetired } = productPages;
+  assert.deepEqual(failures(await scan({ ...home, ...withoutRetired }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-producto-retirado»']);
+  // Su página sin la etiqueta «Ejemplo» falla, como la de cualquier ejemplo.
+  const untagged = await scan({ ...home, ...productPages, 'productos/ejemplo-producto-retirado/index.html': previewPage(exampleCard(retiredExamples[0], false)) }, options);
+  assert.deepEqual(failures(untagged).map(finding => [finding.id, finding.file]), [['R-RULE-03', 'productos/ejemplo-producto-retirado/index.html']]);
+
+  // Producción: el ejemplo retirado no existe; su página falla por los datos y por las marcas de ejemplo.
+  const leaked = await scan({ 'productos/ejemplo-producto-retirado/index.html': page('<h1>Producto retirado</h1>') });
+  assert.deepEqual(failedIds(leaked), ['R-RULE-03', 'R-RULE-14']);
+  for (const token of [retiredExamples[0].name, retiredExamples[0].code]) {
+    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${token}</p>`) })), ['R-RULE-03'], token);
+  }
+});
+
 test('R-RULE-24 y R-QUOTE-06: el contacto es el confirmado y el texto de WhatsApp va codificado', async () => {
   await assertEachFails('R-RULE-24', [
     '<a href="https://wa.me/5215511223344?text=Hola">WhatsApp</a>', '<a href="https://wa.me/522214002219">WhatsApp</a>',

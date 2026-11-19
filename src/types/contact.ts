@@ -55,6 +55,8 @@ export interface ContactMessages {
   brand(brandName: string): string;
   category(categoryName: string): string;
   datasheet(product: ProductReference): string;
+  /** Producto retirado: pide una alternativa. Lleva la línea «Enlace» solo si hay `url`. */
+  retired(product: ProductReference): string;
 }
 
 /** Asuntos de correo, uno por cada mensaje. */
@@ -66,6 +68,8 @@ export interface ContactSubjects {
   brand(brandName: string): string;
   category(categoryName: string): string;
   datasheet(product: Pick<ProductReference, 'brandName' | 'code'>): string;
+  /** «Consulta de alternativas: Marca CÓDIGO»; sin marca ni código, «Consulta de alternativas». */
+  retired(product: Pick<ProductReference, 'brandName' | 'code'>): string;
 }
 
 /** Los dos canales para un mismo mensaje. */
@@ -87,6 +91,7 @@ export interface ContactLinks {
   brand(brandName: string): ContactLinkPair;
   category(categoryName: string): ContactLinkPair;
   datasheet(product: ProductReference): ContactLinkPair;
+  retired(product: ProductReference): ContactLinkPair;
 }
 
 export interface Contact {

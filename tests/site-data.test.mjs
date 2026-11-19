@@ -6,7 +6,9 @@ import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 const { brands, catalog, examples } = await loadProjectData();
 const categoryIds = catalog.categories.map(category => category.id);
 const brandIds = brands.map(brand => brand.id);
-const exampleIds = examples.map(example => example.id);
+// Los diez ejemplos de los listados; el undécimo es el ejemplo de producto retirado (solo tiene su página).
+const exampleIds = examples.filter(example => example.retired !== true).map(example => example.id);
+const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 
 const CATEGORY_KEYS = ['id', 'name', 'shortName', 'summary', 'isDraft', 'productCount', 'url'];
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'productCount', 'url'];
@@ -71,6 +73,9 @@ test('vista previa con los datos reales: diez categorías en borrador y diez eje
   assert.equal(site.products.length, 10);
   assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
   assert.deepEqual(site.paths, { categoryIds, brandIds, productIds: exampleIds });
+  // El ejemplo retirado no está en ningún listado: solo en su colección.
+  assert.deepEqual(site.retiredProducts.map(product => product.id), [RETIRED_EXAMPLE_ID]);
+  assert.equal(site.getProduct(RETIRED_EXAMPLE_ID), undefined);
   for (const product of site.products) {
     assert.equal(product.isExample, true);
     assert.equal(product.brandId, null);
@@ -246,7 +251,7 @@ test('textos fijos de la vista previa', () => {
 
 // --- Módulo de entrada que usan las páginas -----------------------------------------------------------------
 // Astro define la constante __CATALOG_PREVIEW__ al compilar; aquí se define a mano antes de cargar el módulo.
-const EXPORTS = ['EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'routes'];
+const EXPORTS = ['EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
 
 test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', async () => {
   globalThis.__CATALOG_PREVIEW__ = false;
@@ -260,6 +265,8 @@ test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', as
   assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
   assert.deepEqual(site.featuredProducts(), []);
   assert.equal(site.getProduct('ejemplo-orejera'), undefined);
+  assert.deepEqual(site.retiredProducts, []);
+  assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID), undefined);
 });
 
 test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async () => {
@@ -277,6 +284,9 @@ test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async ()
   assert.deepEqual(site.productsByCategory('soldadura').map(product => product.code), ['EJ-1101']);
   assert.equal(site.featuredProducts(3).length, 3);
   assert.equal(site.routes.catalog, '/catalogo/');
+  assert.deepEqual(site.retiredProducts.map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
+  assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID)?.categoryIds[0], 'manos');
+  assert.equal(site.getCategory('manos')?.productCount, 1);
 });
 
 test('site-data.mjs no se puede cargar en un navegador ni fuera de una compilación', async () => {

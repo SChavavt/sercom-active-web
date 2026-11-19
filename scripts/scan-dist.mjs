@@ -21,6 +21,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isPublicRetired } from '../src/lib/catalog-policy.mjs';
 import { EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -496,7 +497,7 @@ export const CHECKS = [
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
   ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan) y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero.'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
-  ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
+  ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…; la palabra cuenta en cualquier lugar del nombre: «textcolor», «MAINCOLOR», «navbg», «darktheme»; salvo «tema», que cuenta solo al principio del nombre o de una de sus partes, después de «_», «-» o «$» o en camelCase: «temaOscuro», «tema_claro», «miTema»; no dentro de otra palabra, como «sistema», ni en «temas», que son asuntos, ni en «temática», «temático» o «temario», que son otras palabras; pegado a otra palabra sí cuenta: «temaoscuro»), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
@@ -1007,7 +1008,9 @@ export async function scanDist(directory, options = {}) {
   // Carpeta, nombre para el informe, identificadores que pueden tener página y si deben tenerla todos.
   const sections = [
     ['categorias', 'categoría', [...idsWhere(categories, category => category.status === 'approved'), ...(preview ? idsWhere(categories, category => category.status === 'draft') : [])], true],
-    ['productos', 'producto', [...idsWhere(data.catalog?.products ?? [], product => product.status === 'approved'), ...(preview ? examples.map(example => example.id) : [])], true],
+    // Un producto retirado que fue público conserva una página informativa en su dirección (R-STATE-04); el ejemplo
+    // retirado está en el archivo de ejemplos, que solo cuenta en la vista previa.
+    ['productos', 'producto', [...idsWhere(data.catalog?.products ?? [], product => product.status === 'approved' || isPublicRetired(product)), ...(preview ? examples.map(example => example.id) : [])], true],
     // Una marca puede no tener página propia (por ejemplo, si todavía no tiene productos): solo se exige que no sobren.
     ['marcas', 'marca', (data.brands ?? []).map(brand => brand.id), false],
   ];

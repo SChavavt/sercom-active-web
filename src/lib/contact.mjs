@@ -38,7 +38,7 @@ export const {
   whatsappUrl,
   /** `mailtoUrl({ subject, body })` → `mailto:<correo>?subject=...&body=...`. */
   mailtoUrl,
-  /** Textos de los mensajes: `general`, `product`, `list`, `specialRequest`, `brand`, `category`, `datasheet`. */
+  /** Textos de los mensajes: `general`, `product`, `list`, `specialRequest`, `brand`, `category`, `datasheet`, `retired`. */
   messages,
   /** Asuntos de correo, con los mismos nombres que `messages`. */
   subjects,

@@ -17,6 +17,9 @@ const exampleCode = value => /^ej-\d/i.test(String(value ?? '').trim());
 const reservedForExamples = p => /^ejemplo(?:-|$)/.test(String(p.id ?? '')) || /\bde ejemplo\b/.test(normalize(p.name))
   || exampleCode(p.model) || (Array.isArray(p.variants) && p.variants.some(v => exampleCode(v?.manufacturerCode)));
 
+/** Aprobación comercial completa: quién aprobó, cuándo y con el suministro confirmado. */
+const hasApproval = p => Boolean(p?.approval) && isText(p.approval.by) && validDate(p.approval.on) && p.approval.supplyConfirmed === true;
+
 function inspectFields(value, path, errors) {
   if (!value || typeof value !== 'object') return;
   for (const [key, child] of Object.entries(value)) {
@@ -75,7 +78,7 @@ export function validateCatalog(catalog, registry) {
     if (!isText(p.description) || !isText(p.saleUnit)) errors.push(`${path}: falta descripción o unidad de venta.`);
     if (!Array.isArray(p.characteristics) || p.characteristics.length < 3 || p.characteristics.length > 5 || p.characteristics.some(v => !isText(v))) errors.push(`${path}: requiere de 3 a 5 características verificadas.`);
     if (!p.source) errors.push(`${path}: falta fuente revisada.`);
-    if (!p.approval || !isText(p.approval.by) || !validDate(p.approval.on) || p.approval.supplyConfirmed !== true) errors.push(`${path}: falta aprobación comercial.`);
+    if (!hasApproval(p)) errors.push(`${path}: falta aprobación comercial.`);
     if (!p.image || !isHttps(p.image.url) || !isText(p.image.alt) || !isHttps(p.image.sourceUrl) || p.image.usageConfirmed !== true) errors.push(`${path}: falta imagen verificable con uso confirmado.`);
     if (Array.isArray(p.categoryIds) && p.categoryIds.some(id => categories.get(id)?.status !== 'approved')) errors.push(`${path}: categoría pendiente de aprobación.`);
   }
@@ -93,5 +96,22 @@ export function getPublishedProducts(catalog, registry) {
     variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, manufacturerCode: v.manufacturerCode })),
     image: { url: p.image.url, alt: p.image.alt },
     documents: (p.documents ?? []).map(d => ({ label: d.label, url: d.url })),
+  }));
+}
+
+/**
+ * Producto retirado que fue público: estado `retired` con una aprobación comercial completa. Conserva una página
+ * informativa en su dirección (R-STATE-04). Un retirado sin aprobación nunca fue público y sigue privado, como un
+ * borrador. Lo que se muestra de él (id, marca, modelo, nombre y categorías) pasa en `validateCatalog` las mismas
+ * reglas que una ficha aprobada; sus categorías no necesitan estar aprobadas: la página muestra solo las públicas.
+ */
+export const isPublicRetired = product => product?.status === 'retired' && hasApproval(product);
+
+/** Exportación explícita de los retirados públicos: solo lo que identifica al producto, nada interno. */
+export function getRetiredProducts(catalog, registry) {
+  const errors = validateCatalog(catalog, registry);
+  if (errors.length) throw new Error(errors.join('\n'));
+  return catalog.products.filter(isPublicRetired).map(p => ({
+    id: p.id, brandId: p.brandId, model: p.model, name: p.name, categoryIds: [...p.categoryIds],
   }));
 }
