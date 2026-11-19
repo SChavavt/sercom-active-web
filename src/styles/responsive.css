@@ -329,6 +329,8 @@
   .empty__title { font-size: 1.375rem; }
   .empty__action { grid-column: 1; width: 100%; }
   .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
+  .brands__fill--even { display: none; }        /* dos marcas por fila: con un número par no falta ninguna celda */
+  .brands--lg .brand { min-height: 72px; }      /* página de marcas: dos por fila, diez filas */
 }
 
 /* 6.6 Columnas por ancho: una celda con `span-8 span-md-12 span-sm-12` ocupa 8 columnas en computadora

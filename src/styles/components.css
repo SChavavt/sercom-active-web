@@ -560,6 +560,10 @@
 
 /* Celdas de marca altas (página de marcas) */
 .brands--lg .brand { min-height: 96px; }
+/* Número de productos bajo el nombre de la marca (BrandCells con `counts`) */
+.brand__count { display: block; margin-top: var(--s-2); color: var(--grey-600); font-size: var(--label-sm); }
+/* Celda blanca que completa la última fila de marcas (BrandCells) */
+.brands__fill { background: var(--surface); }
 
 /* Etiqueta junto al título de una página interior */
 .page-head__tag { margin-top: var(--s-2); }
