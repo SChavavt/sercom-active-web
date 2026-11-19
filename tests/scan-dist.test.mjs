@@ -518,8 +518,30 @@ test('R-RULE-01: dentro de una cadena de un script o de un JSON, «MX$350» es u
   for (const content of ['var URL$1=globalThis.URL;function f(e){return e.$2}const a=$1;', 'a=b.replace(/x/,"MX$1");', 'const r=/^MX$/;', 'const q=/["\']/g;var A$1=2;A$1(q);', 'const t=`${a}`;var B$2=1;']) {
     assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
   }
-  // Una dirección no es texto: «a$1» en un href no es un precio.
-  await assertNoneFails(['<script>$(1);var A$1=2;</script>', '<a href="/catalogo/?q=a$1">Catálogo</a>']);
+  await assertNoneFails(['<script>$(1);var A$1=2;</script>']);
+  // Una dirección se lee como texto: ninguna dirección del sitio lleva «$» seguido de una cifra, así que «a$1» en un
+  // href falla a propósito (la excepción del código solo vale para el código de un script).
+  await assertEachFails('R-RULE-01', ['<a href="/catalogo/?q=a$1">Catálogo</a>']);
+});
+
+test('R-RULE-01: un precio en el texto de un borrador de WhatsApp o de correo, aunque lo siga un signo', async () => {
+  // El borrador es la única acción comercial del sitio: su texto se lee como texto, con el %XX decodificado.
+  const EMAIL = data.business.email;
+  await assertEachFails('R-RULE-01', [
+    `<a href="${WHATSAPP}?text=Hola%2C%20quiero%20cotizar%20Casco%20(MX%24350)">Cotizar</a>`,
+    `<a href="${WHATSAPP}?text=Casco%20MX%24350%3B%20gracias">Cotizar</a>`,
+    `<a href="${WHATSAPP}?text=%C2%BFEl%20casco%20cuesta%20MX%24350%3F">Cotizar</a>`,
+    `<a href="mailto:${EMAIL}?subject=Casco%20(MX%24350)">Correo</a>`,
+    `<a href="mailto:${EMAIL}?subject=Cotizaci%C3%B3n&amp;body=Casco%20(MX%24350)">Correo</a>`,
+    `<a href="${WHATSAPP}?text=Casco%20precio%3D%24350">Cotizar</a>`,
+  ]);
+  // Sin codificar, el mismo texto falla además por R-QUOTE-06.
+  assert.ok(failedIds(await scan({ 'pagina/index.html': page(`<a href="${WHATSAPP}?text=precio=$350">Cotizar</a>`) })).includes('R-RULE-01'));
+  // El texto de --rules lo dice.
+  assert.ok(RULES.some(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose' && rule.doc.includes('también las direcciones')));
+  assert.ok(!RULES.some(rule => rule.doc.includes('salvo los que son una dirección')));
+  // El texto de un borrador sin precio sigue limpio.
+  await assertNoneFails([`<a href="${WHATSAPP}?text=Hola%2C%20Yosmara.%0AProducto%3A%20Casco%20(modelo%203)%3B%20cantidad%3A%2012">WhatsApp</a>`]);
 });
 
 test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabra antes de la cifra, y las claves de precio en el código', async () => {

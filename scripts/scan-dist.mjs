@@ -65,12 +65,11 @@ const oneLine = text => text.replace(/\s+/g, ' ').trim();
 const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const withoutScripts = html => html.replace(/<script\b[\s\S]*?<\/script>/gi, ' ').replace(/<style\b[\s\S]*?<\/style>/gi, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
-// Atributos que un visitante o un buscador leen como texto; el resto de los atributos se revisa en el ámbito `words`.
+// Atributos que un visitante o un buscador leen como texto. El resto (salvo los de NON_TEXT_ATTRIBUTES, también las
+// direcciones) se revisa con su %XX decodificado en los ámbitos `words` y `prose`.
 const TEXT_ATTRIBUTES = /^(?:alt|title|aria-label|placeholder|content|value)$/i;
 // Atributos que no llevan texto: nombres de clase, geometría de SVG y similares.
 const NON_TEXT_ATTRIBUTES = /^(?:class|id|style|d|points|viewbox|transform|xmlns(?::\w+)?|width|height|x|y|x1|x2|y1|y2|cx|cy|r|rx|ry|fill|stroke|stroke-\w+|integrity|nonce|crossorigin|rel|type|charset|lang|dir|sizes|media|as|loading|decoding|fetchpriority|role|tabindex|hidden|aria-hidden|aria-labelledby|aria-describedby|aria-controls|aria-current|aria-expanded|for|name|method|target)$/i;
-// Atributos cuyo valor es una dirección.
-const URL_ATTRIBUTES = /^(?:href|xlink:href|src|srcset|action|formaction|poster|cite|ping|background|longdesc)$/i;
 /** Atributos de todas las etiquetas de un documento: [nombre, valor sin entidades]. */
 const attributesOf = html => [...html.matchAll(/<[a-zA-Z][^\s"'>/]*((?:"[^"]*"|'[^']*'|[^'">])*)>/g)]
   .flatMap(tag => [...tag[1].matchAll(/([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)])
@@ -248,7 +247,7 @@ const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) 
 //           %XX decodificado; el marcado que guardan se lee también sin sus etiquetas), los <script> en línea, las
 //           cadenas `content:` del CSS y el contenido de JS/JSON (un script puede escribir texto en la página; el
 //           marcado que escribe se lee también sin sus etiquetas), sin las frases permitidas
-//   prose   la parte de `words` que no es código: el texto visible, los valores de los atributos, las cadenas
+//   prose   la parte de `words` que no es código: el texto visible, los valores de los atributos (también las direcciones), las cadenas
 //           `content:` del CSS y el texto de un SVG o XML (sin las frases permitidas)
 //   raw     contenido tal cual de cada archivo de texto
 //   norm    contenido de cada archivo de texto con entidades y %XX decodificados
@@ -343,7 +342,7 @@ export const RULES = [
     'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural y sin otra cifra en la misma frase («100 piezas o más», «12 pares»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
   rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
     'precio en el texto, en un atributo o en el CSS',
-    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (salvo los que son una dirección, como href o src), en las cadenas `content:` del CSS y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
+    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
   rule('R-RULE-01', 'FAIL', 'joined', VISIBLE_PRICE,
     'precio o descuento partido por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
@@ -838,9 +837,9 @@ export async function scanDist(directory, options = {}) {
       // Un atributo que guarda marcado («data-msg="Solicitud &lt;b&gt;enviada&lt;/b&gt;"») se lee también sin sus etiquetas.
       const attributeMarkup = otherAttributes.filter(value => value.includes('<')).map(withoutMarkup);
       readable = [text, ...otherAttributes, ...attributeMarkup, scripts, withoutMarkup(scripts), cssContent(styles)].join('\n');
-      // Una dirección («/catalogo/?q=a$1») no es texto: los atributos de dirección quedan fuera de `prose` (siguen en `words`).
-      const proseAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name) && !URL_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
-      visible = [text, ...proseAttributes, ...attributeMarkup, cssContent(styles), scriptStrings(inlineScripts(raw))].join('\n');
+      // Los demás atributos, también las direcciones, son texto: el borrador de un enlace de WhatsApp o de correo
+      // («?text=Casco%20(MX%24350)») es la única acción comercial del sitio, y ninguna dirección lleva «$» y una cifra.
+      visible = [text, ...otherAttributes, ...attributeMarkup, cssContent(styles), scriptStrings(inlineScripts(raw))].join('\n');
     } else if (extension === '.css') {
       readable = `${raw}\n${cssContent(raw)}`;
       visible = cssContent(raw);
