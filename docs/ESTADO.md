@@ -76,7 +76,7 @@ Tomadas al integrar y revisar el paso 1. Todas pueden revisarse con el propietar
 
 ### 4.1 Comandos
 
-Ejecutados el 19 de noviembre de 2026 sobre el código del commit `e756c30` (el último que cambió el código; estos documentos no lo cambian), con Node.js 24.22.3 y npm 11.19.1. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
+Ejecutados el 19 de noviembre de 2026 sobre el código del commit `1b5dc2f` (el último que cambió el código; estos documentos no lo cambian), con Node.js 24.22.3 y npm 11.19.1. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
 
 | Comando | Resultado |
 | --- | --- |
