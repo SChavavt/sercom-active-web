@@ -14,13 +14,15 @@
   background: repeating-linear-gradient(135deg, var(--blue-050) 0 7px, var(--blue-100) 7px 8px);
 }
 .producto__media--photo { background: var(--surface); }
+/* Se queda bajo la cabecera fija: --masthead-shift es su alto real (SiteHeader), que crece con el texto espaciado o
+   agrandado; sin JavaScript, el alto del diseño */
 .producto__frame {
   position: sticky;
-  top: calc(var(--masthead-h) + var(--line));
+  top: calc(var(--masthead-shift, var(--masthead-h)) + var(--line));
   display: grid;
   place-items: center;
   aspect-ratio: 4 / 3;
-  max-height: calc(100vh - var(--masthead-h) - var(--line));
+  max-height: calc(100vh - var(--masthead-shift, var(--masthead-h)) - var(--line));
 }
 .producto__tag { position: absolute; z-index: 1; top: var(--s-6); left: var(--pad); }   /* sobre la fotografía */
 .producto__plate {
