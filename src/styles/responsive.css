@@ -317,6 +317,11 @@
   .data__value--text { font-size: 0.9375rem; }
   .dock__link { font-size: 0.875rem; }
   .footer__links a { font-size: 0.875rem; }        /* las dos columnas de enlaces mantienen sus filas alineadas */
+  /* Menú: en las celdas de dos columnas «señalización» y «respiratoria» apenas caben (con el texto espaciado de
+     WCAG 1.4.12 se partían en «señalizació» / «n»). Una palabra que no cabe se parte con guion (la página es es-MX),
+     como en el mosaico de la portada; partirla en cualquier letra queda como último recurso. Solo las palabras de
+     12 letras o más: las más cortas caben siempre, y con guion solo cambiarían de renglón. */
+  .catpanel__link > span { hyphens: auto; hyphenate-limit-chars: 12 3 3; }
 }
 
 /* 6.5 Estados que dependen de los datos y componentes sin dibujo en la maqueta */
