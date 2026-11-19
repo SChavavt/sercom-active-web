@@ -1032,6 +1032,8 @@ test('R-RULE-01: después de «precio de» solo el nombre de una marca que empie
   // una cifra.
   await assertEachFails('R-RULE-01', [
     '<p>Precio de 3M: a cotizar</p><p>Respirador 3M 6200</p>', '<p>Los precios de 3M se confirman al cotizar. 12 modelos disponibles.</p>',
+    // Otra mención de la marca en la misma frase cuenta como cifra (límite escrito).
+    '<p>Precio de 3M: a cotizar, como todo 3M</p>',
   ]);
   // La marca escrita como la escribe (con su mayúscula y como palabra completa) es un nombre. «Los precios de 3M…» y
   // «Precio de 3M: a cotizar» fallaban en f37334b: son texto de marca y no dicen ningún precio (la única excepción a
@@ -1412,6 +1414,19 @@ test('R-RULE-10: las promesas en la voz del sitio, el singular con un plazo, má
   // reconocen.
   await assertNoneFails(['Te respondo mañana.', 'Te respondo al momento.', 'Te respondo rápido.', 'Respuesta rápida por WhatsApp.', 'Atención inmediata por WhatsApp.',
     'Te marcamos a la brevedad.', 'Lo estaremos contactando.', 'Te estamos contactando en breve.'].map(text => `<p>${text}</p>`));
+});
+
+test('R-RULE-10: miles de «respuesta» o «cotización» en una línea sin signos no hacen leer la línea entera desde cada una', async () => {
+  // La negación de la respuesta nombrada se busca hasta 150 caracteres atrás. Sin ese límite, dieciséis mil «cotización»
+  // seguidas (unos 180 KB sin un signo) tardaban unos 16 s, porque desde cada una se leía la línea hasta el principio.
+  for (const body of [`${'cotización '.repeat(20000)}`, `No ${'respuesta '.repeat(20000)}`]) {
+    const started = performance.now();
+    await scan({ 'pagina/index.html': page(`<p>${body}</p>`) });
+    assert.ok(performance.now() - started < 5000, `${body.slice(0, 12)}…: ${Math.round(performance.now() - started)} ms`);
+  }
+  // Una negación más lejana que eso en la misma frase no cuenta (límite escrito).
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>No ${'escribe la talla y la cantidad '.repeat(6)}respuesta en 24 horas.</p>`) })), ['R-RULE-10']);
+  assert.deepEqual(failures(await scan({ 'pagina/index.html': page(`<p>No ${'escribe la talla y la cantidad '.repeat(3)}respuesta en 24 horas.</p>`) })), []);
 });
 
 test('R-RULE-10: --rules nombra cada plazo del patrón, y sus ejemplos y límites hacen lo que dice', async () => {
