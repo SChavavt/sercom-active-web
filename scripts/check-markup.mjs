@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
 // (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
-// de un producto retirado) que se leen en el HTML y en las hojas de estilo, sin navegador.
+// de un producto retirado) y del aviso de arriba (que nada lo oculte), que se leen en el HTML y en las hojas de
+// estilo, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -180,6 +181,100 @@ export function cssSelectors(css) {
     }
   }
   return selectors;
+}
+/**
+ * Reglas de estilo de una hoja: sus selectores, sus declaraciones (sin los comentarios) y las reglas @ que la
+ * contienen, de fuera hacia dentro («@media print»). Las reglas de @keyframes y @font-face no son reglas de estilo.
+ * Una regla anidada dentro de otra lleva los selectores de las dos unidos («&» es el de fuera).
+ * @param {string} css
+ * @returns {{ selectors: string[], declarations: string, conditions: string[] }[]}
+ */
+export function cssRules(css) {
+  /** @type {{ selectors: string[], declarations: string, conditions: string[] }[]} */
+  const rules = [];
+  /** @type {({ at: string } | { rule: { selectors: string[], declarations: string, conditions: string[] } } | { skip: true })[]} */
+  const stack = [];
+  let buffer = '';
+  const top = () => stack[stack.length - 1];
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i];
+    if (char === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end === -1 ? css.length : end + 1;
+    } else if (char === '"' || char === "'") {
+      const end = stringEnd(css, i);
+      buffer += css.slice(i, end);
+      i = end - 1;
+    } else if (char === '\\') {
+      buffer += css.slice(i, i + 2);
+      i++;
+    } else if (char === '{') {
+      const current = top();
+      const prelude = (current && 'rule' in current ? buffer.slice(buffer.lastIndexOf(';') + 1) : buffer).trim();
+      if (current && 'rule' in current) current.rule.declarations += buffer.slice(0, buffer.lastIndexOf(';') + 1);
+      buffer = '';
+      if (prelude.startsWith('@')) {
+        stack.push(/^@(?:-\w+-)?(?:keyframes|font-face|counter-style|font-feature-values|property|page)\b/i.test(prelude) ? { skip: true } : { at: prelude.replace(/\s+/g, ' ') });
+      } else if (stack.some(entry => 'skip' in entry)) {
+        stack.push({ skip: true });
+      } else {
+        const parent = [...stack].reverse().find(entry => 'rule' in entry);
+        const own = splitSelectorList(prelude);
+        const selectors = parent && 'rule' in parent
+          ? parent.rule.selectors.flatMap(outer => own.map(inner => (inner.includes('&') ? inner.split('&').join(outer) : `${outer} ${inner}`)))
+          : own;
+        const rule = { selectors, declarations: '', conditions: stack.flatMap(entry => ('at' in entry ? [entry.at] : [])) };
+        rules.push(rule);
+        stack.push({ rule });
+      }
+    } else if (char === '}') {
+      const current = stack.pop();
+      if (current && 'rule' in current) current.rule.declarations += buffer;
+      buffer = '';
+    } else if (char === ';' && !(top() && 'rule' in top())) {
+      buffer = '';
+    } else {
+      buffer += char;
+    }
+  }
+  return rules;
+}
+/**
+ * Declaraciones de un bloque de estilo («color: red; display: none !important»), con el nombre en minúsculas y el
+ * valor sin «!important»; los escapes se resuelven y los comentarios se quitan.
+ * @param {string} block
+ */
+export function declarationsOf(block) {
+  const declarations = [];
+  let part = '';
+  const flush = () => {
+    const colon = part.indexOf(':');
+    if (colon > 0) {
+      const property = unescapeCss(part.slice(0, colon).trim()).toLowerCase();
+      const value = unescapeCss(part.slice(colon + 1)).replace(/!\s*important\s*$/i, '').trim();
+      declarations.push({ property, value });
+    }
+    part = '';
+  };
+  for (let i = 0; i < block.length; i++) {
+    if (block[i] === '/' && block[i + 1] === '*') {
+      const end = block.indexOf('*/', i + 2);
+      i = end === -1 ? block.length : end + 1;
+    } else if (block[i] === '"' || block[i] === "'") {
+      const end = stringEnd(block, i);
+      part += block.slice(i, end);
+      i = end - 1;
+    } else if (block[i] === '\\') {
+      part += block.slice(i, i + 2);
+      i++;
+    } else if (block[i] === ';') {
+      flush();
+    } else {
+      part += block[i];
+    }
+  }
+  flush();
+  return declarations;
 }
 /** Posición siguiente al cierre de la cadena que empieza en `start`. */
 function stringEnd(text, start) {
@@ -469,6 +564,69 @@ const linksWithText = (elements, text) => elements.filter(element => element.nam
 const actionsReading = (elements, text) => elements.filter(element => (element.name === 'a' || element.name === 'button') && reads(element, text));
 /** Una página es de retirado si es la de un producto y lleva el aviso. */
 export const isRetiredPage = page => isProductRoute(page.route) && retiredMarks(page).length > 0;
+
+// Aviso de arriba de la página (SiteNotice.astro): <aside class="site-notice"><p class="site-notice__text"><strong>…
+// al principio de <body>. Una prueba avisa si la plantilla deja de escribirlo así.
+export const NOTICE_MARKUP = { tag: 'aside', textTag: 'p', leadTag: 'strong', classes: ['site-notice', 'site-notice__text'] };
+// Elementos que, ocultos, ocultan el aviso: él, su texto, lo que va en el texto y lo que lo contiene (body, html).
+const NOTICE_SUBJECTS = [NOTICE_MARKUP.tag, NOTICE_MARKUP.textTag, NOTICE_MARKUP.leadTag, 'body', 'html'];
+const NOTICE_ANCESTORS = ['html', 'body', NOTICE_MARKUP.tag, NOTICE_MARKUP.textTag];
+/** ¿La declaración quita el elemento de la pantalla? display:none, visibility:hidden o collapse, content-visibility:hidden. */
+const hidesElement = ({ property, value }) => {
+  const keyword = value.toLowerCase();
+  return (property === 'display' && keyword === 'none') || (property === 'visibility' && (keyword === 'hidden' || keyword === 'collapse'))
+    || (property === 'content-visibility' && keyword === 'hidden');
+};
+/** ¿La regla solo se aplica al imprimir? Lo está si una de sus reglas @ es un @media cuyas consultas son todas de impresión. */
+const printOnly = conditions => conditions.some(condition => {
+  const media = /^@media\s+(.*)$/is.exec(condition);
+  return Boolean(media) && splitSelectorList(media[1]).every(query => /^(?:only\s+)?print\b/i.test(query.trim()));
+});
+/** Quita de un selector los argumentos de las seudoclases con paréntesis («:not(.js)» → «:not»), las cadenas y lo que va entre corchetes se conservan. */
+const withoutArguments = selector => {
+  let out = '';
+  let depth = 0;
+  for (let i = 0; i < selector.length; i++) {
+    const char = selector[i];
+    if (char === '"' || char === "'") { const end = stringEnd(selector, i); if (!depth) out += selector.slice(i, end); i = end - 1; }
+    else if (char === '\\') { if (!depth) out += selector.slice(i, i + 2); i++; }
+    else if (char === '(') depth++;
+    else if (char === ')') depth = Math.max(0, depth - 1);
+    else if (!depth) out += char;
+  }
+  return out;
+};
+/**
+ * ¿Un selector puede seleccionar el aviso, su texto o lo que lo contiene? Sí si nombra .site-notice o
+ * .site-notice__text (con «.», con un selector de atributo sobre class o con escapes, como U-07), o si no pide
+ * ninguna clase, id ni atributo y sus tipos son los del aviso y de lo que lo contiene («aside», «body > aside», «*»).
+ * Un selector que termina en un seudoelemento («::before») solo alcanza ese seudoelemento.
+ */
+function reachesNotice(selector) {
+  const bare = withoutArguments(selector);
+  const compounds = bare.trim().split(/\s*[>+~]\s*|\s+/).filter(Boolean);
+  const subject = compounds[compounds.length - 1] ?? '';
+  if (/::|:(?:before|after|first-line|first-letter)\b/i.test(subject)) return false;
+  const { classes, attributes } = readSelector(selector);
+  if (classes.some(name => NOTICE_MARKUP.classes.includes(name))) return true;
+  const target = { isWhole: word => NOTICE_MARKUP.classes.includes(word), names: NOTICE_MARKUP.classes };
+  if (attributes.some(attribute => attribute.name === 'class' && classAttributeCouldMatch(attribute, target))) return true;
+  if (/[.#[]/.test(bare)) return false;
+  const typeOf = compound => /^(?:(?:\*|[\w-]+)?\|)?([\w-]+|\*)?/.exec(compound)?.[1]?.toLowerCase() ?? '';
+  const fits = (compound, types) => ['', '*'].includes(typeOf(compound)) || types.includes(typeOf(compound));
+  return fits(subject, NOTICE_SUBJECTS) && compounds.slice(0, -1).every(compound => fits(compound, NOTICE_ANCESTORS));
+}
+/** Lo que oculta un elemento desde su marcado: hidden, popover, aria-hidden="true" o un estilo en línea que lo quita. */
+function hiddenByAttributes(element) {
+  const reasons = [];
+  if (element.attributes.has('hidden')) reasons.push('hidden');
+  if (element.attributes.has('popover')) reasons.push('popover');
+  if ((element.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') reasons.push('aria-hidden="true"');
+  for (const declaration of declarationsOf(element.attributes.get('style') ?? '')) {
+    if (hidesElement(declaration)) reasons.push(`style="${declaration.property}: ${declaration.value}"`);
+  }
+  return reasons;
+}
 
 /** @type {Check[]} */
 export const CHECKS = [
@@ -916,6 +1074,38 @@ export const CHECKS = [
       for (const svg of page.elements.filter(element => element.name === 'svg' && hasClass(element, 'icon'))) {
         const missing = ['width', 'height'].filter(key => !numeric(svg.attributes.get(key)));
         if (missing.length) problems.push(`${describe(svg)}${svg.parent ? ` dentro de ${describe(svg.parent)}` : ''} no lleva ${missing.map(key => `${key} numérico`).join(' ni ')}: sin la hoja de estilo crece al ancho de la página`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'I-04',
+    title: 'Nada oculta el aviso de arriba fuera de la impresión: ni hidden, popover, aria-hidden="true" o un estilo en línea en el aviso, su texto o lo que lo contiene, ni una regla de estilo que pueda seleccionarlos con display:none, visibility:hidden o collapse, o content-visibility:hidden',
+    // Que el aviso deba estar (y cuál) lo decide scripts/scan-dist.mjs, que conoce --launch; aquí solo se revisa que,
+    // si está, nada lo oculte. Un texto que se lee sin navegador no ve una hoja de estilo: por eso esta comprobación.
+    page(page) {
+      const problems = [];
+      const reported = new Set();
+      for (const notice of page.elements.filter(element => classesOf(element).some(name => NOTICE_MARKUP.classes.includes(name)))) {
+        for (let element = notice; element && element.name !== '#document'; element = element.parent) {
+          const reasons = hiddenByAttributes(element);
+          if (!reasons.length || reported.has(element)) continue;
+          reported.add(element);
+          problems.push(`${describe(element)}${element === notice ? '' : `, que contiene ${describe(notice)},`} lleva ${reasons.join(', ')}: oculta el aviso de arriba`);
+        }
+      }
+      return problems;
+    },
+    sheet(sheet) {
+      const problems = [];
+      for (const rule of cssRules(sheet.css)) {
+        if (printOnly(rule.conditions)) continue;
+        const hiding = declarationsOf(rule.declarations).filter(hidesElement);
+        if (!hiding.length) continue;
+        for (const selector of rule.selectors.filter(reachesNotice)) {
+          const where = rule.conditions.length ? ` (dentro de ${rule.conditions.join(' › ')})` : '';
+          problems.push(`la regla «${selector}»${where} lleva ${hiding.map(({ property, value }) => `${property}: ${value}`).join(', ')}: oculta el aviso de arriba (puede seleccionarlo a él, a su texto o a lo que lo contiene); solo se permite dentro de @media print`);
+        }
       }
       return problems;
     },
