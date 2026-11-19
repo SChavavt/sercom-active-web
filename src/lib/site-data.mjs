@@ -50,6 +50,9 @@ export const {
   getCategory,
   getBrand,
   getProduct,
+  /** Productos retirados que fueron públicos: su página informativa, en la misma dirección. No están en `products`. */
+  retiredProducts,
+  getRetiredProduct,
   productsByCategory,
   productsByBrand,
   featuredProducts,

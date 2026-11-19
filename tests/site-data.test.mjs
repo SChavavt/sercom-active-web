@@ -246,7 +246,7 @@ test('textos fijos de la vista previa', () => {
 
 // --- Módulo de entrada que usan las páginas -----------------------------------------------------------------
 // Astro define la constante __CATALOG_PREVIEW__ al compilar; aquí se define a mano antes de cargar el módulo.
-const EXPORTS = ['EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'routes'];
+const EXPORTS = ['EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
 
 test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', async () => {
   globalThis.__CATALOG_PREVIEW__ = false;
@@ -260,6 +260,7 @@ test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', as
   assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
   assert.deepEqual(site.featuredProducts(), []);
   assert.equal(site.getProduct('ejemplo-orejera'), undefined);
+  assert.deepEqual(site.retiredProducts, []);
 });
 
 test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async () => {
@@ -277,6 +278,7 @@ test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async ()
   assert.deepEqual(site.productsByCategory('soldadura').map(product => product.code), ['EJ-1101']);
   assert.equal(site.featuredProducts(3).length, 3);
   assert.equal(site.routes.catalog, '/catalogo/');
+  assert.deepEqual(site.retiredProducts, []);
 });
 
 test('site-data.mjs no se puede cargar en un navegador ni fuera de una compilación', async () => {

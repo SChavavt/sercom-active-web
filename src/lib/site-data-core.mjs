@@ -4,9 +4,9 @@
 // Las páginas no usan este módulo directamente: importan `site-data.mjs`.
 /**
  * @import { Catalog } from '../types/catalog.ts'
- * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, SiteData, SiteSources } from '../types/site.ts'
+ * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { getPublishedProducts, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { getPublishedProducts, getRetiredProducts, mentionsExcludedBrand } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { normalizeText } from './text.mjs';
 
@@ -52,7 +52,8 @@ const hasWord = (/** @type {string} */ haystack, /** @type {string} */ needle) =
 
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks'];
 const LINK_KEYS = ['label', 'url'];
-const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants'];
+// `retired: true` marca el ejemplo de producto retirado: tiene su página, pero no entra en ningún listado.
+const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants', 'retired'];
 const VARIANT_KEYS = ['id', 'label', 'code'];
 /** Tipos de recurso del registro que nunca se publican como enlace. */
 const BLOCKED_RESOURCE_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];
@@ -146,7 +147,7 @@ export function crossCheckBrands(brands, registry) {
 /**
  * Valida los productos de ejemplo de la vista previa. Deben ser inconfundibles con fichas reales:
  * identificador «ejemplo-…», código «EJ-0000», nombre con «de ejemplo», marca «Marca de ejemplo»
- * y ninguna mención de una marca real.
+ * y ninguna mención de una marca real. `retired: true` marca un ejemplo retirado; sus demás reglas no cambian.
  * @param {unknown} examples Contenido de `src/data/preview/example-products.json`.
  * @param {{ categoryIds: readonly string[], brands: readonly Pick<BrandRecord, 'id' | 'name'>[] }} context
  * @returns {string[]} Errores; lista vacía si todo es correcto.
@@ -174,6 +175,7 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     codes.add(example.code);
     if (!isText(example.name) || !hasWord(normalizeText(example.name), 'de ejemplo')) errors.push(`${path}: el nombre debe contener «de ejemplo».`);
     if (example.brandName !== EXAMPLE_BRAND_NAME) errors.push(`${path}: la marca debe ser «${EXAMPLE_BRAND_NAME}».`);
+    if ('retired' in example && typeof example.retired !== 'boolean') errors.push(`${path}: retired debe ser true o false.`);
     if (!Array.isArray(example.categoryIds) || example.categoryIds.length === 0 || example.categoryIds.some(id => !categoryIds.includes(id))) {
       errors.push(`${path}: faltan categorías existentes.`);
     }
@@ -227,7 +229,10 @@ function failOn(errors) {
  *
  * - Los productos reales entran únicamente por `getPublishedProducts`, que valida el catálogo completo
  *   y entrega solo los campos públicos de las fichas aprobadas.
+ * - Los productos retirados que fueron públicos (`getRetiredProducts`) van en su propia colección,
+ *   `retiredProducts`, con solo lo que los identifica: ningún listado, conteo, búsqueda ni selección los incluye.
  * - Los productos de ejemplo solo existen en modo `preview`; en `production` se ignoran aunque se entreguen.
+ *   Un ejemplo con `retired: true` va a `retiredProducts`, nunca a `products`.
  * - El alcance de marcas sale de `brands.json` (el validador comprueba que coincide con el registro de investigación).
  *
  * Todo lo que devuelve está congelado: para ordenar o filtrar, copia antes (`[...products]`).
@@ -242,6 +247,7 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
   const brandRecords = /** @type {BrandRecord[]} */ (brands);
   const brandScope = { sources: brandRecords.map(brand => ({ entity_id: brand.id, name: brand.name, entity_type: brand.kind })) };
   const published = getPublishedProducts(catalog, brandScope);
+  const retiredRecords = getRetiredProducts(catalog, brandScope);
   const editorial = /** @type {Catalog} */ (catalog);
 
   const visibleCategories = editorial.categories.filter(category => category.status === 'approved' || (isPreview && category.status === 'draft'));
@@ -250,9 +256,13 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
 
   /** @type {ExampleProductRecord[]} */
   let examples = [];
+  /** @type {ExampleProductRecord[]} */
+  let retiredExamples = [];
   if (isPreview) {
     failOn(validateExampleProducts(exampleProducts, { categoryIds: editorial.categories.map(category => category.id), brands: brandRecords }));
-    examples = /** @type {ExampleProductRecord[]} */ (exampleProducts);
+    const all = /** @type {ExampleProductRecord[]} */ (exampleProducts);
+    examples = all.filter(example => example.retired !== true);
+    retiredExamples = all.filter(example => example.retired === true);
   }
 
   /** @param {string} productId @param {readonly string[]} ids */
@@ -305,6 +315,34 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
   ];
   const productById = new Map(products.map(product => [product.id, product]));
   if (productById.size !== products.length) throw new Error('Hay identificadores de producto repetidos entre el catálogo y los ejemplos.');
+
+  // Retirados: solo identificación y las categorías públicas en este modo (pueden quedar sin ninguna).
+  /** @param {readonly string[]} ids */
+  const publicCategoryIds = ids => ids.filter(id => categoryNames.has(id));
+  /** @type {PublicRetiredProduct[]} */
+  const retiredProducts = [
+    ...retiredRecords.map(record => {
+      const brandName = brandNames.get(record.brandId);
+      if (brandName === undefined) throw new Error(`${record.id}: la marca «${record.brandId}» no está en la lista pública de marcas.`);
+      const ids = publicCategoryIds(record.categoryIds);
+      return {
+        id: record.id, url: routes.product(record.id), name: record.name, brandId: record.brandId, brandName, code: record.model,
+        categoryIds: ids, categoryNames: namesOf(record.id, ids), isExample: false,
+      };
+    }),
+    ...retiredExamples.map(example => {
+      const ids = publicCategoryIds(example.categoryIds);
+      return {
+        id: example.id, url: routes.product(example.id), name: example.name, brandId: null, brandName: EXAMPLE_BRAND_NAME, code: example.code,
+        categoryIds: ids, categoryNames: namesOf(example.id, ids), isExample: true,
+      };
+    }),
+  ];
+  const retiredById = new Map(retiredProducts.map(product => [product.id, product]));
+  // Una dirección es de un producto o de un retirado, nunca de los dos.
+  if (retiredById.size !== retiredProducts.length || retiredProducts.some(product => productById.has(product.id))) {
+    throw new Error('Hay identificadores repetidos entre los productos y los retirados.');
+  }
 
   /** @param {string} id */
   const productsByCategory = id => products.filter(product => product.categoryIds.includes(id));
@@ -365,6 +403,8 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
     getCategory: id => categoryById.get(id),
     getBrand: id => brandById.get(id),
     getProduct: id => productById.get(id),
+    retiredProducts: deepFreeze(retiredProducts),
+    getRetiredProduct: id => retiredById.get(id),
     productsByCategory,
     productsByBrand,
     featuredProducts,
