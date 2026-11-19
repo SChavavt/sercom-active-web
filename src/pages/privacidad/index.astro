@@ -6,12 +6,13 @@
 // cotización del paso 2 (guarda datos en el navegador) o cualquier medición.
 // Textos: brief de páginas «atencion», sección 4. Se ve igual en los dos modos.
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import EmailAddress from '../../components/EmailAddress.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import { contactDetails, mailtoUrl } from '../../lib/contact.mjs';
 import { routes } from '../../lib/site-data.mjs';
 import '../../styles/pages/atencion.css';
 
-const { businessName, email } = contactDetails;
+const { businessName } = contactDetails;
 ---
 <BaseLayout title="Privacidad" description="Qué datos pide este sitio y qué pasa con lo que nos envías por WhatsApp o por correo.">
   <PageHeader
@@ -34,7 +35,7 @@ const { businessName, email } = contactDetails;
     </div>
     <div class="privacidad__row grid12">
       <dt class="privacidad__key cell span-4">Dudas sobre tus datos</dt>
-      <dd class="privacidad__value cell span-8"><p>Escríbenos a <a class="privacidad__link" href={mailtoUrl()}>{email}</a>.</p></dd>
+      <dd class="privacidad__value cell span-8"><p>Escríbenos a <a class="privacidad__link" href={mailtoUrl()}><EmailAddress /></a>.</p></dd>
     </div>
   </dl>
 </BaseLayout>

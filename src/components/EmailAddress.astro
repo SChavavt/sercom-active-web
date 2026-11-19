@@ -1,0 +1,13 @@
+---
+// Dirección de correo de contacto como texto (`.email`), tomada de contactDetails. Solo puede partirse justo
+// después de «@» («ventas.puebla@» / «sercomactive.com»): cada parte va sin cortes (`.email__part`, nowrap) y
+// entre las dos hay un <wbr>. Así nunca se lee un dominio a medias («…sercomactive.co» + «m»).
+// Va dentro del enlace mailto; el destino del enlace no cambia. No la usa la franja de servicio del encabezado.
+//
+// Uso:  <a href={contactLinks.general().mailto}><EmailAddress /></a>
+import { contactDetails } from '../lib/contact.mjs';
+
+const { email } = contactDetails;
+const at = email.lastIndexOf('@') + 1;
+---
+<span class="email"><span class="email__part">{email.slice(0, at)}</span><wbr /><span class="email__part">{email.slice(at)}</span></span>

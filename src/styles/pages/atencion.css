@@ -92,6 +92,8 @@
 .privacidad__value p { max-width: 64ch; }
 .privacidad__link { color: var(--blue); font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; overflow-wrap: anywhere; }
 .privacidad__link:hover { text-decoration-thickness: 2px; }
+/* La dirección pasa entera al renglón siguiente si cabe ahí; solo si no cabe se parte después de «@» */
+.privacidad__link .email { display: inline-block; text-decoration: inherit; }
 
 @media (max-width: 1099px) {
   .privacidad__link { padding-block: 13px; }        /* objetivo táctil de 44 px sin cambiar el renglón */

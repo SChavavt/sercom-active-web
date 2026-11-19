@@ -463,6 +463,9 @@
 .data__link .icon { color: var(--blue); }
 .data__link:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
 
+/* Dirección de correo (EmailAddress): solo se parte justo después de «@» */
+.email__part { white-space: nowrap; }
+
 /* 4.13 Pasos ----------------------------------------------------------------- */
 .step { position: relative; display: flex; flex-direction: column; gap: var(--s-7); min-height: 216px; padding: var(--s-7) var(--pad) var(--s-8); background: var(--surface); }
 .step__num {
