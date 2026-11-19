@@ -331,7 +331,24 @@
   .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
 }
 
-/* 6.6 Movimiento e impresión */
+/* 6.6 Columnas por ancho: una celda con `span-8 span-md-12 span-sm-12` ocupa 8 columnas en computadora
+   y toda la fila en tableta y celular. Sirven a las páginas nuevas sin tocar estos archivos. */
+@media (max-width: 1099px) {
+  .span-md-2 { grid-column: span 2; }
+  .span-md-3 { grid-column: span 3; }
+  .span-md-4 { grid-column: span 4; }
+  .span-md-6 { grid-column: span 6; }
+  .span-md-8 { grid-column: span 8; }
+  .span-md-12 { grid-column: span 12; }
+}
+@media (max-width: 699px) {
+  .span-sm-3 { grid-column: span 3; }
+  .span-sm-4 { grid-column: span 4; }
+  .span-sm-6 { grid-column: span 6; }
+  .span-sm-12 { grid-column: span 12; }
+}
+
+/* 6.7 Movimiento e impresión */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
