@@ -558,8 +558,11 @@ const contactLiterals = (text, record = business) => {
   return contactPatterns(record).filter(([, pattern]) => pattern.test(code)).map(([label]) => label);
 };
 
+// Los valores de business.json con los que se escribieron los casos (los de la revisión): los casos usan este registro,
+// no el archivo, para que un cambio de contacto no los rompa.
+const REVIEWED_CONTACT = { contactName: 'Yosmara del Rocío Torres Pérez', contactFirstName: 'Yosmara', email: 'ventas.puebla@sercomactive.com', whatsappDisplay: '+52 1 221 400 2219', whatsappDigits: '5212214002219' };
+
 test('ninguna página, componente, plantilla ni módulo lleva escritos los datos de contacto de business.json', () => {
-  assert.equal(business.contactFirstName, 'Yosmara');
   const misuse = [
     // La de la revisión: el nombre escrito en la página de contacto.
     ['<p class="atiende">Te atiende Yosmara del Rocío Torres Pérez.</p>', ['nombre', 'nombre de pila']],
@@ -573,15 +576,15 @@ test('ninguna página, componente, plantilla ni módulo lleva escritos los datos
     ['<p>Llámanos al (221) 400-2219.</p>', ['cifras del teléfono']],
     ['<a href="tel:2214002219">Teléfono</a>', ['cifras del teléfono']],
   ];
-  for (const [code, labels] of misuse) assert.deepEqual(contactLiterals(code), labels, code);
+  for (const [code, labels] of misuse) assert.deepEqual(contactLiterals(code, REVIEWED_CONTACT), labels, code);
   const harmless = [
     '---\n// Saluda a Yosmara del Rocío Torres Pérez con los datos de business.json (ventas.puebla@sercomactive.com).\nimport { contactDetails } from \'../lib/contact.mjs\';\n---\n<!-- +52 1 221 400 2219 -->',
     '<p>Te atiende {contactDetails.name}.</p><a href={contactLinks.whatsapp}>{contactDetails.whatsappDisplay}</a>',
     '<p>Modelo 2214002218, talla 9.</p>', '<p>Los Yosmarales</p>',
   ];
-  for (const code of harmless) assert.deepEqual(contactLiterals(code), [], code);
+  for (const code of harmless) assert.deepEqual(contactLiterals(code, REVIEWED_CONTACT), [], code);
   // Un nombre de pila que también es una palabra común: en minúsculas no cuenta; con mayúscula, sí.
-  const rosa = { ...business, contactName: 'Rosa María López Ruiz', contactFirstName: 'Rosa' };
+  const rosa = { ...REVIEWED_CONTACT, contactName: 'Rosa María López Ruiz', contactFirstName: 'Rosa' };
   assert.deepEqual(contactLiterals('<p>Guante de nitrilo color rosa.</p>', rosa), []);
   assert.deepEqual(contactLiterals('<p>Rosa revisa opciones contigo.</p>', rosa), ['nombre de pila']);
 
