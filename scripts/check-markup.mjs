@@ -194,6 +194,52 @@ function headerParts(page) {
   };
 }
 
+/**
+ * Entradas de la cabecera y de la barra fija que pueden marcar la ubicación actual, con su clave:
+ * «nav:/marcas/» (enlace de la navegación), «nav:categorias» (el resumen Categorías), «cat:/categorias/manos/»
+ * (categoría del panel; «cat:todo» es «Ver todo el catálogo»), «cta» (bloque «Cotizar mi lista»), «dock:/cotizar/»
+ * (enlace de la barra fija) y «logo».
+ * @param {Page} page
+ */
+function locationEntries(page, parts) {
+  const entries = [];
+  const add = (key, element) => entries.push({ key, element, value: element.attributes.get('aria-current') ?? null, label: textOf(element) || key });
+  for (const element of parts.elements) {
+    if (parts.menu && closest(element, node => node === parts.menu)) {
+      if (element.name === 'summary') add('nav:categorias', element);
+      else if (element.name === 'a' && hasClass(element, 'catpanel__link')) add(hasClass(element, 'catpanel__link--all') ? 'cat:todo' : `cat:${element.attributes.get('href')}`, element);
+      else if (element.name === 'a') add(`nav:${element.attributes.get('href')}`, element);
+    } else if (hasClass(element, 'masthead__cta')) add('cta', element);
+    else if (hasClass(element, 'masthead__logo')) add('logo', element);
+    else if (element.attributes.has('aria-current')) add(`otro:${describe(element)}`, element);
+  }
+  const dock = page.elements.find(element => element.name === 'nav' && hasClass(element, 'dock'));
+  if (dock) for (const element of allElements(dock)) if (element.name === 'a') add(`dock:${element.attributes.get('href')}`, element);
+  return { entries, dock };
+}
+
+/** Prefijo de las rutas con parámetro («/marcas/»), sacado de `routes` para no escribir las rutas aquí. */
+const prefix = make => make('').slice(0, -1);
+
+/**
+ * Qué entradas deben marcar la ubicación en una ruta, y con qué valor. Las que no aparecen no se marcan.
+ * @param {string} route
+ * @returns {Record<string, 'page' | 'true'>}
+ */
+export function expectedLocation(route) {
+  const path = route.split(/[?#]/)[0];
+  const inside = make => path.startsWith(prefix(make)) && path.length > prefix(make).length;
+  if (path === routes.home) return { logo: 'page' };
+  if (path === routes.catalog) return { [`nav:${routes.catalog}`]: 'page' };
+  if (path === routes.brands) return { [`nav:${routes.brands}`]: 'page' };
+  if (path === routes.contact) return { [`nav:${routes.contact}`]: 'page' };
+  if (path === routes.quoteList) return { [`nav:${routes.quoteList}`]: 'page', cta: 'page', [`dock:${routes.quoteList}`]: 'page' };
+  if (inside(routes.brand)) return { [`nav:${routes.brands}`]: 'true' };
+  if (inside(routes.category)) return { 'nav:categorias': 'true', [`cat:${path}`]: 'page' };
+  if (inside(routes.product)) return { [`nav:${routes.catalog}`]: 'true' };
+  return {};
+}
+
 /** @type {Check[]} */
 export const CHECKS = [
   {
@@ -230,6 +276,27 @@ export const CHECKS = [
       const present = sequence.filter(([, element]) => element);
       for (let i = 1; i < present.length; i++) {
         if (present[i][1].order < present[i - 1][1].order) problems.push(`${present[i][0]} está antes que ${present[i - 1][0]}: el orden de computadora es logotipo, navegación, búsqueda, WhatsApp, Cotizar mi lista`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'U-05',
+    title: 'La cabecera y la barra fija marcan la ubicación actual con aria-current según la ruta, y nada más lleva la marca',
+    page(page) {
+      const parts = headerParts(page);
+      if (!parts) return ['la página no tiene la cabecera del sitio (<header class="site-header">)'];
+      const { entries, dock } = locationEntries(page, parts);
+      const want = expectedLocation(page.route);
+      const problems = [];
+      if (!dock) problems.push('falta la barra fija (<nav class="dock">)');
+      for (const [key, value] of Object.entries(want)) {
+        const found = entries.filter(entry => entry.key === key);
+        if (!found.length) problems.push(`falta la entrada ${key} que debe marcar la ubicación (aria-current="${value}")`);
+        for (const entry of found) if (entry.value !== value) problems.push(`«${entry.label}» (${key}) debe llevar aria-current="${value}" y lleva ${entry.value === null ? 'nada' : `aria-current="${entry.value}"`}`);
+      }
+      for (const entry of entries) {
+        if (entry.value !== null && !(entry.key in want)) problems.push(`«${entry.label}» (${entry.key}) lleva aria-current="${entry.value}" y no le corresponde en ${page.route}`);
       }
       return problems;
     },

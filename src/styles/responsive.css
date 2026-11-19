@@ -88,8 +88,10 @@
   .nav__link { justify-content: space-between; min-height: 60px; padding: 0 var(--pad); font-size: 1.125rem; }
   .nav__link::after { display: none; }
   .nav__link:hover { background: var(--surface-tint); }
+  .nav__link[aria-current] { box-shadow: inset 4px 0 var(--blue); font-weight: 700; }      /* fila actual: barra azul a la izquierda y peso */
   .nav__cat { display: block; }
   .nav__cat[open] > .nav__link { box-shadow: 0 var(--line) 0 var(--rule); }
+  .nav__cat[open] > .nav__link[aria-current] { box-shadow: inset 4px 0 var(--blue), 0 var(--line) 0 var(--rule); }
   .catpanel { position: static; margin: 0; padding: var(--line) 0 0; box-shadow: none; }
   .catpanel__list > li { grid-column: span 6; }
   .catpanel__list > .catpanel__all { grid-column: span 12; }
@@ -299,6 +301,8 @@
   .dock__link--wa { background: var(--blue); color: var(--white); }
   .dock__link--wa .icon { color: var(--white); }
   .dock__link:focus-visible { outline-offset: -3px; }
+  .dock__link[aria-current="page"] { position: relative; }
+  .dock__link[aria-current="page"]::after { content: ""; position: absolute; left: var(--s-3); right: var(--s-3); bottom: 0; height: 4px; background: var(--blue); }   /* en /cotizar/, como la barra bajo el enlace actual */
   .dock__link--wa:focus-visible { outline-color: var(--white); }
 }
 

@@ -5,7 +5,8 @@
 // Lo que depende de los datos se decide aquí, nunca con un interruptor escrito a mano:
 //   - sin categorías públicas (producción hoy) no hay entrada «Categorías» ni panel;
 //   - sin productos públicos no hay campo de búsqueda ni botón Buscar.
-// La página actual se marca con aria-current="page" (y "true" en su sección, por ejemplo una marca).
+// La página actual se marca con aria-current="page" (y "true" en su sección: una marca en «Marcas», una categoría
+// en «Categorías», una ficha en «Catálogo»); la marca se ve a todos los anchos (ver components.css y responsive.css).
 // El script es mejora progresiva: sin JavaScript la navegación y la búsqueda quedan visibles y
 // «Categorías» funciona como <details> nativo.
 import logo from '../assets/brand/logo.svg';
@@ -20,10 +21,13 @@ const hasCategories = categories.length > 0;
 const hasSearch = products.length > 0;
 const whatsapp = contactLinks.general().whatsapp;
 
+// Prefijo de las fichas de producto («/productos/»): una ficha está dentro de la sección Catálogo.
+const inProducts = path.startsWith(routes.product('').slice(0, -1));
 /** aria-current para un enlace: "page" en su propia página, "true" dentro de su sección. */
 function current(href: string): 'page' | 'true' | undefined {
   if (path === href) return 'page';
   if (href !== routes.home && path.startsWith(href)) return 'true';
+  if (href === routes.catalog && inProducts) return 'true';
   return undefined;
 }
 // Prefijo de las páginas de categoría («/categorias/»), sacado de routes para no escribir la ruta aquí.

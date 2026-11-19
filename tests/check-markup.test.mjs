@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { checkMarkup, cssSelectors, parseHtml, routeOf, selectorClasses } from '../scripts/check-markup.mjs';
+import { checkMarkup, cssSelectors, expectedLocation, parseHtml, routeOf, selectorClasses } from '../scripts/check-markup.mjs';
 import { makeTree, removeTree, ROOT } from './helpers.mjs';
 
 // ---------------------------------------------------------------------------------------------------
@@ -151,6 +151,60 @@ test('U-03: un botón después de su panel, o un orden de computadora distinto, 
   assert.equal((await check({ 'pagina/index.html': page({ order: ['logo', 'menuButton', 'nav', 'form', 'wa', 'cta'] }) }, { ids: ['U-03'] })).length, 1);
   assert.equal((await check({ 'pagina/index.html': page({ search: false }) }, { ids: ['U-03'] })).length, 1);
   assert.equal((await check({ 'pagina/index.html': '<!doctype html><html><body><main>Sin cabecera</main></body></html>' }, { ids: ['U-03'] })).length, 1);
+});
+
+// ---------------------------------------------------------------------------------------------------
+// U-05: ubicación actual
+// ---------------------------------------------------------------------------------------------------
+
+// Cada ruta con sus marcas correctas.
+const LOCATIONS = {
+  'index.html': { logo: 'page' },
+  'catalogo/index.html': { 'nav:/catalogo/': 'page' },
+  'marcas/index.html': { 'nav:/marcas/': 'page' },
+  'marcas/ansell/index.html': { 'nav:/marcas/': 'true' },
+  'categorias/manos/index.html': { 'nav:categorias': 'true', 'cat:/categorias/manos/': 'page' },
+  'productos/guante/index.html': { 'nav:/catalogo/': 'true' },
+  'cotizar/index.html': { 'nav:/cotizar/': 'page', cta: 'page', 'dock:/cotizar/': 'page' },
+  'contacto/index.html': { 'nav:/contacto/': 'page' },
+  'solicitud-especial/index.html': {},
+  'privacidad/index.html': {},
+  '404.html': {},
+};
+
+test('U-05: las marcas esperadas salen de la ruta', () => {
+  for (const [file, marks] of Object.entries(LOCATIONS)) assert.deepEqual(expectedLocation(routeOf(file)), marks, file);
+  assert.deepEqual(expectedLocation('/catalogo/?q=guante'), { 'nav:/catalogo/': 'page' });
+});
+
+test('U-05: cada ruta con exactamente sus marcas pasa', async () => {
+  const files = Object.fromEntries(Object.entries(LOCATIONS).map(([file, marks]) => [file, page({ marks })]));
+  assert.deepEqual(await check(files, { ids: ['U-05'] }), []);
+});
+
+test('U-05: una marca que falta, sobra o lleva otro valor falla', async () => {
+  const cases = [
+    // Lo que hacía la cabecera antes de la corrección: la ficha no marcaba Catálogo y la barra fija no marcaba nada.
+    ['productos/guante/index.html', {}],
+    ['cotizar/index.html', { 'nav:/cotizar/': 'page', cta: 'page' }],
+    ['marcas/ansell/index.html', { 'nav:/marcas/': 'page' }],
+    ['categorias/manos/index.html', { 'nav:categorias': 'true' }],
+    ['categorias/manos/index.html', { 'nav:categorias': 'true', 'cat:/categorias/manos/': 'page', 'cat:/categorias/cabeza/': 'page' }],
+    ['catalogo/index.html', { 'nav:/catalogo/': 'page', 'cat:todo': 'page' }],
+    ['solicitud-especial/index.html', { 'nav:/contacto/': 'page' }],
+    ['404.html', { logo: 'page' }],
+    ['index.html', { logo: 'page', 'nav:/catalogo/': 'true' }],
+    ['contacto/index.html', { 'nav:/contacto/': 'page', 'dock:/cotizar/': 'page' }],
+  ];
+  for (const [file, marks] of cases) {
+    const problems = await check({ [file]: page({ marks }) }, { ids: ['U-05'] });
+    assert.equal(problems.length, 1, `${file} ${JSON.stringify(marks)} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+    assert.equal(problems[0].file, file);
+  }
+  // La entrada que debe marcarse no existe (sin Categorías en una página de categoría), o falta la barra fija.
+  assert.equal((await check({ 'categorias/manos/index.html': page({ categories: false, marks: {} }) }, { ids: ['U-05'] })).length, 2);
+  const withoutDock = page({ marks: { 'nav:/contacto/': 'page' } }).replace(/<nav class="dock"[\s\S]*?<\/nav>/, '');
+  assert.equal((await check({ 'contacto/index.html': withoutDock }, { ids: ['U-05'] })).length, 1);
 });
 
 // ---------------------------------------------------------------------------------------------------
