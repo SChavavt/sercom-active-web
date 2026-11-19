@@ -101,6 +101,7 @@
   .catpanel__list > li { grid-column: span 6; }
   .catpanel__list > .catpanel__all { grid-column: span 12; }
   .catpanel__link { min-height: 60px; padding-inline: var(--pad); }
+  .catpanel__link > span { max-width: calc(100% - 28px - var(--s-3) + var(--pad)); }      /* hasta el borde de la celda, como en computadora */
   .masthead__search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
   .masthead__search-input { font-size: 1rem; }
   .masthead__search-btn { width: 48px; height: 48px; }

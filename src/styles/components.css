@@ -121,7 +121,10 @@
   text-decoration: none;
 }
 .catpanel__link .icon { color: var(--blue); }
-.catpanel__link > span { min-width: 0; overflow-wrap: anywhere; }     /* una palabra larga se parte antes que salir de su celda */
+/* Una palabra que no cabe puede ocupar el relleno derecho; si tampoco cabe ahí, se parte antes que salir de su celda
+   (con texto espaciado). El tope solo baja el mínimo de una palabra más ancha que ese espacio: con el texto normal
+   las líneas no cambian. 28px + gap: el icono de la categoría. */
+.catpanel__link > span { max-width: calc(100% - 28px - var(--s-3) + var(--s-5)); overflow-wrap: break-word; }
 .catpanel__link:hover { background: var(--surface-tint); }
 .catpanel__link--all { justify-content: space-between; padding-inline: var(--pad); background: var(--surface-tint); }
 .catpanel__link--all:hover { background: var(--blue-100); }
