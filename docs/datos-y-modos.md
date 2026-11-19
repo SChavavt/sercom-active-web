@@ -57,7 +57,7 @@ Otros usos: `npx astro dev` abre el servidor de desarrollo en modo producción; 
 | Módulo | Dónde se usa | Qué ofrece |
 | --- | --- | --- |
 | `src/lib/site-data.mjs` | Solo al compilar (encabezado de archivos `.astro`) | `mode`, `isPreview`, `categories`, `brands`, `products`, `paths`, `getCategory`, `getBrand`, `getProduct`, `productsByCategory`, `productsByBrand`, `featuredProducts`, `routes`, `PREVIEW_NOTICE`, `EXAMPLE_TAG` |
-| `src/lib/contact.mjs` | Solo al compilar | `whatsappUrl`, `mailtoUrl`, `messages`, `subjects`, `contactLinks`, `absoluteUrl` |
+| `src/lib/contact.mjs` | Solo al compilar | `whatsappUrl`, `mailtoUrl`, `messages`, `subjects`, `contactLinks`, `absoluteUrl`, `contactDetails` (nombre, ubicación, contacto, iniciales, correo, WhatsApp visible y horarios; sin domicilio) |
 | `src/lib/routes.mjs`, `search.mjs`, `text.mjs`, `contact-core.mjs` | También en scripts de navegador | Rutas, búsqueda, normalización de texto, `withPageLink` y `withRequestDescription` |
 
 Un `<script>` de navegador no importa `site-data.mjs`, `contact.mjs` ni archivos `.json`: llevaría los datos completos al JavaScript público. Los dos módulos se niegan a ejecutarse en un navegador, una prueba lo vigila y el escáner lo detecta en la salida.
