@@ -34,11 +34,12 @@ const decodeEntities = text => text
   .replace(/&amp;/g, '&');
 
 /**
- * @typedef {{ name: string, attributes: Map<string, string>, children: Element[], parent: Element | null, text: string[], order: number }} Element
+ * @typedef {{ name: string, attributes: Map<string, string>, children: Element[], parent: Element | null, text: string[], content: (string | Element)[], order: number }} Element
  */
 
 /**
- * Árbol de elementos de un documento. Cada elemento lleva su orden en el documento (`order`) y su texto directo.
+ * Árbol de elementos de un documento. Cada elemento lleva su orden en el documento (`order`), su texto directo
+ * (`text`) y su contenido tal como se lee (`content`: el texto directo y los elementos hijos, en su orden).
  * El contenido de <script>, <style>, <textarea> y <title> no se interpreta. Las hojas <style> se devuelven aparte.
  * @param {string} source
  */
@@ -46,17 +47,23 @@ export function parseHtml(source) {
   const html = source.replace(/<!--[\s\S]*?-->/g, '');
   const lower = html.toLowerCase();
   /** @type {Element} */
-  const root = { name: '#document', attributes: new Map(), children: [], parent: null, text: [], order: 0 };
+  const root = { name: '#document', attributes: new Map(), children: [], parent: null, text: [], content: [], order: 0 };
   /** @type {string[]} */
   const styles = [];
   let current = root;
   let order = 0;
+  /** Anota un texto en su elemento: en el texto directo y, en su lugar, en el contenido. */
+  const addText = (element, raw) => {
+    const text = decodeEntities(raw);
+    element.text.push(text);
+    element.content.push(text);
+  };
   const tag = /<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)/g;
   let last = 0;
   let match;
   while ((match = tag.exec(html))) {
     const between = html.slice(last, match.index);
-    if (between.trim()) current.text.push(decodeEntities(between));
+    if (between.trim()) addText(current, between);
     const [, closing, rawName] = match;
     const name = rawName.toLowerCase();
     if (closing) {
@@ -82,13 +89,14 @@ export function parseHtml(source) {
     const selfClosing = end > 0 && html[end - 1] === '/';
     let next = end === -1 ? html.length : end + 1;
     /** @type {Element} */
-    const element = { name, attributes, children: [], parent: current, text: [], order: ++order };
+    const element = { name, attributes, children: [], parent: current, text: [], content: [], order: ++order };
     current.children.push(element);
+    current.content.push(element);
     if (RAW_TEXT.has(name)) {
       const close = lower.indexOf(`</${name}`, next);
       const content = html.slice(next, close === -1 ? html.length : close);
       if (name === 'style') styles.push(content);
-      else if (name !== 'script') element.text.push(decodeEntities(content));
+      else if (name !== 'script') addText(element, content);
       const closeEnd = close === -1 ? html.length : html.indexOf('>', close) + 1;
       next = closeEnd || html.length;
     } else if (!VOID.has(name) && !selfClosing) {
@@ -108,7 +116,8 @@ export function allElements(node) {
 }
 export const classesOf = element => (element.attributes.get('class') ?? '').split(/\s+/).filter(Boolean);
 export const hasClass = (element, name) => classesOf(element).includes(name);
-export const textOf = element => [...element.text, ...element.children.map(textOf)].join(' ').replace(/\s+/g, ' ').trim();
+/** El texto de un elemento como se lee: el suyo y el de sus hijos, en el orden del documento. */
+export const textOf = element => element.content.map(part => (typeof part === 'string' ? part : textOf(part))).join(' ').replace(/\s+/g, ' ').trim();
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
 export function closest(node, test) {
   for (let element = node; element && element.name !== '#document'; element = element.parent) if (test(element)) return element;

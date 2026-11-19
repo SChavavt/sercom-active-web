@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { checkMarkup, cssSelectors, expectedLocation, parseHtml, routeOf, selectorAttributes, selectorClasses } from '../scripts/check-markup.mjs';
+import { checkMarkup, cssSelectors, expectedLocation, parseHtml, routeOf, selectorAttributes, selectorClasses, textOf } from '../scripts/check-markup.mjs';
 import { makeTree, removeTree, ROOT } from './helpers.mjs';
 
 // ---------------------------------------------------------------------------------------------------
@@ -79,6 +79,18 @@ test('el lector de HTML arma el árbol con elementos vacíos, autocerrados y tex
   assert.equal(div.children[3].children.length, 0, 'el contenido de <script> no se interpreta');
   assert.deepEqual(styles, ['.x{color:red}']);
   assert.equal(span.name, 'span');
+});
+
+test('el texto de un elemento se lee en el orden del documento, con el de sus hijos en su lugar', () => {
+  const { root } = parseHtml('<p>Uno <b>dos</b> tres <i>cua<u>tro</u></i></p><a><span>Cotizar</span> ahora</a><h2>Produc<b>to</b> &amp; más</h2><title>Inicio · Sitio</title>');
+  const [p, a, h2, title] = root.children;
+  assert.equal(textOf(p), 'Uno dos tres cua tro');
+  assert.deepEqual(p.content.map(part => (typeof part === 'string' ? part : `<${part.name}>`)), ['Uno ', '<b>', ' tres ', '<i>']);
+  assert.deepEqual(p.text, ['Uno ', ' tres '], 'el texto directo sigue aparte');
+  assert.equal(textOf(a), 'Cotizar ahora');
+  assert.equal(textOf(h2), 'Produc to & más');
+  assert.equal(textOf(title), 'Inicio · Sitio');
+  assert.equal(textOf(root), 'Uno dos tres cua tro Cotizar ahora Produc to & más Inicio · Sitio');
 });
 
 test('los selectores y sus clases se leen de cada regla, también dentro de @media', () => {
