@@ -2,7 +2,8 @@
 // Ficha de producto (/productos/{id}/): una hoja técnica sobre la retícula de doce columnas.
 //   1. Fila de ruta: Inicio / Catálogo / {categoría} / {producto} (sin categoría si el producto no tiene).
 //   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
-//      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1),
+//      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
+//      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular),
 //      filas de datos (marca, código, unidad de venta), resumen, «Características», «Variantes»,
 //      «Documentación», el aviso de disponibilidad y las dos acciones de cotizar. Un bloque sin datos no se
 //      imprime. En tableta y celular las dos partes se apilan, la imagen primero y baja.
@@ -45,8 +46,8 @@ const reference = { brandName: product.brandName, code: product.code, name: prod
 const quote = contactLinks.product(reference);
 const datasheet = contactLinks.datasheet(reference);
 
-// Variantes: dos por fila en computadora, cuatro en tableta y dos en celular. La celda final pinta de
-// blanco lo que falte de la última fila en cada ancho (nunca queda azul a la vista).
+// Variantes: una fila por variante en computadora, cuatro celdas por fila en tableta y dos en celular. La
+// celda final pinta de blanco lo que falte de la última fila en tableta y celular (nunca queda azul a la vista).
 const variantCount = product.variants.length;
 const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4': (4 - (variantCount % 4)) % 4 };
 // Un código largo no cabe en una celda de tableta o celular sin partirse: entonces las variantes siguen en filas.
@@ -93,7 +94,7 @@ const moreOdd = more.items.length % 2 === 1;
     <div class="producto__body span-5 span-md-12">
       <div class="producto__head cell">
         {category && <a class="producto__cat label" href={category.url}>{category.name}</a>}
-        <h1 class="producto__title t-h2" id="titulo">{product.name}</h1>
+        <h1 class="producto__title t-title" id="titulo">{product.name}</h1>
       </div>
 
       <dl class="data producto__data">
