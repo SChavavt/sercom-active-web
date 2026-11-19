@@ -203,7 +203,7 @@ test('mensaje para consultar alternativas a un producto retirado, con y sin enla
   assert.equal(subjects.retired({ brandName: 'Marca' }), 'Consulta de alternativas: Marca');
   assert.equal(subjects.retired({ name: 'Guante' }), 'Consulta de alternativas');
   assert.equal(subjects.retired({}), 'Consulta de alternativas');
-  // Sin dirección del sitio, la página la agrega al hacer clic con withPageLink: el resultado es el mismo mensaje.
+  // Sin dirección del sitio, la página la agrega al cargar con withPageLink: el resultado es el mismo mensaje.
   const built = contactLinks.retired(retired);
   const complete = contactLinks.retired({ ...retired, url: retiredUrl });
   assert.equal(withPageLink(built.whatsapp, retiredUrl), complete.whatsapp);

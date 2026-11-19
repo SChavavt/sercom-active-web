@@ -5,17 +5,33 @@
 //
 // Uso: imprime <PageLinkScript /> en el componente o la página y pon en cada enlace de cotización
 //   data-page-link={pageUrl ? undefined : product.url}
-// (la ruta de la ficha, por ejemplo `/productos/abc/`). Al hacer clic, el script reescribe el `href` con
-// `withPageLink` y quita el atributo. Mejora progresiva: sin JavaScript el mensaje sale igual, sin el enlace.
+// (la ruta de la ficha, por ejemplo `/productos/abc/`). Al cargar la página, el script reescribe el `href` de
+// cada uno con `withPageLink` y quita el atributo: así también un clic central, «Abrir en una pestaña nueva»,
+// «Copiar enlace» o una pulsación larga en el celular llevan la línea. Un enlace que aparezca después se
+// completa al hacer clic. `withPageLink` nunca agrega una segunda línea «Enlace».
+// Mejora progresiva: sin JavaScript el mensaje sale igual, sin el enlace. Con SITE_URL el enlace ya viene
+// completo en el HTML y no lleva el atributo.
 // Abrir WhatsApp o el correo no es un envío: el script no muestra ninguna confirmación.
 ---
 <script>
   import { withPageLink } from '../lib/contact-core.mjs';
 
-  document.addEventListener('click', event => {
-    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-page-link]') : null;
-    if (!link?.dataset.pageLink) return;
-    link.href = withPageLink(link.href, new URL(link.dataset.pageLink, window.location.href).href);
+  /** Escribe la dirección de la ficha en el mensaje del enlace y quita el atributo: cada enlace se completa una vez. */
+  function complete(link: HTMLAnchorElement) {
+    const path = link.dataset.pageLink;
+    if (!path) return;
+    link.href = withPageLink(link.href, new URL(path, window.location.href).href);
     delete link.dataset.pageLink;
-  });
+  }
+
+  // El script de módulo corre cuando la página ya está leída: todos los enlaces existen.
+  for (const link of document.querySelectorAll<HTMLAnchorElement>('a[data-page-link]')) complete(link);
+
+  // Respaldo para un enlace agregado después de la carga (clic normal, con Ctrl o central).
+  for (const type of ['click', 'auxclick']) {
+    document.addEventListener(type, event => {
+      const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-page-link]') : null;
+      if (link) complete(link);
+    });
+  }
 </script>
