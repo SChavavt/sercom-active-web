@@ -543,7 +543,7 @@
 .crumbs { color: var(--grey-600); }
 .crumbs__list { display: flex; flex-wrap: wrap; align-items: center; row-gap: var(--s-1); }
 .crumbs__item { display: flex; align-items: center; }
-.crumbs__item + .crumbs__item::before { content: "/"; margin: 0 10px; color: var(--grey-300); }
+.crumbs__sep { margin: 0 10px; color: var(--grey-300); }      /* al final del elemento anterior, oculta al lector */
 .crumbs__link { display: inline-flex; align-items: center; min-height: 32px; color: var(--blue); text-decoration: none; }
 .crumbs__link:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .crumbs [aria-current="page"] { color: var(--ink); }
