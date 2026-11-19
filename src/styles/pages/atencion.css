@@ -67,3 +67,15 @@
   .draft__text { font-size: 0.9375rem; }
   .atencion__enough { padding: var(--s-5) var(--pad); font-size: 1rem; }
 }
+
+/* --- Solicitud especial ----------------------------------------------------- */
+/* Ruta de navegación sobre la banda: una fila delgada */
+.solicitud__crumbs { padding: var(--s-5) var(--pad); }
+/* Celda junto a la acción de correo: guarda la nota de la búsqueda cuando llega una */
+.solicitud__found { display: flex; align-items: center; }
+.solicitud__note { flex: 1; }
+
+@media (max-width: 1099px) {
+  .solicitud__crumbs { padding-block: var(--s-2); }
+  .solicitud__found:not(.is-filled) { display: none; }      /* vacía no ocupa una fila en tableta y celular */
+}

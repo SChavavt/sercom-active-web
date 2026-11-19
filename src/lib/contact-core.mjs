@@ -114,13 +114,24 @@ function addLinkLine(text, url) {
 }
 
 /**
+ * Para el navegador y la compilación: la descripción tal como entra en la línea «Descripción o uso» de una
+ * solicitud especial (una sola línea, sin espacios sobrantes, hasta 200 caracteres). Cadena vacía si no hay
+ * texto útil. Sirve para mostrar en la página exactamente lo que se agregó al borrador.
+ * @param {unknown} description
+ * @returns {string}
+ */
+export function requestDescription(description) {
+  return clean(description).slice(0, MAX_DESCRIPTION_LENGTH).trim();
+}
+
+/**
  * Escribe la descripción en la línea «Descripción o uso» de una solicitud especial.
  * @param {string} text
  * @param {unknown} description
  * @returns {string}
  */
 function setDescriptionLine(text, description) {
-  const value = clean(description).slice(0, MAX_DESCRIPTION_LENGTH).trim();
+  const value = requestDescription(description);
   return text
     .split('\n')
     .map(line => (line.startsWith(`${DESCRIPTION_LABEL}:`) ? field(DESCRIPTION_LABEL, value) : line))
