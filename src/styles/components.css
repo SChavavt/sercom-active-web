@@ -54,7 +54,7 @@
 .masthead__logo:focus-visible { outline-offset: -3px; }
 .masthead__logo img { width: 156px; height: 59px; }        /* logo.svg sin margen propio: proporción 2.656 */
 
-.nav { display: flex; }
+.masthead__nav { display: flex; }
 .nav__list { display: flex; flex: 1; justify-content: space-between; padding: 0 var(--s-3); }
 .nav__list > li { display: flex; }
 .nav__link {
@@ -121,9 +121,9 @@
 .catpanel__link--all { justify-content: space-between; padding-inline: var(--pad); background: var(--surface-tint); }
 .catpanel__link--all:hover { background: var(--blue-100); }
 
-.search { display: flex; align-items: center; min-width: 0; padding: 0 var(--s-2) 0 var(--s-5); }
-.search:focus-within { outline: 3px solid var(--focus); outline-offset: -3px; }
-.search__input {
+.masthead__search { display: flex; align-items: center; min-width: 0; padding: 0 var(--s-2) 0 var(--s-5); }
+.masthead__search:focus-within { outline: 3px solid var(--focus); outline-offset: -3px; }
+.masthead__search-input {
   flex: 1;
   min-width: 0;
   height: 44px;
@@ -135,12 +135,12 @@
   appearance: none;
   -webkit-appearance: none;
 }
-.search__input:focus { outline: none; }
-.search__input::placeholder { color: var(--grey-600); opacity: 1; }
-.search__input::-webkit-search-cancel-button { -webkit-appearance: none; }
-.search__btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: var(--blue); }
-.search__btn:hover { background: var(--surface-tint); }
-.search__btn:focus-visible { outline-offset: -3px; }
+.masthead__search-input:focus { outline: none; }
+.masthead__search-input::placeholder { color: var(--grey-600); opacity: 1; }
+.masthead__search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.masthead__search-btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: var(--blue); }
+.masthead__search-btn:hover { background: var(--surface-tint); }
+.masthead__search-btn:focus-visible { outline-offset: -3px; }
 
 .masthead__wa {
   display: flex;

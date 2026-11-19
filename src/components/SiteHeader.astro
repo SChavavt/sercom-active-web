@@ -53,7 +53,7 @@ const allSpan = 12 - ((categories.length * 2) % 12);
       </button>
     )}
 
-    <nav class:list={['nav', hasSearch ? 'span-4' : 'span-7']} id="menu" aria-label="Principal">
+    <nav class:list={['masthead__nav', hasSearch ? 'span-4' : 'span-7']} id="menu" aria-label="Principal">
       <ul class="nav__list">
         <li><a class="nav__link" href={routes.catalog} aria-current={current(routes.catalog)}>Catálogo</a></li>
         {hasCategories && (
@@ -78,10 +78,10 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     </nav>
 
     {hasSearch && (
-      <form class="search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
+      <form class="masthead__search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
         <label class="vh" for="q">Buscar por producto, marca o código</label>
-        <input class="search__input" id="q" name={SEARCH_PARAM} type="search" placeholder="Buscar por producto, marca o código" autocomplete="off" enterkeyhint="search" />
-        <button class="search__btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>
+        <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder="Buscar por producto, marca o código" autocomplete="off" enterkeyhint="search" />
+        <button class="masthead__search-btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>
       </form>
     )}
 

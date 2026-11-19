@@ -13,9 +13,9 @@
   .nav__list { padding: 0 var(--s-2); }
   .nav__link { padding: 0 var(--s-2); font-size: 0.9375rem; }
   .nav__link::after { left: var(--s-2); right: var(--s-2); }
-  .search { padding-left: var(--s-4); padding-right: var(--s-1); }
-  .search__input { font-size: 0.875rem; }
-  .search__btn { width: 40px; }
+  .masthead__search { padding-left: var(--s-4); padding-right: var(--s-1); }
+  .masthead__search-input { font-size: 0.875rem; }
+  .masthead__search-btn { width: 40px; }
   .masthead__cta .icon { display: none; }
   .hero__head { padding-top: var(--s-9); padding-bottom: var(--s-10); }
   .hero__lead { padding-top: var(--s-9); }
@@ -61,7 +61,7 @@
   .masthead__cta .icon { display: none; }
 
   /* paneles que se abren bajo la cabecera */
-  .nav, .search {
+  .masthead__nav, .masthead__search {
     position: absolute;
     top: 100%;
     left: calc(-1 * var(--line));
@@ -72,8 +72,8 @@
     border-top: 0;
     box-shadow: var(--shadow-overlay);
   }
-  .nav.is-open, .search.is-open { display: flex; }
-  .nav { max-height: calc(100vh - var(--masthead-h) - 1px); max-height: calc(100dvh - var(--masthead-h) - 1px); overflow-y: auto; background: var(--rule); }
+  .masthead__nav.is-open, .masthead__search.is-open { display: flex; }
+  .masthead__nav { max-height: calc(100vh - var(--masthead-h) - 1px); max-height: calc(100dvh - var(--masthead-h) - 1px); overflow-y: auto; background: var(--rule); }
   .nav__list { flex-direction: column; gap: var(--line); padding: 0; }
   .nav__list > li { display: block; background: var(--surface); }
   .nav__list > .nav__item--quote { display: block; }
@@ -86,16 +86,16 @@
   .catpanel__list > li { grid-column: span 6; }
   .catpanel__list > .catpanel__all { grid-column: span 12; }
   .catpanel__link { min-height: 60px; padding-inline: var(--pad); }
-  .search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
-  .search__input { font-size: 1rem; }
-  .search__btn { width: 48px; height: 48px; }
+  .masthead__search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
+  .masthead__search-input { font-size: 1rem; }
+  .masthead__search-btn { width: 48px; height: 48px; }
 
   /* sin JavaScript nada queda escondido detrás de un botón */
   html:not(.js) .site-header { position: static; }
   html:not(.js) .masthead { flex-wrap: wrap; height: auto; }
   html:not(.js) .masthead__logo { min-height: var(--masthead-h); }
   html:not(.js) .masthead__btn { display: none; }
-  html:not(.js) .nav, html:not(.js) .search { position: static; display: flex; flex: 1 0 100%; margin: 0; border: 0; box-shadow: none; max-height: none; }
+  html:not(.js) .masthead__nav, html:not(.js) .masthead__search { position: static; display: flex; flex: 1 0 100%; margin: 0; border: 0; box-shadow: none; max-height: none; }
 
   /* portada */
   .hero__head, .hero__side { grid-column: span 12; }
@@ -182,7 +182,7 @@
   .masthead__logo img { width: 122px; height: 46px; }
   .masthead__btn { width: 64px; }
   .masthead__wa, .masthead__cta { display: none; }           /* en el celular ambos viven en la barra fija */
-  .nav, .search { left: 0; right: 0; border-inline: 0; border-bottom: var(--line) solid var(--rule); }
+  .masthead__nav, .masthead__search { left: 0; right: 0; border-inline: 0; border-bottom: var(--line) solid var(--rule); }
 
   .hero__title span { display: inline; }
   .hero__head { padding: var(--s-7) var(--pad) var(--s-5); }
