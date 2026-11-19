@@ -1,11 +1,16 @@
 ---
 // Placa de categorías de la portada (`.plate`): un mosaico por categoría con su pictograma de 64 px, el número
 // y el nombre corto, y al final la celda ancha «Solicitud especial · Ayúdame a encontrarlo».
+// Seis mosaicos por fila en computadora, cuatro en tableta y dos en celular; la celda ancha ocupa 4, 6 y 12
+// columnas y cierra la última fila apoyada a la derecha, como en la maqueta (diez categorías). Con otro número
+// de categorías, celdas blancas (GridFill) completan las filas antes de la celda ancha, o al final sin ella.
 // El nombre visible es el corto («Manos»); el nombre accesible es el completo («Protección de manos»).
 // Solo se dibuja si hay categorías: en producción hoy no hay ninguna (la página no debe llamarlo).
 import type { PublicCategory } from '../types/site.ts';
+import { gridFill } from '../lib/grid-fill.mjs';
 import { categoryIcon } from '../lib/icons.ts';
 import { routes } from '../lib/site-data.mjs';
+import GridFill from './GridFill.astro';
 import Icon from './Icon.astro';
 
 interface Props {
@@ -16,6 +21,11 @@ interface Props {
 
 const { categories, special = true } = Astro.props;
 const two = (n: number) => String(n).padStart(2, '0');
+const fill = gridFill(categories.length, {
+  lg: { span: 2, tail: special ? 4 : 0 },
+  md: { span: 3, tail: special ? 6 : 0 },
+  sm: { span: 6, tail: special ? 12 : 0 },
+});
 
 /** Parte el nombre completo alrededor del nombre corto: lo que sobra va oculto a la vista pero se lee. */
 function nameParts(category: PublicCategory) {
@@ -41,7 +51,7 @@ function nameParts(category: PublicCategory) {
           </a>
         </li>
       );
-    })}
+    })}<GridFill as="li" cells={fill} />
     {special && (
       <li class="plate__special span-4">
         <a class="tile tile--wide cell-link" href={routes.specialRequest}>

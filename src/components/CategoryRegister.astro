@@ -2,7 +2,9 @@
 // Registro de categorías (`.register`): filas con número, pictograma de 48 px, nombre completo y la línea
 // orientativa de subcategorías; dos columnas en computadora, una en celular. Cada fila lleva a su categoría.
 import type { PublicCategory } from '../types/site.ts';
+import { gridFill } from '../lib/grid-fill.mjs';
 import { categoryIcon } from '../lib/icons.ts';
+import GridFill from './GridFill.astro';
 import Icon from './Icon.astro';
 
 interface Props {
@@ -14,8 +16,11 @@ interface Props {
 const { categories, headingLevel = 3 } = Astro.props;
 const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
 const two = (n: number) => String(n).padStart(2, '0');
-// Con un número impar de filas, la última columna queda con una celda menos: la retícula lo resuelve.
+// Las filas bajan por columnas: la primera columna lleva las primeras `rows` categorías. Con un número impar,
+// la segunda columna termina una celda antes; una celda blanca (GridFill) ocupa ese lugar en computadora y en
+// tableta. En el celular (una columna) no falta ninguna.
 const rows = Math.ceil(categories.length / 2);
+const fill = gridFill(categories.length, { lg: { span: 1, columns: 2 }, md: { span: 1, columns: 2 }, sm: { span: 12 } });
 ---
 <ul class="register" style={`--register-rows: ${rows}`}>
   {categories.map((category, index) => (
@@ -30,5 +35,5 @@ const rows = Math.ceil(categories.length / 2);
         <Icon name="arrow-right" class="register__go" />
       </a>
     </li>
-  ))}
+  ))}<GridFill as="li" cells={fill} />
 </ul>

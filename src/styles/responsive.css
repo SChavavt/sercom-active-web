@@ -305,11 +305,13 @@
 @media (min-width: 1100px) {
   /* sin búsqueda (no hay productos) la navegación ocupa 7 columnas: los enlaces se agrupan a la izquierda */
   .masthead--no-search .nav__list { justify-content: flex-start; gap: var(--s-5); padding-inline: var(--s-5); }
+  .grid12 > .grid-fill[data-hide~="lg"], .register > .grid-fill[data-hide~="lg"] { display: none; }   /* GridFill */
 }
 @media (min-width: 700px) and (max-width: 1099px) {
   /* pie sin columna de categorías: enlaces y contacto se reparten la fila */
   .site-footer--no-cats .footer__nav { grid-column: span 5; }
   .site-footer--no-cats .footer__reach { grid-column: span 7; }
+  .grid12 > .grid-fill[data-hide~="md"], .register > .grid-fill[data-hide~="md"] { display: none; }   /* GridFill */
 }
 @media (max-width: 1099px) {
   .page-head__main, .page-head__side { grid-column: span 12; }
@@ -320,6 +322,7 @@
   .crumbs__link { min-height: 44px; }                          /* objetivos táctiles */
   .empty { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-6); padding: var(--s-8) var(--pad); }
   .empty__action { grid-column: 2; justify-self: start; }
+  .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-md); }
 }
 @media (max-width: 699px) {
   .page-head__main { padding: var(--s-7) var(--pad) var(--s-5); }
@@ -331,6 +334,8 @@
   .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
   .brands__fill--even { display: none; }        /* dos marcas por fila: con un número par no falta ninguna celda */
   .brands--lg .brand { min-height: 72px; }      /* página de marcas: dos por fila, diez filas */
+  .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-sm); }
+  .grid12 > .grid-fill[data-hide~="sm"], .register > .grid-fill[data-hide~="sm"] { display: none; }   /* GridFill */
 }
 
 /* 6.6 Columnas por ancho: una celda con `span-8 span-md-12 span-sm-12` ocupa 8 columnas en computadora
