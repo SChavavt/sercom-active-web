@@ -4,6 +4,9 @@
 // 9 columnas, y en las otras 3 la línea de resultados («10 productos», «3 resultados para “guante”»),
 // que es una región viva para los lectores de pantalla, con «Limpiar búsqueda».
 //
+// El texto de ayuda del campo («Producto, marca o código») es corto a propósito: cabe entero desde 320 px,
+// también con el texto espaciado. El nombre completo del campo va en su etiqueta.
+//
 // El script filtra en el navegador las tarjetas de la página (CatalogGrid) con matchesSearchText sobre su
 // `data-search`: al cargar con ?q=… (el campo del encabezado envía aquí), mientras se escribe y al enviar,
 // sin recargar. Mantiene la dirección al día con history.replaceState, muestra el estado sin resultados
@@ -29,7 +32,7 @@ const { total } = Astro.props;
     <div class="catalog-search__field">
       <Icon name="search" class="icon--24" />
       <label class="vh" for="catalogo-q">Buscar por producto, marca o código</label>
-      <input class="catalog-search__input" id="catalogo-q" name={SEARCH_PARAM} type="search" placeholder="Buscar por producto, marca o código" autocomplete="off" enterkeyhint="search" />
+      <input class="catalog-search__input" id="catalogo-q" name={SEARCH_PARAM} type="search" placeholder="Producto, marca o código" autocomplete="off" enterkeyhint="search" />
     </div>
     <button class="catalog-search__submit" type="submit">Buscar</button>
   </form>

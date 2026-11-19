@@ -245,9 +245,9 @@
 }
 
 @media (max-width: 699px) {
-  /* Con «Buscar» al lado, en celulares de menos de 386 px el campo mide menos que su texto de ayuda
-     («Buscar por producto, marca o código») y lo corta. El campo toma la fila completa y «Buscar» va debajo,
-     a todo lo ancho: el texto de ayuda se lee completo y el botón queda grande para el pulgar. */
+  /* Con «Buscar» al lado, en los celulares angostos el campo mide menos que su texto de ayuda («Producto, marca
+     o código») y lo corta. El campo toma la fila completa y «Buscar» va debajo, a todo lo ancho: el texto de
+     ayuda se lee completo desde 320 px, también con el texto espaciado, y el botón queda grande para el pulgar. */
   .catalog-search__form { row-gap: var(--line); }
   .catalog-search__field { grid-column: span 12; gap: var(--s-3); padding-right: var(--s-2); }
   .catalog-search__input { font-size: 1rem; }
