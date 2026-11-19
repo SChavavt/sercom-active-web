@@ -11,6 +11,8 @@ Material de terceros incluido en el repositorio y en el sitio compilado. El logo
 
 Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias no exigen un crédito visible en el sitio.
 
+Nada más de terceros llega al sitio compilado: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
+
 ## Tipografía Archivo · SIL Open Font License 1.1
 
 Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). Sin nombre reservado.
