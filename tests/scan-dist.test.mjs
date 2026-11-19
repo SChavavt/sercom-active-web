@@ -230,6 +230,25 @@ test('R-RULE-12: noindex en cada página, robots.txt bloqueado y sin sitemap has
   await assert.rejects(scan({}, { launch: true, preview: true }), /se excluyen/);
 });
 
+test('R-RULE-12 y R-PUB-03: robots.txt revisa cada grupo de buscadores, no solo el de «*»', async () => {
+  // Antes del lanzamiento, un buscador con su propio grupo obedece ese grupo: si no bloquea todo, el sitio queda abierto para él.
+  for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nAllow: /\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow:\n',
+    'User-agent: *\nDisallow: /\n\nUser-agent: Bingbot\nCrawl-delay: 5\n', 'User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\nAllow: /catalogo/\n']) {
+    assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
+  }
+  for (const robots of ['User-agent: *\nDisallow: /\n\nUser-agent: Googlebot\nDisallow: /\n', '\ufeffUser-agent: *\nDisallow: /\n', 'User-agent: *\nDisallow: /\nSitemap: https://sitio.example/sitemap.xml\n']) {
+    assert.deepEqual(failures(await scan({ 'robots.txt': robots })), [], robots);
+  }
+  // Con --launch, ningún grupo puede seguir bloqueando el sitio.
+  const launched = robots => ({ 'index.html': page('<h1>Inicio</h1>', { robots: '' }), 'robots.txt': robots });
+  for (const robots of ['User-agent: Googlebot\nDisallow: /\n', 'User-agent: *\nAllow: /\n\nUser-agent: Googlebot\nDisallow: /\n', 'User-agent: *\nDisallow: /*\n']) {
+    assert.deepEqual(failedIds(await scan(launched(robots), { launch: true })), ['R-PUB-03'], robots);
+  }
+  for (const robots of ['User-agent: *\nAllow: /\n', 'User-agent: *\nDisallow: /privado/\n\nUser-agent: Googlebot\nDisallow:\n']) {
+    assert.deepEqual(failures(await scan(launched(robots), { launch: true })), [], robots);
+  }
+});
+
 test('R-RULE-13: metadatos internos y registro de investigación', async () => {
   for (const [path, content] of [
     ['_astro/datos.js', 'var c={schemaVersion:1,products:[]};'], ['_astro/datos.js', 'const p={approval:{by:"x"}};'], ['datos.json', '{"image":{"usageConfirmed":true}}'],

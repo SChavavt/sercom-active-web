@@ -274,7 +274,7 @@ export const CHECKS = [
   ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa. Los códigos también se buscan escritos con otro separador o sin él («EJ1001», «ej 1001»).'],
   ['R-RULE-03', 'Vista previa: cada página lleva el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran.'],
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
-  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» tiene «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03).'],
+  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero.'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
@@ -474,12 +474,16 @@ function nearPaletteColors(source) {
   return found;
 }
 
-/** Grupos de robots.txt: agentes y reglas. Los grupos de «*» se combinan, como hacen los buscadores. */
-function robotsStarRules(text) {
+/**
+ * Reglas de robots.txt por buscador: cada agente nombrado y «*». Los grupos que nombran al mismo agente se combinan,
+ * como hacen los buscadores; un buscador con su propio grupo solo obedece ese grupo, no el de «*».
+ * @returns {Map<string, [string, string][]>}
+ */
+function robotsAgents(text) {
   const groups = [];
   let current;
   let readingAgents = false;
-  for (const line of text.split(/\r?\n/)) {
+  for (const line of text.replace(/^\ufeff/, '').split(/\r?\n/)) {
     const match = line.replace(/#.*/, '').trim().match(/^([a-z-]+)\s*:\s*(.*)$/i);
     if (!match) continue;
     const [, field, value] = [match[0], match[1].toLowerCase(), match[2].trim()];
@@ -492,7 +496,9 @@ function robotsStarRules(text) {
       if (current && (field === 'allow' || field === 'disallow')) current.rules.push([field, value]);
     }
   }
-  return groups.filter(group => group.agents.includes('*')).flatMap(group => group.rules);
+  const agents = new Map();
+  for (const group of groups) for (const agent of group.agents) agents.set(agent, [...(agents.get(agent) ?? []), ...group.rules]);
+  return agents;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -685,14 +691,20 @@ export async function scanDist(directory, options = {}) {
   }
 
   // R-RULE-12: robots.txt.
-  // Bloquea todo el sitio cuando el grupo «User-agent: *» tiene «Disallow: /» y ningún «Allow» que lo abra; un
-  // bloqueo que solo nombra a un buscador no cuenta.
+  // Bloquea todo el sitio cuando el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y
+  // ningún «Allow» que lo abra. Un bloqueo que solo nombra a un buscador no cuenta, y un buscador con un grupo propio
+  // que no bloquea (o sin reglas) puede recorrer todo el sitio aunque «*» esté bloqueado.
   const robots = files.find(file => name(file) === 'robots.txt');
-  const starRules = robotsStarRules(robots ? await readFile(robots, 'utf8') : '');
-  const disallowsRoot = starRules.some(([field, value]) => field === 'disallow' && value === '/');
-  const blocksAll = disallowsRoot && !starRules.some(([field, value]) => field === 'allow' && value !== '');
-  if (!launch && !blocksAll) add('FAIL', 'R-RULE-12', robots ?? join(directory, 'robots.txt'), 'robots.txt no bloquea todo el sitio a todos los buscadores (User-agent: * con Disallow: / y sin Allow) antes del lanzamiento');
-  if (launch && disallowsRoot) add('FAIL', 'R-PUB-03', robots, 'robots.txt sigue bloqueando el sitio en la versión de lanzamiento');
+  const agents = robotsAgents(robots ? await readFile(robots, 'utf8') : '');
+  const blocks = rules => rules.some(([field, value]) => field === 'disallow' && value === '/') && !rules.some(([field, value]) => field === 'allow' && value !== '');
+  if (!launch) {
+    const open = [...agents].filter(([, rules]) => !blocks(rules)).map(([agent]) => agent);
+    if (!agents.has('*')) add('FAIL', 'R-RULE-12', robots ?? join(directory, 'robots.txt'), 'robots.txt no bloquea todo el sitio a todos los buscadores (User-agent: * con Disallow: / y sin Allow) antes del lanzamiento');
+    else if (open.length) add('FAIL', 'R-RULE-12', robots, `robots.txt no bloquea todo el sitio antes del lanzamiento: el grupo de ${open.map(agent => `«${agent}»`).join(', ')} no tiene Disallow: / o lleva un Allow`);
+  }
+  // Con --launch, ningún grupo puede seguir bloqueando el sitio entero.
+  const stillBlocked = [...agents].filter(([, rules]) => rules.some(([field, value]) => field === 'disallow' && (value === '/' || value === '/*'))).map(([agent]) => agent);
+  if (launch && stillBlocked.length) add('FAIL', 'R-PUB-03', robots, `robots.txt sigue bloqueando el sitio en la versión de lanzamiento (${stillBlocked.map(agent => `«${agent}»`).join(', ')})`);
 
   // R-RULE-14: las páginas generadas corresponden a registros que pueden mostrarse.
   const categories = data.catalog?.categories ?? [];
