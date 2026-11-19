@@ -207,6 +207,12 @@
 .catalog-related__title { color: var(--blue); }
 .catalog-related__list { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-7); padding: var(--s-2) var(--pad); background: var(--surface); }
 
+/* 3.3 Catálogo sin productos pero con categorías: el registro (CategoryRegister) va en dos columnas hasta el
+   celular; con un número impar de categorías la segunda columna termina una celda antes. Esa celda se pinta
+   de blanco con un elemento generado, que la retícula coloca en el lugar libre. En el celular (una columna)
+   no hace falta. */
+.catalog-categories--odd .register::after { content: ""; background: var(--surface); }
+
 /* 4. Tableta y celular: la barra lateral se pliega en dos filas sobre las tarjetas ------------------------- */
 @media (max-width: 1099px) {
   .catalog-search__field { grid-column: span 9; }
@@ -245,6 +251,7 @@
 }
 
 @media (max-width: 699px) {
+  .catalog-categories--odd .register::after { display: none; }
   .catalog-search__field { grid-column: span 9; gap: var(--s-3); padding-right: var(--s-2); }
   .catalog-search__field .icon { display: none; }       /* el botón ya dice «Buscar»: el campo gana ancho */
   .catalog-search__input { font-size: 1rem; }
