@@ -48,7 +48,6 @@ test('el aviso visible con las reglas de hoy pasa, y una página sin aviso tambi
   for (const notice of [
     NOTICE.replace('<aside', '<aside aria-hidden="false" style="display:block; visibility: visible; content-visibility: auto"'),
     NOTICE.replace('<p class', '<p style="--display: none; color: red" class'),
-    `<div class="banda">${NOTICE}</div>`,
   ]) assert.deepEqual(await check({ 'index.html': page(notice) }), [], notice);
 });
 
@@ -138,9 +137,65 @@ test('una regla que puede seleccionar el aviso o su texto y lo oculta falla, en 
 test('una regla que no oculta, que no puede seleccionar el aviso o que solo oculta un pseudoelemento pasa', async () => {
   const css = '.site-notice{display:block}.site-notice{background:none}.site-notice{--display:none}.site-notice::before{display:none}.site-notice__text:after{visibility:hidden}'
     + '.site-notice-x{display:none}.site-notices{display:none}[class*="site-notices"]{display:none}[class*="x-site-notice"]{display:none}[data-x~=site-notice]{display:none}'
-    + '.dock{display:none}.sheet p{display:none}main aside{visibility:hidden}div{display:none}summary::-webkit-details-marker{display:none}.site-notice{content:"display:none"}'
-    + '.masthead__btn[hidden]{display:none}.catalog-grid__item[hidden]{display:none}';
+    + '.dock{display:none}main aside{visibility:hidden}div{display:none}summary::-webkit-details-marker{display:none}.site-notice{content:"display:none"}'
+    + '.masthead__btn[hidden]{display:none}.catalog-grid__item[hidden]{display:none}'
+    // El sujeto lleva una clase, un id o un atributo que el aviso no tiene, o es de otro tipo; o un antecesor no es de
+    // un tipo que contenga el aviso (html, body, aside, p).
+    + 'aside.dock{display:none}p.x{display:none}aside#otro{display:none}[hidden]{display:none}aside[data-x]{display:none}[role=dialog]{display:none}'
+    + '.skip-link + div{display:none}.skip-link ~ .sheet{display:none}div > p{display:none}nav strong{display:none}html.js .dock{display:none}'
+    + '[class|=sheet]{display:none}aside[class~=dock]{display:none}html.x{display:none}body.js{display:none}strong[class]{display:none}';
   assert.deepEqual(await check({ '_astro/otra.css': css }), []);
+});
+
+test('una regla cuyo sujeto puede ser el aviso, su texto o lo que va en él falla aunque lo de antes lleve clases o atributos', async () => {
+  // Lo que va antes del sujeto (antecesores y hermanos) no se juzga por sus clases ni atributos: un script los cambia
+  // (BaseLayout pone .js en <html>). El sujeto se juzga contra el aviso: su tipo, sus clases, sus atributos.
+  const cases = [
+    'html.js aside{display:none}', '.js aside{display:none}', '[lang] aside{display:none}', 'html:not(.js) aside{display:none}', '.sheet p{display:none}',
+    '.skip-link + aside{display:none}', '.skip-link ~ *{visibility:hidden}', 'a + aside{display:none}', '.skip-link~aside>p{display:none}',
+    'aside[aria-label]{display:none}', '[aria-label^="Aviso"]{display:none}', '[aria-label="Otra cosa"]{display:none}', 'aside[ARIA-LABEL$=preparación i]{display:none}',
+    'aside[class]{display:none}', '[class|=site]{display:none}', 'aside[class^="site"]{display:none}', 'p:not(.x){visibility:hidden}', 'aside:first-of-type{display:none}',
+    'body > :not(.sheet){display:none}', ':where(body) strong{display:none}', '.x .site-notice__text{display:none}', 'aside [class]{display:none}',
+    // Lo que contiene el aviso, con la clase que pone el script (.js en <html>) o sus atributos.
+    '.js{display:none}', 'html.js{visibility:hidden}', '[lang]{display:none}', ':root[style]{display:none}', '[class~=js]{display:none}', 'body:not(.x){display:none}',
+  ];
+  for (const css of cases) {
+    const problems = await check({ '_astro/otra.css': css });
+    assert.equal(problems.length, 1, `${css}\n${JSON.stringify(problems)}`);
+    assert.match(problems[0].message, /oculta el aviso/);
+  }
+});
+
+test('un atributo que oculta lo que va dentro del texto del aviso falla', async () => {
+  for (const notice of [
+    NOTICE.replace('<strong>', '<strong hidden>'),
+    NOTICE.replace('<strong>', '<strong aria-hidden="true">'),
+    NOTICE.replace('<strong>', '<strong style="display:none">'),
+    NOTICE.replace('<strong>', '<strong popover>'),
+  ]) {
+    const problems = await check({ 'index.html': page(notice) });
+    assert.equal(problems.length, 1, `${notice}\n${JSON.stringify(problems)}`);
+    assert.match(problems[0].message, /^<strong>, dentro de <p\.site-notice__text>, lleva .*: oculta el aviso/);
+  }
+});
+
+test('un aviso con un elemento, una clase o un atributo que la comprobación no conoce falla: sus reglas no se podrían juzgar', async () => {
+  for (const [notice, what, html] of [
+    [NOTICE.replace('<aside', '<aside id="aviso"'), /«id»/],
+    [NOTICE.replace('<aside', '<aside data-tipo="desarrollo"'), /«data-tipo»/],
+    [NOTICE.replace('class="site-notice"', 'class="site-notice site-notice--lanzamiento"'), /«site-notice--lanzamiento»/],
+    [NOTICE.replace('<strong>', '<strong class="x">'), /«x»/],
+    [NOTICE.replace('</p>', ' <a href="/contacto/">Escríbenos</a></p>'), /el elemento <a>/],
+    // Un elemento que envuelve el aviso: «div{display:none}» lo ocultaría y la tabla no lo tiene.
+    [`<div class="banda">${NOTICE}</div>`, /el elemento <div>/],
+    ['', /«x»/, page(NOTICE).replace('<html lang="es-MX">', '<html lang="es-MX" class="x">')],
+    ['', /«data-tema»/, page(NOTICE).replace('<body>', '<body data-tema="claro">')],
+  ]) {
+    const problems = await check({ 'index.html': html ?? page(notice) });
+    assert.equal(problems.length, 1, `${notice}\n${JSON.stringify(problems)}`);
+    assert.match(problems[0].message, /NOTICE_MARKUP/);
+    assert.match(problems[0].message, what);
+  }
 });
 
 test('la línea de comandos falla con un <style> que oculta el aviso y lo nombra en la lista de comprobaciones', async () => {

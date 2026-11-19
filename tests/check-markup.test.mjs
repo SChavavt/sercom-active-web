@@ -165,6 +165,16 @@ test('U-07: una parte del valor que toca un espacio por un lado y su borde por e
   assert.deepEqual(await check({ '_astro/pagina.css': near }, { ids: ['U-07'] }), []);
 });
 
+test('U-07: «|=» con un valor que, seguido de un guion, empieza una clase retirada falla', async () => {
+  // «[class|="nav-"]» selecciona class="nav--open …" (el valor seguido de «-»), y nav--open es del bloque .nav.
+  for (const css of ['[class|="nav-"]{display:none}', '[class|="search-"]{x:0}', '[class|=nav]{x:0}', '[class|="NAV-" i]{x:0}']) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+  // «nav_-…», «na-…» o «NAV-…» (sin «i») nunca son clases retiradas.
+  assert.deepEqual(await check({ '_astro/pagina.css': '[class|="nav_"]{x:0}[class|=na]{x:0}[class|="NAV-"]{x:0}[class|="masthead__nav"]{x:0}' }, { ids: ['U-07'] }), []);
+});
+
 test('U-07: un selector de atributo con espacio de nombres (*|, |, ns|) se lee igual', async () => {
   for (const css of ['[*|class~=nav]{display:none}', '[|class~=nav]{x:0}', '[svg|class="search"]{x:0}', '[*|CLASS*=" search"]{x:0}']) {
     const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
@@ -246,6 +256,12 @@ test('U-03: un tabindex positivo en la cabecera, o -1 en un botón o en una piez
     const problems = await check({ 'pagina/index.html': html.replace(from, to) }, { ids: ['U-03'] });
     assert.equal(problems.length, 1, `${to} → ${JSON.stringify(problems.map(problem => problem.message))}`);
     assert.match(problems[0].message, /tabindex/);
+  }
+  // El propio <header> también: con tabindex positivo pasaría delante de todo lo demás.
+  for (const value of ['1', ' 2']) {
+    const problems = await check({ 'pagina/index.html': page().replace('<header class="site-header"', `<header tabindex="${value}" class="site-header"`) }, { ids: ['U-03'] });
+    assert.equal(problems.length, 1, `<header tabindex="${value}"> → ${JSON.stringify(problems.map(problem => problem.message))}`);
+    assert.match(problems[0].message, /<header\.site-header> lleva tabindex/);
   }
   // tabindex="0", o -1 en lo que no se enfoca con Tab (la copia oculta del texto de ayuda), no cambian el orden.
   const fine = page().replace('<a class="masthead__wa"', '<a tabindex="0" class="masthead__wa"').replace('<span class="masthead__search-hint"', '<span tabindex="-1" class="masthead__search-hint"');

@@ -311,12 +311,13 @@ const ATTRIBUTE_SELECTOR = new RegExp(String.raw`^\s*(?:(?:\*|(?:${ESCAPE}|[\w-]
 
 /**
  * Lee un selector: las clases que nombra con «.» y sus selectores de atributo (lo que va entre corchetes y dentro de
- * las cadenas no son clases). Los escapes se resuelven.
+ * las cadenas no son clases). Los escapes se resuelven. `unread` cuenta los corchetes que no se pudieron leer.
  * @param {string} selector
  */
 function readSelector(selector) {
   const classes = [];
   const attributes = [];
+  let unread = 0;
   for (let i = 0; i < selector.length;) {
     const char = selector[i];
     if (char === '"' || char === "'") {
@@ -339,13 +340,15 @@ function readSelector(selector) {
         const [, name, operator, raw, flag] = match;
         const value = raw === undefined ? null : unescapeCss(/^["']/.test(raw) ? raw.slice(1, -1) : raw);
         attributes.push({ name: unescapeCss(name).toLowerCase(), operator: operator ?? null, value, insensitive: flag?.toLowerCase() === 'i' });
+      } else {
+        unread++;
       }
       i = end + 1;
     } else {
       i++;
     }
   }
-  return { classes, attributes };
+  return { classes, attributes, unread };
 }
 /** Clases que nombra un selector («.a .b__c:hover» → ["a", "b__c"]). */
 export const selectorClasses = selector => readSelector(selector).classes;
@@ -398,7 +401,16 @@ export function classAttributeCouldMatch({ operator, value, insensitive }, { isW
   if (!operator || !value) return false;
   const text = insensitive ? value.toLowerCase() : value;
   const words = text.split(/\s+/).filter(Boolean);
-  if (operator === '=' || operator === '~=' || operator === '|=') return words.some(isWhole);
+  if (operator === '=' || operator === '~=') return words.some(isWhole);
+  // «|=» pide el valor entero o el valor seguido de «-»: las palabras de delante son enteras; la última es entera o el
+  // principio de una clase que sigue con «-» («[class|=site]» en «site-notice», «[class|="nav-"]» en «nav--open»).
+  // «-x» representa cualquier continuación para las familias abiertas («nav--…»).
+  if (operator === '|=') {
+    // Con un espacio al final, todas las palabras del valor son enteras.
+    const last = /\s$/.test(text) ? undefined : words[words.length - 1];
+    return (last === undefined ? words : words.slice(0, -1)).some(isWhole)
+      || (last !== undefined && (isWhole(last) || names.some(name => name.startsWith(`${last}-`)) || isWhole(`${last}-x`)));
+  }
   if (!['^=', '$=', '*='].includes(operator)) return false;
   if (operator === '*=' && !words.length) return names.some(name => ` ${name} `.includes(text));
   const startBound = operator === '^=' || /^\s/.test(text);
@@ -568,9 +580,26 @@ export const isRetiredPage = page => isProductRoute(page.route) && retiredMarks(
 
 // Aviso de arriba de la página (SiteNotice.astro): <aside class="site-notice"><p class="site-notice__text"><strong>…
 // al principio de <body>. Una prueba avisa si la plantilla deja de escribirlo así.
-export const NOTICE_MARKUP = { tag: 'aside', textTag: 'p', leadTag: 'strong', classes: ['site-notice', 'site-notice__text'] };
-// Elementos que, ocultos, ocultan el aviso: él, su texto, lo que va en el texto y lo que lo contiene (body, html).
-const NOTICE_SUBJECTS = [NOTICE_MARKUP.tag, NOTICE_MARKUP.textTag, NOTICE_MARKUP.leadTag, 'body', 'html'];
+//
+// `elements` son los elementos que, ocultos, ocultan el aviso: él, su texto, lo que va en el texto y lo que lo contiene,
+// cada uno con las clases y los atributos que puede llevar (los del marcado y los que ponen los scripts: BaseLayout
+// añade .js a <html> y SiteHeader escribe variables en su style). Con esta tabla se juzga si una regla de estilo puede
+// seleccionar uno de ellos; la comprobación de cada página confirma que el aviso compilado no tiene nada fuera de ella
+// (sin contar hidden, popover, aria-hidden y style, que se revisan aparte). Un script que cambie el aviso o lo que lo
+// contiene se anota aquí.
+export const NOTICE_MARKUP = {
+  tag: 'aside', textTag: 'p', leadTag: 'strong', classes: ['site-notice', 'site-notice__text'],
+  elements: [
+    { name: 'aside', classes: ['site-notice'], attributes: ['class', 'aria-label'] },
+    { name: 'p', classes: ['site-notice__text'], attributes: ['class'] },
+    { name: 'strong', classes: [], attributes: [] },
+    { name: 'body', classes: [], attributes: [] },
+    { name: 'html', classes: ['js'], attributes: ['lang', 'class', 'style'] },
+  ],
+};
+// Atributos que se revisan aparte (hiddenByAttributes): no hace falta anotarlos en la tabla.
+const NOTICE_JUDGED_ATTRIBUTES = ['hidden', 'popover', 'aria-hidden', 'style'];
+// Tipos de lo que puede contener a un elemento del aviso: los antecesores de <strong> (p, aside, body, html).
 const NOTICE_ANCESTORS = ['html', 'body', NOTICE_MARKUP.tag, NOTICE_MARKUP.textTag];
 /** ¿La declaración quita el elemento de la pantalla? display:none, visibility:hidden o collapse, content-visibility:hidden. */
 const hidesElement = ({ property, value }) => {
@@ -598,24 +627,96 @@ const withoutArguments = selector => {
   return out;
 };
 /**
- * ¿Un selector puede seleccionar el aviso, su texto o lo que lo contiene? Sí si nombra .site-notice o
- * .site-notice__text (con «.», con un selector de atributo sobre class o con escapes, como U-07), o si no pide
- * ninguna clase, id ni atributo y sus tipos son los del aviso y de lo que lo contiene («aside», «body > aside», «*»).
- * Un selector que termina en un seudoelemento («::before») solo alcanza ese seudoelemento.
+ * Separa un selector sin argumentos de seudoclases en sus selectores compuestos, con el combinador que va después de
+ * cada uno («html.js > aside» → [{ compound: "html.js", next: ">" }, { compound: "aside", next: null }]). Lo que va
+ * entre corchetes, las cadenas y los escapes no separan.
+ * @param {string} bare
+ */
+function compoundsOf(bare) {
+  /** @type {{ compound: string, next: string | null }[]} */
+  const compounds = [];
+  let current = '';
+  let pending = null;
+  for (let i = 0; i < bare.length; i++) {
+    const char = bare[i];
+    if (/[\s>+~]/.test(char)) {
+      if (current) { compounds.push({ compound: current, next: null }); current = ''; }
+      if (compounds.length && /[>+~]/.test(char)) pending = char;
+      else if (compounds.length && !pending) pending = ' ';
+      continue;
+    }
+    if (pending) { compounds[compounds.length - 1].next = pending; pending = null; }
+    if (char === '"' || char === "'") { const end = stringEnd(bare, i); current += bare.slice(i, end); i = end - 1; }
+    else if (char === '\\') { current += bare.slice(i, i + 2); i++; }
+    else if (char === '[') {
+      let end = i + 1;
+      while (end < bare.length && bare[end] !== ']') {
+        if (bare[end] === '"' || bare[end] === "'") end = stringEnd(bare, end);
+        else end += bare[end] === '\\' ? 2 : 1;
+      }
+      current += bare.slice(i, end + 1);
+      i = end;
+    } else current += char;
+  }
+  if (current) compounds.push({ compound: current, next: null });
+  return compounds;
+}
+const COMPOUND_TYPE = new RegExp(String.raw`^(?:(?:\*|(?:${ESCAPE}|[\w-])+)?\|(?!=))?(\*|(?:${ESCAPE}|[\w -￿-])+)?`);
+/** El tipo de un selector compuesto en minúsculas («svg|aside.x» → «aside»); «» si no lo pide o es «*». */
+const typeOfCompound = compound => {
+  const type = COMPOUND_TYPE.exec(compound)?.[1];
+  return !type || type === '*' ? '' : unescapeCss(type).toLowerCase();
+};
+/** ¿El selector compuesto pide un id («#x»)? Lo que va entre corchetes, en cadenas o escapado no cuenta. */
+const asksForId = compound => /#/.test(compound.replace(/\[(?:[^\]"'\\]|\\.|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')*\]?|\\./g, ''));
+/**
+ * ¿Un selector compuesto, el sujeto de la regla, puede ser `element` (una fila de NOTICE_MARKUP.elements)? Su tipo,
+ * sus clases, su id y sus selectores de atributo se comparan con los de la fila; los de clase, como los lee U-07. Las
+ * seudoclases no se juzgan (pueden cumplirse), y un corchete que no se puede leer puede ser cualquier cosa.
+ */
+function compoundCouldBe(compound, element) {
+  const type = typeOfCompound(compound);
+  if (type && type !== element.name) return false;
+  const { classes, attributes, unread } = readSelector(compound);
+  if (unread) return true;
+  if (!classes.every(name => element.classes.includes(name))) return false;
+  if (asksForId(compound) && !element.attributes.includes('id')) return false;
+  const target = { isWhole: word => element.classes.includes(word), names: element.classes };
+  return attributes.every(attribute => element.attributes.includes(attribute.name)
+    && (attribute.name !== 'class' || !attribute.operator || classAttributeCouldMatch(attribute, target)));
+}
+/**
+ * ¿Un selector puede seleccionar el aviso, su texto, lo que va en el texto o lo que lo contiene?
+ *
+ * Se juzga su sujeto (el último selector compuesto) contra cada elemento de NOTICE_MARKUP.elements. De lo que va
+ * antes solo cuenta el tipo de los antecesores (un compuesto seguido de « » o «>» debe poder ser html, body, aside
+ * o p, «main aside» no puede ser el aviso); sus clases y atributos no se juzgan, porque un script los cambia (.js en
+ * <html>), y los hermanos («.skip-link + aside») pueden ser cualquier cosa. Además, como antes, cuenta todo selector
+ * que nombra .site-notice o .site-notice__text en cualquier parte (con «.», con un selector de atributo sobre class o
+ * con escapes, como U-07). Un selector que termina en un seudoelemento («::before») solo alcanza ese seudoelemento.
  */
 function reachesNotice(selector) {
-  const bare = withoutArguments(selector);
-  const compounds = bare.trim().split(/\s*[>+~]\s*|\s+/).filter(Boolean);
-  const subject = compounds[compounds.length - 1] ?? '';
+  const compounds = compoundsOf(withoutArguments(selector).trim());
+  const subject = compounds[compounds.length - 1]?.compound ?? '';
   if (/::|:(?:before|after|first-line|first-letter)\b/i.test(subject)) return false;
   const { classes, attributes } = readSelector(selector);
   if (classes.some(name => NOTICE_MARKUP.classes.includes(name))) return true;
   const target = { isWhole: word => NOTICE_MARKUP.classes.includes(word), names: NOTICE_MARKUP.classes };
   if (attributes.some(attribute => attribute.name === 'class' && classAttributeCouldMatch(attribute, target))) return true;
-  if (/[.#[]/.test(bare)) return false;
-  const typeOf = compound => /^(?:(?:\*|[\w-]+)?\|)?([\w-]+|\*)?/.exec(compound)?.[1]?.toLowerCase() ?? '';
-  const fits = (compound, types) => ['', '*'].includes(typeOf(compound)) || types.includes(typeOf(compound));
-  return fits(subject, NOTICE_SUBJECTS) && compounds.slice(0, -1).every(compound => fits(compound, NOTICE_ANCESTORS));
+  const ancestorsFit = compounds.slice(0, -1).every(({ compound, next }) => {
+    const type = typeOfCompound(compound);
+    return next === '+' || next === '~' || !type || NOTICE_ANCESTORS.includes(type);
+  });
+  return ancestorsFit && NOTICE_MARKUP.elements.some(element => compoundCouldBe(subject, element));
+}
+/** Lo que un elemento del aviso (o de lo que lo contiene) lleva y NOTICE_MARKUP.elements no describe. */
+function unknownToNotice(element) {
+  const entry = NOTICE_MARKUP.elements.find(known => known.name === element.name);
+  if (!entry) return [`el elemento <${element.name}>`];
+  return [
+    ...classesOf(element).filter(name => !entry.classes.includes(name)).map(name => `la clase «${name}»`),
+    ...[...element.attributes.keys()].filter(name => !entry.attributes.includes(name) && !NOTICE_JUDGED_ATTRIBUTES.includes(name)).map(name => `el atributo «${name}»`),
+  ];
 }
 /** Lo que oculta un elemento desde su marcado: hidden, popover, aria-hidden="true" o un estilo en línea que lo quita. */
 function hiddenByAttributes(element) {
@@ -667,8 +768,9 @@ export const CHECKS = [
         if (present[i][1].order < present[i - 1][1].order) problems.push(`${present[i][0]} está antes que ${present[i - 1][0]}: el orden de computadora es logotipo, navegación, búsqueda, WhatsApp, Cotizar mi lista`);
       }
       // El orden del documento solo es el del teclado si nada lo cambia: ningún tabindex positivo en la cabecera (ese
-      // elemento pasaría delante de todo) y ningún negativo en los botones ni en lo que se enfoca de esa secuencia.
-      for (const element of parts.elements) {
+      // elemento pasaría delante de todo; el <header> también cuenta) y ningún negativo en los botones ni en lo que se
+      // enfoca de esa secuencia.
+      for (const element of [parts.header, ...parts.elements]) {
         const index = tabindexOf(element);
         if (index !== null && index > 0) problems.push(`${describe(element)} lleva tabindex="${element.attributes.get('tabindex')}": con Tab pasa delante de todo lo demás`);
       }
@@ -1081,18 +1183,28 @@ export const CHECKS = [
   },
   {
     id: 'I-04',
-    title: 'Nada oculta el aviso de arriba fuera de la impresión: ni hidden, popover, aria-hidden="true" o un estilo en línea en el aviso, su texto o lo que lo contiene, ni una regla de estilo que pueda seleccionarlos con display:none, visibility:hidden o collapse, o content-visibility:hidden',
+    title: 'Nada oculta el aviso de arriba fuera de la impresión: ni hidden, popover, aria-hidden="true" o un estilo en línea en el aviso, en lo que va dentro o en lo que lo contiene, ni una regla de estilo que pueda seleccionarlos con display:none, visibility:hidden o collapse, o content-visibility:hidden; el aviso compilado no lleva elementos, clases ni atributos que la comprobación no conozca',
     // Que el aviso deba estar (y cuál) lo decide scripts/scan-dist.mjs, que conoce --launch; aquí solo se revisa que,
     // si está, nada lo oculte. Un texto que se lee sin navegador no ve una hoja de estilo: por eso esta comprobación.
     page(page) {
       const problems = [];
-      const reported = new Set();
-      for (const notice of page.elements.filter(element => classesOf(element).some(name => NOTICE_MARKUP.classes.includes(name)))) {
-        for (let element = notice; element && element.name !== '#document'; element = element.parent) {
-          const reasons = hiddenByAttributes(element);
-          if (!reasons.length || reported.has(element)) continue;
-          reported.add(element);
-          problems.push(`${describe(element)}${element === notice ? '' : `, que contiene ${describe(notice)},`} lleva ${reasons.join(', ')}: oculta el aviso de arriba`);
+      const seen = new Set();
+      const isNotice = element => classesOf(element).some(name => NOTICE_MARKUP.classes.includes(name));
+      for (const notice of page.elements.filter(isNotice)) {
+        const containers = [];
+        for (let element = notice.parent; element && element.name !== '#document'; element = element.parent) containers.push(element);
+        // El aviso, lo que va dentro (el <strong> de la primera frase) y lo que lo contiene, hasta <html>.
+        for (const element of [notice, ...allElements(notice), ...containers]) {
+          if (seen.has(element)) continue;
+          seen.add(element);
+          const relation = isNotice(element) ? '' : containers.includes(element) ? `, que contiene ${describe(notice)},` : `, dentro de ${describe(closest(element.parent, isNotice) ?? notice)},`;
+          const hiding = hiddenByAttributes(element);
+          if (hiding.length) {
+            problems.push(`${describe(element)}${relation} lleva ${hiding.join(', ')}: oculta el aviso de arriba`);
+            continue;
+          }
+          const unknown = unknownToNotice(element);
+          if (unknown.length) problems.push(`${describe(element)}${relation} no está descrito en NOTICE_MARKUP.elements (scripts/check-markup.mjs): ${unknown.join(', ')}. Sin esa descripción la comprobación no puede saber si una regla de estilo lo oculta; anótalo allí o quítalo del aviso`);
         }
       }
       return problems;
@@ -1105,7 +1217,7 @@ export const CHECKS = [
         if (!hiding.length) continue;
         for (const selector of rule.selectors.filter(reachesNotice)) {
           const where = rule.conditions.length ? ` (dentro de ${rule.conditions.join(' › ')})` : '';
-          problems.push(`la regla «${selector}»${where} lleva ${hiding.map(({ property, value }) => `${property}: ${value}`).join(', ')}: oculta el aviso de arriba (puede seleccionarlo a él, a su texto o a lo que lo contiene); solo se permite dentro de @media print`);
+          problems.push(`la regla «${selector}»${where} lleva ${hiding.map(({ property, value }) => `${property}: ${value}`).join(', ')}: oculta el aviso de arriba (su sujeto puede ser el aviso, su texto, lo que va en él o lo que lo contiene); solo se permite dentro de @media print, o con un sujeto que el aviso no pueda ser (una clase propia)`);
         }
       }
       return problems;
