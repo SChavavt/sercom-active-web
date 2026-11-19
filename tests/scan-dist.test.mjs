@@ -656,6 +656,20 @@ test('R-RULE-29: colores de la paleta anterior en setProperty, constantes y clav
   }
 });
 
+test('R-RULE-29: un nombre de color cuenta donde empieza un nombre o una parte de él, no dentro de otra palabra', async () => {
+  // «tema» dentro de «sistema» no es un tema, y «temas» son asuntos: un ancla bajo esos nombres no es un color.
+  for (const content of ["const sistema={id:'#00a6e9'};", "const temas=[{titulo:'Envíos',ancla:'#00a6e9'}];", "const sistemas={id:'#00a6e9'};", "const problemas=[{ancla:'#00a6e9'}];",
+    "const esquema={id:'#00a6e9'};", "const sistema='#00a6e9';", "var o={sistema:'#00a6e9',subtema:'#00a6e9'};", "const TEMAS=[{ancla:'#00a6e9'}];", "const temasDelMes=[{ancla:'#00a6e9'}];"]) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  assert.deepEqual(failures(await scan({ 'datos.json': '{"sistema":{"id":"#00a6e9"},"temas":[{"ancla":"#00a6e9"}]}' })), [], 'JSON');
+  // Al principio del nombre, después de «_», «-» o «$», o en una parte en camelCase, sí cuenta.
+  for (const content of ["const themeColors={fondo:'#0e2a3e'};", "const brandColors=['#0e2a3e'];", "const miPaleta=['#0e2a3e'];", "const TEMA={primary:'#0e2a3e'};", "const tema_claro={x:'#0e2a3e'};",
+    "const temaSecundario={x:'#0e2a3e'};", "const COLOR_PRIMARIO='#0e2a3e';", "const azulMarino='#0e2a3e';", "const btnFondo='#0e2a3e';", "const $marca='#0e2a3e';", "el.style.setProperty('--color-marca','#0e2a3e');"]) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+});
+
 test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
   for (const robots of ['User-agent: *\nDisallow: /\n\nuseragent: Googlebot\nDisallow:\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nAllow: /\n', 'useragent: *\nDisallow: /\n\nUSERAGENT: Bingbot\nDisallow: /privado/\n']) {
     assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);

@@ -491,7 +491,7 @@ export const CHECKS = [
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
-  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
+  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…; la palabra cuenta al principio del nombre o de una de sus partes, después de «_», «-» o «$» o en camelCase: «themeColors», «tema_claro», «miPaleta»; no dentro de otra palabra, como «sistema», ni «temas», que son asuntos), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
@@ -664,14 +664,20 @@ function contactSources(raw, extension) {
 // Atributos que llevan un color: style, fill, stroke, los terminados en «color» (color, bgcolor, bordercolor,
 // stop-color…) y los atributos de color antiguos sin guion (text, link, vlink, alink).
 const COLOR_NAME = /^(?:style|fill|stroke|text|link|vlink|alink|[\w-]*colou?r)$/i;
+// Una palabra de color cuenta solo donde empieza un nombre o una parte de él: al principio del identificador o de la
+// clave, después de «_», «-» o «$», o en la mayúscula que abre una parte en camelCase («themeColors», «miPaleta»).
+// Dentro de otra palabra no cuenta: «sistema» no lleva «tema».
+const NAME_PART_START = '(?:(?<![A-Za-z0-9$])|(?<=[_$-])|(?<=(?-i:[a-z0-9]))(?=(?-i:[A-Z])))';
+// «tema» en plural («temas», «TEMAS», «temasDelMes») son asuntos, no un tema de color.
+const TEMA = 'tema(?!(?-i:[sS](?![a-z])))';
 // En un script o un JSON, un valor asignado a una propiedad, una clave o una constante cuyo nombre dice color
 // («el.style.color="#…"», «{"fill":"#…"}», «const NAVY='#…'», «{primary:'#…'}»).
-const COLOR_WORDS = 'colou?r|background|fill|stroke|border|shadow|outline|bg|fondo|primary|secondary|accent|brand|marca|navy|cyan|cian|azul|palette|paleta|theme|tema';
+const COLOR_WORDS = `colou?r|background|fill|stroke|border|shadow|outline|bg|fondo|primary|secondary|accent|brand|marca|navy|cyan|cian|azul|palette|paleta|theme|${TEMA}`;
 // El valor termina en una comilla, «;», «{» o «}»: en «tema={primary:'#…'}» también se lee la clave de dentro.
-const SCRIPT_COLOR = new RegExp(`(?:${COLOR_WORDS})[\\w-]*["'\`]?\\s*[:=,]\\s*["'\`]?([^"'\`;{}]*)`, 'gi');
+const SCRIPT_COLOR = new RegExp(`${NAME_PART_START}(?:${COLOR_WORDS})[\\w-]*["'\`]?\\s*[:=,]\\s*["'\`]?([^"'\`;{}]*)`, 'gi');
 // Un objeto o una lista bajo un nombre que dice color o paleta («colores={fondo:'#…'}», «palette=['#…','#fff']»): se
 // leen todos sus valores (con un nivel de anidación).
-const SCRIPT_COLOR_GROUP = /(?:colou?r|palette|paleta|theme|tema)[\w-]*["'`]?\s*[:=]\s*[{[](?:[^{}[\]]|[{[][^{}[\]]*[}\]])*[}\]]/gi;
+const SCRIPT_COLOR_GROUP = new RegExp(`${NAME_PART_START}(?:colou?r|palette|paleta|theme|${TEMA})[\\w-]*["'\`]?\\s*[:=]\\s*[{[](?:[^{}[\\]]|[{[][^{}[\\]]*[}\\]])*[}\\]]`, 'gi');
 // El segundo argumento de `setProperty(…, '#…')`, cualquiera que sea el primero («'--marca'», «nombre»).
 const SET_PROPERTY = /\bsetProperty\s*\(\s*[^,()]*,\s*["'`]?([^"'`)]*)/g;
 /**
