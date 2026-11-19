@@ -49,6 +49,9 @@ const datasheet = contactLinks.datasheet(reference);
 // blanco lo que falte de la última fila en cada ancho (nunca queda azul a la vista).
 const variantCount = product.variants.length;
 const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4': (4 - (variantCount % 4)) % 4 };
+// Un código largo no cabe en una celda de tableta o celular sin partirse: entonces las variantes siguen en filas.
+const CHIP_CODE_MAX = 14;
+const variantRows = product.variants.some(variant => variant.code.length > CHIP_CODE_MAX);
 
 // Más productos: primero los de sus categorías; si no hay otros, una selección variada del catálogo.
 const MORE_LIMIT = 4;
@@ -135,14 +138,14 @@ const moreOdd = more.items.length % 2 === 1;
       {variantCount > 0 && (
         <section class="producto__part" aria-labelledby="variantes-title">
           <h2 class="producto__part-title t-h3" id="variantes-title">Variantes</h2>
-          <ul class="producto__chips" {...variantFill}>
+          <ul class:list={['producto__chips', { 'producto__chips--rows': variantRows }]} {...variantFill}>
             {product.variants.map(variant => (
               <li class="producto__chip">
                 <span class="producto__chip-label">{variant.label}</span>
                 <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>
               </li>
             ))}
-            <li class="producto__chip-fill" aria-hidden="true"></li>
+            {!variantRows && <li class="producto__chip-fill" aria-hidden="true"></li>}
           </ul>
         </section>
       )}

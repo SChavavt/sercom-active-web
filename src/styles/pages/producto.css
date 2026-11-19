@@ -33,7 +33,8 @@
   color: var(--blue);
 }
 .producto__plate .icon { width: 58%; height: 58%; }
-.producto__img { width: 100%; height: 100%; padding: var(--s-9) var(--pad); object-fit: contain; }
+/* la foto llena el marco sin deformarse ni recortarse, sea horizontal o vertical: el marco no crece con ella */
+.producto__img { position: absolute; inset: 0; width: 100%; height: 100%; padding: var(--s-9) var(--pad); object-fit: contain; }
 
 /* Datos: 5 columnas, una columna de celdas ---------------------------------- */
 .producto__body { display: flex; flex-direction: column; gap: var(--line); min-width: 0; }
@@ -118,8 +119,10 @@
 /* Tableta y celular: las dos partes se apilan, la imagen primero y baja ------------- */
 @media (max-width: 1099px) {
   .producto__crumbs { padding-block: var(--s-1); }
+  .producto__cat { min-height: 44px; }                       /* objetivo táctil */
+  .producto__title { margin-top: var(--s-1); }
   .producto__media, .producto__body { grid-column: span 12; }
-  .producto__frame { position: static; aspect-ratio: auto; height: clamp(200px, 34vw, 300px); max-height: none; }
+  .producto__frame { position: relative; top: auto; aspect-ratio: auto; height: clamp(200px, 34vw, 300px); max-height: none; }
   .producto__plate { width: auto; height: 64%; }
   .producto__img { padding: var(--s-5) var(--pad); }
 
@@ -129,6 +132,11 @@
   .producto__chips[data-fill-4="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chips[data-fill-4="2"] .producto__chip-fill { display: block; grid-column: span 2; }
   .producto__chips[data-fill-4="3"] .producto__chip-fill { display: block; grid-column: span 3; }
+
+  /* códigos largos: las variantes siguen en filas, como en computadora */
+  .producto__chips--rows { grid-template-columns: minmax(0, 1fr); }
+  .producto__chips--rows .producto__chip { flex-direction: row; flex-wrap: wrap; align-items: baseline; justify-content: space-between; min-height: 56px; padding-block: var(--s-4); }
+  .producto__chips--rows .producto__chip-code { font-size: inherit; }
 
   .producto__doc { min-height: 60px; }
 
@@ -150,7 +158,7 @@
   .producto__part-title { padding-top: var(--s-6); }
   .producto__item { column-gap: var(--s-4); }
 
-  .producto__chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .producto__chips:not(.producto__chips--rows) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .producto__chips[data-fill-4] .producto__chip-fill { display: none; }
   .producto__chips[data-fill-2="1"] .producto__chip-fill { display: block; grid-column: span 1; }
   .producto__chip { min-height: 64px; }
