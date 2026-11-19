@@ -40,7 +40,7 @@ const rest = items.slice(visibleCount);
 {visible.length > 0 && (
   <ul class="catalog-nav__list">
     {visible.map(item => (
-      <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined}><span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+      <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
     ))}
   </ul>
 )}
@@ -49,7 +49,7 @@ const rest = items.slice(visibleCount);
     <summary class="catalog-nav__toggle"><span class="catalog-nav__toggle-more">{moreLabel}</span><span class="catalog-nav__toggle-less">{lessLabel}</span><Icon name="chevron-down" class="icon--18" /></summary>
     <ul class="catalog-nav__list">
       {rest.map(item => (
-        <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined}><span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+        <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
       ))}
     </ul>
   </details>
