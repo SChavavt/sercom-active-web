@@ -14,7 +14,7 @@
   .masthead__nav-link { padding: 0 var(--s-2); font-size: 0.9375rem; }
   .masthead__nav-link::after { left: var(--s-2); right: var(--s-2); }
   .masthead__search { padding-left: var(--s-4); padding-right: var(--s-1); }
-  .masthead__search-input { font-size: 0.875rem; }
+  .masthead__search-field { font-size: 0.875rem; }
   .masthead__search-btn { width: 40px; }
   .masthead__cta .icon { display: none; }
   .hero__head { padding-top: var(--s-9); padding-bottom: var(--s-10); }
@@ -103,7 +103,7 @@
   .catpanel__link { min-height: 60px; padding-inline: var(--pad); }
   .catpanel__link > span { max-width: calc(100% - 28px - var(--s-3) + var(--pad)); }      /* hasta el borde de la celda, como en computadora */
   .masthead__search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
-  .masthead__search-input { font-size: 1rem; }
+  .masthead__search-field { font-size: 1rem; }
   .masthead__search-btn { width: 48px; height: 48px; }
 
   /* sin JavaScript nada queda escondido detrás de un botón */
@@ -408,6 +408,7 @@
   .masthead__nav-link::after { forced-color-adjust: none; background: CanvasText; }
   .catpanel__link[aria-current] { border-left: 4px solid CanvasText; }
   .masthead__cta[aria-current="page"], .dock__link[aria-current="page"] { border-bottom: 4px solid CanvasText; }
+  .masthead__search-hint { color: GrayText; }            /* la copia del placeholder, con el color del placeholder del sistema */
 
   /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
   .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }

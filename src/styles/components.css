@@ -132,6 +132,7 @@
 
 .masthead__search { display: flex; align-items: center; min-width: 0; padding: 0 var(--s-2) 0 var(--s-5); }
 .masthead__search:focus-within { outline: 3px solid var(--focus); outline-offset: -3px; }
+.masthead__search-field { position: relative; display: flex; flex: 1; min-width: 0; font-size: 0.9375rem; }   /* el campo toma de aquí su tamaño de letra */
 .masthead__search-input {
   flex: 1;
   min-width: 0;
@@ -140,13 +141,20 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  font-size: 0.9375rem;
   appearance: none;
   -webkit-appearance: none;
 }
 .masthead__search-input:focus { outline: none; }
 .masthead__search-input::placeholder { color: var(--grey-600); opacity: 1; }
 .masthead__search-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+/* Copia del placeholder: invisible, en una línea, sirve para medir; con .is-long (SiteHeader: el placeholder no cabe)
+   se ve en lugar del placeholder y baja a dos líneas dentro de la celda. Desaparece en cuanto el campo tiene texto. */
+.masthead__search-hint { position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; color: var(--grey-600); visibility: hidden; pointer-events: none; }
+.masthead__search-hint > span { flex: none; white-space: nowrap; }
+.masthead__search-field.is-long .masthead__search-hint { overflow: visible; visibility: visible; }
+.masthead__search-field.is-long .masthead__search-hint > span { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: break-word; }
+.masthead__search-input:not(:placeholder-shown) + .masthead__search-hint,
+.masthead__search-input:not(:placeholder-shown) + .masthead__search-hint > span { visibility: hidden; }   /* también en la línea: no depende de la herencia */
 .masthead__search-btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: var(--blue); }
 .masthead__search-btn:hover { background: var(--surface-tint); }
 .masthead__search-btn:focus-visible { outline-offset: -3px; }

@@ -35,7 +35,7 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
     + `<li class="${c.quote}">${link('/cotizar/', 'Cotizar mi lista').slice(4, -5)}</li>${link('/contacto/', 'Contacto')}</ul></nav>`;
   const form = search
     ? `<form class="${c.search} span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action="/catalogo/" method="get"><label class="vh" for="q">Buscar</label>`
-      + `<input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon"></svg></button></form>`
+      + `<span class="masthead__search-field"><input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><span class="masthead__search-hint" aria-hidden="true"><span>Buscar por producto, marca o código</span></span></span><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon"></svg></button></form>`
     : '';
   return `<header class="site-header"><div class="utility"><ul class="utility__group"><li class="utility__item">Puebla, México</li></ul></div>`
     + '<div class="masthead grid12">'

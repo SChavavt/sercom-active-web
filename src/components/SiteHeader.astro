@@ -34,6 +34,8 @@ function current(href: string): 'page' | 'true' | undefined {
 const inCategories = path.startsWith(routes.category('').slice(0, -1));
 // La celda «Ver todo el catálogo» completa la última fila del panel (cada categoría ocupa 2 columnas).
 const allSpan = 12 - ((categories.length * 2) % 12);
+// Nombre del campo de búsqueda, su placeholder y la copia que lo sustituye cuando no cabe en una línea.
+const searchHint = 'Buscar por producto, marca o código';
 ---
 <header class="site-header">
   <div class="utility">
@@ -89,8 +91,11 @@ const allSpan = 12 - ((categories.length * 2) % 12);
 
     {hasSearch && (
       <form class="masthead__search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
-        <label class="vh" for="q">Buscar por producto, marca o código</label>
-        <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder="Buscar por producto, marca o código" autocomplete="off" enterkeyhint="search" />
+        <label class="vh" for="q">{searchHint}</label>
+        <span class="masthead__search-field">
+          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} autocomplete="off" enterkeyhint="search" />
+          <span class="masthead__search-hint" aria-hidden="true"><span>{searchHint}</span></span>
+        </span>
         <button class="masthead__search-btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>
       </form>
     )}
@@ -149,6 +154,26 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     });
     measure.observe(utility);
     measure.observe(masthead);
+  }
+
+  // Texto de ayuda del buscador: si el placeholder no cabe en una línea (texto espaciado o agrandado, o un campo
+  // estrecho), el campo muestra en su lugar la copia de .masthead__search-hint, que puede ocupar dos líneas. Cuando
+  // cabe, y siempre sin JavaScript, queda el placeholder de siempre.
+  const searchField = search?.querySelector<HTMLElement>('.masthead__search-field');
+  const searchInput = searchField?.querySelector<HTMLInputElement>('input');
+  const searchHint = searchField?.querySelector<HTMLElement>('.masthead__search-hint > span');
+  if (searchField && searchInput && searchHint && 'ResizeObserver' in window) {
+    const placeholder = searchInput.placeholder;
+    const fitHint = () => {
+      searchField.classList.remove('is-long');      // la copia vuelve a medir su ancho en una línea
+      const long = searchInput.clientWidth > 0 && searchHint.getBoundingClientRect().width > searchInput.clientWidth + 0.5;
+      searchField.classList.toggle('is-long', long);
+      // Un espacio: el campo vacío sigue con :placeholder-shown, que oculta la copia en cuanto hay texto (components.css).
+      searchInput.placeholder = long ? ' ' : placeholder;
+    };
+    const watchHint = new ResizeObserver(fitHint);
+    watchHint.observe(searchInput);
+    watchHint.observe(searchHint);
   }
 
   window.addEventListener('scroll', fit, { passive: true });
