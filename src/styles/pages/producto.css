@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Ficha de producto (/productos/{id}/): src/pages/productos/[id].astro
+   Una hoja técnica sobre las doce columnas: imagen en 7, datos en 5, todo en celdas blancas
+   separadas por el filete de 1 px. Solo variables de tokens.css y fonts.css; sin bordes propios.
+   ========================================================================== */
+
+/* Fila de ruta ------------------------------------------------------------- */
+.producto__crumbs { padding: var(--s-3) var(--pad); }
+
+/* Imagen: 7 columnas. El marco se queda a la vista mientras se leen los datos -------- */
+.producto__media {
+  position: relative;
+  /* sin fotografía: el rayado de corte de las tarjetas */
+  background: repeating-linear-gradient(135deg, var(--blue-050) 0 7px, var(--blue-100) 7px 8px);
+}
+.producto__media--photo { background: var(--surface); }
+.producto__frame {
+  position: sticky;
+  top: calc(var(--masthead-h) + var(--line));
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  max-height: calc(100vh - var(--masthead-h) - var(--line));
+}
+.producto__tag { position: absolute; top: var(--s-6); left: var(--pad); }
+.producto__plate {
+  display: grid;
+  place-items: center;
+  width: 40%;
+  aspect-ratio: 1;
+  background: var(--surface);
+  outline: var(--line) solid var(--blue);
+  color: var(--blue);
+}
+.producto__plate .icon { width: 58%; height: 58%; }
+.producto__img { width: 100%; height: 100%; padding: var(--s-9) var(--pad); object-fit: contain; }
+
+/* Datos: 5 columnas, una columna de celdas ---------------------------------- */
+.producto__body { display: flex; flex-direction: column; gap: var(--line); min-width: 0; }
+
+.producto__head { padding: var(--s-7) var(--pad); }
+.producto__cat { display: inline-flex; align-items: center; min-height: 32px; color: var(--blue); text-decoration: none; }
+.producto__cat:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.producto__title { margin-top: var(--s-3); overflow-wrap: break-word; }
+
+/* El código es lo que el comprador copia: completo, sin cambiar, y se selecciona entero de un clic */
+.producto__code { white-space: normal; overflow-wrap: anywhere; user-select: all; }
+
+.producto__summary { padding: var(--s-6) var(--pad) var(--s-7); }
+.producto__summary p { max-width: 62ch; font-size: 1.0625rem; text-wrap: pretty; }
+
+/* Bloques con título: Características, Variantes, Documentación */
+.producto__part { display: grid; gap: var(--line); }
+.producto__part-title { padding: var(--s-7) var(--pad) var(--s-3); background: var(--surface); }
+
+.producto__list { display: grid; gap: var(--line); }
+.producto__item {
+  display: grid;
+  grid-template-columns: 2ch minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: var(--s-5);
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+  text-wrap: pretty;
+}
+.producto__num { color: var(--grey-600); font-size: var(--label-sm); font-variant-numeric: tabular-nums; }
+
+/* Variantes: información, no controles (sin cursor ni cambio al pasar). En computadora, una fila por variante
+   con su código a la derecha: en 5 columnas no cabe una división que caiga sobre la retícula. En tableta y
+   celular son celdas de 3 y de 6 columnas (cuatro y dos por fila), sobre las mismas pistas de la lámina. */
+.producto__chips { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.producto__chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px var(--s-5);
+  min-height: 56px;
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+}
+.producto__chip-label { font-weight: var(--type-strong-weight); line-height: 1.3; overflow-wrap: break-word; }
+.producto__chip-code { line-height: 1.3; white-space: normal; overflow-wrap: anywhere; }
+/* la celda final completa en blanco la última fila (solo en tableta y celular) */
+.producto__chip-fill { display: none; background: var(--surface); }
+
+.producto__docs { display: grid; gap: var(--line); }
+.producto__doc {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--s-4);
+  min-height: 64px;
+  padding: var(--s-3) var(--pad);
+  background: var(--surface);
+  font-weight: var(--type-button-weight);
+  line-height: 1.3;
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.producto__doc .icon { color: var(--blue); }
+.producto__doc:hover { background: var(--surface-tint); }
+.producto__doc:hover .producto__doc-label { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-color: var(--blue); }
+
+.producto__actions { display: grid; gap: var(--line); }
+
+/* Banda de ayuda, compacta ----------------------------------------------------- */
+.producto__help .band__body,
+.producto__help .band__action { padding-block: var(--s-9); }
+.producto__help .band__action { justify-content: flex-end; }
+.producto__help .band__icon { display: none; }
+
+/* Computadora pequeña ------------------------------------------------------------ */
+@media (max-width: 1359px) {
+  .producto__plate { width: 42%; }
+}
+
+/* Tableta y celular: las dos partes se apilan, la imagen primero y baja ------------- */
+@media (max-width: 1099px) {
+  .producto__crumbs { padding-block: var(--s-1); }
+  .producto__media, .producto__body { grid-column: span 12; }
+  .producto__frame { position: static; aspect-ratio: auto; height: clamp(200px, 34vw, 300px); max-height: none; }
+  .producto__plate { width: auto; height: 64%; }
+  .producto__img { padding: var(--s-5) var(--pad); }
+
+  .producto__chips { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .producto__chip { flex-direction: column; flex-wrap: nowrap; align-items: flex-start; justify-content: center; min-height: 68px; padding-block: var(--s-3); }
+  .producto__chip-code { font-size: var(--small); }
+  .producto__chips[data-fill-4="1"] .producto__chip-fill { display: block; grid-column: span 1; }
+  .producto__chips[data-fill-4="2"] .producto__chip-fill { display: block; grid-column: span 2; }
+  .producto__chips[data-fill-4="3"] .producto__chip-fill { display: block; grid-column: span 3; }
+
+  .producto__doc { min-height: 60px; }
+
+  .producto__help .band__body { padding-bottom: var(--s-6); }
+  .producto__help .band__action { padding-top: 0; }
+
+  /* dos tarjetas por fila: la celda final solo hace falta con un número impar */
+  .producto__more-fill { display: none; }
+  .producto__more-fill--odd { display: block; grid-column: span 6; }
+}
+
+@media (max-width: 699px) {
+  .producto__frame { height: 200px; }
+  .producto__plate { height: 60%; }
+  .producto__tag { top: var(--s-3); }
+  .producto__head { padding: var(--s-6) var(--pad); }
+  .producto__summary { padding: var(--s-5) var(--pad) var(--s-6); }
+  .producto__summary p { font-size: 1rem; }
+  .producto__part-title { padding-top: var(--s-6); }
+  .producto__item { column-gap: var(--s-4); }
+
+  .producto__chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .producto__chips[data-fill-4] .producto__chip-fill { display: none; }
+  .producto__chips[data-fill-2="1"] .producto__chip-fill { display: block; grid-column: span 1; }
+  .producto__chip { min-height: 64px; }
+
+  .producto__doc { column-gap: var(--s-3); }
+}
