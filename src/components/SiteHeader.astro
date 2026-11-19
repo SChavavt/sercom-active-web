@@ -119,6 +119,7 @@ const searchHint = 'Buscar por producto, marca o código';
   const dock = document.querySelector<HTMLElement>('.dock');
 
   const isOpen = (button: HTMLButtonElement | null) => button?.getAttribute('aria-expanded') === 'true';
+  const dockHeight = () => (dock && getComputedStyle(dock).display !== 'none' ? dock.offsetHeight : 0);
 
   /** Ajusta el alto del menú abierto para que termine sobre la barra fija, esté donde esté el encabezado. */
   function fit() {
@@ -127,9 +128,23 @@ const searchHint = 'Buscar por producto, marca o código';
       nav.style.maxHeight = '';
       return;
     }
-    const dockHeight = dock && getComputedStyle(dock).display !== 'none' ? dock.offsetHeight : 0;
     // Sin alto mínimo: el panel nunca pasa debajo de la barra fija (se desplaza por dentro).
-    nav.style.maxHeight = `${Math.max(0, window.innerHeight - nav.getBoundingClientRect().top - dockHeight)}px`;
+    nav.style.maxHeight = `${Math.max(0, window.innerHeight - nav.getBoundingClientRect().top - dockHeight())}px`;
+    keepFocusInMenu();
+  }
+
+  /** Si el panel cambió de alto o de lugar con el foco dentro (Tab muy rápido mientras la página se desplaza), el
+      elemento con foco vuelve a quedar entero a la vista desplazando el panel, nunca la página. */
+  function keepFocusInMenu() {
+    const active = document.activeElement;
+    if (!nav || !isOpen(menuButton) || !(active instanceof HTMLElement) || !nav.contains(active)) return;
+    // El borde inferior visible es el del panel o, si es más alto, el de la barra fija (o el de la ventana).
+    const box = nav.getBoundingClientRect();
+    const top = box.top + nav.clientTop;
+    const bottom = Math.min(box.bottom, window.innerHeight - dockHeight());
+    const item = active.getBoundingClientRect();
+    if (item.bottom > bottom) nav.scrollTop += item.bottom - bottom;
+    else if (item.top < top) nav.scrollTop -= top - item.top;
   }
 
   function setOpen(button: HTMLButtonElement | null, panel: HTMLElement | null, open: boolean) {
@@ -177,6 +192,9 @@ const searchHint = 'Buscar por producto, marca o código';
   }
 
   window.addEventListener('scroll', fit, { passive: true });
+  // Con movimiento reducido toda propiedad tiene una transición de 0.01 ms (responsive.css): el alto nuevo se aplica
+  // un cuadro después, y es entonces cuando hay que volver a mirar el foco.
+  nav?.addEventListener('transitionend', event => { if (event.target === nav && event.propertyName === 'max-height') keepFocusInMenu(); });
   window.addEventListener('resize', fit);
 
   menuButton?.addEventListener('click', () => {
