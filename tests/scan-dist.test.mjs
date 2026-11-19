@@ -524,6 +524,23 @@ test('R-RULE-01: una cifra seguida de una unidad de cantidad no es un precio', a
   await assertEachFails('R-RULE-01', ['<p>Precio por volumen: 100</p>', '<p>Precio por volumen: 100 pesos</p>', '<p>Precio: 100.00 por pieza</p>', '<p>Precio por pieza 35 MXN</p>']);
 });
 
+test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
+  await assertEachFails('R-RULE-10', [
+    '<p>Mensaje de WhatsApp enviado</p>', '<p>Tu lista de productos enviada</p>', '<p>Solicitud por WhatsApp enviada</p>', '<p>¡Tu solicitud a Sercom enviada!</p>',
+    '<p>Su solicitud ha quedado registrada</p>', '<p>La solicitud enviada.</p>', '<p>La solicitud enviada</p>', '<p>Tu lista de productos fue enviada</p>', '<p>Solicitud especial enviada</p>',
+    '<p>Te enviaremos la cotización en breve</p>', '<p>Un asesor se comunicará contigo</p>', '<p>Recibirás tu cotización en breve</p>', '<div data-msg="Solicitud &lt;b&gt;enviada&lt;/b&gt;"></div>',
+  ]);
+  for (const content of ['toast("Mensaje de WhatsApp enviado");', 't.innerHTML="La solicitud <b>enviada</b>.";']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-10'], content);
+  }
+  // El participio como adjetivo dentro de una frase que sigue, o después de una preposición, no es una confirmación.
+  await assertNoneFails([
+    '<p>Revisa la lista enviada por WhatsApp</p>', '<p>Una vez enviado tu mensaje, Sercom contesta por WhatsApp.</p>', '<p>Cuando tu mensaje sea enviado desde tu teléfono.</p>',
+    '<p>Marcas y productos registrados</p>', '<p>El correo registrado del negocio</p>', '<p>Nunca se ha enviado nada sin tu permiso.</p>', '<p>Nadie ha recibido tus datos.</p>',
+    '<p>Escribe al correo registrado.</p>', '<p>Revisa los datos en la lista enviada.</p>', '<p>Recibirás tu cotización por WhatsApp o por correo.</p>', '<p>Consulta la lista de marcas registradas en cada ficha.</p>', '<p>Lista de marcas registradas</p>',
+  ]);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
