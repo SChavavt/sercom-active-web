@@ -563,12 +563,19 @@ const AUXILIARY = '(?:ya|fue|fueron|ha|han|sido|se|quedo|quedaron|quedado|queda|
 // «Lista de marcas registradas»: «marca registrada» es un nombre, no una confirmación.
 const CONFIRMED = `(?<!\\bmarcas?\\s+)${PARTICIPLE}\\b`;
 const DETERMINER = '(?:el|la|los|las|un|una|unos|unas|cada|este|esta|ese|esa|otro|otra)';
-// Un verbo de recibir, responder, enviar, cotizar o contactar en primera persona del plural o dirigido al lector…
-const RESPONSE_VERB = '\\b(?:recibiras|recibes|recibira|(?:te\\s+)?respondemos|te\\s+contestamos|(?:te\\s+)?cotizamos|(?:te\\s+)?enviamos|te\\s+contactamos|te\\s+llamamos|te\\s+atendemos)\\b';
+// Un verbo de recibir, responder, contestar, enviar, mandar, cotizar o contactar en primera persona del plural
+// (presente o futuro) o dirigido al lector…
+const RESPONSE_VERB = '\\b(?:recibiras|recibes|recibira|(?:te\\s+)?respondemos|(?:te\\s+)?contestamos|(?:te\\s+)?contestaremos|(?:te\\s+)?cotizamos|(?:te\\s+)?enviamos|(?:te\\s+)?mandamos|(?:te\\s+)?mandaremos|te\\s+contactamos|te\\s+llamamos|te\\s+atendemos)\\b';
+// …o en primera persona del singular, la voz con la que el sitio habla por la persona de ventas («Te respondo», «Te
+// escribo»): presente o futuro de responder, contestar, escribir, enviar y mandar. «Envío» y «mando» también son
+// sustantivos, así que esos dos cuentan solo con «te», «le» o «les» delante. Solo es una promesa con un plazo después.
+const SINGULAR_VERB = '\\b(?:(?:te|le|les)\\s+)?(?:respondo|contesto|escribo|respondere|contestare|escribire|enviare|mandare)\\b|\\b(?:te|le|les)\\s+(?:envio|mando)\\b';
 // …y, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio (ahí empieza otra
 // oración: «Recibes un extintor que se recarga en 1 hora»), un plazo con una cifra: «en 24 horas», «dentro de 48
 // horas», «en menos de 2 horas», «en un día hábil». Una duración de uso no es un plazo: «en 8 horas de turno».
 const RESPONSE_TIME = '(?:en|dentro\\s+de)\\s+(?:(?:menos\\s+de|maximo|un\\s+maximo\\s+de)\\s+)?(?:\\d+|un|una)\\s+(?:minutos|min|horas?|hrs|h|dias?)(?:\\s+habil(?:es)?)?\\b(?!\\s+de\\s+(?:uso|turno|jornada|operacion|autonomia|duracion|exposicion)\\b)';
+// …o un plazo sin cifra: «en breve», «pronto», «a la brevedad», «hoy mismo», «de inmediato».
+const SOON = '\\b(?:en breve|(?:muy )?pronto|a la brevedad|hoy mismo|en (?:unos|pocos) minutos|en menos de|enseguida|en seguida|de inmediato|lo antes posible|lo mas pronto posible)\\b';
 const FALSE_CONFIRMATION = new RegExp([
   // En primera persona: «Hemos enviado tu solicitud», «Ya enviamos tu mensaje», «Registramos tu pedido».
   new RegExp(`${NEGATED}\\b(?:recibimos|enviamos|registramos) (?:tu|su|tus|sus)\\b|\\bhemos (?:recibido|enviado|registrado)\\b|\\bya (?:recibimos|enviamos|registramos)\\b`),
@@ -586,12 +593,17 @@ const FALSE_CONFIRMATION = new RegExp([
   /¡\s*(?:listo|enviad[oa]|recibid[oa]|hecho)\s*!/,
   /gracias por (?:tu|su) (?:solicitud|mensaje|compra|cotizacion|pedido|lista|correo)/,
   /\bfolio\b|numero de seguimiento/,
-  /\b(?:te|le) (?:responderemos|contactaremos|escribiremos|llamaremos|enviaremos|mandaremos|respondemos|contactamos|escribimos|llamamos|respondera|contactara|escribira|llamara)\b|\bnos (?:pondremos en contacto|comunicaremos)\b/,
+  /\b(?:te|le) (?:responderemos|contestaremos|contactaremos|escribiremos|llamaremos|enviaremos|mandaremos|respondemos|contestamos|contactamos|escribimos|llamamos|mandamos|respondera|contactara|escribira|llamara|daremos (?:una |tu |su )?respuesta)\b|\bnos (?:pondremos en contacto|comunicaremos)\b/,
+  // «Ya tenemos tu solicitud»: una recepción afirmada.
+  new RegExp(`${NEGATED}\\bya tenemos (?:tu|su|tus|sus) ${CONFIRMATION_NOUN}\\b`),
   // Un tercero que responde («Un asesor se comunicará contigo») o un plazo («Recibirás tu cotización en breve»).
   new RegExp(`${NEGATED}\\bse (?:comunicara|pondra en contacto)\\b`),
   /\brecibiras\b[^.!?<]{0,40}?\b(?:en breve|pronto|a la brevedad|hoy mismo|en (?:unos|pocos) minutos|en menos de)\b/,
-  // Un plazo con una cifra: «Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos en 2 horas».
-  new RegExp(`${NEGATED}${RESPONSE_VERB}(?:\\s+(?!(?:que|y|para)\\b)[^\\s.!?;,<]+){0,6}?\\s+${RESPONSE_TIME}`),
+  // Un plazo con una cifra o sin ella: «Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos
+  // en 2 horas», «Contestamos a la brevedad», «Te respondo a la brevedad», «Te escribo en 24 horas».
+  new RegExp(`${NEGATED}(?:${RESPONSE_VERB}|${SINGULAR_VERB})(?:\\s+(?!(?:que|y|para)\\b)[^\\s.!?;,<]+){0,6}?\\s+(?:${RESPONSE_TIME}|${SOON})`),
+  // El plazo antes del verbo: «En breve recibirás tu cotización», «Pronto te contestamos», «A la brevedad te respondo».
+  new RegExp(`${SOON}\\s+(?:(?:te|le|les)\\s+)?(?:recibiras|recibes|recibira|respondemos|responderemos|contestamos|contestaremos|enviamos|enviaremos|mandamos|mandaremos|cotizamos|cotizaremos|escribimos|escribiremos|contactamos|contactaremos|llamamos|llamaremos|respondo|contesto|escribo|envio|mando|respondere|contestare|escribire|enviare|mandare)\\b`),
 ].map(part => part.source).join('|'), 'i');
 // Precios: símbolo o código de moneda junto a una cifra, la palabra de un precio seguida de una cifra y vocabulario
 // de oferta. Un prefijo de moneda de una a tres mayúsculas antes de «$» («MX$350», «US$ 25») también es un precio.
@@ -697,7 +709,7 @@ export const RULES = [
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
   rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud»), folios o plazos de respuesta («Te respondemos en breve», «Un asesor se comunicará contigo»), también con una cifra: un verbo de recibir, responder, enviar, cotizar o contactar dirigido al lector o en primera persona del plural y, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio, «en» o «dentro de» con una cifra y una unidad de tiempo («Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos en menos de 2 horas»; no «Recibes un extintor que se recarga en 1 hora» ni una duración de uso, como «en 8 horas de turno»; no «Precio en 24 horas» ni «Usa el respirador un máximo de 8 horas»). El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
+    'Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud», «Ya tenemos tu solicitud», también con mensaje, pedido o lista), folios o promesas de respuesta: «te» o «le» con responder, contestar, contactar, escribir, llamar, enviar o mandar en primera persona del plural («Te respondemos en breve», «Te contestamos», «Te mandaremos»), «te daremos respuesta», «nos comunicaremos», «Un asesor se comunicará contigo»; un verbo de recibir, responder, contestar, enviar, mandar, cotizar o contactar dirigido al lector o en primera persona del plural, o responder, contestar, escribir, enviar o mandar en primera persona del singular, la voz del contacto de ventas («Te respondo», «Te escribiré»; «envío» y «mando» solo con «te», «le» o «les» delante, porque también son sustantivos), seguido, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio, de un plazo: «en» o «dentro de» con una cifra y una unidad de tiempo («Recibirás tu cotización en 24 horas», «Te cotizamos en 24 hrs», «Respondemos en menos de 2 horas», «Te escribo en 24 horas»; no «Recibes un extintor que se recarga en 1 hora» ni una duración de uso, como «en 8 horas de turno»; no «Precio en 24 horas» ni «Usa el respirador un máximo de 8 horas»), o un plazo sin cifra: «en breve», «pronto», «a la brevedad», «hoy mismo», «de inmediato», «lo antes posible» («Contestamos a la brevedad», «Te respondo a la brevedad»); y el plazo sin cifra antes del verbo («En breve recibirás tu cotización», «A la brevedad te respondo»). Sin plazo, la primera persona del singular no promete nada: «Te respondo dudas sobre tallas por WhatsApp», «Escríbeme por WhatsApp y te respondo» y «Mando la ficha técnica si el fabricante la publica» no fallan. El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).'),
   rule('R-RULE-10', 'FAIL', 'joined', FALSE_CONFIRMATION,
     'confirmación falsa partida por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Solicitud envi<span>ada</span>».'),

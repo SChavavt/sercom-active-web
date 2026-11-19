@@ -917,6 +917,30 @@ test('R-RULE-10: un plazo de respuesta con una cifra', async () => {
   await assertEachFails('R-RULE-10', ['<p>Te respondemos y cotizamos en 24 horas</p>', '<p>Te cotizamos en 2 días de trabajo</p>', '<p>Respondemos en 24 horas de servicio.</p>']);
 });
 
+test('R-RULE-10: contestar y mandar, la primera persona del singular con un plazo, el plazo antes del verbo y «ya tenemos»', async () => {
+  // Las promesas de la revisión final, que pasaban.
+  const promises = ['Te contestaremos a la brevedad.', 'Te contestamos pronto.', 'Te contestaremos en 24 horas.', 'Te mandamos tu cotización en 24 horas.',
+    'En breve recibirás tu cotización.', 'Pronto recibirás tu cotización.', '¡Gracias! Ya tenemos tu solicitud.', 'Te daremos respuesta en menos de 24 horas.',
+    'Te respondo a la brevedad.', 'Te contesto a la brevedad.'];
+  await assertEachFails('R-RULE-10', promises.map(text => `<p>${text}</p>`));
+  for (const text of promises) assert.deepEqual(failedIds(await scan({ '_astro/app.js': `toast(${JSON.stringify(text)});` })), ['R-RULE-10'], `JS ${text}`);
+  // Otras formas de lo mismo: contestar y mandar en plural sin «te», el singular con un plazo con cifra o sin ella, el
+  // plazo antes del verbo y «ya tenemos» con otro sustantivo.
+  await assertEachFails('R-RULE-10', [
+    '<p>Contestamos a la brevedad.</p>', '<p>Contestaremos tu mensaje en 24 horas.</p>', '<p>Mandamos tu cotización en 1 día hábil.</p>', '<p>Le contestamos hoy mismo.</p>',
+    '<p>Te escribo en 24 horas.</p>', '<p>Te envío la cotización a la brevedad.</p>', '<p>Le mando tu cotización hoy mismo.</p>', '<p>Te responderé en breve.</p>',
+    '<p>Respondo en menos de 2 horas.</p>', '<p>A la brevedad te respondo.</p>', '<p>En breve te contestamos.</p>', '<p>Ya tenemos tu lista.</p>', '<p>Ya tenemos su pedido.</p>',
+    '<p>Te daremos una respuesta pronto.</p>', '<p>Te <b>contesto</b> a la brevedad.</p>',
+  ]);
+  // Sin plazo, la primera persona del singular no promete nada; «envío» y «mando» sin «te» o «le» son sustantivos.
+  await assertNoneFails([
+    '<p>Te respondo dudas sobre tallas por WhatsApp.</p>', '<p>Escríbeme por WhatsApp y te respondo.</p>', '<p>Mando la ficha técnica si el fabricante la publica.</p>',
+    '<p>Te respondo por WhatsApp o por correo.</p>', '<p>Contesto tus dudas sobre tallas.</p>', '<p>Te mando la ficha técnica cuando el fabricante la publica.</p>',
+    '<p>Envío de la ficha técnica: pídela en tu mensaje.</p>', '<p>Si lo necesitas pronto, dilo en tu mensaje.</p>', '<p>Tenemos tu lista de marcas a la vista en el catálogo.</p>',
+    '<p>Escríbeme y te respondo con la disponibilidad confirmada al cotizar.</p>',
+  ]);
+});
+
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {
   await assertEachFails('R-RULE-24', [
     '<a href="https://l.example.com/?u=https%253A%252F%252Fwa.me%252F5215555555555">WhatsApp</a>',
