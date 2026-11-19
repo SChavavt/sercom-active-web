@@ -140,9 +140,9 @@ const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) 
 //   text    texto visible de cada página HTML, sin las frases permitidas
 //   joined  texto visible de cada página HTML con las etiquetas en línea retiradas sin dejar espacio, sin las frases permitidas
 //   words   lo que una persona podría llegar a leer: el texto visible, los demás atributos (data-*, enlaces con su
-//           %XX decodificado), los <script> en línea, las cadenas `content:` del CSS y el contenido de JS/JSON
-//           (un script puede escribir texto en la página; el marcado que escribe se lee también sin sus etiquetas),
-//           sin las frases permitidas
+//           %XX decodificado; el marcado que guardan se lee también sin sus etiquetas), los <script> en línea, las
+//           cadenas `content:` del CSS y el contenido de JS/JSON (un script puede escribir texto en la página; el
+//           marcado que escribe se lee también sin sus etiquetas), sin las frases permitidas
 //   prose   la parte de `words` que no es código: el texto visible, los valores de los atributos, las cadenas
 //           `content:` del CSS y el texto de un SVG o XML (sin las frases permitidas)
 //   raw     contenido tal cual de cada archivo de texto
