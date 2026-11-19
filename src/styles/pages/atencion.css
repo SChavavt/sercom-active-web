@@ -84,3 +84,22 @@
 /* La ubicación como etiqueta con el cuadro azul, igual que en la franja de servicio */
 .contacto__place { display: flex; align-items: center; gap: 10px; color: var(--ink); }
 .contacto__place::before { content: ""; flex: none; width: 10px; height: 10px; background: var(--blue); }
+
+/* --- Privacidad: filas de etiqueta y texto (4 + 8 columnas, como «Cómo funciona») --- */
+.privacidad { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.privacidad__key { padding: var(--s-7) var(--pad); font-size: var(--h3); font-weight: 700; line-height: 1.25; letter-spacing: -0.005em; text-wrap: balance; }
+.privacidad__value { padding: var(--s-7) var(--pad); font-size: var(--lead); line-height: var(--type-lead-leading); text-wrap: pretty; }
+.privacidad__value p { max-width: 64ch; }
+.privacidad__link { color: var(--blue); font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; overflow-wrap: anywhere; }
+.privacidad__link:hover { text-decoration-thickness: 2px; }
+
+@media (max-width: 1099px) {
+  .privacidad__row { row-gap: 0; }                 /* etiqueta y texto forman una sola celda */
+  .privacidad__key, .privacidad__value { grid-column: span 12; }
+  .privacidad__key { padding-bottom: var(--s-2); }
+  .privacidad__value { padding-top: 0; }
+}
+@media (max-width: 699px) {
+  .privacidad__key { padding-top: var(--s-6); font-size: 1.125rem; }
+  .privacidad__value { padding-bottom: var(--s-6); }
+}

@@ -1,9 +1,40 @@
 ---
-// PROVISIONAL: el texto del aviso de privacidad todavía no está aprobado. La reemplaza quien lo redacte.
+// Privacidad (/privacidad/). Aviso breve con lo que es cierto del sitio tal como está construido: no pide
+// datos, no usa cookies ni almacenamiento del navegador, no envía formularios y los botones de contacto
+// solo abren un borrador en la aplicación del cliente. NO es el aviso de privacidad de la empresa: ese
+// texto lo debe entregar la empresa antes de publicar. Revisar esta página si se agrega la lista de
+// cotización del paso 2 (guarda datos en el navegador) o cualquier medición.
+// Textos: brief de páginas «atencion», sección 4. Se ve igual en los dos modos.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHeader from '../../components/PageHeader.astro';
+import { contactDetails, mailtoUrl } from '../../lib/contact.mjs';
 import { routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/atencion.css';
+
+const { businessName, email } = contactDetails;
 ---
-<BaseLayout title="Privacidad">
-  <PageHeader title="Privacidad" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Privacidad' }]} />
+<BaseLayout title="Privacidad" description="Qué datos pide este sitio y qué pasa con lo que nos envías por WhatsApp o por correo.">
+  <PageHeader
+    title="Privacidad"
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Privacidad' }]}
+    lead="Este sitio es un catálogo de consulta: no pide datos personales para usarlo."
+  />
+  <dl class="privacidad">
+    <div class="privacidad__row grid12">
+      <dt class="privacidad__key cell span-4">Qué datos pide este sitio</dt>
+      <dd class="privacidad__value cell span-8"><p>Ninguno. No hay formularios de registro, cuentas de usuario ni cookies de seguimiento.</p></dd>
+    </div>
+    <div class="privacidad__row grid12">
+      <dt class="privacidad__key cell span-4">Cuando nos escribes</dt>
+      <dd class="privacidad__value cell span-8"><p>Los botones de WhatsApp y de correo abren tu propia aplicación con un borrador que puedes editar. El sitio no envía el mensaje por ti ni guarda una copia.</p></dd>
+    </div>
+    <div class="privacidad__row grid12">
+      <dt class="privacidad__key cell span-4">Lo que nos compartes</dt>
+      <dd class="privacidad__value cell span-8"><p>Lo que envíes por WhatsApp o por correo llega directamente a {businessName} para atender tu solicitud de cotización.</p></dd>
+    </div>
+    <div class="privacidad__row grid12">
+      <dt class="privacidad__key cell span-4">Dudas sobre tus datos</dt>
+      <dd class="privacidad__value cell span-8"><p>Escríbenos a <a class="privacidad__link" href={mailtoUrl()}>{email}</a>.</p></dd>
+    </div>
+  </dl>
 </BaseLayout>
