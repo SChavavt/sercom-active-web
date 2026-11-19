@@ -544,6 +544,19 @@ test('R-RULE-01: un precio en el texto de un borrador de WhatsApp o de correo, a
   await assertNoneFails([`<a href="${WHATSAPP}?text=Hola%2C%20Yosmara.%0AProducto%3A%20Casco%20(modelo%203)%3B%20cantidad%3A%2012">WhatsApp</a>`]);
 });
 
+test('R-RULE-01: una cadena `content:` del CSS se lee entera, aunque lleve «;» o «}»', async () => {
+  const css = ['.p::after{content:"Desde MX$350; IVA incluido"}', '.p::after{content:"Envío; casco (MX$350)"}', ".p::after{content:'Envío} casco $350'}",
+    '.p::after{content:"Desde " "MX$350;"}', '.p::after{content:"\\24 350"}', 'a::before{content:"x"}b::after{content:"Casco; MX$350"}b{color:red}'];
+  for (const content of css) assert.deepEqual(failedIds(await scan({ '_astro/sitio.css': content })), ['R-RULE-01'], content);
+  await assertEachFails('R-RULE-01', ['<style>.p::after{content:"Desde MX$350; IVA incluido"}</style>', "<style>.p::after{content:'Envío} casco $350'}</style>", '<p style=\'--x:1;content:"Envío; casco (MX$350)"\'>x</p>']);
+  // Lo que ya estaba limpio sigue limpio: cadenas vacías, escapes que no son un precio, contadores y CSS compactado.
+  for (const content of ['.a::before{content:""}', '.q::before{content:"\\201C"}', 'li::before{content:counter(x) ". "}', 'a::before{content:"x"}b{color:red}',
+    '.p::after{content:";"}.q{margin:0}', ".p::after{content:'}'}.q{margin:0}"]) {
+    assert.deepEqual(failures(await scan({ '_astro/sitio.css': content })), [], content);
+  }
+  await assertNoneFails(['<style>.q::before{content:"\\201C"}</style>', '<p style=\'content:"; "\'>x</p>']);
+});
+
 test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabra antes de la cifra, y las claves de precio en el código', async () => {
   await assertEachFails('R-RULE-01', [
     '<p>Precio por pieza 350.00</p>', '<p>Precio con IVA 350</p>', '<p>Precio de mayoreo 300</p>', '<p>Precio para mayoristas 300</p>', '<p>Costo por unidad 120</p>',

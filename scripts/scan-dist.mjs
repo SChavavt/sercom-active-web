@@ -211,11 +211,35 @@ const scriptStrings = code => {
   const strings = stringLiterals(code);
   return [...strings, ...strings.filter(text => text.includes('<')).map(withoutMarkup)].join('\n|\n');
 };
-/** Cadenas de `content:` de una hoja de estilo, con los escapes de CSS decodificados («\24 350» es «$350»). */
-const cssContent = css => [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<![\w-])content\s*:\s*([^;}]*)/gi)]
-  .flatMap(match => [...match[1].matchAll(/"((?:[^"\\]|\\[\s\S])*)"|'((?:[^'\\]|\\[\s\S])*)'/g)].map(string => string[1] ?? string[2]))
-  .map(value => value.replace(/\\([0-9a-f]{1,6})\s?/gi, (escape, hex) => codePoint(hex, 16) ?? escape).replace(/\\([\s\S])/g, '$1'))
-  .join('\n');
+/**
+ * Cadenas de `content:` de una hoja de estilo, con los escapes de CSS decodificados («\24 350» es «$350»). El valor se
+ * lee hasta el primer «;» o «}» fuera de una cadena: dentro de "…" o '…' (con escapes «\») no terminan el valor
+ * («content:"Desde MX$350; IVA incluido"»). Se leen todas las cadenas del valor («content:"Desde " "MX$350"»); una
+ * cadena sin cerrar termina en el salto de línea.
+ */
+function cssContent(css) {
+  const text = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const strings = [];
+  for (const match of text.matchAll(/(?<![\w-])content\s*:/gi)) {
+    let index = match.index + match[0].length;
+    while (index < text.length && text[index] !== ';' && text[index] !== '}') {
+      const quote = text[index];
+      index += 1;
+      if (quote !== '"' && quote !== "'") continue;
+      let value = '';
+      while (index < text.length && text[index] !== quote && text[index] !== '\n') {
+        const length = text[index] === '\\' ? 2 : 1;
+        value += text.slice(index, index + length);
+        index += length;
+      }
+      strings.push(value);
+      if (text[index] === quote) index += 1;
+    }
+  }
+  return strings
+    .map(value => value.replace(/\\([0-9a-f]{1,6})\s?/gi, (escape, hex) => codePoint(hex, 16) ?? escape).replace(/\\([\s\S])/g, '$1'))
+    .join('\n');
+}
 const attribute = (tag, name) => {
   const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, 'i'));
   return match ? decodeEntities(match[1] ?? match[2] ?? match[3] ?? '') : undefined;
@@ -342,7 +366,7 @@ export const RULES = [
     'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural y sin otra cifra en la misma frase («100 piezas o más», «12 pares»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
   rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
     'precio en el texto, en un atributo o en el CSS',
-    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
+    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS (enteras, aunque lleven «;» o «}») y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
   rule('R-RULE-01', 'FAIL', 'joined', VISIBLE_PRICE,
     'precio o descuento partido por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
