@@ -3,7 +3,8 @@
 //   1. Fila de ruta: Inicio / Catálogo / {categoría} / {producto} (sin categoría si el producto no tiene).
 //   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
 //      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
-//      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular),
+//      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular; un nombre
+//      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección),
 //      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
 //      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
 //      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
@@ -29,6 +30,7 @@ import RetiredProduct from '../../components/RetiredProduct.astro';
 import SectionHead from '../../components/SectionHead.astro';
 import Tag from '../../components/Tag.astro';
 import { categoryIcon } from '../../lib/icons.ts';
+import { isLongProductName } from '../../lib/product-title.mjs';
 import { absoluteUrl, contactDetails, contactLinks } from '../../lib/contact.mjs';
 import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, productsByCategory, products, retiredProducts, routes } from '../../lib/site-data.mjs';
 import type { PublicProduct } from '../../types/site.ts';
@@ -109,7 +111,7 @@ const moreOdd = more.items.length % 2 === 1;
     <div class="producto__body span-5 span-md-12">
       <div class="producto__head cell">
         {category && <a class="producto__cat label" href={category.url}>{category.name}</a>}
-        <h1 class="producto__title t-title" id="titulo">{product.name}</h1>
+        <h1 class="producto__title t-title" id="titulo" data-long={isLongProductName(product.name) ? '' : undefined}>{product.name}</h1>
       </div>
 
       <dl class="data producto__data">

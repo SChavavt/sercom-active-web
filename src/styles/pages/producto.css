@@ -43,6 +43,12 @@
 .producto__cat { display: inline-flex; align-items: center; min-height: 32px; color: var(--blue); text-decoration: none; }
 .producto__cat:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .producto__title { margin-top: var(--s-3); overflow-wrap: break-word; }
+/* Nombre largo (más de 50 caracteres, data-long: src/lib/product-title.mjs): en computadora el título baja un paso,
+   al tamaño de los títulos de sección, en renglones equilibrados, para que «Cotizar este producto» siga en la
+   primera pantalla. En tableta y celular la acción queda debajo de la imagen de todos modos: no cambia. */
+@media (min-width: 1100px) {
+  .producto__title[data-long] { font-size: var(--type-h2-size); text-wrap: balance; }
+}
 
 /* El código es lo que el comprador copia: completo, sin cambiar, y se selecciona entero de un clic */
 .producto__code { white-space: normal; overflow-wrap: anywhere; user-select: all; }
