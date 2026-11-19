@@ -137,7 +137,7 @@ El campo «Buscar» y la entrada «Categorías» solo se imprimen si hay product
 
 **Ubicación actual.** `aria-current="page"` en el enlace a la propia página y `"true"` en su sección: una página de marca marca «Marcas»; una de categoría, «Categorías» (y su categoría lleva `page` en el panel); una ficha, «Catálogo». En `/cotizar/` la llevan la entrada del menú, el bloque «Cotizar mi lista» y el enlace de la barra fija. La portada, la solicitud especial, la privacidad y la 404 no marcan nada. Se dibuja con un subrayado azul de 4 px en computadora, una barra azul de 4 px a la izquierda en las filas del menú y del panel, una barra blanca de 4 px dentro del bloque «Cotizar mi lista» y una azul abajo en la barra fija.
 
-**El texto del campo de búsqueda.** El campo se llama «Buscar en el catálogo» (etiqueta oculta y texto de ayuda) y envía a `/catalogo/?q=…`. Con el tamaño de letra normal ese texto cabe en una línea en todos los anchos. Con texto espaciado o agrandado puede no caber: entonces el script del encabezado (si existe `ResizeObserver`) agrega `.is-long` a `.masthead__search-field`, cambia el texto de ayuda por un espacio y muestra en su lugar `.masthead__search-hint`, una copia oculta a los lectores de pantalla que ocupa hasta dos líneas dentro de la celda y se oculta en cuanto el campo tiene texto. Sin JavaScript queda el texto de ayuda nativo. Mientras la copia se ve, axe informa dos resultados «incompletos» (`#q`, «Element has no value», y la copia, «partially overlaps other elements»); los dos son límites de la herramienta, y el contraste de la copia es 6.76:1.
+**El texto del campo de búsqueda.** El campo se llama «Buscar en el catálogo» (etiqueta oculta y texto de ayuda) y envía a `/catalogo/?q=…`. Con el tamaño de letra normal ese texto cabe en una línea en todos los anchos. Con texto espaciado o agrandado puede no caber: entonces el script del encabezado (si existe `ResizeObserver`) agrega `.is-long` a `.masthead__search-field`, cambia el texto de ayuda por un espacio y muestra en su lugar `.masthead__search-hint`, una copia oculta a los lectores de pantalla que ocupa hasta dos líneas dentro de la celda y se oculta en cuanto el campo tiene texto. Sin JavaScript queda el texto de ayuda nativo. Mientras la copia se ve, axe informa dos resultados «incompletos» (`#q`, «Element has no value», y la copia, «partially overlaps other elements»); los dos son límites de la herramienta, y el contraste de la copia es 6.76:1 (el par 8 de la tabla de 11.6, que redondea hacia abajo).
 
 **Texto que crece.** La franja y la cabecera tienen alto mínimo, no fijo, y la franja, sus grupos y la lista de navegación de computadora pueden pasar a otra línea. El encabezado mide su alto real con `ResizeObserver` y lo escribe en `--utility-shift` y `--masthead-shift` en `<html>`; la posición fija y `scroll-padding-top` usan esos valores, con las alturas de diseño como respaldo. Una hoja de página que coloque algo bajo la cabecera fija debe usar `var(--masthead-shift, var(--masthead-h))`.
 
@@ -340,7 +340,7 @@ Pares de texto y fondo usados en el sitio, medidos en la revisión final en ambo
 | 5 | `#46464C` gris 700 | `#FFFFFF` | 9.37:1 | normal 13 px | datos de tarjeta, pie, notas, horario, textos de entrada y registro | cumple |
 | 6 | `#46464C` | `#F3F8FC` | 8.76:1 | normal 14 px | líneas del registro al pasar | cumple |
 | 7 | `#FFFFFF` | `#00548F` azul 700 | 7.88:1 | normal 16 px | acciones principales al pasar, «Buscar» del catálogo, «Cotizar mi lista» | cumple |
-| 8 | `#5A5B62` gris 600 | `#FFFFFF` | 6.75:1 | normal 11.5 px | textos de ayuda de los dos campos (y la copia de 4.3), claves de `ContactData`, números de registro y mosaico | cumple |
+| 8 | `#5A5B62` gris 600 | `#FFFFFF` | 6.75:1 | normal 11.5 px | textos de ayuda de los dos campos, claves de `ContactData`, números de registro y mosaico | cumple |
 | 9 | `#5A5B62` | `#F3F8FC` | 6.32:1 | normal 11.5 px | números en filas al pasar, conteos de la barra lateral al pasar | cumple |
 | 10 | `#FFFFFF` | `#0067B0` azul | 5.88:1 | normal 15 px | «Buscar» del catálogo, texto de la banda, «Cotizar mi lista», WhatsApp de la barra fija, acciones principales | cumple |
 | 11 | `#FFFFFF` | `#0067B0` | 5.88:1 | grande 20 px | títulos de banda, monograma | cumple |
@@ -350,8 +350,6 @@ Pares de texto y fondo usados en el sitio, medidos en la revisión final en ambo
 | 15 | `#19171A` | `#F3F8FC` | 16.66:1 | grande 19 px | nombres de mosaico, filas H3 del menú | cumple |
 | 16 | `#0067B0` | `#E6F0F7` | 5.09:1 | normal 12.5 px | antetítulo de la celda ancha al pasar | cumple |
 | 17 | `#C9CACE` gris 300 | `#FFFFFF` | 1.63:1 | normal 12.5 px | diagonales de la ruta (ocultas a los lectores de pantalla) | exento (decoración) |
-
-La copia del texto de ayuda del encabezado (4.3) usa el par 8; su razón exacta es 6.76:1 (6.75 en la tabla por el redondeo hacia abajo).
 
 **Anillo de foco** contra el color sobre el que se dibuja (contraste de elementos que no son texto, WCAG 1.4.11):
 
