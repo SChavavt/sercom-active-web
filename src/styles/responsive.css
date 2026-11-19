@@ -182,6 +182,7 @@
   }
 
   body { padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px)); }      /* espacio para la barra fija: la última línea del pie queda visible */
+  html { scroll-padding-bottom: calc(57px + env(safe-area-inset-bottom, 0px) + var(--s-4)); }   /* el elemento que recibe el foco no queda bajo la barra fija */
   .sheet { margin-bottom: 0; padding: 0; }
   .preview__text { padding-inline: var(--pad); font-size: 0.78125rem; }
   .utility { justify-content: flex-start; }

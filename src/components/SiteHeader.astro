@@ -119,7 +119,8 @@ const allSpan = 12 - ((categories.length * 2) % 12);
       return;
     }
     const dockHeight = dock && getComputedStyle(dock).display !== 'none' ? dock.offsetHeight : 0;
-    nav.style.maxHeight = `${Math.max(160, window.innerHeight - nav.getBoundingClientRect().top - dockHeight)}px`;
+    // Sin alto mínimo: el panel nunca pasa debajo de la barra fija (se desplaza por dentro).
+    nav.style.maxHeight = `${Math.max(0, window.innerHeight - nav.getBoundingClientRect().top - dockHeight)}px`;
   }
 
   function setOpen(button: HTMLButtonElement | null, panel: HTMLElement | null, open: boolean) {
