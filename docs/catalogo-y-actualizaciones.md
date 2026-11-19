@@ -1,41 +1,111 @@
 # Carga y mantenimiento del catálogo
 
-## Qué está disponible
+Cómo se agrega, se aprueba, se corrige y se retira un producto real, comprobado contra el validador (`src/lib/catalog-policy.mjs`) y los tipos (`src/types/catalog.ts`) actuales. Los productos reales llegan en el paso 3 (catálogo piloto de 30 a 50 productos); hasta entonces `src/data/catalog.json` no tiene fichas y las páginas se revisan con los ejemplos de la vista previa (ver [`datos-y-modos.md`](datos-y-modos.md)).
 
-`research/Sercom_Active_Fuentes_Catalogos.json` es el registro original de investigación: 19 entidades y 35 referencias, con estado y siguiente acción. Incluye 18 marcas y un proveedor; no son 19 catálogos completos listos para importar. Algunas URLs son históricas o están pendientes de acceso. La validación estructural del proyecto no vuelve a descargar las fuentes.
+## 1. Qué está disponible
 
-`src/data/catalog.json` contiene categorías candidatas en borrador y cero productos. Esto evita publicar un inventario o una oferta sin validar. Las fichas se cargarán después de escoger modelos reales.
+`research/Sercom_Active_Fuentes_Catalogos.json` es el registro original de investigación: 19 entidades y 35 referencias, con estado y siguiente acción. Incluye 18 marcas y un proveedor; no son 19 catálogos completos listos para importar. Algunas URLs son históricas o están pendientes de acceso. La validación del proyecto no vuelve a descargar las fuentes.
 
-## Flujo de edición inicial
+`src/data/catalog.json` contiene las diez categorías candidatas, todas en borrador, y ninguna ficha. Esto evita publicar un inventario o una oferta sin validar.
 
-1. Obtener material oficial y confirmar los modelos que Sercom puede suministrar.
-2. Incorporar cada ficha como `draft`, conservando marca, código exacto, categorías y fuente.
-3. Completar descripción, 3-5 características verificadas, unidad, imagen y variantes aplicables.
-4. Revisar el uso de imágenes y documentos. No asumir derechos por estar disponibles en Internet.
-5. Registrar revisión comercial y pasar a `approved` cuando corresponda. Las categorías también deben aprobarse.
-6. Ejecutar `npm run check`, `npm test` y `npm run build`, revisar la diferencia y la página generada.
-7. Incorporar la versión revisada a `main`. Al conectar el alojamiento, sus compilaciones publicarán los cambios.
+## 2. Campos de una ficha y lo que exige el validador
 
-El código permite la publicación de aprobados mediante `getPublishedProducts`, que elimina metadatos internos. Falta conectar esa salida a las futuras pantallas del catálogo. Un campo booleano no sustituye la revisión humana ni confirma inventario.
+Cada producto de `catalog.json` es un objeto con estos campos y ningún otro (un campo desconocido se rechaza):
 
-## Identidad y variantes
+| Campo | Contenido | Regla |
+| --- | --- | --- |
+| `id` | Identificador | Minúsculas, cifras y guiones (`guante-nitrilo-37-175`); único. Es la dirección de la página: `/productos/{id}/`. |
+| `brandId` | Marca | Un `id` de `brands.json` de tipo `brand` (un proveedor no es una marca). |
+| `model` | Modelo o código exacto del fabricante | No vacío; único dentro de la misma marca. Es el «Código» que se muestra y se busca. |
+| `name` | Nombre visible | No vacío. |
+| `categoryIds` | Categorías | Al menos una; todas deben existir en `catalog.json`. |
+| `status` | Estado editorial | `draft`, `in_review`, `approved` o `retired` (sección 4). |
+| `description` | Resumen | Texto. Obligatorio para `approved`. |
+| `characteristics` | Características verificadas | Lista de textos; de 3 a 5 para `approved`. |
+| `saleUnit` | Unidad de venta (`par`, `pieza`, `caja`…) | Obligatoria para `approved`. |
+| `variants` | Tallas, colores o presentaciones | Lista de `{ id, label, manufacturerCode }`: `id` en el formato de arriba y único en la ficha, etiqueta y código del fabricante no vacíos. |
+| `image` | Fotografía | `{ url, alt, sourceUrl, usageConfirmed }`: `url` y `sourceUrl` con `https`, texto alternativo, y `usageConfirmed: true`. Obligatoria para `approved`. |
+| `source` | Fuente revisada | `{ url, checkedOn }`: `https` y fecha `AAAA-MM-DD` válida. Obligatoria para `approved`. |
+| `approval` | Aprobación comercial | `{ by, on, supplyConfirmed }`: quién aprobó, fecha `AAAA-MM-DD` válida y `supplyConfirmed: true`. Obligatoria para `approved` y para que un retirado conserve su página. |
+| `documents` | Fichas técnicas u otros documentos | Lista de `{ label, url }` con `https`. Opcional. |
 
-Un modelo se identifica por marca y código. Variantes como talla/color se guardan dentro de esa ficha con su código original. No duplicar el mismo modelo por aparecer en varios proveedores o categorías. Espomega puede ser origen comercial; el producto debe conservar su marca real, por ejemplo Derma Care.
+Además, en todo el archivo:
 
-## Automatización posterior, sin necesitar una base de datos desde hoy
+- Ninguna clave se llama precio, costo, existencias o inventario (`price`, `precio`, `cost`, `costo`, `stock`, `inventory`, `inventario`, en singular o plural): el sitio no publica esos datos.
+- La marca excluida no puede aparecer en `id`, `brandId`, `model`, `name` ni en el nombre de la marca.
+- Lo reservado a los ejemplos se rechaza: un `id` que empieza con `ejemplo-`, un nombre con «de ejemplo» y un código (`model` o de variante) que empieza con `EJ-` y una cifra.
+- Una ficha `approved` exige que **todas** sus categorías estén aprobadas.
 
-Una tarea del repositorio puede consultar las fuentes permitidas, conservar `ETag`, fecha y huella, comparar con la versión anterior y proponer cambios en una rama. Tras validación y revisión, se integran y se vuelve a compilar el sitio. Git conserva un historial; los PDFs originales y materiales voluminosos deben almacenarse aparte según permiso y tamaño.
+Lo que el validador no revisa todavía: el texto de los campos de producto frente a las reglas de afirmaciones del sitio. Un texto legítimo de fabricante puede hacer fallar el escáner; está descrito en [`datos-y-modos.md`](datos-y-modos.md#7-límite-conocido-las-reglas-de-afirmaciones-y-el-texto-de-los-productos) y se decide antes de cargar el piloto.
 
-Una base de datos puede ayudar cuando hay un panel y varios editores, pero no es requisito para detectar cambios o actualizar archivos JSON. Ninguna de esas tareas está programada en este repositorio; el único workflow preparado es el control de calidad de cambios de código.
+## 3. Flujo para agregar un producto real
 
-Reglas del futuro conector:
+1. Obtener material del fabricante y confirmar con el contacto comercial los modelos que Sercom Active puede suministrar.
+2. Agregar la ficha como `draft` con `id`, `brandId`, `model`, `name`, `categoryIds` y `source`. Mientras esté en `draft` o `in_review` no aparece en ninguna compilación.
+3. Completar `description`, de 3 a 5 `characteristics` verificadas en la fuente, `saleUnit`, las `variants` aplicables con su código original y los `documents` que se puedan enlazar.
+4. Revisar el uso de la imagen y de los documentos: no se asumen derechos por estar disponibles en Internet. Registrar `image.sourceUrl` y poner `usageConfirmed: true` solo con el uso confirmado.
+5. Con la revisión del contacto comercial, registrar `approval` (`by`, `on`, `supplyConfirmed: true`) y pasar a `approved`. Si su categoría sigue en borrador, aprobarla también (ver [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría)).
+6. Ejecutar `npm run check`, `npm test` y `npm run verify`, revisar la diferencia y la página generada en la compilación de producción (`npm run build` y `npm run preview`).
+7. Integrar el cambio en `main`. Cuando haya alojamiento conectado, su compilación publicará el cambio (hoy no hay ninguno).
 
-- Respetar el acceso y las condiciones de la fuente; preferir Excel/CSV o API/feed entregado por proveedor.
-- Mantener lista de marcas y modelos habilitados y excluir GISA.
-- Descargar en servidor/trabajo interno, nunca al abrir cada visita del cliente.
-- Separar cambio de archivo de cambio técnico de producto.
-- Conservar último contenido aprobado ante un error o una extracción dudosa.
-- Presentar altas, cambios y posibles retirados para revisión; no borrar porque una fuente devolvió 404/503.
+`getPublishedProducts` entrega a las páginas solo lo público (sin aprobación, fuente ni uso de imagen). Un campo booleano no sustituye la revisión humana ni confirma inventario.
+
+## 4. Qué hace el sitio con cada estado
+
+| Estado | Qué pasa |
+| --- | --- |
+| `draft` | Nada se publica. `/productos/{id}/` no existe (404). |
+| `in_review` | Igual que `draft`. |
+| `approved` | Ficha en `/productos/{id}/`; aparece en el catálogo, en su categoría, en su marca, en la búsqueda, en los conteos, en «Productos del catálogo» de la portada y en «Más productos…». |
+| `retired` con `approval` completa | Fue público: su dirección se conserva como página informativa (sección 5). Sale de listados, conteos, búsqueda y selecciones. |
+| `retired` sin `approval` completa | Nunca fue público y sigue privado: su dirección da 404. El escáner falla si existe una página para él (R-RULE-14). |
+
+## 5. Producto retirado
+
+Quien guardó el enlace de una ficha, escaneó una cotización o conserva un mensaje no debe llegar a un error: la dirección de un producto que fue público sigue funcionando y dice que salió del catálogo (requisito R-STATE-04 del plan).
+
+**Datos.** Un producto con `status: "retired"` y `approval` completa (`by`, `on` con fecha válida y `supplyConfirmed: true`) es un retirado público (`isPublicRetired`). `getRetiredProducts` entrega de él solo `id`, `brandId`, `model`, `name` y `categoryIds`, y `createSiteData` lo pone en `retiredProducts`, aparte de `products`, con sus categorías públicas en el modo (puede quedar sin ninguna). Lo que se muestra pasa en el validador las mismas reglas que una ficha aprobada; sus categorías no necesitan estar aprobadas. Un identificador no puede repetirse entre productos y retirados.
+
+**Cómo retirar un producto.**
+
+1. En `src/data/catalog.json`, cambiar su `status` a `retired` y **conservar** su bloque `approval`.
+2. Ejecutar `npm run check`, `npm test` y `npm run verify`.
+3. Su dirección `/productos/{id}/` sigue funcionando y pasa a ser la página informativa; el producto sale de listados, conteos, búsqueda, «Productos del catálogo» y «Más productos…».
+
+Solo si el producto debe desaparecer por completo (su dirección da 404) se quita también `approval`. Volver a publicarlo es devolverlo a `approved` con sus datos completos.
+
+**Qué muestra la página.** La ruta, el pictograma de su categoría (nunca una fotografía), la categoría pública y el nombre (H1), las filas Marca y Código, el aviso «Producto retirado» con «Este producto ya no forma parte del catálogo.» y «Dinos qué necesitas y revisamos alternativas.», las acciones «Consultar alternativas» (WhatsApp) y «Consultar por correo» con el borrador de alternativas, la banda de solicitud especial y «Más productos…». Su título es «{nombre} (producto retirado) · Sercom Active».
+
+**Qué nunca muestra.** Acciones para cotizar o pedir la ficha técnica, unidad de venta, resumen, características, variantes, documentación, el aviso de disponibilidad ni la banda de ayuda de la ficha: nadie mantiene ya esos datos y el producto no se cotiza.
+
+**El ejemplo de la vista previa.** `src/data/preview/example-products.json` tiene un ejemplo con `"retired": true`, «Producto de ejemplo retirado». Solo existe en la vista previa y ninguna página lo enlaza: se abre escribiendo la dirección `/productos/ejemplo-producto-retirado/` en el servidor de `npm run dev` o de la vista previa compilada.
+
+**Qué lo protege.** El escáner (R-RULE-14) exige que existan exactamente las páginas de los retirados públicos y ninguna de un retirado sin aprobación. El verificador de marcado comprueba que una página de producto sea ficha o retirado, nunca las dos (R-STATE-04a), que el aviso y las dos acciones estén completos (R-STATE-04b), que haya un solo H1 antes del aviso y el título lleve «(producto retirado)» (R-STATE-04c) y que no aparezca nada de la ficha (R-STATE-04d). Detalle en [`datos-y-modos.md`](datos-y-modos.md#65-verificador-de-marcado).
+
+## 6. Imágenes, documentos y variantes
+
+- **Imágenes.** Hoy una ficha aprobada tiene una sola fotografía, con dirección absoluta `https`, que la página usa tal cual dentro de un marco de proporción fija. **Pendiente para el paso 3:** ampliar el esquema de imagen (archivo local optimizado o dirección absoluta, con ancho y alto) con sus pruebas, antes de cargar el piloto. No se diseña una galería de varias fotografías mientras el modelo de datos no la admita.
+- **Documentos.** Cada documento se enlaza a su origen (`https`) y se abre en otra pestaña. Sin documentos, la ficha ofrece «Solicitar ficha técnica» por WhatsApp. Los PDF de fabricantes no se copian a `public/`.
+- **Variantes.** Se guardan dentro de su ficha con el código original del fabricante. Se muestran como información (no se eligen: eso llega en el paso 2) y la búsqueda encuentra sus códigos.
+
+## 7. Identidad de un producto
+
+Un modelo se identifica por marca y código. No se duplica el mismo modelo por aparecer en varios proveedores o categorías: una ficha puede tener varias categorías. Espomega puede ser origen comercial; el producto conserva su marca real, por ejemplo Derma Care.
+
+## 8. Automatización posterior, sin necesitar una base de datos desde hoy
+
+**No está construido.** Una tarea del repositorio podría consultar las fuentes permitidas, conservar `ETag`, fecha y huella, comparar con la versión anterior y proponer cambios en una rama. Tras validación y revisión, se integran y se vuelve a compilar el sitio. Git conserva un historial; los PDF originales y materiales voluminosos se almacenarían aparte según permiso y tamaño.
+
+Una base de datos puede ayudar cuando haya un panel y varios editores, pero no es requisito para detectar cambios o actualizar archivos JSON. Ninguna de esas tareas está programada en este repositorio; el único flujo de GitHub Actions es el control de calidad.
+
+Reglas para el futuro conector:
+
+- Respetar el acceso y las condiciones de la fuente; preferir Excel, CSV o una API entregada por el proveedor.
+- Mantener la lista de marcas y modelos habilitados, sin la marca que el proyecto excluye.
+- Descargar en un trabajo interno, nunca al abrir cada visita del cliente.
+- Separar el cambio de archivo del cambio técnico de producto.
+- Conservar el último contenido aprobado ante un error o una extracción dudosa.
+- Presentar altas, cambios y posibles retirados para revisión; no borrar porque una fuente devolvió 404 o 503.
 - No convertir un catálogo actualizado en una promesa de existencia, precio o entrega.
 
 Las credenciales, costos de proveedor, archivos de clientes y adjuntos no se agregan a Git ni a `public/`. `private-imports/` está excluida del repositorio como ubicación local temporal, no como respaldo durable.
