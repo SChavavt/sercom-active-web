@@ -19,8 +19,9 @@
 .site-header {
   position: sticky;
   /* la franja de servicio se desplaza; la cabecera se queda. --utility-shift es el alto real de la franja
-     (lo mide SiteHeader): crece si el texto se agranda o se espacia */
-  top: calc(-1 * (var(--utility-shift, var(--utility-h)) + var(--line)));
+     (lo mide SiteHeader): crece si el texto se agranda o se espacia. Sin JavaScript, o antes de la primera medida,
+     vale --utility-fit, el alto que la franja tiene con la letra agrandada (responsive.css 6.9), o el del diseño */
+  top: calc(-1 * (var(--utility-shift, var(--utility-fit, var(--utility-h))) + var(--line)));
   z-index: 50;
   display: grid;
   grid-template-columns: minmax(0, 1fr);

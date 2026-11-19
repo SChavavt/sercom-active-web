@@ -506,6 +506,33 @@
   }
 }
 
+/* Cabecera fija de computadora sin JavaScript: sin la medida del script, la cabecera debe esconder la franja
+   con el alto que esta tiene. Un renglón de la franja mide lo más alto de sus piezas: el texto (0.8125rem con
+   interlínea 1.2) o los iconos de 16 px; entre renglones y arriba y abajo, 4 px. Con la letra normal un renglón queda
+   en los 36 px del diseño. Los dos grupos van en un renglón mientras caben juntos (194 px + 46.77rem de contenido,
+   más el relleno de la franja a cada lado); si no, en dos, y el primero se parte a su vez cuando él solo
+   (81 px + 26.94rem) no cabe (el lugar queda solo en su renglón, con su letra y su interlínea de etiqueta), el
+   segundo cuando él solo (89 px + 19.83rem) no cabe. Con la letra normal ninguna condición se cumple desde 1100 px;
+   con 200 % la franja tiene uno o dos renglones. Con JavaScript manda la medida del script (--utility-shift). Abajo
+   de 1100 px, sin JavaScript la cabecera no es fija (6.2). */
+@media (min-width: 1100px) {
+  .site-header {
+    --utility-row: max(16px, 0.8125rem * 1.2);
+    --utility-place-row: max(16px, var(--label-sm) * var(--type-label-leading));
+    --utility-fit: max(var(--utility-h), 2 * var(--s-1) + var(--utility-row));
+  }
+}
+@media (min-width: 1100px) and (max-width: 1359px) {
+  @container lamina (width < calc(242px + 46.77rem)) { .site-header { --utility-fit: calc(3 * var(--s-1) + 2 * var(--utility-row)); } }
+  @container lamina (width < calc(129px + 26.94rem)) { .site-header { --utility-fit: calc(4 * var(--s-1) + 2 * var(--utility-row) + var(--utility-place-row)); } }
+  @container lamina (width < calc(137px + 19.83rem)) { .site-header { --utility-fit: calc(5 * var(--s-1) + 3 * var(--utility-row) + var(--utility-place-row)); } }
+}
+@media (min-width: 1360px) {
+  @container lamina (width < calc(258px + 46.77rem)) { .site-header { --utility-fit: calc(3 * var(--s-1) + 2 * var(--utility-row)); } }
+  @container lamina (width < calc(145px + 26.94rem)) { .site-header { --utility-fit: calc(4 * var(--s-1) + 2 * var(--utility-row) + var(--utility-place-row)); } }
+  @container lamina (width < calc(153px + 19.83rem)) { .site-header { --utility-fit: calc(5 * var(--s-1) + 3 * var(--utility-row) + var(--utility-place-row)); } }
+}
+
 /* Pie: la columna de contacto debe tener lugar para la parte más ancha del correo, «sercomactive.com» (7.68rem
    con la letra del pie de computadora, 7.17rem con la de tableta) más su icono; los enlaces, para su palabra más
    larga. Si no lo tiene, las columnas se reacomodan en dos filas: en computadora, cuatro celdas de 6 columnas; en
