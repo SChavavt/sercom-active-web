@@ -59,9 +59,9 @@
 .masthead__logo img { width: 156px; height: 59px; }        /* logo.svg sin margen propio: proporción 2.656 */
 
 .masthead__nav { display: flex; min-width: 0; }
-.nav__list { display: flex; flex: 1; flex-wrap: wrap; justify-content: space-between; padding: 0 var(--s-3); }   /* si no caben, los enlaces bajan de línea */
-.nav__list > li { display: flex; }
-.nav__link {
+.masthead__nav-list { display: flex; flex: 1; flex-wrap: wrap; justify-content: space-between; padding: 0 var(--s-3); }   /* si no caben, los enlaces bajan de línea */
+.masthead__nav-list > li { display: flex; }
+.masthead__nav-link {
   position: relative;
   display: flex;
   align-items: center;
@@ -74,7 +74,7 @@
   white-space: nowrap;
   list-style: none;
 }
-.nav__link::after {
+.masthead__nav-link::after {
   content: "";
   position: absolute;
   left: var(--s-3);
@@ -86,14 +86,14 @@
   transform-origin: bottom;
   transition: transform var(--ease);
 }
-.nav__link:hover::after,
-.nav__link[aria-current]::after,                         /* página actual ("page") y su sección ("true") */
-.nav__cat[open] > .nav__link::after { transform: none; }
-.nav__link:focus-visible { outline-offset: -3px; }
-.nav__link .icon { color: var(--blue); transition: transform var(--ease); }
-.nav__cat { display: flex; }
-.nav__cat[open] > .nav__link .icon { transform: rotate(180deg); }
-.nav__list > .nav__item--quote { display: none; }        /* en computadora esta entrada es el bloque azul al final de la cabecera */
+.masthead__nav-link:hover::after,
+.masthead__nav-link[aria-current]::after,                         /* página actual ("page") y su sección ("true") */
+.masthead__nav-cat[open] > .masthead__nav-link::after { transform: none; }
+.masthead__nav-link:focus-visible { outline-offset: -3px; }
+.masthead__nav-link .icon { color: var(--blue); transition: transform var(--ease); }
+.masthead__nav-cat { display: flex; }
+.masthead__nav-cat[open] > .masthead__nav-link .icon { transform: rotate(180deg); }
+.masthead__nav-list > .masthead__nav-item--quote { display: none; }        /* en computadora esta entrada es el bloque azul al final de la cabecera */
 
 /* Panel de categorías: una pequeña placa que cuelga de la cabecera */
 .catpanel {

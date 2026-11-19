@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { checkMarkup, cssSelectors, expectedLocation, parseHtml, routeOf, selectorClasses } from '../scripts/check-markup.mjs';
+import { checkMarkup, cssSelectors, expectedLocation, parseHtml, routeOf, selectorAttributes, selectorClasses } from '../scripts/check-markup.mjs';
 import { makeTree, removeTree, ROOT } from './helpers.mjs';
 
 // ---------------------------------------------------------------------------------------------------
@@ -17,19 +17,22 @@ import { makeTree, removeTree, ROOT } from './helpers.mjs';
  */
 const ORDER = ['logo', 'searchButton', 'menuButton', 'nav', 'form', 'wa', 'cta'];
 function header({ search = true, categories = true, marks = {}, classes = {}, order = ORDER } = {}) {
-  const c = { nav: 'masthead__nav', search: 'masthead__search', input: 'masthead__search-input', button: 'masthead__search-btn', ...classes };
+  const c = {
+    nav: 'masthead__nav', list: 'masthead__nav-list', link: 'masthead__nav-link', cat: 'masthead__nav-cat', quote: 'masthead__nav-item--quote',
+    search: 'masthead__search', input: 'masthead__search-input', button: 'masthead__search-btn', ...classes,
+  };
   const current = key => (marks[key] ? ` aria-current="${marks[key]}"` : '');
-  const link = (href, label) => `<li><a class="nav__link" href="${href}"${current(`nav:${href}`)}>${label}</a></li>`;
+  const link = (href, label) => `<li><a class="${c.link}" href="${href}"${current(`nav:${href}`)}>${label}</a></li>`;
   const searchButton = search ? '<button class="masthead__btn masthead__btn--search" type="button" aria-expanded="false" aria-controls="buscador" data-toggle="search"><span class="label">Buscar</span></button>' : '';
   const menuButton = '<button class="masthead__btn masthead__btn--menu" type="button" aria-expanded="false" aria-controls="menu" data-toggle="menu"><span class="label">Menú</span></button>';
   const cats = categories
-    ? `<li><details class="nav__cat"><summary class="nav__link"${current('nav:categorias')}>Categorías<svg class="icon"><path d="M0 0"/></svg></summary><div class="catpanel"><ul class="catpanel__list grid12">`
+    ? `<li><details class="${c.cat}"><summary class="${c.link}"${current('nav:categorias')}>Categorías<svg class="icon"><path d="M0 0"/></svg></summary><div class="catpanel"><ul class="catpanel__list grid12">`
       + `<li class="span-2"><a class="catpanel__link cell-link" href="/categorias/manos/"${current('cat:/categorias/manos/')}><span>Protección de manos</span></a></li>`
       + `<li class="span-2"><a class="catpanel__link cell-link" href="/categorias/cabeza/"${current('cat:/categorias/cabeza/')}><span>Protección de cabeza</span></a></li>`
       + `<li class="catpanel__all"><a class="catpanel__link catpanel__link--all cell-link" href="/catalogo/"${current('cat:todo')}><span>Ver todo el catálogo</span></a></li></ul></div></details></li>`
     : '';
-  const nav = `<nav class="${c.nav} span-4" id="menu" aria-label="Principal"><ul class="nav__list">${link('/catalogo/', 'Catálogo')}${cats}${link('/marcas/', 'Marcas')}`
-    + `<li class="nav__item--quote">${link('/cotizar/', 'Cotizar mi lista').slice(4, -5)}</li>${link('/contacto/', 'Contacto')}</ul></nav>`;
+  const nav = `<nav class="${c.nav} span-4" id="menu" aria-label="Principal"><ul class="${c.list}">${link('/catalogo/', 'Catálogo')}${cats}${link('/marcas/', 'Marcas')}`
+    + `<li class="${c.quote}">${link('/cotizar/', 'Cotizar mi lista').slice(4, -5)}</li>${link('/contacto/', 'Contacto')}</ul></nav>`;
   const form = search
     ? `<form class="${c.search} span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action="/catalogo/" method="get"><label class="vh" for="q">Buscar</label>`
       + `<input class="${c.input}" id="q" name="q" type="search" placeholder="Buscar por producto, marca o código" /><button class="${c.button}" type="submit" aria-label="Buscar"><svg class="icon"></svg></button></form>`
@@ -47,7 +50,7 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
 const dock = (marks = {}) => `<nav class="dock" aria-label="Acciones rápidas"><a class="dock__link" href="/cotizar/"${marks['dock:/cotizar/'] ? ` aria-current="${marks['dock:/cotizar/']}"` : ''}><span>Cotizar mi lista</span></a><a class="dock__link dock__link--wa" href="https://wa.me/5212214002219"><span>WhatsApp</span></a></nav>`;
 const page = (options = {}, body = '<h1>Página</h1>') => `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>Prueba</title></head><body><a class="skip-link" href="#contenido">Saltar al contenido</a>`
   + `<div class="sheet">${header(options)}<main id="contenido" tabindex="-1">${body}</main></div>${dock(options.marks)}</body></html>`;
-const STYLE = '.masthead__nav{display:flex}.masthead__search{display:flex}.masthead__search-input{flex:1}.masthead__search-btn{width:44px}.nav__link{padding:0 12px}@media (max-width:1099px){.masthead__nav,.masthead__search{position:absolute;display:none}html:not(.js) .masthead__nav{display:flex}}';
+const STYLE = '.masthead__nav{display:flex}.masthead__search{display:flex}.masthead__search-input{flex:1}.masthead__search-btn{width:44px}.masthead__nav-link{padding:0 12px}@media (max-width:1099px){.masthead__nav,.masthead__search{position:absolute;display:none}html:not(.js) .masthead__nav{display:flex}}';
 
 /** Revisa un sitio temporal (una portada correcta más `files`) con solo las comprobaciones indicadas. */
 async function check(files, { ids, preview = true } = {}) {
@@ -77,9 +80,14 @@ test('el lector de HTML arma el árbol con elementos vacíos, autocerrados y tex
 });
 
 test('los selectores y sus clases se leen de cada regla, también dentro de @media', () => {
-  const css = '/* .nav comentario */ .a,.b .c:hover{x:1}@media (max-width:1099px){html:not(.js) .d,.e:is(.f, .g){y:2}}@keyframes k{from{z:0}50%{z:1}}.h[data-x="{.nav}"]{w:0}';
-  assert.deepEqual(cssSelectors(css), ['.a', '.b .c:hover', 'html:not(.js) .d', '.e:is(.f, .g)', '.h[data-x=""]']);
+  const css = '/* .nav comentario */ .a,.b .c:hover{x:1}@media (max-width:1099px){html:not(.js) .d,.e:is(.f, .g){y:2}}@keyframes k{from{z:0}50%{z:1}}.h[data-x="{.nav}"]{w:0}.i::before{content:"}.nav{"}';
+  assert.deepEqual(cssSelectors(css), ['.a', '.b .c:hover', 'html:not(.js) .d', '.e:is(.f, .g)', '.h[data-x="{.nav}"]', '.i::before']);
   assert.deepEqual(selectorClasses('.masthead__nav.is-open > .nav__link::after'), ['masthead__nav', 'is-open', 'nav__link']);
+  // Los escapes se leen como el navegador; lo que va dentro de un atributo o de una cadena no es una clase.
+  assert.deepEqual(selectorClasses('.se\\61 rch .na\\v .\\6e av__link:not(.x)[data-x=".y"]'), ['search', 'nav', 'nav__link', 'x']);
+  assert.deepEqual(selectorAttributes('main [class~="nav" i] [data-x=a][class|=b], [CLASS^=se\\61 rch]'), [
+    { operator: '~=', value: 'nav', insensitive: true }, { operator: '|=', value: 'b', insensitive: false }, { operator: '^=', value: 'search', insensitive: false },
+  ]);
 });
 
 test('la ruta de cada página sale de su archivo', () => {
@@ -95,8 +103,10 @@ test('la ruta de cada página sale de su archivo', () => {
 test('U-07: la cabecera con nombres de su bloque pasa, en vista previa y en producción', async () => {
   assert.deepEqual(await check({ 'marcas/index.html': page({ marks: { 'nav:/marcas/': 'page' } }) }, { ids: ['U-07'] }), []);
   assert.deepEqual(await check({ 'index.html': page({ search: false, categories: false, marks: { logo: 'page' } }) }, { ids: ['U-07'], preview: false }), []);
-  // Clases que solo se parecen a las retiradas.
-  assert.deepEqual(await check({ '_astro/pagina.css': '.navegacion{x:0}.searchbox{x:0}.catalog-search__input{x:0}.search-x{x:0}.nav__link{x:0}.masthead--no-search .nav__list{x:0}' }, { ids: ['U-07'] }), []);
+  // Clases y selectores de atributo que solo se parecen a los retirados.
+  const similar = '.navegacion{x:0}.searchbox{x:0}.catalog-search__input{x:0}.search-x{x:0}.catalog-nav__list{x:0}.masthead--no-search .masthead__nav-list{x:0}'
+    + '[class*="catalog-nav"]{x:0}[class^="masthead"]{x:0}[data-x~=nav]{x:0}[class]{x:0}.h[data-x="{.nav}"]{x:0}:is(.navegacion,.searchbox){x:0}.i::before{content:".nav"}';
+  assert.deepEqual(await check({ '_astro/pagina.css': similar }, { ids: ['U-07'] }), []);
 });
 
 test('U-07: una regla de estilo con .nav, .search, .search__input o .search__btn falla', async () => {
@@ -109,9 +119,26 @@ test('U-07: una regla de estilo con .nav, .search, .search__input o .search__btn
   assert.deepEqual(inline.map(problem => problem.file), ['pagina/index.html <style> 1']);
 });
 
+test('U-07: los hijos del bloque .nav o .search, los selectores de atributo y los escapes también fallan', async () => {
+  const cases = [
+    // Los hijos que conservaban el nombre genérico: una página con un bloque .nav propio heredaba sus reglas.
+    '.nav__item--quote{display:none}', '.nav__list>li{background:#fff}', '.nav__link{min-height:60px}', '.nav__cat{display:flex}', '.search--abierta{x:0}',
+    // Otras formas de escribir los mismos nombres.
+    '[class~=nav]{display:none}', '[class="search"]{display:none}', '[class~="nav" i]{x:0}', "[class|='search']{x:0}", '[class^=nav]{x:0}',
+    '[class*="nav__l"]{x:0}', '[class$="__btn"]{x:0}', '[class*=" search "]{x:0}', 'main [class~=search__input]{x:0}',
+    '.se\\61 rch{display:none}', '.na\\v{x:0}', '.\\6e av__link{x:0}',
+  ];
+  for (const css of cases) {
+    const problems = await check({ '_astro/otra.css': css }, { ids: ['U-07'] });
+    assert.equal(problems.length, 1, `${css} → ${JSON.stringify(problems.map(problem => problem.message))}`);
+  }
+});
+
 test('U-07: la cabecera que usa las clases genéricas o no usa las de su bloque falla', async () => {
   const cases = [
     [{ nav: 'nav' }, 2], [{ nav: 'masthead__nav nav' }, 1], [{ search: 'search' }, 2], [{ input: 'search__input' }, 2], [{ button: 'search__btn' }, 2], [{ nav: 'navegacion' }, 1],
+    // Los hijos con los nombres anteriores (uno por cada elemento que los lleva: 4 enlaces y el resumen Categorías).
+    [{ list: 'nav__list' }, 1], [{ link: 'nav__link' }, 5], [{ cat: 'nav__cat' }, 1], [{ quote: 'nav__item--quote' }, 1],
   ];
   for (const [classes, count] of cases) {
     const problems = await check({ 'pagina/index.html': page({ classes }) }, { ids: ['U-07'] });

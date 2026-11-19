@@ -125,33 +125,116 @@ const describe = element => {
 
 /**
  * Selectores de una hoja de estilo, uno por elemento de cada lista de selectores (sin @media ni @font-face).
+ * Los comentarios se quitan; las cadenas se conservan tal cual (un «{» o un «;» dentro de una cadena no corta nada).
  * @param {string} css
  */
 export function cssSelectors(css) {
-  const clean = css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""');
   const selectors = [];
-  // El texto antes de cada «{» es un selector o una regla @; las declaraciones no contienen llaves.
-  for (const match of clean.matchAll(/([^{};]+)\{/g)) {
-    const prelude = match[1].trim();
-    if (!prelude || prelude.startsWith('@') || /^(?:from|to|\d+(?:\.\d+)?%)(?:\s*,|$)/.test(prelude)) continue;
-    selectors.push(...splitSelectorList(prelude));
+  let buffer = '';
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i];
+    if (char === '/' && css[i + 1] === '*') {
+      const end = css.indexOf('*/', i + 2);
+      i = end === -1 ? css.length : end + 1;
+    } else if (char === '"' || char === "'") {
+      const end = stringEnd(css, i);
+      buffer += css.slice(i, end);
+      i = end - 1;
+    } else if (char === '\\') {
+      buffer += css.slice(i, i + 2);
+      i++;
+    } else if (char === '{') {
+      // El texto antes de cada «{» es un selector o una regla @; las declaraciones no contienen llaves.
+      const prelude = buffer.trim();
+      buffer = '';
+      if (!prelude || prelude.startsWith('@') || /^(?:from|to|\d+(?:\.\d+)?%)(?:\s*,|$)/.test(prelude)) continue;
+      selectors.push(...splitSelectorList(prelude));
+    } else if (char === '}' || char === ';') {
+      buffer = '';
+    } else {
+      buffer += char;
+    }
   }
   return selectors;
+}
+/** Posición siguiente al cierre de la cadena que empieza en `start`. */
+function stringEnd(text, start) {
+  const quote = text[start];
+  for (let i = start + 1; i < text.length; i++) {
+    if (text[i] === '\\') i++;
+    else if (text[i] === quote) return i + 1;
+  }
+  return text.length;
 }
 /** Separa «a, b:is(c, d)» en ["a", "b:is(c, d)"]. */
 function splitSelectorList(list) {
   const parts = [];
   let depth = 0, start = 0;
   for (let i = 0; i < list.length; i++) {
-    if (list[i] === '(') depth++;
-    else if (list[i] === ')') depth--;
+    if (list[i] === '"' || list[i] === "'") i = stringEnd(list, i) - 1;
+    else if (list[i] === '\\') i++;
+    else if (list[i] === '(' || list[i] === '[') depth++;
+    else if (list[i] === ')' || list[i] === ']') depth--;
     else if (list[i] === ',' && depth === 0) { parts.push(list.slice(start, i).trim()); start = i + 1; }
   }
   parts.push(list.slice(start).trim());
   return parts.filter(Boolean);
 }
+
+/** Quita los escapes de CSS de un nombre o de un valor, como lo lee el navegador («se\61 rch» → «search»). */
+export const unescapeCss = text => text.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|([^\n\r\f]))/g,
+  (_, hex, char) => (hex ? String.fromCodePoint(Number.parseInt(hex, 16) || 0xfffd) : char));
+const ESCAPE = String.raw`\\(?:[0-9a-fA-F]{1,6}[ \t\n\r\f]?|[^\n\r\f])`;
+const IDENT = new RegExp(String.raw`(?:${ESCAPE}|[\w\u00a0-\uffff-])+`, 'y');
+const ATTRIBUTE_SELECTOR = new RegExp(String.raw`^\s*((?:${ESCAPE}|[\w-])+)\s*(?:([~|^$*]?=)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:${ESCAPE}|[^\s\]\\])+)\s*([iIsS])?)?\s*$`, 's');
+
+/**
+ * Lee un selector: las clases que nombra con «.» y sus selectores de atributo (lo que va entre corchetes y dentro de
+ * las cadenas no son clases). Los escapes se resuelven.
+ * @param {string} selector
+ */
+function readSelector(selector) {
+  const classes = [];
+  const attributes = [];
+  for (let i = 0; i < selector.length;) {
+    const char = selector[i];
+    if (char === '"' || char === "'") {
+      i = stringEnd(selector, i);
+    } else if (char === '\\') {
+      i += 2;
+    } else if (char === '.') {
+      IDENT.lastIndex = i + 1;
+      const match = IDENT.exec(selector);
+      if (match) classes.push(unescapeCss(match[0]));
+      i = match ? IDENT.lastIndex : i + 1;
+    } else if (char === '[') {
+      let end = i + 1;
+      while (end < selector.length && selector[end] !== ']') {
+        if (selector[end] === '"' || selector[end] === "'") end = stringEnd(selector, end);
+        else end += selector[end] === '\\' ? 2 : 1;
+      }
+      const match = ATTRIBUTE_SELECTOR.exec(selector.slice(i + 1, end));
+      if (match) {
+        const [, name, operator, raw, flag] = match;
+        const value = raw === undefined ? null : unescapeCss(/^["']/.test(raw) ? raw.slice(1, -1) : raw);
+        attributes.push({ name: unescapeCss(name).toLowerCase(), operator: operator ?? null, value, insensitive: flag?.toLowerCase() === 'i' });
+      }
+      i = end + 1;
+    } else {
+      i++;
+    }
+  }
+  return { classes, attributes };
+}
 /** Clases que nombra un selector («.a .b__c:hover» → ["a", "b__c"]). */
-export const selectorClasses = selector => [...selector.matchAll(/\.(-?[_a-zA-Z\u00a0-\uffff][\w\u00a0-\uffff-]*)/g)].map(match => match[1]);
+export const selectorClasses = selector => readSelector(selector).classes;
+/**
+ * Selectores de atributo sobre `class` de un selector («[class~="nav" i]» → { operator: "~=", value: "nav", insensitive: true }).
+ * @returns {{ operator: string | null, value: string | null, insensitive: boolean }[]}
+ */
+export const selectorAttributes = selector => readSelector(selector).attributes
+  .filter(attribute => attribute.name === 'class')
+  .map(({ operator, value, insensitive }) => ({ operator, value, insensitive }));
 
 // ---------------------------------------------------------------------------------------------------
 // Rutas
@@ -167,8 +250,34 @@ export function routeOf(file) {
 // Comprobaciones
 // ---------------------------------------------------------------------------------------------------
 
-// Clases genéricas que la cabecera ya no usa: una página puede usarlas sin heredar reglas de la cabecera (U-07).
-const RETIRED_HEADER_CLASSES = ['nav', 'search', 'search__input', 'search__btn'];
+// Bloques genéricos que la cabecera ya no usa (U-07): ni la cabecera ni ninguna regla de las hojas globales usan
+// «nav» o «search», ni sus elementos y variantes («nav__link», «search__input», «nav--x»). Así un elemento de página
+// con esos nombres nunca hereda reglas de la cabecera. Las clases de la cabecera son «masthead__nav…» y «masthead__search…».
+const RETIRED_HEADER_BLOCKS = ['nav', 'search'];
+// Nombres que usó la cabecera, para los selectores de atributo que comparan una parte del valor («[class^=nav]»).
+const RETIRED_HEADER_CLASSES = ['nav', 'nav__list', 'nav__link', 'nav__cat', 'nav__item--quote', 'search', 'search__input', 'search__btn'];
+/** ¿La clase es de un bloque retirado? */
+export const isRetiredClass = name => RETIRED_HEADER_BLOCKS.some(block => name === block || name.startsWith(`${block}__`) || name.startsWith(`${block}--`));
+/**
+ * ¿Un selector de atributo sobre `class` puede seleccionar un elemento con una clase retirada?
+ * «=» y «~=» comparan palabras enteras; «|=», el valor o su prefijo con guion; «^=», «$=» y «*=», una parte del valor.
+ * @param {{ operator: string | null, value: string | null, insensitive: boolean }} attribute
+ */
+export function classAttributeIsRetired({ operator, value, insensitive }) {
+  if (!operator || !value) return false;
+  const text = insensitive ? value.toLowerCase() : value;
+  const words = text.split(/\s+/).filter(Boolean);
+  // Palabras completas dentro del valor: las que tienen espacio (o el borde que el operador fija) a ambos lados.
+  const whole = (open, close) => words.filter((_, index) => (index > 0 || open || /^\s/.test(text)) && (index < words.length - 1 || close || /\s$/.test(text)));
+  switch (operator) {
+    case '=': case '~=': return words.some(isRetiredClass);
+    case '|=': return isRetiredClass(text);
+    case '^=': return RETIRED_HEADER_CLASSES.some(name => name.startsWith(text)) || whole(true, false).some(isRetiredClass);
+    case '$=': return RETIRED_HEADER_CLASSES.some(name => name.endsWith(text)) || whole(false, true).some(isRetiredClass);
+    case '*=': return RETIRED_HEADER_CLASSES.some(name => name.includes(text)) || whole(false, false).some(isRetiredClass);
+    default: return false;
+  }
+}
 
 /**
  * @typedef {{ file: string, route: string, root: Element, elements: Element[] }} Page
@@ -303,12 +412,13 @@ export const CHECKS = [
   },
   {
     id: 'U-07',
-    title: 'La navegación y la búsqueda de la cabecera usan nombres de su bloque; ninguna regla global selecciona .nav, .search, .search__input ni .search__btn',
+    title: 'La navegación y la búsqueda de la cabecera usan nombres de su bloque; ninguna regla global selecciona .nav, .search ni sus elementos (.nav__link, .search__input…), tampoco con [class…] ni con escapes',
     sheet(sheet) {
       const problems = [];
       for (const selector of sheet.selectors) {
-        const retired = selectorClasses(selector).filter(name => RETIRED_HEADER_CLASSES.includes(name));
-        if (retired.length) problems.push(`el selector «${selector}» usa la clase genérica .${retired.join(', .')}: una página que use ese nombre heredaría las reglas de la cabecera`);
+        const retired = [...new Set(selectorClasses(selector).filter(isRetiredClass))].map(name => `.${name}`);
+        for (const attribute of selectorAttributes(selector)) if (classAttributeIsRetired(attribute)) retired.push(`[class${attribute.operator}"${attribute.value}"${attribute.insensitive ? ' i' : ''}]`);
+        if (retired.length) problems.push(`el selector «${selector}» usa el nombre genérico ${retired.join(', ')}: una página que use ese nombre heredaría las reglas de la cabecera`);
       }
       return problems;
     },
@@ -317,7 +427,7 @@ export const CHECKS = [
       if (!parts) return ['la página no tiene la cabecera del sitio (<header class="site-header">)'];
       const problems = [];
       for (const element of parts.elements) {
-        const retired = classesOf(element).filter(name => RETIRED_HEADER_CLASSES.includes(name));
+        const retired = classesOf(element).filter(isRetiredClass);
         if (retired.length) problems.push(`${describe(element)} de la cabecera usa la clase genérica .${retired.join(', .')}`);
       }
       if (!parts.menu) problems.push('falta la navegación principal (#menu) en la cabecera');

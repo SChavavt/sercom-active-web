@@ -10,9 +10,9 @@
 @media (max-width: 1359px) {
   :root { --margin: 48px; --pad: 24px; --section-top: 72px; }
   .masthead__logo img { width: 141px; height: 53px; }
-  .nav__list { padding: 0 var(--s-2); }
-  .nav__link { padding: 0 var(--s-2); font-size: 0.9375rem; }
-  .nav__link::after { left: var(--s-2); right: var(--s-2); }
+  .masthead__nav-list { padding: 0 var(--s-2); }
+  .masthead__nav-link { padding: 0 var(--s-2); font-size: 0.9375rem; }
+  .masthead__nav-link::after { left: var(--s-2); right: var(--s-2); }
   .masthead__search { padding-left: var(--s-4); padding-right: var(--s-1); }
   .masthead__search-input { font-size: 0.875rem; }
   .masthead__search-btn { width: 40px; }
@@ -29,14 +29,14 @@
 /* Con búsqueda la navegación tiene 4 columnas: hasta 1199 px sus enlaces se aprietan para no invadir la celda
    de búsqueda (sin búsqueda tiene 7 columnas y no cambia) */
 @media (min-width: 1100px) and (max-width: 1199px) {
-  .masthead:not(.masthead--no-search) .nav__list { padding-inline: var(--s-1); }
-  .masthead:not(.masthead--no-search) .nav__link { padding-inline: 6px; font-size: 0.875rem; }
-  .masthead:not(.masthead--no-search) .nav__link::after { left: 6px; right: 6px; }
+  .masthead:not(.masthead--no-search) .masthead__nav-list { padding-inline: var(--s-1); }
+  .masthead:not(.masthead--no-search) .masthead__nav-link { padding-inline: 6px; font-size: 0.875rem; }
+  .masthead:not(.masthead--no-search) .masthead__nav-link::after { left: 6px; right: 6px; }
 }
 /* Con búsqueda, de 1360 a 1379 px los enlaces del diseño de 1440 miden hasta 4.5 px más que el interior de la lista:
    con menos relleno lateral caben en una fila (la lista baja de línea solo cuando de verdad no caben) */
 @media (min-width: 1360px) and (max-width: 1379px) {
-  .masthead:not(.masthead--no-search) .nav__list { padding-inline: var(--s-2); }
+  .masthead:not(.masthead--no-search) .masthead__nav-list { padding-inline: var(--s-2); }
 }
 
 /* 6.2 Tableta y celular: la navegación se pliega y las filas se reacomodan (revisado a 768) */
@@ -87,16 +87,16 @@
   }
   .masthead__nav.is-open, .masthead__search.is-open { display: flex; }
   .masthead__nav { max-height: calc(100vh - var(--masthead-h) - 1px); max-height: calc(100dvh - var(--masthead-h) - 1px); overflow-y: auto; background: var(--rule); }
-  .nav__list { flex-direction: column; flex-wrap: nowrap; gap: var(--line); padding: 0; }   /* nowrap: en el panel con alto máximo no se forman columnas */
-  .nav__list > li { display: block; background: var(--surface); }
-  .nav__list > .nav__item--quote { display: block; }
-  .nav__link { justify-content: space-between; min-height: 60px; padding: 0 var(--pad); font-size: 1.125rem; }
-  .nav__link::after { display: none; }
-  .nav__link:hover { background: var(--surface-tint); }
-  .nav__link[aria-current] { box-shadow: inset 4px 0 var(--blue); font-weight: 700; }      /* fila actual: barra azul a la izquierda y peso */
-  .nav__cat { display: block; }
-  .nav__cat[open] > .nav__link { box-shadow: 0 var(--line) 0 var(--rule); }
-  .nav__cat[open] > .nav__link[aria-current] { box-shadow: inset 4px 0 var(--blue), 0 var(--line) 0 var(--rule); }
+  .masthead__nav-list { flex-direction: column; flex-wrap: nowrap; gap: var(--line); padding: 0; }   /* nowrap: en el panel con alto máximo no se forman columnas */
+  .masthead__nav-list > li { display: block; background: var(--surface); }
+  .masthead__nav-list > .masthead__nav-item--quote { display: block; }
+  .masthead__nav-link { justify-content: space-between; min-height: 60px; padding: 0 var(--pad); font-size: 1.125rem; }
+  .masthead__nav-link::after { display: none; }
+  .masthead__nav-link:hover { background: var(--surface-tint); }
+  .masthead__nav-link[aria-current] { box-shadow: inset 4px 0 var(--blue); font-weight: 700; }      /* fila actual: barra azul a la izquierda y peso */
+  .masthead__nav-cat { display: block; }
+  .masthead__nav-cat[open] > .masthead__nav-link { box-shadow: 0 var(--line) 0 var(--rule); }
+  .masthead__nav-cat[open] > .masthead__nav-link[aria-current] { box-shadow: inset 4px 0 var(--blue), 0 var(--line) 0 var(--rule); }
   .catpanel { position: static; margin: 0; padding: var(--line) 0 0; box-shadow: none; }
   .catpanel__list > li { grid-column: span 6; }
   .catpanel__list > .catpanel__all { grid-column: span 12; }
@@ -321,7 +321,7 @@
 /* 6.5 Estados que dependen de los datos y componentes sin dibujo en la maqueta */
 @media (min-width: 1100px) {
   /* sin búsqueda (no hay productos) la navegación ocupa 7 columnas: los enlaces se agrupan a la izquierda */
-  .masthead--no-search .nav__list { justify-content: flex-start; gap: var(--s-5); padding-inline: var(--s-5); }
+  .masthead--no-search .masthead__nav-list { justify-content: flex-start; gap: var(--s-5); padding-inline: var(--s-5); }
 }
 @media (min-width: 700px) and (max-width: 1099px) {
   /* pie sin columna de categorías: enlaces y contacto se reparten la fila */
@@ -404,7 +404,7 @@
 
   /* ubicación actual: la barra bajo el enlace se pinta con el color del texto; las barras hechas con sombra
      (filas de tableta y celular, categoría actual, bloque Cotizar y barra fija en /cotizar/) pasan a borde */
-  .nav__link::after { forced-color-adjust: none; background: CanvasText; }
+  .masthead__nav-link::after { forced-color-adjust: none; background: CanvasText; }
   .catpanel__link[aria-current] { border-left: 4px solid CanvasText; }
   .masthead__cta[aria-current="page"], .dock__link[aria-current="page"] { border-bottom: 4px solid CanvasText; }
 
@@ -412,6 +412,6 @@
   .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }
 }
 @media (forced-colors: active) and (max-width: 1099px) {
-  :where(.nav__list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
-  .nav__link[aria-current] { border-left: 4px solid CanvasText; }
+  :where(.masthead__nav-list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
+  .masthead__nav-link[aria-current] { border-left: 4px solid CanvasText; }
 }

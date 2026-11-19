@@ -64,12 +64,12 @@ const allSpan = 12 - ((categories.length * 2) % 12);
     </button>
 
     <nav class:list={['masthead__nav', hasSearch ? 'span-4' : 'span-7']} id="menu" aria-label="Principal">
-      <ul class="nav__list">
-        <li><a class="nav__link" href={routes.catalog} aria-current={current(routes.catalog)}>Catálogo</a></li>
+      <ul class="masthead__nav-list">
+        <li><a class="masthead__nav-link" href={routes.catalog} aria-current={current(routes.catalog)}>Catálogo</a></li>
         {hasCategories && (
           <li>
-            <details class="nav__cat">
-              <summary class="nav__link" aria-current={inCategories ? 'true' : undefined}>Categorías<Icon name="chevron-down" class="icon--16" /></summary>
+            <details class="masthead__nav-cat">
+              <summary class="masthead__nav-link" aria-current={inCategories ? 'true' : undefined}>Categorías<Icon name="chevron-down" class="icon--16" /></summary>
               <div class="catpanel">
                 <ul class="catpanel__list grid12">
                   {categories.map(category => (
@@ -81,9 +81,9 @@ const allSpan = 12 - ((categories.length * 2) % 12);
             </details>
           </li>
         )}
-        <li><a class="nav__link" href={routes.brands} aria-current={current(routes.brands)}>Marcas</a></li>
-        <li class="nav__item--quote"><a class="nav__link" href={routes.quoteList} aria-current={current(routes.quoteList)}>Cotizar mi lista</a></li>
-        <li><a class="nav__link" href={routes.contact} aria-current={current(routes.contact)}>Contacto</a></li>
+        <li><a class="masthead__nav-link" href={routes.brands} aria-current={current(routes.brands)}>Marcas</a></li>
+        <li class="masthead__nav-item--quote"><a class="masthead__nav-link" href={routes.quoteList} aria-current={current(routes.quoteList)}>Cotizar mi lista</a></li>
+        <li><a class="masthead__nav-link" href={routes.contact} aria-current={current(routes.contact)}>Contacto</a></li>
       </ul>
     </nav>
 
@@ -110,7 +110,7 @@ const allSpan = 12 - ((categories.length * 2) % 12);
   const searchButton = document.querySelector<HTMLButtonElement>('[data-toggle="search"]');
   const nav = document.getElementById('menu');
   const search = document.getElementById('buscador');
-  const categoriesPanel = document.querySelector<HTMLDetailsElement>('.nav__cat');
+  const categoriesPanel = document.querySelector<HTMLDetailsElement>('.masthead__nav-cat');
   const dock = document.querySelector<HTMLElement>('.dock');
 
   const isOpen = (button: HTMLButtonElement | null) => button?.getAttribute('aria-expanded') === 'true';
