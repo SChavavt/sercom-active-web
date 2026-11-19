@@ -7,16 +7,19 @@
 //             Por omisión se usa la variable SITE_URL, la misma que lee astro.config.mjs.
 //
 // Qué revisa en cada página HTML y en cada hoja de estilo:
-//   1. Cada href, src, srcset, poster, action y url() interno lleva a un archivo de la carpeta. La ruta de una
+//   1. Cada href, src, srcset, poster, action, url() e image-set() interno lleva a un archivo de la carpeta. La ruta de una
 //      página termina en diagonal (/catalogo/) y corresponde a un index.html.
 //   2. Cada #ancla existe como id en la página de destino.
 //   3. Ningún enlace está vacío, es solo «#», usa javascript: o carece de href.
 //   4. Nada apunta a localhost, a una red local, a file:// ni a una carpeta del equipo donde se compiló
 //      (esto también se busca dentro de JS, CSS y JSON).
 //   5. La página 404 solo usa rutas que empiezan con «/», porque se muestra en cualquier dirección.
+//   6. Ninguna dirección empieza con «//» (sin esquema): «'/' + '/catalogo/'» da «//catalogo/», que el navegador
+//      abre en el servidor «catalogo».
 //
 // Qué no revisa: los enlaces externos, de WhatsApp, de correo y de teléfono no se consultan (la revisión no
-// usa la red); hay que probarlos a mano antes de publicar. Tampoco ejecuta scripts.
+// usa la red); hay que probarlos a mano antes de publicar. Tampoco ejecuta scripts: una dirección que un script
+// arma en el navegador, o que va en un atributo data-*, no se revisa.
 //
 // Termina con código 1 si encuentra problemas y con 2 si la carpeta no existe o no tiene páginas HTML.
 import { readdir, readFile } from 'node:fs/promises';
@@ -95,13 +98,39 @@ function srcsetUrls(value) {
   return [...value.matchAll(/([^\s,][^\s]*)(?:\s+[\d.]+[wx])?\s*(?:,|$)/g)].map(match => match[1].replace(/,+$/, '')).filter(Boolean);
 }
 
-/** Direcciones de url(...) y de @import en una hoja de estilo. */
+const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi;
+
+/** Contenido de cada image-set(…) o -webkit-image-set(…), con sus paréntesis internos. */
+function imageSets(css) {
+  const contents = [];
+  for (const match of css.matchAll(/(?:-webkit-)?image-set\(/gi)) {
+    let depth = 1;
+    let quote = '';
+    let index = match.index + match[0].length;
+    const start = index;
+    for (; index < css.length && depth > 0; index += 1) {
+      const char = css[index];
+      if (quote) { if (char === '\\') index += 1; else if (char === quote) quote = ''; }
+      else if (char === '"' || char === "'") quote = char;
+      else if (char === '(') depth += 1;
+      else if (char === ')') depth -= 1;
+    }
+    contents.push(css.slice(start, index - 1));
+  }
+  return contents;
+}
+
+/** Direcciones de url(...), de image-set("…") y de @import en una hoja de estilo. */
 function cssUrls(css) {
   const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
-  const urls = [...clean.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)].map(match => match[1] ?? match[2] ?? match[3] ?? '');
+  const urls = [...clean.matchAll(CSS_URL)].map(match => match[1] ?? match[2] ?? match[3] ?? '');
+  // En image-set() una dirección también puede ir como cadena sola: image-set("a.png" 1x, "b.png" 2x).
+  // Las url(…) ya se contaron y type("image/avif") es un tipo, no una dirección.
+  const sets = imageSets(clean).flatMap(content => [...content.replace(CSS_URL, ' ').replace(/\btype\(\s*(?:"[^"]*"|'[^']*')\s*\)/gi, ' ')
+    .matchAll(/"([^"]*)"|'([^']*)'/g)].map(match => match[1] ?? match[2]));
   const imports = [...clean.matchAll(/@import\s+(?:"([^"]+)"|'([^']+)')/gi)].map(match => match[1] ?? match[2]);
   // url(#filtro) apunta a un elemento del mismo documento y data: lleva el contenido incluido.
-  return [...urls, ...imports].map(url => url.trim()).filter(url => url && !url.startsWith('#') && !/^data:/i.test(url));
+  return [...urls, ...sets, ...imports].map(url => url.trim()).filter(url => url && !url.startsWith('#') && !/^data:/i.test(url));
 }
 
 /**
@@ -230,6 +259,12 @@ export async function checkLinks(directory, options = {}) {
 
     let url;
     try { url = new URL(value, `${INTERNAL_ORIGIN}${basePath}`); } catch { return report(file, 'roto', value, `${shown}: dirección no válida`); }
+    // «//catalogo/» no es una ruta del sitio: el navegador la abre en el servidor «catalogo». Suele salir de unir
+    // «/» con una ruta que ya empieza con «/». El sitio no usa direcciones externas sin esquema.
+    if (!scheme && /^\/\//.test(value)) {
+      if (isLocalHost(url.hostname)) return report(file, 'local', value, `${shown}: apunta al equipo o a la red local (${url.host})`);
+      return report(file, 'roto', value, `${shown}: «//» al inicio la convierte en una dirección del servidor «${url.host}»; una ruta del sitio empieza con una sola «/» y una dirección externa lleva https:`);
+    }
     if (url.origin !== INTERNAL_ORIGIN && url.origin !== siteOrigin) {
       if (isLocalHost(url.hostname)) return report(file, 'local', value, `${shown}: apunta al equipo o a la red local (${url.host})`);
       counts.external += 1;
