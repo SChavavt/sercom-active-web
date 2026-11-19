@@ -1172,6 +1172,19 @@ test('--rules nombra «representante» en R-RULE-07 y todo <iframe> en R-RULE-11
   assert.match(entry('R-RULE-11', 'mapa'), /Cualquier <iframe> falla mientras la atención presencial no esté confirmada, porque el escáner no distingue un mapa de otra inserción: un video del fabricante se da como enlace/);
 });
 
+test('--rules y check-links no prometen revisar los botones: un botón sin efecto solo se encuentra en el navegador', async () => {
+  // R-RULE-30: check-links revisa enlaces; los botones de la cabecera, check-markup; un botón sin efecto, solo el navegador.
+  const links = CHECKS.filter(([id]) => id === 'R-RULE-30').map(([, doc]) => doc).join('\n');
+  assert.doesNotMatch(links, /controles inertes/);
+  assert.match(links, /vacíos, «#», javascript: o un <a> sin href/);
+  assert.match(links, /botones propios de la cabecera/);
+  assert.match(links, /Un botón que no hace nada no lo encuentra ninguna comprobación: solo la revisión de la página en el navegador/);
+  const header = (await readText('scripts/check-links.mjs')).split('\nimport ')[0];
+  assert.doesNotMatch(header, /controles inertes/);
+  assert.match(header, /Solo revisa enlaces: un <button> u otro control que no hace nada no se detecta aquí/);
+  assert.match(header, /Un botón sin efecto solo se encuentra revisando la página en el navegador/);
+});
+
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
   const cli = (...args) => spawnSync(process.execPath, ['scripts/scan-dist.mjs', ...args], { cwd: ROOT, encoding: 'utf8' });
   const clean = await makeTree(site({ 'robots.txt': ROBOTS, 'index.html': page() }));

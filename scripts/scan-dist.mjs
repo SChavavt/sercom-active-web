@@ -791,7 +791,7 @@ export const CHECKS = [
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-PUB-04', 'La página 404 (404.html de la raíz) nunca declara <link rel="canonical">: el servidor la entrega en cualquier dirección desconocida y /404/ no es una página. Las demás páginas llevan su dirección canónica solo cuando se compila con SITE_URL.'],
   ['R-COPY-15', 'El <title> de la portada (index.html de la raíz) es la denominación provisional: el nombre de src/data/business.json, « · » y su titleLabel («Sercom Active · Atención en Puebla»). Las páginas interiores llevan «<Página> · Sercom Active» y la etiqueta «Atención comercial en Puebla» sigue en el encabezado, el pie y las descripciones.'],
-  ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
+  ['R-RULE-30', 'scripts/check-links.mjs revisa los enlaces: rotos, y los que no llevan a ninguna parte (vacíos, «#», javascript: o un <a> sin href). scripts/check-markup.mjs revisa solo los botones propios de la cabecera (Menú y Buscar con el panel que abren, y el botón de la búsqueda). Un botón que no hace nada no lo encuentra ninguna comprobación: solo la revisión de la página en el navegador.'],
   ['R-A11Y-06', 'Los enlaces y botones tienen texto o aria-label (WARN).'],
   ['R-A11Y-07', 'Cada imagen tiene atributo alt.'],
   ['BUILD', 'La carpeta no contiene restos de una compilación fallida (.prerender/).'],

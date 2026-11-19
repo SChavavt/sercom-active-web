@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Verificador de enlaces de un sitio ya compilado (regla R-RULE-30: sin enlaces rotos ni controles inertes).
+// Verificador de enlaces de un sitio ya compilado (regla R-RULE-30: sin enlaces rotos ni enlaces inertes).
 //
 // Uso:  node scripts/check-links.mjs [carpeta] [--site=https://dominio]
 //   carpeta   carpeta compilada; por omisión `dist`
@@ -20,6 +20,8 @@
 // Qué no revisa: los enlaces externos, de WhatsApp, de correo y de teléfono no se consultan (la revisión no
 // usa la red); hay que probarlos a mano antes de publicar. Tampoco ejecuta scripts: una dirección que un script
 // arma en el navegador, o que va en un atributo data-*, no se revisa.
+// Solo revisa enlaces: un <button> u otro control que no hace nada no se detecta aquí (check-markup revisa solo los
+// botones propios de la cabecera). Un botón sin efecto solo se encuentra revisando la página en el navegador.
 //
 // Termina con código 1 si encuentra problemas y con 2 si la carpeta no existe o no tiene páginas HTML.
 import { readdir, readFile } from 'node:fs/promises';
