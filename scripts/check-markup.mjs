@@ -324,6 +324,7 @@ function splitSelectorList(list) {
 export const unescapeCss = text => text.replace(/\\(?:([0-9a-fA-F]{1,6})[ \t\n\r\f]?|([^\n\r\f]))/g,
   (_, hex, char) => (hex ? String.fromCodePoint(Number.parseInt(hex, 16) || 0xfffd) : char));
 const ESCAPE = String.raw`\\(?:[0-9a-fA-F]{1,6}[ \t\n\r\f]?|[^\n\r\f])`;
+const ESCAPE_AT = new RegExp(ESCAPE, 'y');
 const IDENT = new RegExp(String.raw`(?:${ESCAPE}|[\w\u00a0-\uffff-])+`, 'y');
 // El nombre puede llevar delante un espacio de nombres («*|class», «|class», «svg|class»); «class|=» es el operador.
 const ATTRIBUTE_SELECTOR = new RegExp(String.raw`^\s*(?:(?:\*|(?:${ESCAPE}|[\w-])+)?\|(?!=))?((?:${ESCAPE}|[\w-])+)\s*(?:([~|^$*]?=)\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|(?:${ESCAPE}|[^\s\]\\])+)\s*([iIsS])?)?\s*$`, 's');
@@ -648,7 +649,8 @@ const withoutArguments = selector => {
 /**
  * Separa un selector sin argumentos de seudoclases en sus selectores compuestos, con el combinador que va después de
  * cada uno («html.js > aside» → [{ compound: "html.js", next: ">" }, { compound: "aside", next: null }]). Lo que va
- * entre corchetes, las cadenas y los escapes no separan.
+ * entre corchetes, las cadenas y los escapes no separan; un escape hexadecimal lleva consigo el espacio que lo cierra
+ * («html.js \61 side» → «html.js» y «\61 side»), como lo leen U-07 y el navegador.
  * @param {string} bare
  */
 function compoundsOf(bare) {
@@ -666,8 +668,13 @@ function compoundsOf(bare) {
     }
     if (pending) { compounds[compounds.length - 1].next = pending; pending = null; }
     if (char === '"' || char === "'") { const end = stringEnd(bare, i); current += bare.slice(i, end); i = end - 1; }
-    else if (char === '\\') { current += bare.slice(i, i + 2); i++; }
-    else if (char === '[') {
+    else if (char === '\\') {
+      // Un escape va entero, con el espacio que puede cerrarlo («\61 side» es «aside», un solo compuesto).
+      ESCAPE_AT.lastIndex = i;
+      const escape = ESCAPE_AT.exec(bare)?.[0] ?? char;
+      current += escape;
+      i += escape.length - 1;
+    } else if (char === '[') {
       let end = i + 1;
       while (end < bare.length && bare[end] !== ']') {
         if (bare[end] === '"' || bare[end] === "'") end = stringEnd(bare, end);

@@ -253,3 +253,18 @@ test('una regla anidada que oculta el aviso al imprimir, que oculta otra cosa o 
     + '.site-notice{@starting-style{display:none}}.site-notice{@keyframes k{from{display:none}}}main{@media screen{aside{display:none}}}';
   assert.deepEqual(await check({ '_astro/otra.css': css }), []);
 });
+
+test('un selector de tipo escrito con escapes se lee entero, con el espacio que cierra el escape', async () => {
+  // «\61 side» es «aside»: el espacio después de «\61» termina el escape, no separa dos selectores compuestos.
+  const cases = [
+    '\\61 side { display: none }', 'html.js \\61 side { display: none }', '\\000061side{display:none}', '\\70 {visibility:hidden}', '\\61\tside{display:none}',
+    'body \\61 side>p{display:none}', '\\62 ody>\\61 side{display:none}', '\\73 trong{display:none}',
+  ];
+  for (const css of cases) {
+    const problems = await check({ '_astro/otra.css': css });
+    assert.equal(problems.length, 1, `${css}\n${JSON.stringify(problems)}`);
+    assert.match(problems[0].message, /oculta el aviso/);
+  }
+  // Con el escape leído entero, el tipo se juzga como cualquier otro: otro elemento, otro antecesor u otra clase pasan.
+  assert.deepEqual(await check({ '_astro/otra.css': 'main \\61 side{display:none}\\64 iv{display:none}\\61 side.dock{display:none}\\6d ain aside{display:none}\\6e av strong{display:none}' }), []);
+});
