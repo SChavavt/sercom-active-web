@@ -363,7 +363,7 @@ Reglas para un componente nuevo:
 - Si las celdas de una fila ya no caben lado a lado, pasan a filas, con una regla `@container lamina` cuyo umbral se mide en `rem` con el texto real.
 - Para que el texto agrandado quepa nunca se achica la letra, no se corta con «…» y no se agrega una barra de desplazamiento.
 - Con la letra normal nada cambia: cada condición nueva es falsa con la raíz de 16 px desde 320 px, también con el espaciado de texto.
-- Los umbrales en `rem` están medidos con Archivo y con los textos de hoy (por ejemplo «WhatsApp», la clave más larga de las filas de datos, «Señalización» en los mosaicos o «sercomactive.com» en el pie): si cambian la fuente o esas palabras, se miden de nuevo.
+- Los umbrales en `rem` están medidos con Archivo y con los textos de hoy (por ejemplo «WhatsApp», la clave más larga de las filas de datos, «Señalización» en los mosaicos, «sercomactive.com» en el pie, o el lugar, el horario, el teléfono y el correo de la franja, de los que depende el alto que la cabecera fija le da sin JavaScript): si cambian la fuente o esos textos, se miden de nuevo.
 
 ### 11.5 Colores forzados, movimiento reducido e impresión
 
