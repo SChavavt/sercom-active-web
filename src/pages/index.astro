@@ -18,19 +18,15 @@ import Note from '../components/Note.astro';
 import ProductGrid from '../components/ProductGrid.astro';
 import SectionHead from '../components/SectionHead.astro';
 import Steps from '../components/Steps.astro';
-import type { IconName } from '../lib/icons.ts';
-import { faqs } from '../lib/ayuda.ts';
+import { faqs, helpEntries } from '../lib/ayuda.ts';
 import { contactDetails, contactLinks } from '../lib/contact.mjs';
 import { brands, categories, featuredProducts, routes } from '../lib/site-data.mjs';
 
 const hasCategories = categories.length > 0;
 const featured = featuredProducts(8);
 
-const entries: { href: string; icon: IconName; title: string; kicker: string; text: string }[] = [
-  { href: routes.catalog, icon: 'layout-grid', title: 'Explorar productos', kicker: 'Productos y marcas', text: 'Conoce las categorías y las marcas que manejamos.' },
-  { href: routes.quoteList, icon: 'clipboard-list', title: 'Cotizar mi lista', kicker: 'Códigos y cantidades', text: '¿Ya tienes marcas, códigos o cantidades? Envíanos tu lista y preparamos la cotización.' },
-  { href: routes.specialRequest, icon: 'zoom-question', title: 'Ayúdame a encontrarlo', kicker: 'Solicitud especial', text: '¿Buscas un artículo que no identificas o que no aparece? Cuéntanos qué necesitas.' },
-];
+// Las tres formas de pedir ayuda: los textos viven una sola vez en src/lib/ayuda.ts (helpEntries).
+const entries = helpEntries.map(({ href, icon, title, kicker, text }) => ({ href, icon, title, kicker, text }));
 
 const { contactFirstName } = contactDetails;
 const steps = [
