@@ -4,7 +4,8 @@
 //   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
 //      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
 //      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular; un nombre
-//      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección),
+//      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección; la fila de
+//      ruta lleva la misma marca y en computadora se queda en un renglón, con el nombre cortado con «…»),
 //      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
 //      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
 //      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
@@ -49,6 +50,8 @@ if (!item) throw new Error(`Producto desconocido: ${Astro.params.id}`);
 const categoryId = item.categoryIds[0];
 const category = categoryId ? getCategory(categoryId) : undefined;
 const brand = item.brandId ? getBrand(item.brandId) : undefined;
+// Nombre largo (más de 50 caracteres): en computadora el H1 baja un paso y la ruta se queda en un renglón (producto.css).
+const longName = product ? isLongProductName(product.name) : false;
 
 // Mensajes de cotización: llevan la dirección de la ficha. Sin SITE_URL la agrega PageLinkScript al hacer clic.
 const pageUrl = absoluteUrl(item.url, Astro.site);
@@ -84,7 +87,7 @@ const moreFillSpan = (MORE_LIMIT - more.items.length) * 3;
 const moreOdd = more.items.length % 2 === 1;
 ---
 <BaseLayout title={title} description={description}>
-  <div class="producto__crumbs cell">
+  <div class="producto__crumbs cell" data-long={longName ? '' : undefined}>
     <Breadcrumbs
       items={[
         { label: 'Inicio', href: routes.home },
@@ -111,7 +114,7 @@ const moreOdd = more.items.length % 2 === 1;
     <div class="producto__body span-5 span-md-12">
       <div class="producto__head cell">
         {category && <a class="producto__cat label" href={category.url}>{category.name}</a>}
-        <h1 class="producto__title t-title" id="titulo" data-long={isLongProductName(product.name) ? '' : undefined}>{product.name}</h1>
+        <h1 class="producto__title t-title" id="titulo" data-long={longName ? '' : undefined}>{product.name}</h1>
       </div>
 
       <dl class="data producto__data">

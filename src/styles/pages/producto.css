@@ -48,6 +48,11 @@
    primera pantalla. En tableta y celular la acción queda debajo de la imagen de todos modos: no cambia. */
 @media (min-width: 1100px) {
   .producto__title[data-long] { font-size: var(--type-h2-size); text-wrap: balance; }
+  /* La fila de ruta del mismo nombre largo se queda en un renglón: el último elemento (el nombre, que el H1 da entero
+     justo debajo y el lector lee completo) toma lo que queda de la fila y se corta con «…». Si ni 12em le quedan
+     (letra agrandada), baja entero al renglón siguiente y ahí se corta: la fila nunca sale de su celda. */
+  .producto__crumbs[data-long] .crumbs__item:last-child { flex: 1 1 0; min-width: min(100%, 12em); }
+  .producto__crumbs[data-long] [aria-current="page"] { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 }
 
 /* El código es lo que el comprador copia: completo, sin cambiar, y se selecciona entero de un clic */

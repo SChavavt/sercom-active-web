@@ -19,6 +19,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { routes } from '../src/lib/routes.mjs';
+import { isLongProductName } from '../src/lib/product-title.mjs';
 import { resultSummary } from '../src/lib/search.mjs';
 
 // ---------------------------------------------------------------------------------------------------
@@ -750,6 +751,27 @@ export const CHECKS = [
       // El aviso se busca en todo el contenido principal, como se lee: partido en elementos sigue siendo el aviso.
       const whole = mainOf(page);
       if (whole && bare(textOf(whole)).includes(bare(FICHA_TEXTS.availability))) problems.push('la página muestra el aviso de disponibilidad');
+      return problems;
+    },
+  },
+  {
+    id: 'V-03',
+    title: 'En la ficha de un producto, el título y la fila de ruta llevan data-long exactamente cuando el nombre pasa de 50 caracteres',
+    page(page) {
+      const problems = [];
+      const title = page.elements.find(element => element.name === 'h1' && hasClass(element, 'producto__title'));
+      if (!title) return problems;
+      const titleLong = title.attributes.has('data-long');
+      // El título de la ficha (no el de un producto retirado, que no baja de tamaño) se marca según su nombre.
+      if (closest(title, element => hasClass(element, 'producto'))) {
+        const long = isLongProductName(textOf(title));
+        if (titleLong !== long) problems.push(`el título «${textOf(title)}» ${long ? 'pasa de 50 caracteres y no lleva' : 'no pasa de 50 caracteres y lleva'} data-long`);
+      }
+      // La fila de ruta va con el título: con un nombre largo se queda en un renglón (producto.css).
+      const crumbs = page.elements.find(element => hasClass(element, 'producto__crumbs'));
+      if (crumbs && crumbs.attributes.has('data-long') !== titleLong) {
+        problems.push(`la fila de ruta ${titleLong ? 'no lleva' : 'lleva'} data-long y el título «${textOf(title)}» ${titleLong ? 'sí' : 'no'}: los dos van juntos`);
+      }
       return problems;
     },
   },

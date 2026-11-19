@@ -403,6 +403,48 @@ test('F-9b: en el pie solo el enlace a la página actual lleva aria-current y el
 });
 
 // ---------------------------------------------------------------------------------------------------
+// V-03: título largo de la ficha y su fila de ruta
+// ---------------------------------------------------------------------------------------------------
+
+const NAME_90 = 'Guante de ejemplo de nitrilo con recubrimiento de palma y puño tejido para piezas grasosas';
+const NAME_50 = 'Guante de ejemplo de nitrilo con recubrimiento de p';
+/** Ficha como la escribe productos/[id].astro: fila de ruta y, en la sección .producto, el H1 del nombre. */
+const ficha = (name, { title = '', crumbs = '' } = {}) => `<div class="producto__crumbs cell"${crumbs}><nav class="crumbs label" aria-label="Ruta de navegación"><ol class="crumbs__list">`
+  + `<li class="crumbs__item"><a class="crumbs__link" href="/">Inicio</a><span class="crumbs__sep" aria-hidden="true">/</span></li><li class="crumbs__item"><span aria-current="page">${name}</span></li></ol></nav></div>`
+  + `<section class="producto grid12" aria-labelledby="titulo"><div class="producto__head cell"><h1 class="producto__title t-title" id="titulo"${title}>${name}</h1></div></section>`;
+
+test('V-03: el título y la ruta llevan data-long juntos, solo con un nombre de más de 50 caracteres', async () => {
+  assert.equal([...NAME_90].length, 90);
+  assert.equal([...NAME_50.slice(0, 50)].length, 50);
+  const good = [
+    ficha(NAME_90, { title: ' data-long', crumbs: ' data-long' }),
+    ficha(NAME_90, { title: ' data-long=""', crumbs: ' data-long=""' }),
+    ficha(NAME_50.slice(0, 50)),
+    ficha('Guante recubierto de ejemplo'),
+  ];
+  for (const body of good) assert.deepEqual(await check({ 'productos/x/index.html': page({}, body) }, { ids: ['V-03'] }), [], body);
+  // Un producto retirado no baja su título; una página sin ficha no tiene nada que revisar.
+  const retired = `<div class="producto__crumbs cell"></div><section class="retirado"><h1 class="producto__title t-title">${NAME_90} (producto retirado)</h1></section>`;
+  assert.deepEqual(await check({ 'productos/r/index.html': page({}, retired), 'contacto/index.html': page() }, { ids: ['V-03'] }), []);
+});
+
+test('V-03: un nombre largo sin data-long, uno corto con data-long o la ruta sin la marca del título fallan', async () => {
+  const bad = [
+    [ficha(NAME_90), /pasa de 50 caracteres y no lleva data-long/],
+    [ficha(NAME_90, { crumbs: ' data-long' }), /pasa de 50 caracteres y no lleva data-long/],
+    [ficha(NAME_50.slice(0, 50), { title: ' data-long', crumbs: ' data-long' }), /no pasa de 50 caracteres y lleva data-long/],
+    // Lo que escribía la ficha antes de la ronda 2: el título marcado y la ruta sin marcar (se partía en dos renglones).
+    [ficha(NAME_90, { title: ' data-long' }), /la fila de ruta no lleva data-long/],
+    [ficha('Guante recubierto de ejemplo', { crumbs: ' data-long' }), /la fila de ruta lleva data-long/],
+  ];
+  for (const [body, message] of bad) {
+    const problems = await check({ 'productos/x/index.html': page({}, body) }, { ids: ['V-03'] });
+    assert.ok(problems.some(problem => message.test(problem.message)), `${body}\n${JSON.stringify(problems)}`);
+    assert.equal(problems[0].file, 'productos/x/index.html');
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------
 // V-06: separador de la línea marca · código de las tarjetas
 // ---------------------------------------------------------------------------------------------------
 
