@@ -220,6 +220,9 @@ export function createContact(settings) {
   if (!firstName || !business) throw new Error('Contacto: faltan contactFirstName o name.');
 
   const hello = `Hola, ${firstName}.`;
+  // Línea de apertura del plan (R-QUOTE-05): abre el mensaje general y el de producto. Se escribe una sola vez
+  // para que los dos no se separen. Los demás mensajes dicen para qué escribe el cliente y abren a su manera.
+  const quoteOpening = `${hello} Quiero solicitar una cotización con ${business}.`;
   const lines = (/** @type {string[]} */ ...parts) => parts.join('\n');
   /** @param {string | null} [text] */
   const whatsappUrl = text => buildWhatsappUrl(digits, text);
@@ -228,9 +231,9 @@ export function createContact(settings) {
 
   /** @type {ContactMessages} */
   const messages = {
-    general: () => `${hello} Me interesa solicitar información y una cotización con ${business}.`,
+    general: () => quoteOpening,
     product: product => addLinkLine(lines(
-      `${hello} Quiero solicitar una cotización con ${business}.`,
+      quoteOpening,
       field('Producto', productLabel(product)),
       field('Variante (talla o color)'),
       field('Cantidad y unidad'),

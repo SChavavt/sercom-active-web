@@ -65,8 +65,19 @@ test('mailtoUrl codifica asunto y cuerpo; los saltos de línea viajan como %0D%0
   assert.equal(mailtoUrl({ subject: null, body: undefined }), `mailto:${EMAIL}`);
 });
 
-test('mensaje general', () => {
-  assert.equal(messages.general(), 'Hola, Yosmara. Me interesa solicitar información y una cotización con Sercom Active.');
+test('mensaje general: la línea de apertura del plan (R-QUOTE-05)', () => {
+  assert.equal(messages.general(), 'Hola, Yosmara. Quiero solicitar una cotización con Sercom Active.');
+});
+
+test('el mensaje general y el de producto abren con la misma línea', () => {
+  // Se escribe una sola vez: si cambia, cambia en los dos borradores.
+  const opening = messages.general();
+  assert.equal(messages.product(product).split('\n')[0], opening);
+  assert.equal(messages.product({}).split('\n')[0], opening);
+  const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
+  assert.equal(other.messages.product(product).split('\n')[0], other.messages.general());
+  // El asunto del correo general no cambia.
+  assert.equal(subjects.general(), 'Solicitud de cotización');
 });
 
 test('mensaje de producto, con y sin enlace a la página', () => {
@@ -356,7 +367,7 @@ test('el recorte a 200 caracteres no parte un emoji ni deja caracteres sueltos q
 
 test('createContact usa los datos que recibe y rechaza datos de contacto mal formados', () => {
   const other = createContact({ name: 'Negocio de prueba', contactFirstName: 'Persona', email: 'prueba@example.invalid', whatsappDigits: '5215500000000' });
-  assert.equal(other.messages.general(), 'Hola, Persona. Me interesa solicitar información y una cotización con Negocio de prueba.');
+  assert.equal(other.messages.general(), 'Hola, Persona. Quiero solicitar una cotización con Negocio de prueba.');
   assert.equal(other.whatsappUrl('Hola'), 'https://wa.me/5215500000000?text=Hola');
   assert.equal(other.mailtoUrl({ subject: 'Hola' }), 'mailto:prueba@example.invalid?subject=Hola');
   assert.equal(buildWhatsappUrl('5215500000000', 'Hola'), 'https://wa.me/5215500000000?text=Hola');
