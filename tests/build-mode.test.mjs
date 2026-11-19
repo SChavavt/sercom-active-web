@@ -527,6 +527,69 @@ test('solo los módulos de la capa de datos cargan archivos de src/data/ o de re
   for (const [path, allowed] of Object.entries(DATA_LAYER)) assert.deepEqual(dataLoads(path, rawSources.get(path)), allowed, path);
 });
 
+// Datos de contacto escritos a mano. Las páginas los toman de business.json a través de contact.mjs: un nombre, un
+// correo o un número copiados en una plantilla se quedan viejos cuando business.json cambia, y ningún escáner de la
+// salida lo nota (el nombre viejo es texto común). Se buscan en el código sin comentarios de src/pages/,
+// src/components/, src/layouts/ y src/lib/ (los tipos de src/types/ solo los mencionan en comentarios).
+const business = await readJson('src/data/business.json');
+const CONTACT_CODE = /^src\/(?:pages|components|layouts|lib)\//;
+const foldAccents = text => text.normalize('NFD').replace(/\p{M}/gu, '');
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Cifras con cualquier separador de un teléfono entre ellas («221 400 2219», «(221) 400-2219», «221.400.2219»). */
+const digitsPattern = digits => `(?<!\\d)${[...digits].join('[\\s().+-]*')}(?!\\d)`;
+/**
+ * Patrones de los datos de contacto de un business.json. El nombre completo y el correo no distinguen mayúsculas ni
+ * acentos. El nombre de pila se busca como palabra completa y con su mayúscula inicial, como se escribe un nombre: si
+ * además es una palabra común («Rosa», «Luz», «Paz»), esa palabra en minúsculas no cuenta («guante color rosa»), y una
+ * frase que empiece con ella sí, aunque no hable de la persona: esa frase se escribe de otra forma. El número cuenta
+ * como se muestra, con sus cifras completas o con las diez del número nacional, con o sin separadores.
+ */
+const contactPatterns = record => [
+  ['nombre', new RegExp(foldAccents(record.contactName).split(/\s+/).map(escapeRegExp).join('\\s+'), 'i')],
+  ['nombre de pila', new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(foldAccents(record.contactFirstName))}(?![\\p{L}\\p{N}])`, 'u')],
+  // También partido como lo dibuja EmailAddress («ventas.puebla@» y el dominio en otro elemento).
+  ['correo', new RegExp(`${escapeRegExp(record.email)}|${escapeRegExp(record.email.split('@')[0])}@`, 'i')],
+  ['teléfono como se muestra', new RegExp(record.whatsappDisplay.split(/\s+/).map(escapeRegExp).join('\\s*'))],
+  ['cifras del teléfono', new RegExp(`${digitsPattern(record.whatsappDigits)}|${digitsPattern(record.whatsappDigits.slice(-10))}`)],
+];
+/** Datos de contacto que un código lleva escritos, leído sin comentarios y sin acentos. */
+const contactLiterals = (text, record = business) => {
+  const code = foldAccents(stripComments(text));
+  return contactPatterns(record).filter(([, pattern]) => pattern.test(code)).map(([label]) => label);
+};
+
+test('ninguna página, componente, plantilla ni módulo lleva escritos los datos de contacto de business.json', () => {
+  assert.equal(business.contactFirstName, 'Yosmara');
+  const misuse = [
+    // La de la revisión: el nombre escrito en la página de contacto.
+    ['<p class="atiende">Te atiende Yosmara del Rocío Torres Pérez.</p>', ['nombre', 'nombre de pila']],
+    ['<p>Te atiende YOSMARA DEL ROCIO TORRES PEREZ.</p>', ['nombre']],
+    ['<p>Yosmara revisa opciones contigo.</p>', ['nombre de pila']],
+    ["const saludo = 'Hola, Yosmara.';", ['nombre de pila']],
+    ['<a href="mailto:ventas.puebla@sercomactive.com">Correo</a>', ['correo']],
+    ['<span class="email__part">ventas.puebla@</span><wbr><span class="email__part">sercomactive.com</span>', ['correo']],
+    ['<p>WhatsApp: +52 1 221 400 2219</p>', ['teléfono como se muestra', 'cifras del teléfono']],
+    ['<a href="https://wa.me/5212214002219">WhatsApp</a>', ['cifras del teléfono']],
+    ['<p>Llámanos al (221) 400-2219.</p>', ['cifras del teléfono']],
+    ['<a href="tel:2214002219">Teléfono</a>', ['cifras del teléfono']],
+  ];
+  for (const [code, labels] of misuse) assert.deepEqual(contactLiterals(code), labels, code);
+  const harmless = [
+    '---\n// Saluda a Yosmara del Rocío Torres Pérez con los datos de business.json (ventas.puebla@sercomactive.com).\nimport { contactDetails } from \'../lib/contact.mjs\';\n---\n<!-- +52 1 221 400 2219 -->',
+    '<p>Te atiende {contactDetails.name}.</p><a href={contactLinks.whatsapp}>{contactDetails.whatsappDisplay}</a>',
+    '<p>Modelo 2214002218, talla 9.</p>', '<p>Los Yosmarales</p>',
+  ];
+  for (const code of harmless) assert.deepEqual(contactLiterals(code), [], code);
+  // Un nombre de pila que también es una palabra común: en minúsculas no cuenta; con mayúscula, sí.
+  const rosa = { ...business, contactName: 'Rosa María López Ruiz', contactFirstName: 'Rosa' };
+  assert.deepEqual(contactLiterals('<p>Guante de nitrilo color rosa.</p>', rosa), []);
+  assert.deepEqual(contactLiterals('<p>Rosa revisa opciones contigo.</p>', rosa), ['nombre de pila']);
+
+  const written = [...sources].filter(([path]) => CONTACT_CODE.test(path))
+    .flatMap(([path, code]) => contactLiterals(code).map(label => `${path}: ${label}`));
+  assert.deepEqual(written, [], 'un archivo lleva escrito un dato de contacto: se toma de business.json con contact.mjs (contactDetails, contactLinks)');
+});
+
 test('los módulos para el navegador no importan datos ni usan APIs de Node o de Astro', () => {
   const allowed = {
     'src/lib/text.mjs': [],
