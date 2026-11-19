@@ -28,7 +28,7 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'title']);
 const ATTRIBUTE = /\s*([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/y;
 const decodeEntities = text => text
-  .replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+  .replace(/&nbsp;/g, '\u00a0').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
   .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
   .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
   .replace(/&amp;/g, '&');
@@ -63,7 +63,10 @@ export function parseHtml(source) {
   let match;
   while ((match = tag.exec(html))) {
     const between = html.slice(last, match.index);
-    if (between.trim()) addText(current, between);
+    // El espacio suelto entre dos elementos (también &nbsp;) no es texto del elemento, pero sí parte de cómo se lee:
+    // va al contenido en su lugar (un espacio normal es un punto donde el renglón puede partirse; uno de no separación, no).
+    if (decodeEntities(between).trim()) addText(current, between);
+    else if (between) current.content.push(decodeEntities(between));
     const [, closing, rawName] = match;
     const name = rawName.toLowerCase();
     if (closing) {
@@ -118,6 +121,8 @@ export const classesOf = element => (element.attributes.get('class') ?? '').spli
 export const hasClass = (element, name) => classesOf(element).includes(name);
 /** El texto de un elemento como se lee: el suyo y el de sus hijos, en el orden del documento. */
 export const textOf = element => element.content.map(part => (typeof part === 'string' ? part : textOf(part))).join(' ').replace(/\s+/g, ' ').trim();
+/** El texto de un elemento tal como está escrito (entidades resueltas, espacios intactos), sin separar los elementos. */
+export const rawText = element => element.content.map(part => (typeof part === 'string' ? part : rawText(part))).join('');
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
 export function closest(node, test) {
   for (let element = node; element && element.name !== '#document'; element = element.parent) if (test(element)) return element;
@@ -737,6 +742,25 @@ export const CHECKS = [
       // El aviso se busca en todo el contenido principal, como se lee: partido en elementos sigue siendo el aviso.
       const whole = mainOf(page);
       if (whole && bare(textOf(whole)).includes(bare(FICHA_TEXTS.availability))) problems.push('la página muestra el aviso de disponibilidad');
+      return problems;
+    },
+  },
+  {
+    id: 'V-06',
+    title: 'En la línea marca · código de una tarjeta de producto, el separador va unido a la marca con un espacio de no separación: el renglón solo puede partirse después del separador',
+    page(page) {
+      const problems = [];
+      for (const meta of page.elements.filter(element => hasClass(element, 'product__meta'))) {
+        const text = rawText(meta);
+        for (let at = text.indexOf('·'); at !== -1; at = text.indexOf('·', at + 1)) {
+          // El espacio que va justo antes del separador: solo espacios de no separación, y al menos uno.
+          const before = /\s*$/.exec(text.slice(0, at))[0];
+          if (!before || /[^\u00a0]/.test(before)) {
+            const shown = before ? before.replace(/\u00a0/g, '⍽').replace(/\n/g, '↵').replace(/ /g, '␣') : 'nada';
+            problems.push(`el separador de «${textOf(meta)}» va precedido por ${shown}: lleva un espacio de no separación (&nbsp;), así que el renglón puede empezar con «·»`);
+          }
+        }
+      }
       return problems;
     },
   },

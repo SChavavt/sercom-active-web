@@ -3,6 +3,8 @@
 //   imagen (o, sin fotografía, el pictograma de la categoría sobre el rayado), etiqueta «Ejemplo» si es un
 //   ejemplo de la vista previa, categoría, nombre, marca y código, «Ver ficha» (toda la tarjeta lleva a la
 //   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product.
+// El separador «·» va unido a la marca con un espacio de no separación (dentro de su elemento, que el celular
+// oculta junto con él): el renglón solo puede partirse después del separador, nunca empezar con «·».
 // Abrir WhatsApp no es un envío: ninguna página muestra confirmaciones.
 // Mientras el sitio no tenga dirección pública (SITE_URL), el mensaje se arma sin la línea «Enlace» y el
 // script compartido PageLinkScript la agrega al hacer clic, con la dirección de la ficha en el sitio donde se
@@ -42,7 +44,7 @@ const categoryId = product.categoryIds[0];
   <div class="product__body">
     {categoryName && <p class="product__cat label">{categoryName}</p>}
     <Heading class="product__name t-h3">{product.name}</Heading>
-    <p class="product__meta t-small">{product.brandName} <span class="sep" aria-hidden="true">·</span> <span class="t-code">{product.code}</span></p>
+    <p class="product__meta t-small">{product.brandName}<span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">{product.code}</span></p>
   </div>
   <div class="product__actions">
     <a class="product__action product__action--sheet" href={product.url}><span>Ver ficha<span class="vh">: {product.name}</span></span><Icon name="arrow-right" class="icon--18" /></a>

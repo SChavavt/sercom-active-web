@@ -403,6 +403,56 @@ test('F-9b: en el pie solo el enlace a la página actual lleva aria-current y el
 });
 
 // ---------------------------------------------------------------------------------------------------
+// V-06: separador de la línea marca · código de las tarjetas
+// ---------------------------------------------------------------------------------------------------
+
+test('el lector conserva el espacio de no separación y el texto que solo es espacio, en su lugar del contenido', () => {
+  const { root } = parseHtml('<p>Marca&nbsp;<b>·</b> <i>C-1</i>&#160;<u>x</u> <s>y</s></p>');
+  const [p] = root.children;
+  assert.deepEqual(p.content.map(part => (typeof part === 'string' ? part : `<${part.name}>`)), ['Marca ', '<b>', ' ', '<i>', ' ', '<u>', ' ', '<s>']);
+  // El texto directo y la lectura de textOf no cambian: el espacio suelto no cuenta como texto.
+  assert.deepEqual(p.text, ['Marca ']);
+  assert.equal(textOf(p), 'Marca · C-1 x y');
+});
+
+/** Tarjeta de producto como la escribe ProductCard; `meta` es el contenido de su línea marca · código. */
+const META_GOOD = 'Marca de ejemplo<span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">EJ-1001</span>';
+const card = (meta = META_GOOD, { name = 'Guante de ejemplo', sheet, quote } = {}) => '<article class="product span-3"><div class="product__body">'
+  + `<h3 class="product__name t-h3">${name}</h3><p class="product__meta t-small">${meta}</p></div><div class="product__actions">`
+  + `<a class="product__action product__action--sheet" href="/productos/guante/"${sheet === undefined ? ` aria-label="Ver ficha: ${name}"` : sheet}><span>Ver ficha<span class="vh">: ${name}</span></span><svg class="icon icon--18" width="18" height="18" aria-hidden="true"></svg></a>`
+  + `<a class="product__action product__action--quote" href="https://wa.me/5212214002219"${quote === undefined ? ` aria-label="Cotizar: ${name}"` : quote}><span>Cotizar<span class="vh">: ${name}</span></span><svg class="icon icon--18" width="18" height="18" aria-hidden="true"></svg></a></div></article>`;
+
+test('V-06: el separador unido a la marca con un espacio de no separación pasa, dentro o fuera de su elemento', async () => {
+  const good = [
+    META_GOOD,
+    'Marca de ejemplo&nbsp;<span class="sep" aria-hidden="true">·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo&#160;<span class="sep" aria-hidden="true">·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo <span class="sep" aria-hidden="true">·</span>\n<span class="t-code">EJ-1001</span>',
+  ];
+  assert.deepEqual(await check({ 'catalogo/index.html': page({}, good.map(meta => card(meta)).join('')) }, { ids: ['V-06'] }), []);
+  // Una página sin tarjetas no tiene nada que revisar.
+  assert.deepEqual(await check({ 'contacto/index.html': page() }, { ids: ['V-06'] }), []);
+});
+
+test('V-06: un separador precedido por un espacio normal, por ninguno o por un salto de renglón falla', async () => {
+  const bad = [
+    // Lo que escribía ProductCard: el renglón podía empezar con «·».
+    'Marca de ejemplo <span class="sep" aria-hidden="true">·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo<span class="sep" aria-hidden="true">·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo\n<span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo <span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">EJ-1001</span>',
+    '<b>Marca de ejemplo</b> <span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">EJ-1001</span>',
+    'Marca de ejemplo&nbsp;<span class="sep" aria-hidden="true"> ·</span> <span class="t-code">EJ-1001</span>',
+  ];
+  for (const meta of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, card(meta)) }, { ids: ['V-06'] });
+    assert.equal(problems.length, 1, meta);
+    assert.match(problems[0].message, /espacio de no separación/, meta);
+    assert.equal(problems[0].file, 'catalogo/index.html');
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------
 // Línea de comandos
 // ---------------------------------------------------------------------------------------------------
 
