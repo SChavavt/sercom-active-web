@@ -618,9 +618,14 @@ const QUANTITY_UNIT = '(?:piezas|pzas|pzs|pares|cajas|unidades|paquetes|rollos|m
 const NOT_QUANTITY = `(?!\\d*(?:,\\d{3})*\\s*${QUANTITY_UNIT}\\b(?![^.!?;\\d]*\\d))`;
 // Palabras que, entre «precio por|con|de|para» y una cifra, hacen de la cifra un dato del producto («Precio para talla 9»).
 const NOT_PRICE_NOUN = '(?!(?:modelo|talla|tipo|clase|serie|nivel|numero|calibre|norma)\\b)';
-// Una cifra pegada a una letra es un nombre, no un importe: «El precio vigente de 3M» (3M es una de las marcas). Una
-// unidad pegada sí deja la cifra como precio («Precio de 35pza»). Se aplica justo después de la primera cifra.
-const NOT_NAME = '(?![\\d.,]*(?!(?:pzas?|pzs?|piezas?|pares?|kg|lts?|ml)\\b)[a-z])';
+// Las marcas de src/data/brands.json cuyo nombre empieza con una cifra, escritas como las escribe la marca. Después de
+// «precio de» su nombre no es un importe: «El precio vigente de 3M», «Los precios de 3M se confirman al cotizar»,
+// «Precio de marca 3M». Una prueba lee brands.json y falla si una marca así falta en esta lista.
+export const FIGURE_BRANDS = ['3M'];
+// Solo el nombre exacto (con sus mayúsculas), como palabra completa y sin una cifra después: «Precio de 3M 350» es un
+// precio, y una cifra pegada a otras letras también («Precio de 2x1», «Precio de 350k», «Precio de 99c/u», «Costo de
+// 3m»). Se aplica justo antes de la cifra.
+const NOT_FIGURE_BRAND = `(?!(?-i:${FIGURE_BRANDS.map(escapeRegExp).join('|')})(?![A-Za-z0-9])(?![\\s-]*\\$?\\s?\\d))`;
 /**
  * Patrón de R-RULE-01. En el código de un script (`code: true`) un «$» pegado a una letra, a otro «$», a «=» o a un
  * punto es código («$2», «a$1», «x=$1», «e.$2»), no un precio, y un prefijo en mayúsculas solo cuenta si no es parte
@@ -639,13 +644,14 @@ const pricePattern = ({ code }) => new RegExp([
   // «Precio 350», «Precio unitario 350.00»; no «Precios y cotización 2026».
   new RegExp(`${PRICE_WORD}(?:\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)[a-z]+){0,2}\\s+\\$?\\s?\\d${NOT_QUANTITY}`),
   // «Precio por pieza 350.00», «Precio con IVA 350», «Precio de mayoreo 300»: «por», «con», «de» o «para» y una palabra
-  // antes de la cifra; no un porcentaje («Precio con IVA 16%») ni una talla, una serie o un modelo («Precio para talla 9»).
-  new RegExp(`${PRICE_WORD}\\s+(?:por|con|de|para)\\s+${NOT_PRICE_NOUN}[a-z]+\\s+\\$?\\s?\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
-  // «Precio de 350»; no un año («El precio de 2026 lo confirma Sercom»), una cantidad («el precio de 12 pares») ni un
-  // nombre («Los precios de 3M»).
-  new RegExp(`${PRICE_WORD}\\s+de\\s+\\$?\\s?(?!(?:19|20)\\d\\d\\b)\\d${NOT_NAME}(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
+  // antes de la cifra; no un porcentaje («Precio con IVA 16%»), una talla, una serie o un modelo («Precio para talla 9»)
+  // ni el nombre de una marca («Precio de marca 3M»).
+  new RegExp(`${PRICE_WORD}\\s+(?:por|con|de|para)\\s+${NOT_PRICE_NOUN}[a-z]+\\s+\\$?\\s?${NOT_FIGURE_BRAND}\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
+  // «Precio de 350»; no un año («El precio de 2026 lo confirma Sercom»), una cantidad («el precio de 12 pares») ni el
+  // nombre de una marca («Los precios de 3M»).
+  new RegExp(`${PRICE_WORD}\\s+de\\s+\\$?\\s?(?!(?:19|20)\\d\\d\\b)${NOT_FIGURE_BRAND}\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
   // «Precio unitario de 120»: una palabra entre la del precio y «de», con las mismas excepciones.
-  new RegExp(`${PRICE_WORD}\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)${NOT_PRICE_NOUN}[a-z]+\\s+de\\s+\\$?\\s?(?!(?:19|20)\\d\\d\\b)\\d${NOT_NAME}(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
+  new RegExp(`${PRICE_WORD}\\s+(?!(?:y|e|o|u|ni|a|de|del|para|por|en|con|sin|segun|sujetos?)\\b)${NOT_PRICE_NOUN}[a-z]+\\s+de\\s+\\$?\\s?(?!(?:19|20)\\d\\d\\b)${NOT_FIGURE_BRAND}\\d(?![\\d.,]*\\s*%)${NOT_QUANTITY}`),
   // Una cifra con el IVA: seguida de «+ IVA», «más IVA», «más el IVA», «con IVA», «sin IVA» o «IVA incluido», también
   // escrito «I.V.A.» («Casco 350 + IVA», «25.50 más I.V.A.», «Casco 350 con IVA», «350 IVA incluido»); no un porcentaje
   // («16% + IVA», «16% con IVA»). Con «con», «sin» e «incluido» la cifra no puede ir pegada a un guion: el final de una
@@ -663,7 +669,7 @@ const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 export const RULES = [
   rule('R-RULE-01', 'FAIL', 'words', PUBLIC_PRICE,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o una palabra y «de» («Precio unitario de 120»); en estas dos, una cifra pegada a una letra es un nombre y no cuenta: «El precio vigente de 3M», «Los precios de 3M»; una unidad pegada sí: «Precio de 35pza», o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9»), una cifra con el IVA: seguida de «+ IVA», «más IVA», «más el IVA», «con IVA», «sin IVA» o «IVA incluido», también escrito «I.V.A.» («Casco 350 + IVA», «25.50 más I.V.A.», «Casco 350 con IVA», «350 IVA incluido»; no un porcentaje: «16% + IVA», «16% con IVA», «IVA 16%»; no el final de una norma: «NOM-017-STPS-2008 con IVA»), «c/u» después de una cifra con dos decimales («25.50 c/u»; con un entero no, porque puede ser una cantidad: «25 c/u», «12 pares c/u») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural y sin otra cifra en la misma frase («100 piezas o más», «12 pares»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o una palabra y «de» («Precio unitario de 120»), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9»; en estas tres, el nombre de una marca de brands.json que empieza con una cifra, escrito como lo escribe la marca y como palabra completa (hoy solo «3M», con su mayúscula), no es una cifra: «El precio vigente de 3M», «Los precios de 3M se confirman al cotizar», «Precio de 3M: a cotizar» y «Precio de marca 3M» no fallan; cualquier otra cifra pegada a letras sí es un precio, y también la marca seguida de una cifra: «Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí fallan, igual que «Precio de 35pza»), una cifra con el IVA: seguida de «+ IVA», «más IVA», «más el IVA», «con IVA», «sin IVA» o «IVA incluido», también escrito «I.V.A.» («Casco 350 + IVA», «25.50 más I.V.A.», «Casco 350 con IVA», «350 IVA incluido»; no un porcentaje: «16% + IVA», «16% con IVA», «IVA 16%»; no el final de una norma: «NOM-017-STPS-2008 con IVA»), «c/u» después de una cifra con dos decimales («25.50 c/u»; con un entero no, porque puede ser una cantidad: «25 c/u», «12 pares c/u») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural y sin otra cifra en la misma frase («100 piezas o más», «12 pares»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
   rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
     'precio en el texto, en un atributo o en el CSS',
     'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS (enteras, aunque lleven «;» o «}») y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),

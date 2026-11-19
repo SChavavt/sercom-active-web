@@ -906,7 +906,39 @@ test('R-RULE-01: una cifra con IVA incluido, con o sin IVA, I.V.A.; una cifra pe
   // El texto de --rules dice lo que la regla reconoce ahora.
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
   assert.match(printed, /«con IVA», «sin IVA» o «IVA incluido», también escrito «I\.V\.A\.»/);
-  assert.match(printed, /una cifra pegada a una letra es un nombre y no cuenta: «El precio vigente de 3M»/);
+  assert.match(printed, /el nombre de una marca de brands\.json que empieza con una cifra[^\n]*no es una cifra: «El precio vigente de 3M»/);
+});
+
+test('R-RULE-01: después de «precio de» solo el nombre de una marca que empieza con una cifra no es un precio', async () => {
+  // Una cifra pegada a letras sigue siendo un precio (f37334b las detectaba): una oferta, un importe abreviado, una
+  // unidad o el nombre de la marca escrito de otra forma.
+  await assertEachFails('R-RULE-01', [
+    '<p>Precio de 2x1</p>', '<p>Precio de 2x1: consulta</p>', '<p>Precio de 3x2 en guantes</p>', '<p>Precio de 350c/IVA</p>', '<p>Precio de 350k</p>', '<p>Precio de 5K</p>',
+    '<p>Precio de 99c/u</p>', '<p>Costo de 3m</p>', '<p>Precio de 3MM</p>', '<p>Tarifa de 3M2</p>', '<p>Precio unitario de 350k</p>', '<p>Precio unitario de 2x1</p>',
+    // La marca seguida de una cifra: la cifra es el precio.
+    '<p>Precio de 3M 350</p>', '<p>Precio de 3M-350</p>', '<p>Precio de marca 3M 350</p>',
+  ]);
+  // La marca escrita como la escribe (con su mayúscula y como palabra completa) es un nombre. «Los precios de 3M…» y
+  // «Precio de 3M: a cotizar» fallaban en f37334b: son texto de marca y no dicen ningún precio (la única excepción a
+  // la decisión 2 de esta corrección).
+  await assertNoneFails([
+    '<p>El precio vigente de 3M se confirma al cotizar.</p>', '<p>Los precios de 3M se confirman al cotizar.</p>', '<p>Precio de 3M: a cotizar</p>',
+    '<p>Los precios actuales de 3M y Ansell se confirman al cotizar.</p>', '<p>El costo real de 3M se confirma al cotizar.</p>', '<p>Precio unitario de 3M: a cotizar</p>',
+    '<p>Precio de marca 3M</p>', '<p>Precio de <b>3M</b>: a cotizar</p>',
+  ]);
+  // Cada marca de brands.json cuyo nombre empieza con una cifra está en la excepción: una marca nueva así se nota aquí.
+  const figureBrands = data.brands.map(brand => brand.name).filter(name => /^\d/.test(name));
+  assert.ok(figureBrands.includes('3M'), 'brands.json tiene hoy una marca que empieza con una cifra');
+  for (const name of figureBrands) {
+    for (const body of [`<p>Precio de ${name}: a cotizar</p>`, `<p>Los precios de ${name} se confirman al cotizar.</p>`, `<p>El precio vigente de ${name} se confirma al cotizar.</p>`, `<p>Precio de marca ${name}</p>`]) {
+      assert.deepEqual(failures(await scan({ 'pagina/index.html': page(body) })), [],
+        `${body}: la marca «${name}» de brands.json empieza con una cifra y no está en la excepción de R-RULE-01 (FIGURE_BRANDS de scripts/scan-dist.mjs)`);
+    }
+  }
+  // Una marca que no está en la excepción se lee como una cifra: así es como la prueba anterior la notaría.
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<p>Precio de 4Safe: a cotizar</p>') })), ['R-RULE-01']);
+  const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
+  assert.match(printed, /«Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí/);
 });
 
 test('R-RULE-10: el sustantivo y el participio con una o dos palabras entre ellos, «ha quedado» y la frase que termina', async () => {
