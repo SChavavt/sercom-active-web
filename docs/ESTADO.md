@@ -52,7 +52,7 @@ Tomadas al integrar y revisar el paso 1. Todas pueden revisarse con el propietar
 - Cada acción de contacto abre un borrador de WhatsApp o de correo para la persona de contacto, con los datos de `src/data/business.json`. El sitio no envía nada ni muestra confirmaciones.
 - Búsqueda del catálogo en la vista previa: por nombre, marca, código o categoría, sin distinguir acentos; sin resultados, ofrece «Solicitar este producto» con lo buscado.
 - Sin precios, sin existencias, sin carrito, sin dirección física ni mapa, sin afirmaciones de distribución autorizada.
-- Ninguna página se indexa en buscadores (`noindex` y `robots.txt` bloqueante) hasta el lanzamiento.
+- Ninguna página se indexa en buscadores hasta el lanzamiento: cada página pide a los buscadores que no la incluyan en sus resultados (con la etiqueta `noindex`), y el archivo `robots.txt` les pide no recorrer el sitio. Las dos cosas valen hoy para las dos compilaciones; qué pasa con ellas en la vista previa después del lanzamiento está pendiente ([`publicacion.md`](publicacion.md#4-lista-de-lanzamiento)).
 - Las dos compilaciones, con los ejemplos solo en la vista previa.
 - Protecciones automáticas que revisan los datos, el código y el sitio generado: validador, pruebas, escáner de reglas, verificador de enlaces y verificador de marcado ([`datos-y-modos.md`](datos-y-modos.md)).
 - Accesibilidad: teclado, foco visible, objetivos táctiles, texto espaciado, colores forzados y contraste documentado ([`diseno.md`](diseno.md#11-accesibilidad)).
@@ -61,7 +61,7 @@ Tomadas al integrar y revisar el paso 1. Todas pueden revisarse con el propietar
 
 ### 4.1 Comandos
 
-Ejecutados el 19 de noviembre de 2026 sobre el código del commit `5ba1a00` (estos documentos no cambian el código), con Node.js 24.22.3 y npm 11.19.1. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
+Ejecutados el 19 de noviembre de 2026 sobre el código del commit `5ba1a00` (la versión guardada del código que se revisó; estos documentos no cambian el código), con Node.js 24.22.3 y npm 11.19.1. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
 
 | Comando | Resultado |
 | --- | --- |
@@ -83,7 +83,7 @@ Las 27 páginas de producción son: portada, 404, catálogo, marcas, las 19 pág
 
 ### 4.3 GitHub Actions
 
-El trabajo está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 1 del repositorio, en borrador; nada se ha integrado en `main`. GitHub Actions (el servicio de GitHub que ejecuta comprobaciones automáticas) corre el flujo de calidad en cada envío a esa rama, a través de la solicitud de cambios: `npm ci`, `check`, `test`, `build` y `verify`. No publica nada.
+El trabajo está en la rama `claude/project-thread-xtacqo` (una línea de trabajo separada dentro del repositorio, que no cambia la versión principal hasta que se integra), en la solicitud de cambios n.º 1 del repositorio, en borrador; nada se ha integrado en `main`, la versión principal. GitHub Actions (el servicio de GitHub que ejecuta comprobaciones automáticas) corre el flujo de calidad en cada envío a esa rama, a través de la solicitud de cambios: `npm ci`, `check`, `test`, `build` y `verify`. No publica nada.
 
 ### 4.4 Criterios de terminado del paso 1
 
@@ -128,30 +128,42 @@ Nada. No se ha creado ninguna cuenta ni proyecto de alojamiento, no se ha compra
 
 ## 7. Pendiente del negocio
 
-Ninguno bloquea el paso 1. Todos bloquean la publicación, salvo donde se indica.
+Ninguno bloquea el paso 1. Todos bloquean la publicación, salvo donde se indica. Cada punto dice quién responde cuando está definido; donde dice «el negocio», el propietario indica quién lo confirma.
+
+**Del propietario:**
+
+- **Revisión del paso 1** y los cambios que pida (sección 8).
+- **Alojamiento.** La respuesta a la propuesta (sección 5), quién abre y conserva las cuentas, y el nombre de la dirección del sitio.
+- **Vista previa en una dirección web.** Si se permite colocar una vista previa marcada y no indexada en una dirección web para revisarla (no bloquea la publicación).
+- **Quién revisará los cambios del catálogo** cuando haya productos reales.
+- **La aprobación para publicar.**
+
+**Del contacto comercial:**
+
+- **Textos.** Todo texto visible del sitio es un borrador para su aprobación, incluidos los de la página 11 del plan maestro.
+- **Aviso de privacidad.** La aprobación de su texto.
+- **Categorías y productos.** Cuáles de las diez categorías se aprueban, y los primeros productos reales con sus fuentes e imágenes (paso 3).
+
+**Del negocio:**
 
 - **Marca en la posición 17.** La imagen de marcas de la empresa dice «Safety Guardian»; el registro y el sitio dicen «Derma Care». ¿Cuál es la correcta?
 - **Dirección y teléfono de Puebla.** El sitio propio de la empresa muestra otra dirección de Puebla y otros teléfonos que los dados para este proyecto. Hasta aclararlo y confirmar la atención presencial, el sitio no muestra dirección, mapa ni «Visítanos».
 - **WhatsApp.** Confirmar en un teléfono real que el número abre el chat de la persona de contacto (en los datos, `whatsappTested` sigue en `false`).
-- **Textos.** Todo texto visible del sitio es un borrador para aprobación del contacto comercial, incluidos los de la página 11 del plan maestro.
-- **Aviso de privacidad.** Su texto.
-- **Categorías y productos.** Cuáles de las diez categorías se aprueban, y los primeros productos reales con sus fuentes e imágenes (paso 3).
 - **Logotipo vectorial original.** Solo existe un PNG de 400 px; el SVG del repositorio es un trazo fiel de él. Hace falta para imprimir.
-- **Afirmaciones que no se usan hasta confirmarlas:** «más de 25 años», los tres servicios (análisis de riesgo, asesorías, capacitaciones) y cualquier enlace a la tienda en línea de la empresa.
-- **Vista previa en una dirección web.** Si se permite colocar una vista previa marcada y no indexada en una dirección web para revisarla (no bloquea la publicación).
+- **Afirmaciones que no se usan hasta confirmarlas:** «más de 25 años», los tres servicios (análisis de riesgo, asesorías, capacitaciones) y cualquier enlace a la tienda en línea de la empresa. Hoy el pie de cada página y la descripción por omisión para buscadores dicen «Venta, entrega y asesoría de productos de seguridad industrial.»: esa «asesoría» se confirma o se quita junto con los servicios. Solo «más de 25 años» lo detecta una comprobación automática; lo demás depende de revisar cada cambio ([`datos-y-modos.md`](datos-y-modos.md#63-escáner-de-reglas)).
 - **Condiciones comerciales** (facturación, mínimos, cobertura, pagos, entregas, devoluciones): el sitio dice que se confirman al cotizar.
 
 ## 8. Pendiente técnico, por paso
 
 - **Paso 1:** la revisión del propietario y los cambios que pida.
 - **Paso 2 (buscador, filtros y «Mi cotización»):** filtros combinables, «Agregar a mi cotización» en la ficha, la lista que se arma en el sitio con cantidades y variantes, copiar el resumen y manejar mensajes largos; la búsqueda guiada de la solicitud especial.
-- **Paso 3 (catálogo piloto):** cargar de 30 a 50 productos reales aprobados; ampliar el esquema de imagen (archivo local o dirección, con ancho y alto) con sus pruebas; decidir cómo se revisa el texto de los productos frente a las reglas del escáner; revisar la opción `--strict` cuando haya normas con fuente; retirar los ejemplos cuando haya productos aprobados.
-- **Paso 4 (publicación y QR):** elegir y crear el alojamiento, definir la dirección, la lista de lanzamiento de [`publicacion.md`](publicacion.md) (retirar `noindex`, `robots.txt` y el aviso; agregar `SITE_URL`, sitemap y metadatos para compartir; escáner con `--launch`), confirmar los navegadores compatibles, generar y probar el QR.
-- **Mejoras anotadas:** el menú abierto en una pantalla muy baja (sección 10); detalles de código listados en la revisión de estos documentos (dos comentarios que dicen «al hacer clic» donde el enlace se agrega al cargar, dos parámetros sin usar que dan las dos sugerencias de `npm run check`, y la posición fija de la imagen de la ficha, que usa el alto de diseño del encabezado en lugar de su alto real).
+- **Paso 3 (catálogo piloto):** cargar de 30 a 50 productos reales aprobados; ampliar el esquema de imagen (archivo local o dirección, con ancho y alto) con sus pruebas; decidir cómo se revisa el texto de los productos frente a las reglas del escáner; revisar la opción `--strict` cuando haya normas con fuente; retirar los ejemplos cuando haya productos aprobados; actualizar las pruebas que hoy dan por hecho que no hay productos reales y que las categorías están en borrador ([`datos-y-modos.md`](datos-y-modos.md#62-pruebas)).
+- **Paso 4 (publicación y QR):** elegir y crear el alojamiento, definir la dirección, la lista de lanzamiento de [`publicacion.md`](publicacion.md) (decidir qué pasa con el `noindex` y el `robots.txt` de la vista previa, que son los mismos de producción; retirar de producción `noindex`, `robots.txt` y el aviso; agregar `SITE_URL`, sitemap y metadatos para compartir; escáner con `--launch`), comprobar en el alojamiento la página 404, las direcciones sin diagonal final y cómo se vuelve a una versión anterior, confirmar los navegadores compatibles, generar y probar el QR.
+- **Mejoras anotadas:** el menú abierto en una pantalla muy baja (sección 10); detalles de código listados en la revisión de estos documentos (dos comentarios que dicen «al hacer clic» donde el enlace se agrega al cargar, dos parámetros sin usar que dan las dos sugerencias de `npm run check`, la posición fija de la imagen de la ficha, que usa el alto de diseño del encabezado en lugar de su alto real, un comentario de `scripts/check-markup.mjs` que dice que la vista previa exige la entrada «Categorías» cuando solo exige la búsqueda, y `.env.example`, que presenta `SITE_URL` como variable de un archivo `.env` aunque ese archivo no la aplica).
 
 ## 9. Qué se puede revisar y cómo
 
-Para ver el sitio en una computadora con Node.js 24: `npm ci` y después `npm run dev` (vista previa con ejemplos) o `npm run build` seguido de `npm run preview` (producción). El ejemplo de producto retirado se abre escribiendo `/productos/ejemplo-producto-retirado/` después de la dirección local. Instrucciones completas en [`README.md`](../README.md).
+Para ver el sitio en una computadora con Node.js 24: `npm ci` y después `npm run dev` (vista previa con ejemplos) o `npm run build` seguido de `npm run preview` (producción; el servidor se detiene con Ctrl+C). El ejemplo de producto retirado se abre escribiendo `/productos/ejemplo-producto-retirado/` después de la dirección local. Instrucciones completas en [`README.md`](../README.md).
 
 ## 10. Límites conocidos
 
