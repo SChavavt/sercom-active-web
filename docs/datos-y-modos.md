@@ -69,7 +69,11 @@ La dirección del sitio todavía no existe (`SITE_URL` vacío), así que `absolu
 ## Cómo se mantienen los ejemplos fuera de producción
 
 1. Viven en un archivo aparte y nunca entran en `catalog.json`: la validación rechaza cualquier ficha con identificador `ejemplo-…`, código `EJ-…` o nombre con «de ejemplo».
-2. `site-data.mjs` los carga solo dentro de la rama de vista previa. Con la bandera apagada, la compilación elimina esa rama y el archivo no llega a ningún HTML, script ni JSON. `tests/build-mode.test.mjs` comprueba que ningún otro archivo de `src/` nombra el archivo de ejemplos ni puede alcanzarlo con un `import.meta.glob(…)` o un `import()` con patrón (por ejemplo, `'../data/*/*.json'`), ni con una colección de contenido de Astro (`glob()` o `file()` de `astro/loaders`, por ejemplo `glob({ pattern: '**/*.json', base: './src/data' })`). Un cargador cuyo `base` o `pattern` no es un texto escrito tal cual se rechaza, porque no se puede revisar. Tampoco permite que el código de `src/` lea archivos del disco (`node:fs`, `require`, `createRequire`): los datos se leen con `import` de JSON, que esas pruebas sí pueden revisar.
+2. `site-data.mjs` los carga solo dentro de la rama de vista previa. Con la bandera apagada, la compilación elimina esa rama y el archivo no llega a ningún HTML, script ni JSON. `tests/build-mode.test.mjs` comprueba sobre el código de `src/`:
+   - que ningún otro archivo de código nombra el archivo de ejemplos (`example-products` o `data/preview`), que `site-data.mjs` lo nombra una sola vez, en un `import()` dentro de `if (__CATALOG_PREVIEW__)`, y que nadie más lee esa constante;
+   - que ningún `import.meta.glob(…)` ni `import()` con patrón (por ejemplo, `'../data/*/*.json'`) puede alcanzarlo; un `import()` cuyo argumento no es un texto escrito tal cual se rechaza;
+   - que el proyecto no usa colecciones de contenido de Astro: ningún archivo de `src/` nombra `astro/loaders` ni `astro:content`, de ninguna forma (`import`, `export … from`, `import type`, `import()` o un texto), y no existen `src/content.config.*`, `src/content/config.*` ni la carpeta `src/content/`. Agregar colecciones exige rediseñar antes esta protección;
+   - que el código de `src/` no toca el disco: no importa `fs`, `fs/promises`, `module` ni `child_process`, no usa `require`, `createRequire`, `process.getBuiltinModule`, `process.binding` ni `process.dlopen`, y no importa ningún otro módulo integrado de Node (con `node:` o sin él) fuera de la lista permitida de la prueba, que hoy está vacía. Los datos se leen con `import` de JSON, que las comprobaciones anteriores sí pueden revisar.
 3. En modo producción, `createSiteData` ignora los ejemplos aunque los reciba.
 4. `tests/build-output.test.mjs` compila una página de prueba en ambos modos y comprueba que los ejemplos solo aparecen en la vista previa.
 5. `npm run verify` escanea `dist/` y falla si encuentra `EJ-`, «Marca de ejemplo», `ejemplo-` o «de ejemplo» en cualquier archivo, o cualquier identificador, nombre, texto o código del archivo de ejemplos (los códigos también escritos con otro separador o sin él, como `EJ1001`).
@@ -77,6 +81,8 @@ La dirección del sitio todavía no existe (`SITE_URL` vacío), así que `absolu
 El escáner reconoce los ejemplos por esas marcas y por sus textos. Una página que copiara un ejemplo y reescribiera todos sus textos ya no se distinguiría de una ficha real: por eso la garantía principal es el paso 2, que impide cargar el archivo fuera de la rama de vista previa.
 
 Consecuencia para quien escribe páginas: esas cadenas tampoco pueden usarse en producción como nombre de clase CSS, identificador o texto (por ejemplo, una clase `ejemplo-…`). «Por ejemplo» sí puede escribirse.
+
+Estas comprobaciones, como el escáner y las demás revisiones, protegen contra errores: una forma directa y legible de escribir algo que no debe publicarse o de cargar el archivo de ejemplos, como la escribiría alguien de buena fe. No protegen contra quien esconde un nombre a propósito para que una revisión no lo vea (partir una cadena para esquivar un patrón, `eval`, `new Function`, un acceso calculado a `process`): quien hace eso también puede borrar la prueba, y la defensa contra eso es revisar cada cambio, no un patrón. Un resultado limpio no garantiza más que eso.
 
 ## Límite conocido: las reglas de afirmaciones y el texto de los productos
 

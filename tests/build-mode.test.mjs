@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
+import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -174,96 +175,87 @@ test('ningún import.meta.glob ni import() con patrón puede cargar el archivo d
   assert.deepEqual(offenders, [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
 });
 
-/** Texto del argumento de una llamada que empieza en `start` (justo después del paréntesis de apertura). */
-function callArgument(code, start) {
-  let depth = 1;
-  for (let index = start; index < code.length; index += 1) {
-    if ('([{'.includes(code[index])) depth += 1;
-    else if (')]}'.includes(code[index]) && (depth -= 1) === 0) return code.slice(start, index);
-  }
-  return code.slice(start);
-}
-/**
- * Patrones de los cargadores de colecciones de contenido de Astro (`glob()` y `file()` de «astro/loaders»), resueltos
- * desde la raíz del proyecto, que es donde Astro resuelve `base` y la ruta de `file()`. Un cargador que no se puede
- * leer (un `base` o un `pattern` que no es un texto escrito tal cual, o el módulo importado de otra forma) se devuelve como «?».
- * @param {string} code Código sin comentarios.
- */
-function contentLoaderPatterns(code) {
-  const imports = [...code.matchAll(/\bimport\s+([^;'"]*?)\s+from\s*["']astro\/loaders["']|\bimport\s*\(\s*["']astro\/loaders["']\s*\)/g)];
-  if (!imports.length) return [];
-  const patterns = [];
-  const names = { glob: [], file: [] };
-  for (const match of imports) {
-    const named = match[1]?.trim().match(/^\{([^}]*)\}$/);
-    if (!named) {
-      patterns.push('?');
-      continue;
-    }
-    for (const specifier of named[1].split(',').map(part => part.trim()).filter(Boolean)) {
-      const [imported, local = imported] = specifier.split(/\s+as\s+/).map(part => part.trim());
-      if (imported in names) names[imported].push(local);
-    }
-  }
-  const literal = text => text?.trim().match(/^(["'`])([^"'`$]*)\1$/)?.[2];
-  const fromRoot = path => posix.join('/', path.replace(/^\.\//, ''));
-  for (const [kind, locals] of Object.entries(names)) {
-    for (const local of locals) {
-      for (const call of code.matchAll(new RegExp(`(?<![\\w$.])${local.replace(/\$/g, '\\$')}\\s*\\(`, 'g'))) {
-        const argument = callArgument(code, call.index + call[0].length).trim();
-        if (kind === 'file') {
-          const path = literal(argument.split(/,(?![^{]*\})/)[0]);
-          patterns.push(path === undefined ? '?' : fromRoot(path));
-          continue;
-        }
-        const base = argument.match(/\bbase\s*:\s*([^,}]+)/);
-        const baseValue = base ? literal(base[1]) : '.';
-        const pattern = argument.match(/\bpattern\s*:\s*(\[[^\]]*\]|["'`][^"'`]*["'`])/);
-        if (baseValue === undefined || !pattern || /\$\{/.test(pattern[1])) {
-          patterns.push('?');
-          continue;
-        }
-        for (const glob of [...pattern[1].matchAll(/["'`]([^"'`]*)["'`]/g)].map(found => found[1])) {
-          const negated = glob.startsWith('!');
-          const resolved = posix.join(fromRoot(baseValue), negated ? glob.slice(1) : glob);
-          patterns.push(negated ? `!${resolved}` : resolved);
-        }
-      }
-    }
-  }
-  return patterns;
-}
-// Lecturas del disco o carga de módulos por una ruta calculada: ninguna prueba puede saber qué archivo leen.
-const DISK_ACCESS = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:node:)?(?:fs|fs\/promises|module|child_process)["']|\bcreateRequire\b|(?<![\w$.])require\s*\(|\bprocess\.binding\b/;
+// Colecciones de contenido de Astro. Sus cargadores (`glob()` y `file()` de «astro/loaders») leen archivos de src/ con un
+// patrón, y un cargador puede escribirse de muchas formas que una revisión de la sintaxis no sigue (un alias, `.call`,
+// un módulo que lo reexporta). El proyecto no las usa, así que la regla es total: ningún archivo de src/ nombra
+// «astro/loaders» ni «astro:content», de ninguna forma (import, export, import type, import(), un texto suelto), y no
+// existe su configuración (src/content.config.*, src/content/config.* ni la carpeta src/content/).
+const COLLECTION_MODULES = /astro\/loaders|astro:content/;
+const COLLECTION_PATHS = /^src\/(?:content\.config\.[^/]+|content\/)/;
+const NO_COLLECTIONS = 'este proyecto no usa colecciones de contenido de Astro: no se agregan sin rediseñar antes la protección de los ejemplos (ver «Cómo se mantienen los ejemplos fuera de producción» en docs/datos-y-modos.md)';
+/** Archivos que nombran un módulo de colecciones de contenido o son su configuración. @param {Iterable<[string, string]>} files */
+const collectionFiles = files => [...files].filter(([path, text]) => COLLECTION_PATHS.test(path) || COLLECTION_MODULES.test(text)).map(([path]) => path);
+// Todos los archivos de src/, con sus comentarios: también una mención en un comentario o en un texto cuenta.
+const allSources = new Map(await Promise.all(sourceFiles.map(async path => [path, await readText(path)])));
 
-test('ninguna colección de contenido ni lectura del disco puede llevar el archivo de ejemplos fuera de la rama de vista previa', () => {
-  // La comprobación reconoce los cargadores de Astro y las lecturas con node:fs.
+test('el proyecto no usa colecciones de contenido de Astro', async () => {
+  // Cada forma de cargar una colección nombra el módulo o crea la configuración, también las que esquivaban la
+  // revisión anterior de los cargadores (un alias, `.call`, un módulo que reexporta «astro/loaders»).
   const misuse = [
-    "import { defineCollection } from 'astro:content';\nimport { glob } from 'astro/loaders';\nexport const collections = { sondas: defineCollection({ loader: glob({ pattern: '**/*.json', base: './src/data' }) }) };",
-    "import { glob as cargar } from 'astro/loaders';\nconst c = cargar({ base: 'src', pattern: ['**/*.json', '!content/**'] });",
-    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: 'src/data/**/*.json' });",
-    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: '**/*.json', base: carpeta });",
-    "import { file } from 'astro/loaders';\nconst c = file(`src/data/${carpeta}/example-products.json`);",
-    "import * as cargadores from 'astro/loaders';\nconst c = cargadores.glob({ pattern: '*.md', base: './src/notas' });",
+    ['src/lib/datos.ts', "import { glob } from 'astro/loaders';\nconst cargar = glob;\nconst c = cargar({ pattern: '**/*.json', base: './src/data' });"],
+    ['src/lib/datos.ts', "import { glob } from 'astro/loaders';\nconst c = glob.call(null, { pattern: '**/*.json', base: './src/data' });"],
+    ['src/lib/cargadores.ts', "export { glob } from 'astro/loaders';"],
+    ['src/lib/cargadores.ts', "export * from 'astro/loaders';"],
+    ['src/lib/tipos.ts', "import type { Loader } from 'astro/loaders';"],
+    ['src/lib/datos.mjs', "const { glob } = await import('astro/loaders');"],
+    ['src/lib/datos.mjs', "const modulo = 'astro/loaders';"],
+    ['src/pages/sonda.astro', "---\nimport { getCollection } from 'astro:content';\nconst items = await getCollection('sondas');\n---"],
+    ['src/lib/datos.ts', "import { defineCollection } from 'astro:content';"],
+    ['src/lib/datos.ts', "import { glob as cargar } from 'astro/loaders';\nconst c = cargar({ base: 'src', pattern: ['**/*.json', '!content/**'] });"],
+    ['src/lib/datos.ts', "import * as cargadores from 'astro/loaders';\nconst c = cargadores.glob({ pattern: '*.md', base: './src/notas' });"],
+    ['src/lib/datos.ts', "import { file } from 'astro/loaders';\nconst c = file('src/data/brands.json');"],
+    ['src/lib/datos.ts', "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: '**/*.md', base: './src/content/notas' });"],
+    ['src/content.config.ts', 'export const collections = {};'],
+    ['src/content.config.mjs', ''],
+    ['src/content/config.ts', 'export const collections = {};'],
+    ['src/content/notas/uno.md', '# Nota'],
   ];
-  for (const code of misuse) assert.ok(reachesExamples(contentLoaderPatterns(code)), code);
+  for (const [path, code] of misuse) assert.deepEqual(collectionFiles([[path, code]]), [path], code || path);
   const harmless = [
-    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: '**/*.md', base: './src/content/notas' });",
-    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: ['*.json'], base: './src/data' });",
-    "import { file } from 'astro/loaders';\nconst c = file('src/data/brands.json');",
+    ['src/lib/otra.mjs', "import { defineConfig } from 'astro/config';"],
+    ['src/components/Tarjeta.astro', "---\nimport type { HTMLAttributes } from 'astro/types';\n---"],
+    ['src/lib/contenido.mjs', "export const contenido = 'astro';"],
+    ['src/pages/content.astro', '<p>Contenido</p>'],
   ];
-  for (const code of harmless) assert.equal(reachesExamples(contentLoaderPatterns(code)), false, code);
+  for (const [path, code] of harmless) assert.deepEqual(collectionFiles([[path, code]]), [], path);
+
+  assert.deepEqual(collectionFiles(allSources), [], NO_COLLECTIONS);
+  // La carpeta src/content/ tampoco existe vacía.
+  assert.ok(!(await readdir(join(ROOT, 'src'))).includes('content'), NO_COLLECTIONS);
+});
+
+// Módulos integrados de Node que el código de src/ usa hoy: ninguno. Cualquier otro (con «node:» o sin él) falla.
+const NODE_BUILTINS_ALLOWED = [];
+const NODE_BUILTINS = new Set(builtinModules.filter(name => !name.startsWith('node:')));
+const specifiersOf = code => [...code.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)(["'`])([^"'`]+)\1/g)].map(match => match[2]);
+/** Módulos integrados de Node que importa un código, salvo los permitidos. */
+const nodeBuiltinsOf = code => specifiersOf(code)
+  .filter(specifier => specifier.startsWith('node:') || NODE_BUILTINS.has(specifier))
+  .filter(specifier => !NODE_BUILTINS_ALLOWED.includes(specifier.replace(/^node:/, '')));
+// Lecturas del disco o carga de módulos por una ruta calculada: ninguna prueba puede saber qué archivo leen.
+// `process.getBuiltinModule()` da cualquier módulo de Node sin importarlo; `process.binding()` y `process.dlopen()`, el acceso nativo.
+const DISK_ACCESS = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:node:)?(?:fs|fs\/promises|module|child_process)["']|\bcreateRequire\b|(?<![\w$.])require\s*\(|\bprocess\s*\.\s*(?:binding|_linkedBinding|dlopen)\b|\bgetBuiltinModule\b/;
+
+test('el código de src/ no lee el disco ni importa módulos de Node', () => {
   for (const code of ["import { readdirSync, readFileSync } from 'node:fs';", "import fs from 'fs';", "const { readFile } = await import('node:fs/promises');",
-    "import { createRequire } from 'node:module';", "const datos = require('../data/' + nombre);"]) {
+    "import { createRequire } from 'node:module';", "const datos = require('../data/' + nombre);", "const fs = process.getBuiltinModule('node:fs');",
+    "const { readdirSync } = globalThis.process.getBuiltinModule('fs');", "const enlace = process.binding('fs');", 'process.dlopen(modulo, ruta);']) {
     assert.match(code, DISK_ACCESS, code);
   }
-  assert.doesNotMatch("import { routes } from '../lib/routes.mjs';\nconst ref = fsLike.require;", DISK_ACCESS);
+  assert.doesNotMatch("import { routes } from '../lib/routes.mjs';\nconst ref = fsLike.require;\nconst plataforma = globalThis.process?.platform;", DISK_ACCESS);
+  for (const code of ["import os from 'node:os';", "import { join } from 'path';", "export * from 'node:fs';", 'const fs = await import(`node:fs`);',
+    "import { Worker } from 'node:worker_threads';", "import { readFile } from 'fs/promises';", "import { DatabaseSync } from 'node:sqlite';"]) {
+    assert.notDeepEqual(nodeBuiltinsOf(code), [], code);
+  }
+  for (const code of ["import { routes } from '../lib/routes.mjs';", "import type { HTMLAttributes } from 'astro/types';", "import path from './path.mjs';"]) {
+    assert.deepEqual(nodeBuiltinsOf(code), [], code);
+  }
 
-  const loaders = [...sources].filter(([, code]) => reachesExamples(contentLoaderPatterns(code))).map(([path]) => path);
-  assert.deepEqual(loaders, [], 'una colección de contenido puede cargar el archivo de ejemplos');
   // El código del sitio lee los datos con import de JSON, que las pruebas anteriores pueden revisar; nunca del disco.
   const diskReaders = [...sources].filter(([, code]) => DISK_ACCESS.test(code)).map(([path]) => path);
   assert.deepEqual(diskReaders, [], 'el código de src/ lee archivos del disco');
+  const builtins = [...sources].flatMap(([path, code]) => nodeBuiltinsOf(code).map(specifier => `${path}: ${specifier}`));
+  assert.deepEqual(builtins, [], 'el código de src/ importa un módulo de Node que no está en la lista permitida');
 });
 
 test('el código del sitio nunca importa el registro de investigación', () => {
