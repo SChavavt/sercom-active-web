@@ -51,13 +51,12 @@
   .masthead__logo img { width: 136px; height: 51px; }
   .masthead__btn {
     display: flex;
-    flex: none;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 5px;
-    min-width: 72px;                      /* mínimo, no fijo: con la letra agrandada el botón crece con su etiqueta */
-    padding: 0 var(--s-1);
+    width: 72px;                          /* con la letra agrandada es un mínimo y el botón crece con su etiqueta (6.9) */
+    padding: 0;
     border: 0;
     border-radius: 0;
     color: var(--ink);
@@ -70,7 +69,7 @@
   .masthead__btn .icon--close, .masthead__btn[aria-expanded="true"] .icon--open { display: none; }
   .masthead__btn[aria-expanded="true"] .icon--close { display: block; }
   .masthead__btn--menu { order: 1; }      /* en el documento va antes de la navegación (orden del teclado); a la vista, al final */
-  .masthead__wa { flex: none; min-width: 88px; }
+  .masthead__wa { width: 88px; }
   .masthead__cta { padding: 0 var(--s-5); }
   .masthead__cta .icon { display: none; }
 
@@ -213,7 +212,7 @@
   .utility__hours { display: none; }
 
   .masthead__logo img { width: 122px; height: 46px; }
-  .masthead__btn { min-width: 64px; }
+  .masthead__btn { width: 64px; }
   .masthead__wa, .masthead__cta { display: none; }           /* en el celular ambos viven en la barra fija */
   .masthead__nav, .masthead__search { left: 0; right: 0; border-inline: 0; border-bottom: var(--line) solid var(--rule); }
 
@@ -306,6 +305,7 @@
     padding-top: var(--line);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--rule);
+    container: barra / inline-size;     /* para las reglas de la letra agrandada (6.9) */
   }
   .dock__link {
     display: flex;
@@ -318,7 +318,8 @@
     font-size: 0.9375rem;
     font-weight: var(--type-button-weight);
     line-height: 1.2;
-    text-decoration: none;              /* la etiqueta puede pasar a dos renglones (letra agrandada): el enlace crece */
+    text-decoration: none;
+    white-space: nowrap;                /* con la letra agrandada la etiqueta pasa a dos renglones y el enlace crece (6.9) */
   }
   .dock__link .icon { color: var(--blue); }
   .dock__link--wa { background: var(--blue); color: var(--white); }
@@ -458,6 +459,32 @@
    (contenedor `lamina`, layout.css) con lo que mide el texto en rem; con la letra normal ninguna se cumple a partir
    de 320 px, así que nada de esto cambia el diseño aprobado. Las medidas en rem son las de las etiquetas en
    Archivo (por ejemplo «Buscar» o «Cerrar» en los botones: 3.37rem; «WhatsApp»: 4.46rem). */
+
+/* Interruptor de la letra agrandada: «width < (1rem − 16px) × 400» solo se cumple si la raíz mide más de 16 px (más
+   de 16 px y 1/400 del ancho del contenedor). Con la letra normal no se cumple nunca, a ningún ancho; a 125 % (20 px)
+   o más se cumple en toda lámina de hasta 1600 px, o sea siempre. Bajo él los controles pasan de un ancho fijo a uno
+   mínimo y sus etiquetas pueden partirse: con la letra normal, también con el espaciado de texto de WCAG 1.4.12, el
+   dibujo no cambia en nada. La barra fija está fuera de la lámina y es su propio contenedor (`barra`). */
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .utility__place { white-space: normal; }                   /* E-01: la franja crece y la cabecera fija la sigue */
+  .utility__place::before { flex: none; }
+  .masthead__cta { white-space: normal; text-align: center; }  /* «Cotizar mi lista» en dos renglones */
+  .masthead__wa { padding-inline: var(--s-1); }
+}
+@media (max-width: 1099px) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .masthead__btn { flex: none; width: auto; min-width: 72px; padding: 0 var(--s-1); }
+    .masthead__wa { flex: none; width: auto; min-width: 88px; }
+  }
+}
+@media (max-width: 699px) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .masthead__btn { min-width: 64px; }
+  }
+  @container barra (width < calc((1rem - 16px) * 400)) {
+    .dock__link { white-space: normal; }                     /* E-03: la etiqueta en dos renglones; la barra crece */
+  }
+}
 /* Botones Buscar y Menú del celular: sin lugar para sus etiquetas junto al logotipo (142 px de celda), la etiqueta
    queda solo para el lector (sigue siendo el nombre del botón) y el botón muestra su icono, con sus 64 px. */
 @media (max-width: 699px) {
