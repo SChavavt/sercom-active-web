@@ -5,6 +5,9 @@
 //   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product.
 // El separador «·» va unido a la marca con un espacio de no separación (dentro de su elemento, que el celular
 // oculta junto con él): el renglón solo puede partirse después del separador, nunca empezar con «·».
+// Las dos acciones llevan su nombre completo en aria-label («Ver ficha: {nombre}», «Cotizar: {nombre}»): leído de
+// su contenido, el navegador pone un espacio antes del sufijo oculto («Ver ficha : …»). El sufijo oculto se queda
+// para quien lea el texto de la página.
 // Abrir WhatsApp no es un envío: ninguna página muestra confirmaciones.
 // Mientras el sitio no tenga dirección pública (SITE_URL), el mensaje se arma sin la línea «Enlace» y el
 // script compartido PageLinkScript la agrega al hacer clic, con la dirección de la ficha en el sitio donde se
@@ -47,8 +50,8 @@ const categoryId = product.categoryIds[0];
     <p class="product__meta t-small">{product.brandName}<span class="sep" aria-hidden="true">&nbsp;·</span> <span class="t-code">{product.code}</span></p>
   </div>
   <div class="product__actions">
-    <a class="product__action product__action--sheet" href={product.url}><span>Ver ficha<span class="vh">: {product.name}</span></span><Icon name="arrow-right" class="icon--18" /></a>
-    <a class="product__action product__action--quote" href={quote.whatsapp} data-page-link={pageUrl ? undefined : product.url}><span>Cotizar<span class="vh">: {product.name}</span></span><Icon name="whatsapp" class="icon--18" /></a>
+    <a class="product__action product__action--sheet" href={product.url} aria-label={`Ver ficha: ${product.name}`}><span>Ver ficha<span class="vh">: {product.name}</span></span><Icon name="arrow-right" class="icon--18" /></a>
+    <a class="product__action product__action--quote" href={quote.whatsapp} data-page-link={pageUrl ? undefined : product.url} aria-label={`Cotizar: ${product.name}`}><span>Cotizar<span class="vh">: {product.name}</span></span><Icon name="whatsapp" class="icon--18" /></a>
   </div>
 </article>
 

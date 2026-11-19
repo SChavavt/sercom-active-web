@@ -51,7 +51,7 @@ const links = [
       <div class="footer__contact">
         <p class="footer__who"><strong>{contactDetails.contactName}</strong><br />{contactDetails.locationLabel}</p>
         <p><a href={general.whatsapp}><Icon name="whatsapp" class="icon--16" /><span class="vh">WhatsApp </span><span class="t-code">{contactDetails.whatsappDisplay}</span></a><br />
-        <a href={general.mailto}><Icon name="mail" class="icon--16" /><EmailAddress /></a></p>
+        <a href={general.mailto} aria-label={contactDetails.email}><Icon name="mail" class="icon--16" /><EmailAddress /></a></p>
         <p class="footer__hours">{contactDetails.hoursText}</p>
       </div>
     </div>

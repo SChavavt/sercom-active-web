@@ -35,7 +35,7 @@ const { businessName } = contactDetails;
     </div>
     <div class="privacidad__row grid12">
       <dt class="privacidad__key cell span-4">Dudas sobre tus datos</dt>
-      <dd class="privacidad__value cell span-8"><p>Escríbenos a <a class="privacidad__link" href={mailtoUrl()}><EmailAddress /></a>.</p></dd>
+      <dd class="privacidad__value cell span-8"><p>Escríbenos a <a class="privacidad__link" href={mailtoUrl()} aria-label={contactDetails.email}><EmailAddress /></a>.</p></dd>
     </div>
   </dl>
 </BaseLayout>
