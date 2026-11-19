@@ -12,7 +12,7 @@ Sirve a quien agrega o cambia una página: qué existe, cómo se arma una págin
 | `src/components/` | La plantilla (`SiteNotice`, `SiteHeader`, `SiteFooter`, `Dock`) y los componentes compartidos (sección 6). |
 | `src/pages/` | Las páginas (sección 7). |
 | `src/styles/global.css` | Única entrada de la hoja global. Importa, en este orden: `fonts.css` (kit tipográfico), `tokens.css`, `base.css`, `layout.css`, `components.css`, `sections.css` (secciones de la portada) y `responsive.css`. |
-| `src/styles/pages/` | Hojas de página: `atencion.css` (cotizar, solicitud especial, contacto, privacidad), `catalogo.css` (catálogo, categoría, marca) y `producto.css` (ficha y producto retirado). |
+| `src/styles/pages/` | Hojas de página: `atencion.css` (cotizar, solicitud especial, contacto, privacidad y la 404), `catalogo.css` (catálogo, categoría, marca) y `producto.css` (ficha y producto retirado). |
 | `src/assets/fonts/` | Archivo variable de Archivo (latin y latin-ext) y su licencia OFL. |
 | `src/assets/brand/logo.svg` | Logotipo principal. |
 | `src/assets/icons/icons.json` | Kit de iconos. `src/lib/icons.ts` da los nombres tipados (`IconName`) y `categoryIcon()`. |
@@ -43,7 +43,9 @@ Todas están en `:root` (`tokens.css` y, las tipográficas, `fonts.css`). Se usa
 
 No hay tema oscuro ni colores de estado (error, aviso); si una página necesitara uno, se agrega primero a la base y a la tabla de contraste (sección 11.6).
 
-**Tipografía.** Una sola familia, Archivo variable, servida desde el propio sitio (sin peticiones a terceros).
+**Colores prohibidos.** El azul marino `#0E2A3D` (rgb 14, 42, 61) y el celeste `#00A6E5` (rgb 0, 166, 229) de la paleta anterior del plan maestro. El escáner (R-RULE-29) rechaza cualquier color a 4 o menos por canal de cualquiera de los dos, también con transparencia, y cualquier tema oscuro (`prefers-color-scheme`, `color-scheme`, `light-dark()`).
+
+**Tipografía.** Una sola familia, Archivo variable, servida desde el propio sitio (sin peticiones a terceros). Mientras el archivo carga, o si no carga, se usan las fuentes del sistema ajustadas a las medidas de Archivo para que el texto no salte: `fonts.css` define con `@font-face` las caras «Archivo Fallback», «Archivo Display Fallback» y «Archivo Label Fallback» (sobre Arial, Liberation Sans o Arimo) y sus variantes «… Roboto» (sobre Roboto, primero en las pilas por Android). Las pilas `--font-heading`, `--font-body` y `--font-label` las ordenan; no se cambian sin medir otra vez sus ajustes.
 
 | Función | Variable o clase | Ajustes |
 | --- | --- | --- |
@@ -72,7 +74,7 @@ No hay tema oscuro ni colores de estado (error, aviso); si una página necesitar
 
 La lámina mide como máximo `--sheet-max` (1296 px). `--edge-left` y `--edge-right` son el margen o el área segura del dispositivo, el mayor de los dos.
 
-**Puntos de corte:** **1359** (computadora pequeña), **1099** (la navegación se pliega: tableta), **699** (celular), **379** (celular angosto). Las consultas se escriben con `max-width` y estos valores. El encabezado usa además dos rangos propios (1100–1199 y 1360–1379 px, sección 4.3).
+**Puntos de corte:** **1359** (computadora pequeña), **1099** (la navegación se pliega: tableta), **699** (celular), **379** (celular angosto). Las consultas usan estos valores: `max-width` para lo que cambia al bajar de un ancho y `min-width` con el valor siguiente (700, 1100, 1360) para lo que solo vale desde un ancho, solo o en un rango (`(min-width: 1100px) and (max-width: 1359px)`). El encabezado usa además dos rangos propios (1100–1199 y 1360–1379 px, sección 4.3).
 
 **Forma y movimiento:** `--radius: 0` (esquinas rectas siempre), `--line: 1px`, `--ease: 150ms ease` (solo color y el desplazamiento de 4 px de una flecha). Sombra (`--shadow-overlay`) solo en paneles que flotan sobre la página.
 
@@ -131,11 +133,11 @@ Los dos se dibujan igual (`components.css`, 4.1) y no se imprimen en papel. El e
 - Tableta (700 a 1099 px): logotipo, botón «Buscar», WhatsApp, «Cotizar mi lista» y botón «Menú», dibujado al final. La navegación se pliega en un panel con una fila por entrada (incluida «Cotizar mi lista»). **Orden del teclado: Buscar, Menú, WhatsApp, Cotizar**: el botón Menú va en el documento antes de la navegación, porque al abrir el menú el siguiente Tab debe entrar en él, y se dibuja al final con `order: 1`. Ningún orden del documento cumple a la vez eso, el orden de computadora y el orden visual de tableta; es una decisión aceptada.
 - Celular (hasta 699 px): logotipo, «Buscar» y «Menú»; WhatsApp y «Cotizar mi lista» viven en la barra fija (4.4).
 
-El campo «Buscar» y la entrada «Categorías» solo se imprimen si hay productos o categorías públicos (en producción, hoy no). El botón «Menú» dice «Cerrar» mientras el menú está abierto.
+El campo «Buscar» (y su botón) solo se imprime si hay productos públicos; la entrada «Categorías», si hay categorías públicas (en producción, hoy ninguno de los dos). Una categoría aprobada sin productos agrega «Categorías», pero no la búsqueda. El botón «Menú» dice «Cerrar» mientras el menú está abierto.
 
 **Paneles.** En tableta y celular, el menú y la búsqueda son paneles que abre su botón (`aria-expanded`). Un panel se cierra con Escape (el foco vuelve a su botón), con un clic fuera o cuando el foco sale del panel y de su botón. El menú abierto mide como máximo el espacio hasta la barra fija y se desplaza por dentro; `keepFocusInMenu()` desplaza el panel (nunca la página) para que el elemento con foco se vea entero. El panel «Categorías» de computadora es un `<details>` nativo que se cierra con Escape, con un clic fuera o al salir el foco. Sin JavaScript nada queda escondido detrás de un botón. El panel de búsqueda de tableta y celular mide 64 px de alto.
 
-**Ubicación actual.** `aria-current="page"` en el enlace a la propia página y `"true"` en su sección: una página de marca marca «Marcas»; una de categoría, «Categorías» (y su categoría lleva `page` en el panel); una ficha, «Catálogo». En `/cotizar/` la llevan la entrada del menú, el bloque «Cotizar mi lista» y el enlace de la barra fija. La portada, la solicitud especial, la privacidad y la 404 no marcan nada. Se dibuja con un subrayado azul de 4 px en computadora, una barra azul de 4 px a la izquierda en las filas del menú y del panel, una barra blanca de 4 px dentro del bloque «Cotizar mi lista» y una azul abajo en la barra fija.
+**Ubicación actual.** `aria-current="page"` en el enlace a la propia página y `"true"` en su sección: una página de marca marca «Marcas»; una de categoría, «Categorías» (y su categoría lleva `page` en el panel); una ficha, «Catálogo». En `/cotizar/` la llevan la entrada del menú, el bloque «Cotizar mi lista» y el enlace de la barra fija. La portada marca solo el logotipo (`aria-current="page"`, sin dibujo); la solicitud especial, la privacidad y la 404 no marcan nada en el encabezado ni en la barra fija. Se dibuja con un subrayado azul de 4 px en computadora, una barra azul de 4 px a la izquierda en las filas del menú y del panel, una barra blanca de 4 px dentro del bloque «Cotizar mi lista» y una azul abajo en la barra fija.
 
 **El texto del campo de búsqueda.** El campo se llama «Buscar en el catálogo» (etiqueta oculta y texto de ayuda) y envía a `/catalogo/?q=…`. Con el tamaño de letra normal ese texto cabe en una línea en todos los anchos. Con texto espaciado o agrandado puede no caber: entonces el script del encabezado (si existe `ResizeObserver`) agrega `.is-long` a `.masthead__search-field`, cambia el texto de ayuda por un espacio y muestra en su lugar `.masthead__search-hint`, una copia oculta a los lectores de pantalla que ocupa hasta dos líneas dentro de la celda y se oculta en cuanto el campo tiene texto. Sin JavaScript queda el texto de ayuda nativo. Mientras la copia se ve, axe informa dos resultados «incompletos» (`#q`, «Element has no value», y la copia, «partially overlaps other elements»); los dos son límites de la herramienta, y el contraste de la copia es 6.76:1 (el par 8 de la tabla de 11.6, que redondea hacia abajo).
 
@@ -281,7 +283,7 @@ Todo lo que depende del catálogo se decide con los datos (`categories.length`, 
 
 1. Las reglas de una página van en `src/styles/pages/<pagina>.css` y se importan en el encabezado de la página **después** de la plantilla (`import '../../styles/pages/producto.css';`): Astro las agrega después de la hoja global.
 2. Clases nuevas con el prefijo de la página (`.catalog-…`, `.producto__…`, `.solicitud__…`). No se redefinen clases globales (`.btn`, `.product`, `.sec-head`…) ni se escribe en `:root`.
-3. Se usan las variables y los puntos de corte de la sección 2 con `max-width`.
+3. Se usan las variables y los puntos de corte de la sección 2: `max-width` para bajar de un ancho y `min-width` con el valor siguiente (700, 1100, 1360) para lo que solo vale en anchos mayores.
 4. Se mantiene la lámina: celdas blancas sobre el azul, filetes por huecos de 1 px, sin bordes propios, sin radios, sin sombras.
 5. Toda retícula nueva o bloque sólido nuevo se agrega a la lista de colores forzados (`responsive.css`, 6.8).
 6. Las cadenas reservadas a los ejemplos (`ejemplo-…`, «de ejemplo», «Marca de ejemplo», `EJ-`) no pueden aparecer en producción, tampoco como clase CSS: el escáner falla.
@@ -367,24 +369,26 @@ Otros pares que no son texto: filetes, bordes de campo, iconos y barras de ubica
 
 Declaración propuesta, a partir de las tablas de compatibilidad de las propiedades que usa la hoja compilada: **Safari e iOS 16 o posterior, Chrome y Edge 117 o posterior, Firefox 101 o posterior.** El piso más alto lo pone `grid-template-columns: subgrid` de `pages/catalogo.css` (Chrome y Edge 117, Firefox 71, Safari 16). Otras propiedades necesarias (`:focus-visible`, `overflow-wrap: anywhere`, `aspect-ratio`, `:where()`, `gap` en flex, `inset`, `:placeholder-shown`) piden versiones menores. `100dvh` (Chrome 108, Firefox 101, Safari 15.4) tiene un respaldo en `vh`. `text-wrap: balance` y `pretty`, los colores forzados y `ResizeObserver` (texto de ayuda en dos líneas) son mejoras: sin ellos la página sigue funcionando. No se usan `:has()`, consultas de contenedor, `@layer`, `color-mix` ni anidamiento nativo; usar `:has()` subiría Firefox a 121. Las revisiones en navegador se hicieron en Chromium; estas versiones deben confirmarse antes de publicar.
 
+**Destino de la hoja compilada.** `astro.config.mjs` fija `vite.build.cssTarget` en `chrome90`, `edge90`, `firefox90`, `safari14` e `ios14`. Sin ese ajuste, Lightning CSS (el procesador de CSS de la compilación) conserva el anidamiento y escribe las consultas como rangos (`width<=1099px`), que los navegadores anteriores a Safari 16.4 no entienden. Con él, la hoja compilada sale con `max-width` y `min-width` clásicos. No se quita aunque la declaración de navegadores suba.
+
 ## 13. Producción y vista previa
 
 | | Producción (`npm run build`, hoy) | Vista previa (`npm run build:preview`) |
 | --- | --- | --- |
 | Aviso arriba | «Sitio en preparación · Versión inicial para revisión» en todas las páginas | `PREVIEW_NOTICE` en todas las páginas |
 | Navegación | Catálogo, Marcas, Contacto y el bloque «Cotizar mi lista» | además «Categorías» con su panel |
-| Búsqueda en el encabezado | no hay campo ni botón Buscar | campo en computadora, botón Buscar en tableta y celular |
+| Búsqueda en el encabezado | no hay campo ni botón Buscar (aparecen con el primer producto aprobado) | campo en computadora, botón Buscar en tableta y celular |
 | Portada | sin placa: nota «Estamos preparando el catálogo» y las tres entradas; sin secciones de categorías ni de productos | todas las secciones |
 | Pie | sin columna de categorías | con categorías |
 | Páginas de categoría y de producto | ninguna | las diez categorías, los diez ejemplos y el ejemplo retirado |
 | Etiqueta «Ejemplo» | nunca | en cada ejemplo |
 
-Cuando se apruebe una categoría o un producto real, la entrada «Categorías», la búsqueda y las secciones aparecen solas en producción.
+Cuando se apruebe una categoría, la entrada «Categorías», la placa y las secciones de categorías aparecen solas en producción; la búsqueda del encabezado y las secciones de productos aparecen con el primer producto aprobado. Qué cambia exactamente: [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría).
 
 ## 14. Reglas
 
 - **Logotipo.** Siempre `logo.svg` sobre blanco, con `width` y `height` explícitos y `alt="Sercom Active"`; ancho mínimo 120 px; aire libre alrededor. Nunca se recolorea, estira, recorta, gira, delinea ni se usa como decoración.
-- **Colores.** Solo los de la sección 2. Nada de azul marino ni celeste del plan anterior, ni tema oscuro (el escáner lo detecta).
+- **Colores.** Solo los de la sección 2. Nada del azul marino `#0E2A3D` ni del celeste `#00A6E5` del plan anterior, ni tema oscuro (el escáner lo detecta, R-RULE-29).
 - **Tipografía.** Títulos con peso 700 y ancho 96 %; nunca más de 104 %. El ancho 110 % es solo para etiquetas. Sin cursivas: el énfasis es peso. Sin flechas ni palomitas tecleadas: salen del kit de iconos.
 - **Iconos.** Solo los del kit, mediante `Icon`. Los glifos de redes sociales del kit no se usan mientras la empresa no confirme perfiles. Nunca logotipos de otras marcas.
 - **Ningún control que no haga nada.** Todo lo visible funciona. Lo que llega en el paso 2 (filtros combinables, «Agregar a mi cotización», la lista que se arma en el sitio) no se dibuja. Sin JavaScript todo sigue siendo usable.
@@ -395,6 +399,7 @@ Cuando se apruebe una categoría o un producto real, la entrada «Categorías»,
 ## 15. Comprobaciones
 
 - `npm run check`, `npm test` y `npm run verify` (compila ambos modos y ejecuta el escáner de reglas, el verificador de enlaces y el de marcado).
-- Revisión en navegador de ambas compilaciones (servir `dist/` con `npm run preview` y `dist-preview/` con `npx astro preview --outDir dist-preview`) a 1440, 1280, 768, 390 y 360 px como mínimo: ningún desbordamiento horizontal, teclado, sin JavaScript, texto espaciado y colores forzados.
+- Revisión en navegador de ambas compilaciones a 1440, 1280, 768, 390 y 360 px como mínimo: ningún desbordamiento horizontal, teclado, sin JavaScript, texto espaciado y colores forzados. Para servirlas: `npm run preview` sirve `dist/` y `npx astro preview --outDir dist-preview` sirve `dist-preview/`, pero Astro solo deja correr un servidor de `astro preview` a la vez; para tener los dos, el segundo se arranca con `--ignore-lock` y otro puerto. Sin terminal, el servidor queda en segundo plano y se detiene con `npx astro preview stop` ([`datos-y-modos.md`](datos-y-modos.md#3-los-dos-modos)). También sirve `npm run dev` (vista previa) o `npx astro dev` (producción).
 - Accesibilidad con axe (WCAG 2.1 A y AA): cero infracciones, también con los paneles abiertos.
+- El repositorio no incluye axe ni pruebas con navegador (sus únicas dependencias son Astro, `@astrojs/check` y TypeScript, y una prueba impide agregar otras sin cambiarla). Estas dos revisiones se hacen a mano, en un navegador, con una herramienta que ejecute axe (por ejemplo, su extensión para el navegador) y las herramientas del navegador para el ancho, el espaciado de texto y los colores forzados; el resultado se anota en `docs/ESTADO.md`.
 - Las comprobaciones no sustituyen leer la página: textos, alineación con la retícula y estados vacíos.
