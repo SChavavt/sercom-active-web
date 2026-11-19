@@ -965,7 +965,18 @@ test('R-RULE-01: «con IVA», «sin IVA» o «IVA incluido» después de un dato
     'Talla: 9 con IVA', 'Modelo: 2200 con IVA', 'Calibre: 15 con IVA', 'Modelo #2200 con IVA', 'Modelo N° 2200 con IVA', 'Modelo Nº 2200 con IVA', 'Mod. 2200 con IVA',
     'Tallas 9 con IVA', 'Tallas 8, 9 y 10 con IVA desglosado', 'Modelos 2200 con IVA', 'Normas EN 388 y EN 407 con IVA desglosado',
     'Norma EN 388:2016 con IVA desglosado al cotizar', 'Norma EN ISO 374-1:2016 con IVA desglosado', 'ISO 9001:2015 con IVA desglosado', 'Norma ANSI/ISEA 105 con IVA desglosado',
-    'Talla 9 1/2 con IVA', 'Talla 9/10 con IVA', 'Respirador 3M 6200 con IVA desglosado', 'Cotiza el respirador 3M 6200 con IVA desglosado.', 'Guante Ansell 11-840 con IVA'];
+    'Talla 9 1/2 con IVA', 'Talla 9/10 con IVA', 'Respirador 3M 6200 con IVA desglosado', 'Cotiza el respirador 3M 6200 con IVA desglosado.', 'Guante Ansell 11-840 con IVA',
+    // Las últimas formas de la lista, que está cerrada (limpias en f37334b): la abreviatura de «número» como marca después
+    // de la palabra, una marca seguida de dos puntos, el carácter de fracción (NFKC lo vuelve «1⁄2», con U+2044), un
+    // intervalo después de un dato en plural y una segunda cifra con «y» u «o» después de un dato en singular.
+    'Modelo N.º 2200 con IVA', 'Modelo n.º 2200 con IVA', 'Talla n.° 9 con IVA', 'Talla N.° 9 con IVA', 'Modelo N.o 2200 con IVA', 'Modelo Nro. 2200 con IVA',
+    'Modelo Núm 2200 con IVA', 'Modelo No: 2200 con IVA', 'Modelo N°: 2200 con IVA', 'Modelo #: 2200 con IVA', 'Talla 9½ con IVA', 'Talla 9 ½ con IVA',
+    'Talla 8½ sin IVA', 'Tallas 9½ y 10 con IVA', 'Tallas 7 a 10 con IVA', 'Tallas 7 al 10 con IVA', 'Tallas 8 – 10 con IVA', 'Tallas 8-10 con IVA',
+    'Modelo 2200 y 7500 con IVA', 'Talla 9 o 10 con IVA',
+    // Límites decididos: una cifra justo después de una de esas formas cuenta como dato aunque sea un importe, porque la
+    // regla no puede distinguirlos y gana la frase legítima. «Tallas 9 a 350 con IVA» no se distingue de «Tallas 7 a 10»:
+    // es la pérdida aceptada de esta lista (estaba limpia en f37334b).
+    'Tallas 9 a 350 con IVA', 'Talla 9 y 350 con IVA', 'Talla: 350 con IVA', 'Casco 3M 350 con IVA', 'Casco 350/400 con IVA', 'Tallas 8, 9, 10, 350 con IVA'];
   for (const text of data) {
     const ids = failedIds(await scan({ 'pagina/index.html': page(`<p>${text}</p>`) }));
     assert.ok(!ids.includes('R-RULE-01'), `${text}: ${ids}`);
@@ -979,12 +990,19 @@ test('R-RULE-01: «con IVA», «sin IVA» o «IVA incluido» después de un dato
     '<p>Modelo 2200 + IVA</p>',
     // Dos puntos o una coma después de una palabra que no es un dato, o después de la cifra del dato, y una palabra entre
     // el dato en plural y la cifra: la cifra es un importe.
-    '<p>Casco: 350 con IVA</p>', '<p>Talla 9, 350 IVA incluido</p>', '<p>Tallas 9 a 350 con IVA</p>', '<p>Modelos 2200: 350 con IVA</p>', '<p>Modelo #2200: 350 con IVA</p>',
-    '<p>Casco 350 con el IVA</p>', '<p>Casco 350 IVA incluida</p>', '<p>CFDI 4.0: 350 con IVA</p>',
+    '<p>Casco: 350 con IVA</p>', '<p>Talla 9, 350 IVA incluido</p>', '<p>Modelos 2200: 350 con IVA</p>', '<p>Modelo #2200: 350 con IVA</p>',
+    '<p>Casco 350 con el IVA</p>', '<p>Casco 350 IVA incluida</p>', '<p>CFDI 4.0: 350 con IVA</p>', '<p>Respirador MSA 6200 con IVA</p>',
+    '<p>Modelo N.º 2200: 350 con IVA</p>', '<p>Tallas 7 a 10: 350 con IVA</p>', '<p>Modelo 2200 y 7500: 350 con IVA</p>', '<p>Casco 350 y 400 con IVA</p>',
+    // Un intervalo cuya segunda cifra es más corta que la primera no es un intervalo.
+    '<p>Modelos: 2200 - 350 con IVA</p>', '<p>Modelos 2200 a 350 con IVA</p>',
+    // La lista está cerrada: otra forma de escribir un dato falla («a» o «al» después de un dato en singular).
+    '<p>Talla 9 al 10 con IVA</p>',
   ]);
   const printed = spawnSync(process.execPath, ['scripts/scan-dist.mjs', '--rules'], { cwd: ROOT, encoding: 'utf8' }).stdout;
-  assert.match(printed, /no una cifra pegada a una letra ni la que sigue a un dato del producto[^\n]*«Talla 9 con IVA», «Modelo 2200 con IVA»/);
-  assert.match(printed, /«Talla: 9», «Modelo #2200», «Modelo N° 2200», «Mod\. 2200»[^\n]*«Tallas 8, 9 y 10»[^\n]*«EN 388:2016»[^\n]*«Talla 9 1\/2»[^\n]*«Respirador 3M 6200 con IVA»[^\n]*«Talla 9, 350 IVA incluido»/);
+  assert.match(printed, /la cifra es un dato y no un importe solo en las formas de una lista cerrada[^\n]*«Talla 9 con IVA», «Modelo 2200 con IVA»/);
+  assert.match(printed, /«Talla: 9», «Modelo #2200», «Modelo N° 2200», «Mod\. 2200»[^\n]*«Modelo N\.º 2200»[^\n]*«Modelo #: 2200»[^\n]*«Modelo 2200 y 7500»[^\n]*«Tallas 8, 9 y 10»[^\n]*«Tallas 7 a 10»[^\n]*«EN 388:2016»[^\n]*«Talla 9 1\/2»[^\n]*«Talla 9½»[^\n]*«Respirador 3M 6200 con IVA»[^\n]*«Talla 9, 350 IVA incluido»/);
+  assert.match(printed, /La lista está cerrada: cualquier otra forma de escribir un dato antes de «con IVA», «sin IVA» o «IVA incluido» falla[^\n]*escribe el dato en una de las formas de la lista/);
+  assert.match(printed, /«Tallas 9 a 350 con IVA», «Talla 9 y 350 con IVA»[^\n]*no fallan/);
 });
 
 test('R-RULE-01: después de «precio de» solo el nombre de una marca que empieza con una cifra no es un precio', async () => {
