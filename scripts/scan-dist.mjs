@@ -94,7 +94,8 @@ const joinedText = html => oneLine(fold(decodeEntities(withoutScripts(html).repl
 // etiqueta de cierre (<script>, <style>, <textarea>, <title>, <iframe>…): «<textarea></div></textarea>» no cierra nada.
 // Con eso se leen dos textos:
 //   - `shownText`, el texto que se muestra a todos, para las revisiones que EXIGEN un aviso;
-//   - `allElementText`, todo el texto de los elementos, oculto o no, para las que lo PROHÍBEN.
+//   - `allElementText`, todo el texto de los elementos, oculto o no, para las que lo PROHÍBEN (el contenido de <noscript>,
+//     <textarea>, <title>, <iframe>… se lee tal cual y además como marcado).
 // Cuando el escáner no puede saberlo, un aviso exigido cuenta como no mostrado y uno prohibido como presente.
 const INLINE_ELEMENT = /^(?:a|abbr|b|bdi|bdo|cite|code|data|del|dfn|em|font|i|ins|kbd|mark|q|s|samp|small|span|strong|sub|sup|time|u|var|wbr)$/i;
 const VOID_ELEMENT = /^(?:area|base|br|col|embed|hr|img|input|keygen|link|meta|param|source|track|wbr)$/i;
@@ -264,14 +265,27 @@ const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).
  * Todo el texto de los elementos de una página, oculto o no, para las revisiones que prohíben un aviso (R-PUB-03 con
  * --launch, R-RULE-12 en la vista previa): el aviso tiene que haberse quitado, no escondido. Un comentario (también uno
  * falso), un script, un estilo o un atributo no son texto de un elemento. Las etiquetas en línea no separan palabras.
+ * El contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee dos
+ * veces: tal cual, como el texto que es, y además como marcado, igual que el de cualquier otro elemento. Así el aviso
+ * real envuelto en uno de ellos («<noscript><aside…><strong>Sitio en preparación</strong> · …») sigue en la página,
+ * como lo encontraba el escáner antes de las dos lecturas, sin perder lo que la lectura tal cual encuentra.
  */
 function allElementText(html) {
-  const pieces = [];
+  return comparableText(elementTextPieces(html, []));
+}
+/** Las piezas de `allElementText`, añadidas a `pieces`. */
+function elementTextPieces(html, pieces) {
   for (const token of htmlTokens(html)) {
-    if (token.type === 'text') pieces.push(token.raw && CODE_ELEMENT.test(token.name) ? ' ' : token.text);
-    else pieces.push(INLINE_ELEMENT.test(token.name) ? '' : ' ');
+    if (token.type !== 'text') pieces.push(INLINE_ELEMENT.test(token.name) ? '' : ' ');
+    else if (!token.raw) pieces.push(token.text);
+    else if (CODE_ELEMENT.test(token.name)) pieces.push(' ');
+    else {
+      pieces.push(token.text, ' ');
+      elementTextPieces(token.text, pieces);
+      pieces.push(' ');
+    }
   }
-  return comparableText(pieces);
+  return pieces;
 }
 
 /**
@@ -726,7 +740,7 @@ const PRODUCTION_RULES = [
 
 // Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
 const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML; cuando el escáner no puede saberlo, el aviso cuenta como no mostrado. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
-const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template>, <noscript>, <textarea> o un <details> cerrado; solo un comentario, un script, un estilo o un atributo no cuentan';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan';
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [

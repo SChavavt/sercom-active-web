@@ -394,6 +394,31 @@ for (const [label, body] of Object.entries(forbiddenNotices)) {
   });
 }
 
+// El aviso real envuelto en un elemento cuyo contenido el troceador lee como texto crudo. Las revisiones que lo
+// prohíben leen ese contenido también como marcado: «<strong>Sitio en preparación</strong> · …» sigue siendo el aviso
+// (el escáner anterior a las dos lecturas lo encontraba en todos). `inPerson`: sin R-RULE-11, que prohíbe todo <iframe>.
+for (const container of ['noscript', 'iframe', 'noembed', 'noframes', 'xmp', 'plaintext', 'textarea', 'title']) {
+  test(`R-PUB-03 y R-RULE-12: el aviso real envuelto en <${container}> sigue en la página`, async () => {
+    const body = `<${container}>${DEVELOPMENT_NOTICE_HTML}</${container}>`;
+    const launched = await scan(launchedSite(body), { launch: true, inPerson: true });
+    assert.deepEqual(failures(launched).map(finding => [finding.id, finding.file]), [['R-PUB-03', 'contacto/index.html']]);
+    const preview = await scan({ 'index.html': previewPage(), 'contacto/index.html': previewPage(`<h1>Contacto</h1>${body}`) }, { preview: true, inPerson: true });
+    assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html']]);
+    // Antes del lanzamiento no se muestra a todos (la lectura del texto que se muestra no cambia): falta.
+    const before = await scan({ 'contacto/index.html': page(`<h1>Contacto</h1>${body}`, { notice: 'none' }) }, { inPerson: true });
+    assert.deepEqual(failures(before).map(finding => [finding.id, finding.file]), [['R-RULE-12', 'contacto/index.html']]);
+  });
+}
+
+test('R-PUB-03 y R-RULE-12: el contenido de esos elementos también se sigue leyendo tal cual', async () => {
+  // Leído tal cual, el texto de un <textarea> con un comentario es el aviso (el campo lo muestra con sus «<!--»), y el
+  // de un <noscript> también (es el texto del elemento cuando hay JavaScript).
+  for (const body of [`<textarea><!-- ${DEVELOPMENT_NOTICE} --></textarea>`, `<noscript><!-- ${DEVELOPMENT_NOTICE} --></noscript>`, `<xmp><b>x</b>${DEVELOPMENT_NOTICE}</xmp>`]) {
+    assert.deepEqual(failedIds(await scan(launchedSite(body), { launch: true })), ['R-PUB-03'], body);
+    assert.deepEqual(failedIds(await scan({ 'index.html': previewPage(`<h1>Inicio</h1>${body}`) }, { preview: true })), ['R-RULE-12'], body);
+  }
+});
+
 test('R-PUB-03 y R-RULE-12: un comentario, un script, un estilo o un atributo con el aviso no lo ponen en la página', async () => {
   for (const body of [`<!-- ${DEVELOPMENT_NOTICE} -->`, `<script>var aviso=${JSON.stringify(DEVELOPMENT_NOTICE)};</script>`, `<style>.x::before{content:"${DEVELOPMENT_NOTICE}"}</style>`,
     `<div title="${DEVELOPMENT_NOTICE}" data-aviso="${DEVELOPMENT_NOTICE}"></div>`, `<input value="${DEVELOPMENT_NOTICE}">`, `<?${DEVELOPMENT_NOTICE}>`, `</ ${DEVELOPMENT_NOTICE}>`]) {
@@ -1074,6 +1099,10 @@ test('--rules dice qué lectura de la página usa cada revisión de los avisos d
   // Las que lo prohíben leen todo el texto de los elementos, oculto o no.
   assert.match(docs('R-RULE-12'), /La vista previa lleva solo su propio aviso: [^\n]*también oculto \(en todo el texto de los elementos, oculto o no/);
   assert.match(docs('R-PUB-03'), /tampoco oculto[^\n]*en todo el texto de los elementos, oculto o no/);
+  // El contenido de los elementos de texto crudo se lee tal cual y además como marcado.
+  for (const id of ['R-RULE-12', 'R-PUB-03']) {
+    assert.match(docs(id), /<noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado/, id);
+  }
 });
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {
