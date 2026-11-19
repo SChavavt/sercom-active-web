@@ -13,7 +13,7 @@ const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path
 // Código sin comentarios: los comentarios pueden nombrar archivos que el código no importa.
 // («//» solo cuenta como comentario al inicio de la línea o después de un espacio, para no cortar «https://…».)
 const stripComments = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
-const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|mjs|js|ts|css)$/.test(path)).map(async path => [path, await readText(path)])));
+const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/.test(path)).map(async path => [path, await readText(path)])));
 const sources = new Map([...rawSources].map(([path, text]) => [path, stripComments(text)]));
 const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);
 const { bin: astroBinField } = JSON.parse(await readFile(astroPackage, 'utf8'));
@@ -172,6 +172,98 @@ test('ningún import.meta.glob ni import() con patrón puede cargar el archivo d
 
   const offenders = [...sources].filter(([path, code]) => reachesExamples(loadPatterns(path, code))).map(([path]) => path);
   assert.deepEqual(offenders, [], 'un patrón de carga puede llevar el archivo de ejemplos fuera de la rama de vista previa');
+});
+
+/** Texto del argumento de una llamada que empieza en `start` (justo después del paréntesis de apertura). */
+function callArgument(code, start) {
+  let depth = 1;
+  for (let index = start; index < code.length; index += 1) {
+    if ('([{'.includes(code[index])) depth += 1;
+    else if (')]}'.includes(code[index]) && (depth -= 1) === 0) return code.slice(start, index);
+  }
+  return code.slice(start);
+}
+/**
+ * Patrones de los cargadores de colecciones de contenido de Astro (`glob()` y `file()` de «astro/loaders»), resueltos
+ * desde la raíz del proyecto, que es donde Astro resuelve `base` y la ruta de `file()`. Un cargador que no se puede
+ * leer (un `base` o un `pattern` que no es un texto escrito tal cual, o el módulo importado de otra forma) se devuelve como «?».
+ * @param {string} code Código sin comentarios.
+ */
+function contentLoaderPatterns(code) {
+  const imports = [...code.matchAll(/\bimport\s+([^;'"]*?)\s+from\s*["']astro\/loaders["']|\bimport\s*\(\s*["']astro\/loaders["']\s*\)/g)];
+  if (!imports.length) return [];
+  const patterns = [];
+  const names = { glob: [], file: [] };
+  for (const match of imports) {
+    const named = match[1]?.trim().match(/^\{([^}]*)\}$/);
+    if (!named) {
+      patterns.push('?');
+      continue;
+    }
+    for (const specifier of named[1].split(',').map(part => part.trim()).filter(Boolean)) {
+      const [imported, local = imported] = specifier.split(/\s+as\s+/).map(part => part.trim());
+      if (imported in names) names[imported].push(local);
+    }
+  }
+  const literal = text => text?.trim().match(/^(["'`])([^"'`$]*)\1$/)?.[2];
+  const fromRoot = path => posix.join('/', path.replace(/^\.\//, ''));
+  for (const [kind, locals] of Object.entries(names)) {
+    for (const local of locals) {
+      for (const call of code.matchAll(new RegExp(`(?<![\\w$.])${local.replace(/\$/g, '\\$')}\\s*\\(`, 'g'))) {
+        const argument = callArgument(code, call.index + call[0].length).trim();
+        if (kind === 'file') {
+          const path = literal(argument.split(/,(?![^{]*\})/)[0]);
+          patterns.push(path === undefined ? '?' : fromRoot(path));
+          continue;
+        }
+        const base = argument.match(/\bbase\s*:\s*([^,}]+)/);
+        const baseValue = base ? literal(base[1]) : '.';
+        const pattern = argument.match(/\bpattern\s*:\s*(\[[^\]]*\]|["'`][^"'`]*["'`])/);
+        if (baseValue === undefined || !pattern || /\$\{/.test(pattern[1])) {
+          patterns.push('?');
+          continue;
+        }
+        for (const glob of [...pattern[1].matchAll(/["'`]([^"'`]*)["'`]/g)].map(found => found[1])) {
+          const negated = glob.startsWith('!');
+          const resolved = posix.join(fromRoot(baseValue), negated ? glob.slice(1) : glob);
+          patterns.push(negated ? `!${resolved}` : resolved);
+        }
+      }
+    }
+  }
+  return patterns;
+}
+// Lecturas del disco o carga de módulos por una ruta calculada: ninguna prueba puede saber qué archivo leen.
+const DISK_ACCESS = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:node:)?(?:fs|fs\/promises|module|child_process)["']|\bcreateRequire\b|(?<![\w$.])require\s*\(|\bprocess\.binding\b/;
+
+test('ninguna colección de contenido ni lectura del disco puede llevar el archivo de ejemplos fuera de la rama de vista previa', () => {
+  // La comprobación reconoce los cargadores de Astro y las lecturas con node:fs.
+  const misuse = [
+    "import { defineCollection } from 'astro:content';\nimport { glob } from 'astro/loaders';\nexport const collections = { sondas: defineCollection({ loader: glob({ pattern: '**/*.json', base: './src/data' }) }) };",
+    "import { glob as cargar } from 'astro/loaders';\nconst c = cargar({ base: 'src', pattern: ['**/*.json', '!content/**'] });",
+    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: 'src/data/**/*.json' });",
+    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: '**/*.json', base: carpeta });",
+    "import { file } from 'astro/loaders';\nconst c = file(`src/data/${carpeta}/example-products.json`);",
+    "import * as cargadores from 'astro/loaders';\nconst c = cargadores.glob({ pattern: '*.md', base: './src/notas' });",
+  ];
+  for (const code of misuse) assert.ok(reachesExamples(contentLoaderPatterns(code)), code);
+  const harmless = [
+    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: '**/*.md', base: './src/content/notas' });",
+    "import { glob } from 'astro/loaders';\nconst c = glob({ pattern: ['*.json'], base: './src/data' });",
+    "import { file } from 'astro/loaders';\nconst c = file('src/data/brands.json');",
+  ];
+  for (const code of harmless) assert.equal(reachesExamples(contentLoaderPatterns(code)), false, code);
+  for (const code of ["import { readdirSync, readFileSync } from 'node:fs';", "import fs from 'fs';", "const { readFile } = await import('node:fs/promises');",
+    "import { createRequire } from 'node:module';", "const datos = require('../data/' + nombre);"]) {
+    assert.match(code, DISK_ACCESS, code);
+  }
+  assert.doesNotMatch("import { routes } from '../lib/routes.mjs';\nconst ref = fsLike.require;", DISK_ACCESS);
+
+  const loaders = [...sources].filter(([, code]) => reachesExamples(contentLoaderPatterns(code))).map(([path]) => path);
+  assert.deepEqual(loaders, [], 'una colección de contenido puede cargar el archivo de ejemplos');
+  // El código del sitio lee los datos con import de JSON, que las pruebas anteriores pueden revisar; nunca del disco.
+  const diskReaders = [...sources].filter(([, code]) => DISK_ACCESS.test(code)).map(([path]) => path);
+  assert.deepEqual(diskReaders, [], 'el código de src/ lee archivos del disco');
 });
 
 test('el código del sitio nunca importa el registro de investigación', () => {
