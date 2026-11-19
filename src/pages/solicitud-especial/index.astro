@@ -89,7 +89,9 @@ const items = [
     import { requestDescription, withRequestDescription } from '../../lib/contact-core.mjs';
     import { SEARCH_PARAM } from '../../lib/search.mjs';
 
-    const description = requestDescription(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
+    // Una secuencia % mal formada llega como el carácter de reemplazo (U+FFFD): se quita para no mostrarlo.
+    const query = new URLSearchParams(window.location.search).get(SEARCH_PARAM);
+    const description = requestDescription(query?.replace(/�/g, ' '));
     if (description) {
       const links = document.querySelectorAll<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"], [data-solicitud] a[href^="mailto:"]');
       for (const link of links) link.setAttribute('href', withRequestDescription(link.getAttribute('href'), description));
