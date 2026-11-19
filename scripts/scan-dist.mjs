@@ -113,7 +113,7 @@ const NEVER_SHOWN = /^(?:head|title|template|textarea|noscript|iframe|noembed|no
 const NEVER_SHOWN_IN_SVG = /^(?:desc|metadata|title)$/i;
 
 /** Decodifica los escapes de CSS de un texto («\68 idden» es «hidden», «\:» es «:»). */
-const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0-9a-f])/gi, (escape, hex, character) => (hex ? codePoint(hex, 16) ?? '' : character));
+const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0-9a-f])/gi, (_escape, hex, character) => (hex ? codePoint(hex, 16) ?? '' : character));
 /**
  * ¿Un atributo style esconde el contenido del elemento? display:none, visibility:hidden o collapse, content-visibility:hidden,
  * con o sin !important, en mayúsculas o minúsculas, con escapes de CSS, y leyendo cada declaración sin sus comentarios
