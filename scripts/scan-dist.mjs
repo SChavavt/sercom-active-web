@@ -343,7 +343,7 @@ export const CHECKS = [
   ['R-RULE-03', 'Producción: ningún archivo (ni binario, ni su nombre) contiene identificadores, códigos, nombres o textos del archivo de ejemplos, ni el aviso de vista previa. Los códigos también se buscan escritos con otro separador o sin él («EJ1001», «ej 1001»).'],
   ['R-RULE-03', 'Vista previa: cada página lleva el aviso de vista previa, y en cada página hay al menos tantas etiquetas «Ejemplo» como productos de ejemplo distintos se muestran.'],
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
-  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow») y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero.'],
+  ['R-RULE-12', 'Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan) y no existe un sitemap. Con --launch se exige lo contrario (R-PUB-03): ningún grupo bloquea el sitio entero.'],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea dos o tres veces), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
@@ -586,7 +586,8 @@ function nearPaletteColors(source) {
 
 /**
  * Reglas de robots.txt por buscador: cada agente nombrado y «*». Los grupos que nombran al mismo agente se combinan,
- * como hacen los buscadores; un buscador con su propio grupo solo obedece ese grupo, no el de «*».
+ * como hacen los buscadores; un buscador con su propio grupo solo obedece ese grupo, no el de «*». Un grupo empieza
+ * con «User-agent», también escrito «useragent» o «user agent».
  * @returns {Map<string, [string, string][]>}
  */
 function robotsAgents(text) {
@@ -594,10 +595,11 @@ function robotsAgents(text) {
   let current;
   let readingAgents = false;
   for (const line of text.replace(/^\ufeff/, '').split(/\r?\n/)) {
-    const match = line.replace(/#.*/, '').trim().match(/^([a-z-]+)\s*:\s*(.*)$/i);
+    const match = line.replace(/#.*/, '').trim().match(/^([a-z][a-z -]*?)\s*:\s*(.*)$/i);
     if (!match) continue;
-    const [, field, value] = [match[0], match[1].toLowerCase(), match[2].trim()];
-    if (field === 'user-agent') {
+    // Los buscadores aceptan «useragent» y «user agent» como «User-agent»: se comparan sin espacios ni guiones.
+    const [field, value] = [match[1].toLowerCase().replace(/[\s-]/g, ''), match[2].trim()];
+    if (field === 'useragent') {
       if (!current || !readingAgents) groups.push(current = { agents: [], rules: [] });
       current.agents.push(value.toLowerCase());
       readingAgents = true;

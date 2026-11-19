@@ -570,6 +570,17 @@ test('R-RULE-29: colores de la paleta anterior en setProperty, constantes y clav
   }
 });
 
+test('R-RULE-12: robots.txt reconoce «useragent» y «user agent» como el principio de un grupo', async () => {
+  for (const robots of ['User-agent: *\nDisallow: /\n\nuseragent: Googlebot\nDisallow:\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nAllow: /\n', 'useragent: *\nDisallow: /\n\nUSERAGENT: Bingbot\nDisallow: /privado/\n']) {
+    assert.deepEqual(failedIds(await scan({ 'robots.txt': robots })), ['R-RULE-12'], robots);
+  }
+  for (const robots of ['useragent: *\nDisallow: /\n', 'User-agent: *\nDisallow: /\n\nuser agent: Googlebot\nDisallow: /\n']) {
+    assert.deepEqual(failures(await scan({ 'robots.txt': robots })), [], robots);
+  }
+  const launched = robots => ({ 'index.html': page('<h1>Inicio</h1>', { robots: '' }), 'robots.txt': robots });
+  assert.deepEqual(failedIds(await scan(launched('User-agent: *\nAllow: /\n\nuser agent: Bingbot\nDisallow: /\n'), { launch: true })), ['R-PUB-03']);
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
