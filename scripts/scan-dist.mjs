@@ -316,7 +316,7 @@ export const CHECKS = [
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas (más los ejemplos en la vista previa), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección, es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
-  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()), y ninguna página declara <meta name="color-scheme"> con dark.'],
+  ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke…), un <meta> de color o una propiedad de color de un script, y ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-RULE-30', 'Los enlaces rotos y los controles inertes los revisa scripts/check-links.mjs.'],
@@ -475,6 +475,28 @@ function contactSources(raw, extension) {
   return { plain, code: code.join('\n'), links };
 }
 
+// Propiedades de CSS o atributos que llevan un color.
+const COLOR_NAME = /^(?:style|fill|stroke|color|bgcolor|stop-color|flood-color|lighting-color|[\w-]*-color)$/i;
+// En un script o un JSON, un valor asignado a una propiedad de color («el.style.color="#…"», «{"fill":"#…"}», «color:#…»).
+const SCRIPT_COLOR = /(?:color|background|fill|stroke|border|shadow|outline)[\w-]*["'`]?\s*[:=,]\s*["'`]?([^"'`;}]*)/gi;
+/**
+ * Lo que R-RULE-29 lee como color: una hoja de estilo entera; en HTML y SVG, los estilos, los atributos de color y
+ * el `content` de un <meta> de color (theme-color); en un script o un JSON, los valores de las propiedades de color.
+ * Un ancla («#00a6e9»), un identificador o un dato que se parece a un color no lo son. Los colores exactos de la
+ * paleta anterior se buscan además en todo el archivo (regla R-RULE-29 de `raw`).
+ * @param {string} raw
+ * @param {string} extension
+ */
+function colorSources(raw, extension) {
+  if (extension === '.css') return raw;
+  const scriptColors = code => [...code.matchAll(SCRIPT_COLOR)].map(match => match[0]).join('\n');
+  if (!/^\.(?:html?|svg|xml)$/.test(extension)) return scriptColors(raw);
+  const markup = withoutScripts(raw);
+  const meta = [...markup.matchAll(/<meta\b[^>]*>/gi)].filter(match => /color/i.test(attribute(match[0], 'name') ?? '')).map(match => attribute(match[0], 'content') ?? '');
+  const attributes = attributesOf(markup).filter(([name]) => COLOR_NAME.test(name)).map(([, value]) => value);
+  return [inlineStyles(raw), scriptColors(inlineScripts(raw)), ...meta, ...attributes].join('\n');
+}
+
 const OLD_PALETTE = [[0x0e, 0x2a, 0x3d], [0x00, 0xa6, 0xe5]];
 const NEAR = 4;
 /** HSL (grados y porcentajes) a RGB de 0 a 255. */
@@ -614,7 +636,8 @@ export async function scanDist(directory, options = {}) {
     if (!preview) {
       const folded = fold(decodeEntities(raw));
       for (const [code, pattern] of exampleCodes) {
-        const found = folded.match(pattern);
+        // «ej.» en minúsculas seguido de un espacio es la abreviatura de «ejemplo» («Pedidos grandes, ej. 1001 piezas»).
+        const found = [...folded.matchAll(globalPattern(pattern))].find(match => !/^ej\.\s/.test(match[0]));
         if (found && !raw.includes(code)) add('FAIL', 'R-RULE-03', file, `contiene un código del archivo de ejemplos escrito de otra forma: «${found[0]}» (${code})`);
       }
     }
@@ -675,7 +698,7 @@ export async function scanDist(directory, options = {}) {
       ...contactProblemsDecoded(scriptText(code), contact, { script: true, joinedPieces: true }),
     ])) add('FAIL', 'R-RULE-24', file, problem);
     // R-RULE-29: colores casi iguales a la paleta anterior.
-    for (const color of new Set(nearPaletteColors(raw))) add('FAIL', 'R-RULE-29', file, `color casi igual a la paleta anterior: «${color}»`);
+    for (const color of new Set(nearPaletteColors(colorSources(raw, extension)))) add('FAIL', 'R-RULE-29', file, `color casi igual a la paleta anterior: «${color}»`);
 
     if (!isHtml) continue;
     const markup = withoutScripts(raw);

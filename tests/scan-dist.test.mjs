@@ -335,6 +335,17 @@ test('R-RULE-03 en producción: cualquier marca de ejemplo, en cualquier archivo
   await assertNoneFails(['<p>Por ejemplo, guantes y lentes.</p>', '<p>Un ejemplar del catálogo</p>', '<p>Modelo EJE-100</p>', '<p>Ejemplo: 10 pares</p>', `<p>Hoja ${compact.slice(2)}</p>`, `<p>REJ${compact.slice(2)}</p>`]);
 });
 
+test('R-RULE-29 y R-RULE-03: un ancla, un identificador o una abreviatura no son un color ni un código de ejemplo', async () => {
+  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<p>Pedidos grandes, ej. 1001 piezas</p>']);
+  assert.deepEqual(failures(await scan({ 'datos.json': '{"x":"#0e2a40"}' })), []);
+  assert.deepEqual(failures(await scan({ '_astro/app.js': 'const ancla="#00a6e9";' })), []);
+  // Los colores casi iguales siguen fallando donde son un color: CSS, style, fill, stroke y theme-color.
+  await assertEachFails('R-RULE-29', ['<p style="color:#0e2a40">Texto</p>', '<svg><path fill="#00a6e9" d="M0 0"/></svg>', '<svg><path stroke="#0e2a40" d="M0 0"/></svg>', '<style>.a{color:#0e2a40}</style>']);
+  assert.deepEqual(failedIds(await scan({ 'index.html': page('<h1>Inicio</h1>', { head: '<meta name="theme-color" content="#0e2a40">' }) })), ['R-RULE-29']);
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><path fill="#0e2a3e" d="M0 0"/></svg>' })), ['R-RULE-29']);
+  await assertEachFails('R-RULE-03', ['<p>Pedidos grandes, EJ1001</p>', '<p>Código ej 1001</p>']);
+});
+
 test('R-RULE-03 en vista previa: aviso en cada página y etiqueta «Ejemplo» en cada ejemplo', async () => {
   const [first, second, third] = data.examples;
   const options = { preview: true };
