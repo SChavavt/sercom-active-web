@@ -15,8 +15,10 @@ export interface ContactSettings {
 export interface ContactDetails {
   /** «Sercom Active». */
   readonly businessName: string;
-  /** «Atención comercial en Puebla». */
+  /** «Atención comercial en Puebla»: franja de servicio, pie, contacto y descripciones de las páginas. */
   readonly locationLabel: string;
+  /** «Atención en Puebla»: solo el título de la portada, «Sercom Active · Atención en Puebla» (R-COPY-15). */
+  readonly titleLabel: string;
   /** Nombre completo de la persona que atiende. */
   readonly contactName: string;
   /** Nombre de pila, para frases como «Yosmara revisa opciones…». */

@@ -24,6 +24,7 @@ if (typeof document !== 'undefined') {
 export const contactDetails = Object.freeze({
   businessName: business.name,
   locationLabel: business.locationLabel,
+  titleLabel: business.titleLabel,
   contactName: business.contactName,
   contactFirstName: business.contactFirstName,
   contactInitials: business.contactInitials,

@@ -35,6 +35,9 @@ test('contactDetails muestra los datos de contacto de business.json y nunca la d
   assert.equal(contactDetails.whatsappDisplay, '+52 1 221 400 2219');
   assert.equal(contactDetails.contactName, business.contactName);
   assert.equal(contactDetails.locationLabel, 'Atención comercial en Puebla');
+  // Solo para el título de la portada (R-COPY-15): «Sercom Active · Atención en Puebla». La etiqueta de arriba sigue en todo lo demás.
+  assert.equal(contactDetails.titleLabel, 'Atención en Puebla');
+  assert.equal(contactDetails.titleLabel, business.titleLabel);
   assert.equal(contactDetails.hoursText, 'Lunes a viernes de 9:00 a 18:00. Sábado y domingo cerrado.');
   assert.ok(contactDetails.hoursText.startsWith(contactDetails.hoursShortText));
   assert.ok(Object.isFrozen(contactDetails));

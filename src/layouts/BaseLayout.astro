@@ -16,18 +16,19 @@ import SiteFooter from '../components/SiteFooter.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 
 interface Props {
-  /** Nombre de la página («Catálogo»). El título queda «Catálogo · Sercom Active». Sin él: el de la portada. */
+  /** Nombre de la página («Catálogo»). El título queda «Catálogo · Sercom Active». Sin él: el de la portada,
+   *  «Sercom Active · Atención en Puebla» (nombre y `titleLabel` de business.json). */
   title?: string;
   /** Descripción para buscadores y vistas previas de enlaces. Por omisión, la de la empresa. */
   description?: string;
 }
 
-const { businessName, locationLabel } = contactDetails;
+const { businessName, locationLabel, titleLabel } = contactDetails;
 const {
   title,
   description = `Venta, entrega y asesoría de productos de seguridad industrial. ${locationLabel}.`,
 } = Astro.props;
-const pageTitle = title ? `${title} · ${businessName}` : `${businessName} · ${locationLabel}`;
+const pageTitle = title ? `${title} · ${businessName}` : `${businessName} · ${titleLabel}`;
 const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 <!doctype html>

@@ -9,9 +9,12 @@ const data = await loadProjectData();
 const ROBOTS = 'User-agent: *\nDisallow: /\n';
 const WHATSAPP = `https://wa.me/${data.business.whatsappDigits}`;
 
+// Título de la portada (R-COPY-15): el nombre del negocio y titleLabel, de business.json.
+const HOME_TITLE = `${data.business.name} · ${data.business.titleLabel}`;
+
 /** Página mínima que cumple todas las reglas. */
-function page(body = '<h1>Inicio</h1>', { head = '', notice = false, lang = 'es-MX', robots = '<meta name="robots" content="noindex, nofollow">', skip = '<a href="#contenido">Saltar al contenido</a>' } = {}) {
-  return `<!doctype html><html lang="${lang}"><head><meta charset="UTF-8">${robots}<title>Sercom Active</title>${head}</head>`
+function page(body = '<h1>Inicio</h1>', { head = '', notice = false, lang = 'es-MX', robots = '<meta name="robots" content="noindex, nofollow">', skip = '<a href="#contenido">Saltar al contenido</a>', title = HOME_TITLE } = {}) {
+  return `<!doctype html><html lang="${lang}"><head><meta charset="UTF-8">${robots}<title>${title}</title>${head}</head>`
     + `<body>${notice ? `<p class="aviso">${PREVIEW_NOTICE}</p>` : ''}${skip}<main id="contenido">${body}</main></body></html>`;
 }
 const previewPage = (body, options) => page(body, { ...options, notice: true });
@@ -789,6 +792,31 @@ test('otras reglas de la página: idioma, enlace de salto, imágenes, formulario
   assert.deepEqual(failedIds(await scan({ '.prerender/chunk.mjs': 'export{}' })), ['BUILD']);
 });
 
+test('R-COPY-15: el título de la portada es el nombre del negocio, « · » y titleLabel', async () => {
+  assert.equal(HOME_TITLE, 'Sercom Active · Atención en Puebla');
+  for (const options of [{}, { preview: true }]) {
+    const home = title => ({ 'index.html': options.preview ? previewPage('<h1>Inicio</h1>', { title }) : page('<h1>Inicio</h1>', { title }) });
+    assert.deepEqual(failures(await scan(home(HOME_TITLE), options)), [], JSON.stringify(options));
+    // Las entidades y los espacios sobrantes no cambian el título que se lee.
+    assert.deepEqual(failures(await scan(home(`  ${data.business.name}\n&middot;   Atenci&oacute;n en Puebla `), options)), []);
+    // La etiqueta del encabezado, el nombre solo, otro separador, un título vacío o ninguno.
+    for (const title of [`${data.business.name} · Atención comercial en Puebla`, data.business.name, `${data.business.name} - ${data.business.titleLabel}`, '', 'Inicio · Sercom Active']) {
+      const result = await scan(home(title), options);
+      assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-COPY-15', 'index.html']], title);
+    }
+    const untitled = await scan({ 'index.html': home('')['index.html'].replace('<title></title>', '') }, options);
+    assert.deepEqual(failedIds(untitled), ['R-COPY-15']);
+    // Un título escondido en un comentario no cuenta; el de la página sí.
+    const hidden = home(data.business.name)['index.html'].replace('</head>', `<!-- <title>${HOME_TITLE}</title> --></head>`);
+    assert.deepEqual(failedIds(await scan({ 'index.html': hidden }, options)), ['R-COPY-15']);
+  }
+  // Solo la portada: las páginas interiores llevan «<Página> · Sercom Active».
+  assert.deepEqual(failures(await scan({ 'contacto/index.html': page('<h1>Contacto</h1>', { title: `Contacto · ${data.business.name}` }) })), []);
+  // Sin titleLabel en los datos, la portada no puede tener el título correcto.
+  const data2 = { ...data, business: { ...data.business, titleLabel: undefined } };
+  assert.ok(failedIds(await scan({}, { data: data2 })).includes('R-COPY-15'));
+});
+
 test('cada regla está documentada y conserva su identificador', () => {
   for (const rule of RULES) {
     assert.match(rule.id, /^R-[A-Z0-9]+-\d{2}$/);
@@ -796,7 +824,7 @@ test('cada regla está documentada y conserva su identificador', () => {
     assert.ok(['text', 'joined', 'words', 'prose', 'raw', 'norm'].includes(rule.scope), rule.id);
   }
   const documented = new Set([...RULES.map(rule => rule.id), ...CHECKS.map(([id]) => id)]);
-  for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17']) {
+  for (const id of ['R-RULE-01', 'R-RULE-03', 'R-RULE-07', 'R-RULE-08', 'R-RULE-10', 'R-RULE-12', 'R-RULE-13', 'R-RULE-14', 'R-RULE-24', 'R-RULE-29', 'R-NAV-17', 'R-COPY-15']) {
     assert.ok(documented.has(id), id);
   }
   for (const [, doc] of CHECKS) assert.ok(doc.length > 30);
