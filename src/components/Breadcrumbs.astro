@@ -1,0 +1,22 @@
+---
+// Ruta de navegación («Inicio / Catálogo / …») en estilo de etiqueta. El último elemento es la página actual:
+// no lleva enlace y se marca con aria-current="page". La usa PageHeader; rara vez hace falta sola.
+export interface Crumb {
+  label: string;
+  /** Ruta con diagonal final. Se ignora en el último elemento. */
+  href?: string;
+}
+
+interface Props {
+  items: readonly Crumb[];
+  class?: string;
+}
+const { items, class: className } = Astro.props;
+---
+<nav class:list={['crumbs', 'label', className]} aria-label="Ruta de navegación">
+  <ol class="crumbs__list">
+    {items.map((item, index) => (
+      <li class="crumbs__item">{item.href && index < items.length - 1 ? <a class="crumbs__link" href={item.href}>{item.label}</a> : <span aria-current="page">{item.label}</span>}</li>
+    ))}
+  </ol>
+</nav>

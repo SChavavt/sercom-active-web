@@ -1,0 +1,34 @@
+---
+// Registro de categorías (`.register`): filas con número, pictograma de 48 px, nombre completo y la línea
+// orientativa de subcategorías; dos columnas en computadora, una en celular. Cada fila lleva a su categoría.
+import type { PublicCategory } from '../types/site.ts';
+import { categoryIcon } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props {
+  categories: readonly PublicCategory[];
+  /** Nivel del nombre de cada categoría; 3 por omisión (bajo el H2 de la sección). */
+  headingLevel?: 2 | 3 | 4;
+}
+
+const { categories, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const two = (n: number) => String(n).padStart(2, '0');
+// Con un número impar de filas, la última columna queda con una celda menos: la retícula lo resuelve.
+const rows = Math.ceil(categories.length / 2);
+---
+<ul class="register" style={`--register-rows: ${rows}`}>
+  {categories.map((category, index) => (
+    <li>
+      <a class="register__link cell-link" href={category.url}>
+        <span class="register__num label" aria-hidden="true">{two(index + 1)}</span>
+        <Icon name={categoryIcon(category.id)} class="register__icon icon--art" />
+        <div class="register__body">
+          <Heading class="t-h3">{category.name}</Heading>
+          {category.summary && <p class="register__sub">{category.summary}</p>}
+        </div>
+        <Icon name="arrow-right" class="register__go" />
+      </a>
+    </li>
+  ))}
+</ul>

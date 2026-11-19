@@ -1,18 +1,62 @@
 ---
-import { isPreview, PREVIEW_NOTICE } from '../lib/site-data.mjs';
+// Plantilla de todas las páginas: <head> común (idioma es-MX, título, descripción, noindex, canónica solo
+// si se conoce la dirección del sitio, iconos, precarga de la fuente), enlace «Saltar al contenido», aviso de
+// vista previa (solo en esa compilación), la lámina con encabezado, <main id="contenido"> y pie, y la
+// barra fija del celular. Importa la hoja global una sola vez.
+//
+// Uso:  <BaseLayout title="Catálogo" description="…"> …bloques de la página… </BaseLayout>
+// El contenido va directo dentro de <main>: cada bloque es una fila de la lámina (ver docs/diseno.md).
 import '../styles/global.css';
-interface Props { title: string; description: string; }
-const { title, description } = Astro.props;
+import fontLatin from '../assets/fonts/archivo-latin-wdth-normal.woff2?url';
+import { contactDetails } from '../lib/contact.mjs';
+import { isPreview } from '../lib/site-data.mjs';
+import Dock from '../components/Dock.astro';
+import PreviewBanner from '../components/PreviewBanner.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+
+interface Props {
+  /** Nombre de la página («Catálogo»). El título queda «Catálogo · Sercom Active». Sin él: el de la portada. */
+  title?: string;
+  /** Descripción para buscadores y vistas previas de enlaces. Por omisión, la de la empresa. */
+  description?: string;
+}
+
+const { businessName, locationLabel } = contactDetails;
+const {
+  title,
+  description = `Venta, entrega y asesoría de productos de seguridad industrial. ${locationLabel}.`,
+} = Astro.props;
+const pageTitle = title ? `${title} · ${businessName}` : `${businessName} · ${locationLabel}`;
+const canonical = Astro.site ? new URL(Astro.url.pathname, Astro.site).href : undefined;
 ---
 <!doctype html>
 <html lang="es-MX">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    {/* El sitio no está lanzado: ninguna página se indexa (se retira a propósito al publicar). */}
     <meta name="robots" content="noindex, nofollow" />
+    {canonical && <link rel="canonical" href={canonical} />}
     <meta name="theme-color" content="#ffffff" />
-    <title>{title}</title>
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href={fontLatin} as="font" type="font/woff2" crossorigin />
+    <script is:inline>document.documentElement.classList.add('js');</script>
   </head>
-  <body>{isPreview && <p class="preview-notice">{PREVIEW_NOTICE}</p>}<a class="skip-link" href="#contenido">Saltar al contenido</a><slot /></body>
+  <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+    {isPreview && <PreviewBanner />}
+    <div class="sheet">
+      <SiteHeader />
+      <main id="contenido" tabindex="-1">
+        <slot />
+      </main>
+      <SiteFooter />
+    </div>
+    <Dock />
+  </body>
 </html>

@@ -1,0 +1,62 @@
+---
+// Tarjeta de producto (`.product`) a partir de un PublicProduct:
+//   imagen (o, sin fotografía, el pictograma de la categoría sobre el rayado), etiqueta «Ejemplo» si es un
+//   ejemplo de la vista previa, categoría, nombre, marca y código, «Ver ficha» (toda la tarjeta lleva a la
+//   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product.
+// Abrir WhatsApp no es un envío: ninguna página muestra confirmaciones.
+// Mientras el sitio no tenga dirección pública (SITE_URL), el mensaje se arma sin la línea «Enlace» y el
+// script de abajo la agrega al hacer clic, con la dirección de la ficha en el sitio donde se está viendo.
+import type { PublicProduct } from '../types/site.ts';
+import { absoluteUrl, contactLinks } from '../lib/contact.mjs';
+import { EXAMPLE_TAG } from '../lib/site-data.mjs';
+import { categoryIcon } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+import Tag from './Tag.astro';
+
+interface Props {
+  product: PublicProduct;
+  /** Nivel del nombre del producto; 3 por omisión (bajo el H2 de la sección). */
+  headingLevel?: 2 | 3 | 4;
+  /** Clases de columna, por ejemplo `span-3` (ProductGrid las pone). */
+  class?: string;
+}
+
+const { product, headingLevel = 3, class: className } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+const pageUrl = absoluteUrl(product.url, Astro.site);
+const quote = contactLinks.product({ brandName: product.brandName, code: product.code, name: product.name, url: pageUrl });
+const categoryName = product.categoryNames[0];
+const categoryId = product.categoryIds[0];
+---
+<article class:list={['product', className]}>
+  <div class:list={['product__media', { 'product__media--photo': product.image }]}>
+    {product.isExample && <Tag>{EXAMPLE_TAG}</Tag>}
+    {product.image ? (
+      <img class="product__img" src={product.image.url} alt={product.image.alt} width="400" height="300" loading="lazy" decoding="async" />
+    ) : (
+      <span class="product__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
+    )}
+  </div>
+  <div class="product__body">
+    {categoryName && <p class="product__cat label">{categoryName}</p>}
+    <Heading class="product__name t-h3">{product.name}</Heading>
+    <p class="product__meta t-small">{product.brandName} <span class="sep" aria-hidden="true">·</span> <span class="t-code">{product.code}</span></p>
+  </div>
+  <div class="product__actions">
+    <a class="product__action product__action--sheet" href={product.url}><span>Ver ficha<span class="vh">: {product.name}</span></span><Icon name="arrow-right" class="icon--18" /></a>
+    <a class="product__action product__action--quote" href={quote.whatsapp} data-page-link={pageUrl ? undefined : product.url}><span>Cotizar<span class="vh">: {product.name}</span></span><Icon name="whatsapp" class="icon--18" /></a>
+  </div>
+</article>
+
+<script>
+  // Agrega la línea «Enlace» con la dirección de la ficha al abrir WhatsApp, cuando la compilación no la
+  // conocía. Mejora progresiva: sin JavaScript el mensaje sale igual, solo que sin el enlace.
+  import { withPageLink } from '../lib/contact-core.mjs';
+
+  document.addEventListener('click', event => {
+    const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[data-page-link]') : null;
+    if (!link?.dataset.pageLink) return;
+    link.href = withPageLink(link.href, new URL(link.dataset.pageLink, window.location.href).href);
+    delete link.dataset.pageLink;
+  });
+</script>

@@ -1,0 +1,22 @@
+---
+// Pasos numerados (`.steps`): tres celdas con el número grande en azul y el texto; flecha entre pasos.
+// El número grande es decorativo; los lectores de pantalla leen «1. », «2. »… antes de cada texto.
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Textos de los pasos, en orden (pensado para tres). */
+  steps: readonly string[];
+}
+
+const { steps } = Astro.props;
+const span = steps.length === 2 ? 'span-6' : steps.length === 4 ? 'span-3' : 'span-4';
+---
+<ol class="steps grid12">
+  {steps.map((step, index) => (
+    <li class:list={['step', span]}>
+      <span class="step__num" aria-hidden="true">{index + 1}</span>
+      <p class="step__text t-h3"><span class="vh">{index + 1}. </span>{step}</p>
+      {index < steps.length - 1 && <Icon name="arrow-right" class="step__next icon--24" />}
+    </li>
+  ))}
+</ol>

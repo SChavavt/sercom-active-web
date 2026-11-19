@@ -1,0 +1,12 @@
+---
+// Aviso de vista previa, arriba de todo. Solo lo imprime BaseLayout en compilaciones de vista previa
+// (isPreview); el texto es PREVIEW_NOTICE y su primera frase va en negritas.
+import { PREVIEW_NOTICE } from '../lib/site-data.mjs';
+
+const cut = PREVIEW_NOTICE.indexOf('. ');
+const lead = cut === -1 ? PREVIEW_NOTICE : PREVIEW_NOTICE.slice(0, cut + 1);
+const rest = cut === -1 ? '' : PREVIEW_NOTICE.slice(cut + 2);
+---
+<aside class="preview" aria-label="Aviso de vista previa">
+  <p class="preview__text"><strong>{lead}</strong>{rest && ` ${rest}`}</p>
+</aside>

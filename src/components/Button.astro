@@ -1,0 +1,30 @@
+---
+// Botón sólido (`.btn`): un enlace con aspecto de botón para la acción principal de un bloque.
+// Variantes: azul (por omisión) e `inverse` (blanco, para usarlo sobre la banda azul). `block` ocupa todo el ancho.
+// Sin `href` se imprime un <button>: úsalo solo si un script le da una función (nunca un control que no hace nada).
+import type { HTMLAttributes } from 'astro/types';
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props extends Omit<HTMLAttributes<'a'>, 'type'> {
+  /** Destino. Sin él se imprime <button type={type}>. */
+  href?: string;
+  variant?: 'primary' | 'inverse';
+  /** Ocupa todo el ancho de su celda. */
+  block?: boolean;
+  /** Icono antes del texto (por ejemplo `whatsapp`). */
+  icon?: IconName;
+  /** Icono después del texto (por ejemplo `arrow-right`). */
+  iconEnd?: IconName;
+  /** Solo para <button>. */
+  type?: 'button' | 'submit';
+}
+
+const { href, variant = 'primary', block = false, icon, iconEnd, type = 'button', class: className, ...attrs } = Astro.props;
+const classes = ['btn', { 'btn--inverse': variant === 'inverse', 'btn--block': block }, className];
+---
+{href ? (
+  <a class:list={classes} href={href} {...attrs}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</a>
+) : (
+  <button class:list={classes} type={type} {...(attrs as HTMLAttributes<'button'>)}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</button>
+)}

@@ -1,0 +1,23 @@
+---
+// Celdas de marca (`.brands`): los nombres de las marcas como texto, en un solo tratamiento tipográfico
+// (nunca logotipos de terceros), cuatro por fila en computadora. Cada celda lleva a la página de la marca.
+// `allLink` agrega al final la celda azul «Ver todas las marcas» (en la portada; no en /marcas/).
+import type { PublicBrand } from '../types/site.ts';
+import Icon from './Icon.astro';
+
+interface Props {
+  brands: readonly PublicBrand[];
+  /** Celda final en azul sólido. */
+  allLink?: { href: string; label: string };
+  /** `lg`: celdas de 96 px de alto (página de marcas). */
+  size?: 'md' | 'lg';
+}
+
+const { brands, allLink, size = 'md' } = Astro.props;
+---
+<ul class:list={['brands', 'grid12', { 'brands--lg': size === 'lg' }]}>
+  {brands.map(brand => (
+    <li class="span-3"><a class="brand cell-link" href={brand.url}><span>{brand.name}</span><Icon name="arrow-right" class="icon--18" /></a></li>
+  ))}
+  {allLink && <li class="span-3"><a class="brand brand--all cell-link" href={allLink.href}><span>{allLink.label}</span><Icon name="arrow-right" class="icon--24" /></a></li>}
+</ul>

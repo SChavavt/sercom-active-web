@@ -1,0 +1,35 @@
+---
+// Estado vacío (`.empty`): una celda de ancho completo con un pictograma de línea, dos frases y una sola
+// acción. Para una búsqueda sin resultados o una categoría sin productos todavía (textos del brief, 6.3):
+//   «No encontramos productos con esa búsqueda.» / «Puedes pedirnos este producto y lo buscamos por ti.»
+//     → Solicitar este producto
+//   «Estamos cargando los productos de esta categoría.» / «Mientras tanto, dinos qué necesitas y te
+//     ayudamos a cotizarlo.» → botón de WhatsApp
+import type { IconName } from '../lib/icons.ts';
+import Button from './Button.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Pictograma de línea (64 px); por ejemplo `search`, `zoom-question` o el de la categoría. */
+  icon: IconName;
+  /** Primera frase: lo que pasa. */
+  title: string;
+  /** Segunda frase: qué puede hacer la persona. */
+  text: string;
+  action: { href: string; label: string; icon?: IconName };
+  /** Nivel de la primera frase; 2 por omisión. */
+  headingLevel?: 2 | 3;
+  class?: string;
+}
+
+const { icon, title, text, action, headingLevel = 2, class: className } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+---
+<div class:list={['empty', className]}>
+  <Icon name={icon} class="empty__icon icon--fine" />
+  <div class="empty__body">
+    <Heading class="empty__title">{title}</Heading>
+    <p class="empty__text">{text}</p>
+  </div>
+  <Button class="empty__action" href={action.href} icon={action.icon} iconEnd={action.icon ? undefined : 'arrow-right'}>{action.label}</Button>
+</div>

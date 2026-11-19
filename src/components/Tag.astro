@@ -1,0 +1,9 @@
+---
+// Etiqueta pequeña en mayúsculas sobre tinta (`.tag`). Su uso principal es «Ejemplo» en cada producto
+// de ejemplo de la vista previa (texto de EXAMPLE_TAG en src/lib/site-data.mjs).
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+<span class:list={['tag', className]}><slot /></span>
