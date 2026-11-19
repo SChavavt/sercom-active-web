@@ -631,8 +631,8 @@ test('R-RULE-10: un plazo de respuesta con una cifra', async () => {
     '<p>Te enviamos la lista para que la revises en 5 minutos.</p>', '<p>Recibes el arnés y lo ajustas en 2 minutos.</p>', '<p>Recibes un respirador que protege en 8 horas de jornada.</p>', '<p>Te enviamos el casco, que se ajusta en 2 minutos.</p>',
     // Una duración de uso («de turno», «de uso», «de jornada») tampoco es un plazo de respuesta.
     '<p>Respondemos tus dudas sobre el uso en 8 horas de turno.</p>', '<p>Te cotizamos filtros para trabajar en 40 horas de uso.</p>']);
-  // El segundo verbo de la frase sigue contando por sí mismo.
-  await assertEachFails('R-RULE-10', ['<p>Te respondemos y cotizamos en 24 horas</p>']);
+  // El segundo verbo de la frase sigue contando por sí mismo, y «días de trabajo» son días hábiles, no una duración de uso.
+  await assertEachFails('R-RULE-10', ['<p>Te respondemos y cotizamos en 24 horas</p>', '<p>Te cotizamos en 2 días de trabajo</p>', '<p>Respondemos en 24 horas de servicio.</p>']);
 });
 
 test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección', async () => {

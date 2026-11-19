@@ -305,7 +305,7 @@ const RESPONSE_VERB = '\\b(?:recibiras|recibes|recibira|(?:te\\s+)?respondemos|t
 // …y, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio (ahí empieza otra
 // oración: «Recibes un extintor que se recarga en 1 hora»), un plazo con una cifra: «en 24 horas», «dentro de 48
 // horas», «en menos de 2 horas», «en un día hábil». Una duración de uso no es un plazo: «en 8 horas de turno».
-const RESPONSE_TIME = '(?:en|dentro\\s+de)\\s+(?:(?:menos\\s+de|maximo|un\\s+maximo\\s+de)\\s+)?(?:\\d+|un|una)\\s+(?:minutos|min|horas?|hrs|h|dias?)(?:\\s+habil(?:es)?)?\\b(?!\\s+de\\s+(?:uso|turno|jornada|trabajo|servicio|operacion|autonomia|duracion|exposicion)\\b)';
+const RESPONSE_TIME = '(?:en|dentro\\s+de)\\s+(?:(?:menos\\s+de|maximo|un\\s+maximo\\s+de)\\s+)?(?:\\d+|un|una)\\s+(?:minutos|min|horas?|hrs|h|dias?)(?:\\s+habil(?:es)?)?\\b(?!\\s+de\\s+(?:uso|turno|jornada|operacion|autonomia|duracion|exposicion)\\b)';
 const FALSE_CONFIRMATION = new RegExp([
   // En primera persona: «Hemos enviado tu solicitud», «Ya enviamos tu mensaje», «Registramos tu pedido».
   new RegExp(`${NEGATED}\\b(?:recibimos|enviamos|registramos) (?:tu|su|tus|sus)\\b|\\bhemos (?:recibido|enviado|registrado)\\b|\\bya (?:recibimos|enviamos|registramos)\\b`),
