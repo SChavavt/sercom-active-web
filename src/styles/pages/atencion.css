@@ -73,6 +73,9 @@
 .solicitud__crumbs { padding: var(--s-5) var(--pad); }
 /* Celda junto a la acción de correo: la nota de los borradores y, encima, la de la búsqueda cuando llega una */
 .solicitud__notes { display: flex; flex-direction: column; justify-content: center; }
+/* La búsqueda la escribe el cliente: un término largo sin espacios se parte dentro de la nota en lugar de
+   salirse de la celda y desplazar la página de lado */
+.solicitud__notes [data-search-note] { overflow-wrap: anywhere; }
 /* En computadora la nota va a la izquierda y la acción a la derecha; en el marcado la acción va primero */
 @media (min-width: 1100px) {
   .solicitud__notes { grid-column: 1 / span 8; grid-row: 1; }
