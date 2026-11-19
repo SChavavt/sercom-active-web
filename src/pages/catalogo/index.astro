@@ -1,14 +1,71 @@
 ---
-// PROVISIONAL: página mínima para que la navegación y la revisión de enlaces funcionen. La reemplaza quien
-// construya el catálogo (búsqueda, barra lateral, retícula y estados vacíos; ver docs/diseno.md).
+// Catálogo (/catalogo/). Lo que muestra se decide con los datos, nunca con el modo de compilación:
+//   - Con productos (hoy, la vista previa): fila de búsqueda (CatalogSearch), barra lateral de categorías y
+//     marcas y retícula de tarjetas (CatalogListing), con el estado «sin resultados» de la búsqueda, y la
+//     banda de solicitud especial.
+//   - Sin productos (hoy, producción): sin búsqueda, barra ni retícula. Aviso de que el catálogo se está
+//     preparando con las dos acciones útiles, las categorías como navegación si las hubiera, «Marcas que
+//     manejamos» y la banda.
+// Textos: brief 6.3 y brief de páginas de listado.
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import CatalogBand from '../../components/CatalogBand.astro';
+import BrandCells from '../../components/BrandCells.astro';
+import CatalogListing from '../../components/CatalogListing.astro';
+import CatalogSearch from '../../components/CatalogSearch.astro';
+import CategoryRegister from '../../components/CategoryRegister.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import Note from '../../components/Note.astro';
 import PageHeader from '../../components/PageHeader.astro';
-import { routes } from '../../lib/site-data.mjs';
+import SectionHead from '../../components/SectionHead.astro';
+import { contactDetails } from '../../lib/contact.mjs';
+import { brands, categories, products, routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/catalogo.css';
+
+const hasProducts = products.length > 0;
+const breadcrumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Catálogo' }];
+const lead = hasProducts
+  ? 'Explora por categoría o por marca. Los productos se muestran sin precio: la cotización se prepara según lo que necesitas.'
+  : 'Estamos preparando el catálogo. Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo.';
 ---
-<BaseLayout title="Catálogo">
-  <PageHeader
-    title="Catálogo"
-    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Catálogo' }]}
-    lead="Explora por categoría o por marca. Los productos se muestran sin precio: la cotización se prepara según lo que necesitas."
-  />
+<BaseLayout title="Catálogo" description={`${lead} ${contactDetails.locationLabel}.`}>
+  {hasProducts ? (
+    <Fragment>
+      <PageHeader title="Catálogo" breadcrumbs={breadcrumbs} lead={lead} />
+      <CatalogSearch total={products.length} />
+      <CatalogListing products={products} categories={categories} brands={brands}>
+        <div class="catalog-body__empty" data-catalog-empty hidden>
+          <EmptyState
+            icon="search"
+            title="No encontramos productos con esa búsqueda."
+            text="Puedes pedirnos este producto y lo buscamos por ti."
+            action={{ href: routes.specialRequest, label: 'Solicitar este producto' }}
+            headingLevel={3}
+          />
+        </div>
+      </CatalogListing>
+    </Fragment>
+  ) : (
+    <Fragment>
+      <PageHeader title="Catálogo" breadcrumbs={breadcrumbs} lead={lead}>
+        <ActionRow href={routes.quoteList} primary>Cotizar mi lista</ActionRow>
+        <ActionRow href={routes.specialRequest}>Ayúdame a encontrarlo</ActionRow>
+      </PageHeader>
+
+      {categories.length > 0 && (
+        <section class="section" aria-labelledby="categorias-title">
+          <SectionHead title="Explora nuestras categorías" id="categorias-title" />
+          <CategoryRegister categories={categories} />
+        </section>
+      )}
+
+      <section class="section" aria-labelledby="marcas-title">
+        <SectionHead title="Marcas que manejamos" id="marcas-title" />
+        <BrandCells brands={brands} allLink={{ href: routes.brands, label: 'Ver todas las marcas' }} />
+        <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
+      </section>
+    </Fragment>
+  )}
+
+  <CatalogBand />
 </BaseLayout>

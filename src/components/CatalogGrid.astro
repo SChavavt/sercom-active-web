@@ -1,0 +1,33 @@
+---
+// Retícula de tarjetas del catálogo (`.catalog-grid`), en el área de 9 columnas junto a la barra lateral:
+// cuatro por fila desde 1360 px (retícula anidada de cuatro pistas), tres a 1280 (cada tarjeta sobre tres
+// de las doce columnas), dos en tableta y celular. Las tarjetas de una fila tienen la misma altura.
+// La última fila casi nunca está completa: una celda blanca (`.catalog-grid__fill`) ocupa los lugares que
+// faltan, para que nunca se vea el azul de la lámina. Cuántos faltan se calcula aquí para la lista completa
+// (lo que se ve sin JavaScript) y el script de la búsqueda lo recalcula al filtrar (atributos data-fill4,
+// data-fill3 y data-fill2).
+// Cada tarjeta lleva en `data-search` su texto de búsqueda (searchText de search.mjs).
+//
+// Uso:  <CatalogGrid products={products} />   (con la lista vacía no imprime nada: la página muestra EmptyState)
+import type { PublicProduct } from '../types/site.ts';
+import { searchText } from '../lib/search.mjs';
+import ProductCard from './ProductCard.astro';
+
+interface Props {
+  products: readonly PublicProduct[];
+}
+
+const { products } = Astro.props;
+/** Lugares vacíos de la última fila con `perRow` tarjetas por fila. */
+const missing = (perRow: number) => (perRow - (products.length % perRow)) % perRow;
+---
+{products.length > 0 && (
+  <div class="catalog-grid" data-catalog-grid>
+    <ul class="catalog-grid__list">
+      {products.map(product => (
+        <li class="catalog-grid__item" data-search={searchText(product)}><ProductCard product={product} /></li>
+      ))}
+      <li class="catalog-grid__fill" aria-hidden="true" data-catalog-fill data-fill4={missing(4)} data-fill3={missing(3)} data-fill2={missing(2)}></li>
+    </ul>
+  </div>
+)}

@@ -1,0 +1,252 @@
+/* ==========================================================================
+   Páginas de listado: /catalogo/, /categorias/{id}/ y /marcas/{id}/
+   Una sola hoja para las tres, que comparten piezas (CatalogSearch, CatalogListing, CatalogNav,
+   CatalogGrid), para que no se separen. La importan las tres páginas.
+   Misma lámina que la portada: celdas blancas sobre el azul, filetes por huecos de 1 px, esquinas rectas,
+   solo variables de tokens.css y fonts.css. Puntos de corte: 1359, 1099, 699 (docs/diseno.md).
+
+   Un recurso que se repite: cuando una columna (la barra lateral o la retícula) puede terminar antes que
+   su vecina, su último bloque lleva un filete inferior de 1 px con margen de -1 px. Si sobra espacio debajo,
+   ese filete cierra el bloque y el resto de la celda queda blanco; si el bloque llega al final de la fila,
+   el filete cae exactamente sobre el hueco azul siguiente (el mismo píxel), así que nunca se duplica.
+   ========================================================================== */
+
+/* 1. Fila de búsqueda: campo de 64 px y «Buscar» en 9 columnas, línea de resultados en 3 ---------------- */
+.catalog-search__form {
+  display: grid;
+  grid-template-columns: subgrid;          /* el campo y el botón caen sobre las columnas de la lámina */
+}
+.catalog-search__field {
+  grid-column: span 8;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  min-width: 0;
+  padding: 0 var(--s-4) 0 var(--pad);
+  background: var(--surface);
+}
+.catalog-search__field .icon { color: var(--blue); }
+.catalog-search__field:focus-within { outline: 3px solid var(--focus); outline-offset: -3px; }
+.catalog-search__input {
+  flex: 1;
+  min-width: 0;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 1.125rem;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.catalog-search__input:focus { outline: none; }
+.catalog-search__input::placeholder { color: var(--grey-600); opacity: 1; }
+.catalog-search__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.catalog-search__submit {
+  grid-column: span 1;
+  min-width: 0;
+  min-height: 64px;
+  padding: 0 var(--s-3);
+  border: 0;
+  border-radius: 0;
+  background: var(--blue);
+  color: var(--white);
+  font-weight: var(--type-button-weight);
+  line-height: 1.2;
+  transition: background-color var(--ease);
+}
+.catalog-search__submit:hover { background: var(--blue-700); }
+.catalog-search__submit:active { background: var(--blue-800); }
+.catalog-search__submit:focus-visible { outline-offset: -3px; }
+
+.catalog-search__status {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--s-2) var(--pad);
+  background: var(--surface);
+}
+.catalog-search__count {
+  max-width: 100%;
+  overflow: hidden;
+  font-weight: var(--type-strong-weight);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;                  /* una consulta muy larga se corta; el número siempre queda a la vista */
+}
+.catalog-search__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--blue);
+  font-size: var(--small);
+  font-weight: var(--type-button-weight);
+  text-decoration: none;
+}
+.catalog-search__clear:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.catalog-search__clear[hidden] { display: none; }
+
+/* 2. Cuerpo: barra lateral (3 columnas) y área de productos (9) ------------------------------------------ */
+.catalog-body__results { min-width: 0; background: var(--surface); }
+
+/* 2.1 Barra lateral: dos grupos con título; filas con filete suave entre ellas */
+.catalog-nav { min-width: 0; background: var(--surface); }
+.catalog-nav__groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--line);
+  background: var(--rule);
+  border-bottom: var(--line) solid var(--rule);       /* ver el recurso del filete inferior, arriba */
+  margin-bottom: calc(-1 * var(--line));
+}
+.catalog-nav__folds { display: none; }
+.catalog-nav__group { padding: var(--s-7) 0 var(--s-4); background: var(--surface); }
+.catalog-nav__title { padding: 0 var(--pad) var(--s-3); color: var(--blue); }
+
+.catalog-nav__link,
+.catalog-nav__toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  min-height: 44px;
+  padding: var(--s-2) var(--pad);
+  border-top: var(--line) solid var(--rule-soft);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+.catalog-nav__link:hover,
+.catalog-nav__toggle:hover { background: var(--surface-tint); }
+.catalog-nav__link:focus-visible,
+.catalog-nav__toggle:focus-visible { outline-offset: -3px; }
+.catalog-nav__link:hover .catalog-nav__name { text-decoration: underline; text-decoration-color: var(--blue); text-underline-offset: 3px; }
+.catalog-nav__count { flex: none; color: var(--grey-600); font-size: var(--small); font-variant-numeric: tabular-nums; }
+
+/* Fila actual: el cuadro azul sólido en el margen, centrado en el relleno lateral; el texto no se mueve */
+.catalog-nav__link[aria-current="page"] { font-weight: var(--type-strong-weight); }
+.catalog-nav__link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc((var(--pad) - 10px) / 2);
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  background: var(--blue);
+}
+
+/* «Ver todas las marcas» / «Ver menos marcas»: <details> nativo, se abre en su lugar */
+.catalog-nav__toggle { color: var(--blue); font-weight: var(--type-button-weight); list-style: none; }
+.catalog-nav__toggle .icon { transition: transform var(--ease); }
+.catalog-nav__more[open] > .catalog-nav__toggle .icon { transform: rotate(180deg); }
+.catalog-nav__toggle-less,
+.catalog-nav__more[open] > .catalog-nav__toggle .catalog-nav__toggle-more { display: none; }
+.catalog-nav__more[open] > .catalog-nav__toggle .catalog-nav__toggle-less { display: inline; }
+
+/* 2.2 Retícula de tarjetas: cuatro por fila desde 1360, tres a 1280, dos en tableta y celular */
+.catalog-grid__list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--line);
+  background: var(--rule);
+  border-bottom: var(--line) solid var(--rule);       /* ver el recurso del filete inferior, arriba */
+  margin-bottom: calc(-1 * var(--line));
+}
+.catalog-grid__item { display: flex; min-width: 0; }
+.catalog-grid__item > .product { flex: 1; min-width: 0; }
+.catalog-grid[hidden],
+.catalog-grid__item[hidden] { display: none; }
+
+/* Celda blanca que completa la última fila (CatalogGrid y el script de la búsqueda calculan cuántos lugares faltan) */
+.catalog-grid__fill { display: none; background: var(--surface); }
+@media (min-width: 1360px) {
+  /* Con cuatro tarjetas en 9 columnas cada mitad de la fila de acciones mide unos 120 px y «Ver ficha» se
+     partiría en dos líneas: las dos acciones se apilan, igual que en la tarjeta del celular. */
+  .catalog-grid .product__actions { grid-template-columns: minmax(0, 1fr); }
+  .catalog-grid .product__action--quote { padding-left: var(--pad); border-left: 0; border-top: var(--line) solid var(--rule-soft); }
+  .catalog-grid__fill[data-fill4="1"] { display: block; grid-column: span 1; }
+  .catalog-grid__fill[data-fill4="2"] { display: block; grid-column: span 2; }
+  .catalog-grid__fill[data-fill4="3"] { display: block; grid-column: span 3; }
+}
+@media (min-width: 1100px) and (max-width: 1359px) {
+  .catalog-grid__list { grid-template-columns: repeat(3, minmax(0, 1fr)); }   /* cada tarjeta sobre 3 de las 12 columnas */
+  .catalog-grid__fill[data-fill3="1"] { display: block; grid-column: span 1; }
+  .catalog-grid__fill[data-fill3="2"] { display: block; grid-column: span 2; }
+}
+@media (max-width: 1099px) {
+  .catalog-grid__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-grid__fill[data-fill2="1"] { display: block; grid-column: span 1; }
+}
+
+/* 2.3 Estado sin resultados de la búsqueda, dentro del área de productos */
+.catalog-body__empty { border-bottom: var(--line) solid var(--rule); margin-bottom: calc(-1 * var(--line)); }
+.catalog-body__empty[hidden] { display: none; }
+
+/* 3. Piezas propias de una página -------------------------------------------------------------------------- */
+
+/* 3.1 Marca: enlace «Sitio del fabricante» en la columna lateral del título, sobre la fila de WhatsApp */
+.catalog-brand__links {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 68px;
+  padding: var(--s-2) var(--pad);
+  background: var(--surface);
+}
+
+/* 3.2 Categoría: «Marcas en esta categoría» (solo con productos de marcas reales), sobre la división 3 + 9 */
+.catalog-related__head { display: flex; align-items: center; padding: var(--s-5) var(--pad); background: var(--surface); }
+.catalog-related__title { color: var(--blue); }
+.catalog-related__list { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-7); padding: var(--s-2) var(--pad); background: var(--surface); }
+
+/* 4. Tableta y celular: la barra lateral se pliega en dos filas sobre las tarjetas ------------------------- */
+@media (max-width: 1099px) {
+  .catalog-search__field { grid-column: span 9; }
+  .catalog-search__submit { grid-column: span 3; }
+  .catalog-search__status { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; column-gap: var(--s-5); min-height: 56px; padding-block: var(--s-1); }
+  .catalog-search__clear { min-height: 44px; }
+
+  .catalog-nav { background: transparent; }
+  .catalog-nav__groups { display: none; }
+  .catalog-nav__folds { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+  .catalog-nav__fold { background: var(--surface); }
+  .catalog-nav__fold[open] { padding-bottom: var(--s-3); }
+  .catalog-nav__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    min-height: 60px;
+    padding: 0 var(--pad);
+    font-size: 1.125rem;
+    font-weight: var(--type-button-weight);
+    line-height: 1.2;
+    list-style: none;
+    transition: background-color var(--ease);
+  }
+  .catalog-nav__summary:hover { background: var(--surface-tint); }
+  .catalog-nav__summary:focus-visible { outline-offset: -3px; }
+  .catalog-nav__summary .icon { color: var(--blue); transition: transform var(--ease); }
+  .catalog-nav__fold[open] > .catalog-nav__summary .icon { transform: rotate(180deg); }
+  .catalog-nav__link, .catalog-nav__toggle { min-height: 48px; font-size: 1rem; }
+
+  .catalog-related__head, .catalog-related__list { grid-column: span 12; }
+  .catalog-related__head { padding-bottom: 0; }
+  .catalog-related { row-gap: 0; }
+}
+
+@media (max-width: 699px) {
+  .catalog-search__field { grid-column: span 9; gap: var(--s-3); padding-right: var(--s-2); }
+  .catalog-search__field .icon { display: none; }       /* el botón ya dice «Buscar»: el campo gana ancho */
+  .catalog-search__input { font-size: 1rem; }
+  .catalog-search__submit { grid-column: span 3; }
+}

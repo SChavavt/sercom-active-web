@@ -77,3 +77,37 @@ export function filterProducts(products, query) {
   if (tokens.length === 0) return [...products];
   return products.filter(product => matchesTokens(searchText(product), tokens));
 }
+
+/**
+ * Consulta tal como se muestra en la página: sin espacios al inicio o al final y con un solo espacio
+ * entre palabras. Conserva mayúsculas y acentos (es lo que escribió la persona).
+ * @param {unknown} query
+ * @returns {string}
+ */
+export function displayQuery(query) {
+  return String(query ?? '').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * ¿La consulta filtra algo? Solo cuando tiene al menos una palabra con letras o números.
+ * @param {unknown} query
+ * @returns {boolean}
+ */
+export function isActiveQuery(query) {
+  return queryTokens(query).length > 0;
+}
+
+/**
+ * Línea de resultados del catálogo, en español y con el plural correcto:
+ *   sin búsqueda → «10 productos» (singular «1 producto»);
+ *   con búsqueda → «3 resultados para “guante”» (singular «1 resultado para “guante”»).
+ * Devuelve texto plano: en el navegador se escribe con `textContent`, nunca como HTML.
+ * @param {number} count Productos visibles.
+ * @param {unknown} [query]
+ * @returns {string}
+ */
+export function resultSummary(count, query = '') {
+  const total = Math.max(0, Math.trunc(Number(count)) || 0);
+  if (!isActiveQuery(query)) return `${total} ${total === 1 ? 'producto' : 'productos'}`;
+  return `${total} ${total === 1 ? 'resultado' : 'resultados'} para “${displayQuery(query)}”`;
+}
