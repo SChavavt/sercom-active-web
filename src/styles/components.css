@@ -153,6 +153,13 @@
 .masthead__search-hint > span { flex: none; white-space: nowrap; }
 .masthead__search-field.is-long .masthead__search-hint { overflow: visible; visibility: visible; }
 .masthead__search-field.is-long .masthead__search-hint > span { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: break-word; }
+/* En computadora la celda tiene el alto de la fila de la cabecera (84 px) y no crece con la copia: con el interlineado
+   del texto, dos líneas de la letra al 200 % (93 px) pasaban 4.5 px por arriba y por abajo. Con 1.25 caben (75 px a
+   30 px de letra). El espaciado de texto impone su propio interlineado y la fila crece con él. Tableta y celular
+   conservan el suyo: allí el panel crece con la copia (responsive.css). */
+@media (min-width: 1100px) {
+  .masthead__search-field.is-long .masthead__search-hint > span { line-height: 1.25; }
+}
 .masthead__search-input:not(:placeholder-shown) + .masthead__search-hint,
 .masthead__search-input:not(:placeholder-shown) + .masthead__search-hint > span { visibility: hidden; }   /* también en la línea: no depende de la herencia */
 .masthead__search-btn { display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; border: 0; background: none; color: var(--blue); }

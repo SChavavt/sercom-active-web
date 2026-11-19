@@ -102,13 +102,15 @@
   .catpanel__list > .catpanel__all { grid-column: span 12; }
   .catpanel__link { min-height: 60px; padding-inline: var(--pad); }
   .catpanel__link > span { max-width: calc(100% - 28px - var(--s-3) + var(--pad)); }      /* hasta el borde de la celda, como en computadora */
-  .masthead__search { height: 64px; padding: 0 var(--s-2) 0 var(--pad); background: var(--surface); }
+  /* Al menos 64 px de alto, y más si el contenido lo pide: el campo y el botón (48 px) quedan en 64 px con el filete de
+     abajo, igual que con un alto fijo, y el texto de ayuda en dos líneas hace crecer el panel (abajo) */
+  .masthead__search { min-height: 64px; padding: calc(var(--s-2) - var(--line)) var(--s-2) calc(var(--s-2) - var(--line)) var(--pad); background: var(--surface); }
   .masthead__search-field { font-size: 1rem; }
   .masthead__search-btn { width: 48px; height: 48px; }
   /* Texto de ayuda en dos líneas (.is-long: con la letra agrandada el placeholder no cabe): el panel crece con él en
      lugar de dejarlo salir por arriba y por abajo de sus 64 px. La copia deja de flotar sobre el campo y comparte su
-     casilla con él (el campo la cubre entera y sigue recibiendo el clic), así su alto cuenta. Sin .is-long, nada cambia. */
-  .masthead__search:has(.is-long) { height: auto; min-height: 64px; padding-block: var(--s-2); }
+     casilla con él (el campo la cubre entera y sigue recibiendo el clic), así su alto cuenta. Sin .is-long, nada cambia.
+     No depende de :has(): el panel ya tiene alto automático, así crece también en los navegadores que no lo tienen. */
   .masthead__search-field.is-long { display: grid; }
   .masthead__search-field.is-long > * { grid-area: 1 / 1; }
   .masthead__search-field.is-long .masthead__search-input { height: auto; min-height: 44px; }
