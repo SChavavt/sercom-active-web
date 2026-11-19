@@ -453,6 +453,88 @@ test('V-06: un separador precedido por un espacio normal, por ninguno o por un s
 });
 
 // ---------------------------------------------------------------------------------------------------
+// A-02: nombres accesibles sin espacios sueltos
+// ---------------------------------------------------------------------------------------------------
+
+/** Fila de la barra lateral del catálogo como la escribe CatalogNavList; `label` es su atributo aria-label completo. */
+const navRow = (name, count, label = ` aria-label="${name}, ${count} ${count === 1 ? 'producto' : 'productos'}"`) => `<li><a class="catalog-nav__link" href="/categorias/manos/"${label}>`
+  + `<span class="catalog-nav__name">${name}</span>${count ? `<span class="catalog-nav__count"><span aria-hidden="true">${count}</span><span class="vh">, ${count} ${count === 1 ? 'producto' : 'productos'}</span></span>` : ''}</a></li>`;
+
+test('A-02a: un nombre que empieza con el texto visible pasa, sin importar mayúsculas, espacios ni lo oculto', async () => {
+  const good = [
+    card(),
+    `<ul class="catalog-nav__list">${navRow('Protección de manos', 1)}</ul>`,
+    '<a href="/catalogo/" aria-label="ver   FICHA: Guante"><span>Ver ficha</span></a>',
+    // Sin texto visible (solo un icono) el nombre puede ser cualquiera.
+    '<a href="https://wa.me/5212214002219" aria-label="WhatsApp"><svg class="icon" width="20" height="20" aria-hidden="true"></svg></a>',
+    '<button type="button" aria-label="Cerrar el menú">Cerrar</button>',
+    `<a href="mailto:${ADDRESS}" aria-label="${ADDRESS}">${EMAIL}</a>`,
+  ];
+  assert.deepEqual(await check({ 'catalogo/index.html': page({}, good.join('')) }, { ids: ['A-02a'] }), []);
+});
+
+test('A-02a: un nombre que no empieza con el texto visible falla', async () => {
+  const bad = [
+    card(META_GOOD, { sheet: ' aria-label="Ficha: Guante de ejemplo"' }),
+    '<a href="/catalogo/" aria-label="Guante: Ver ficha"><span>Ver ficha</span><span class="vh">: Guante</span></a>',
+    '<button type="button" aria-label="Abrir">Menú</button>',
+    `<a href="mailto:${ADDRESS}" aria-label="Correo">${EMAIL}</a>`,
+  ];
+  for (const html of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, html) }, { ids: ['A-02a'] });
+    assert.equal(problems.length, 1, html);
+    assert.match(problems[0].message, /empieza con las palabras que se ven/, html);
+  }
+});
+
+test('A-02b: un enlace de correo que muestra la dirección y se llama con ella pasa; la acción «Escribir por correo» y la cabecera no entran', async () => {
+  const good = [
+    `<a href="mailto:${ADDRESS}" aria-label="${ADDRESS}"><svg class="icon icon--16" width="16" height="16" aria-hidden="true"></svg>${EMAIL}</a>`,
+    `<a class="data__link" href="mailto:${ADDRESS}?subject=Cotizaci%C3%B3n&amp;body=Hola" aria-label="${ADDRESS}">${EMAIL}<svg class="icon" width="20" height="20" aria-hidden="true"></svg></a>`,
+    `<a class="action" href="mailto:${ADDRESS}?subject=Hola"><span>Escribir por correo</span></a>`,
+  ];
+  assert.deepEqual(await check({ 'contacto/index.html': page({}, good.join('')) }, { ids: ['A-02b'] }), []);
+  const inHeader = page().replace('<li class="utility__item">Puebla, México</li>', `<li class="utility__item"><a href="mailto:${ADDRESS}">${ADDRESS}</a></li>`);
+  assert.deepEqual(await check({ 'contacto/index.html': inHeader }, { ids: ['A-02b'] }), []);
+});
+
+test('A-02b: un enlace de correo que muestra la dirección sin aria-label, o con otro, falla', async () => {
+  const bad = [
+    [`<a href="mailto:${ADDRESS}">${EMAIL}</a>`, /no tiene aria-label/],
+    [`<a href="mailto:${ADDRESS}?subject=Hola">${EMAIL}</a>`, /no tiene aria-label/],
+    [`<a href="mailto:${ADDRESS}" aria-label="ventas.puebla@ sercomactive.com">${EMAIL}</a>`, /se llama «ventas\.puebla@ sercomactive\.com»/],
+    [`<a href="mailto:${ADDRESS}" aria-label="Escribir a ${ADDRESS}">${EMAIL}</a>`, /se llama/],
+  ];
+  for (const [html, expected] of bad) {
+    const problems = await check({ 'contacto/index.html': page({}, html) }, { ids: ['A-02b'] });
+    assert.equal(problems.length, 1, html);
+    assert.match(problems[0].message, expected, html);
+  }
+});
+
+test('A-02c: las acciones de la tarjeta y las filas con productos con su nombre completo pasan; una fila sin productos no lo necesita', async () => {
+  const good = card() + card(META_GOOD, { name: 'Lente de seguridad' })
+    + `<ul class="catalog-nav__list">${navRow('Protección de manos', 1)}${navRow('Protección de cabeza', 12)}${navRow('Soldadura', 0, '')}</ul>`;
+  assert.deepEqual(await check({ 'catalogo/index.html': page({}, good) }, { ids: ['A-02c'] }), []);
+});
+
+test('A-02c: una acción o una fila sin nombre, o con otro, falla', async () => {
+  const bad = [
+    [card(META_GOOD, { sheet: '' }), /no tiene aria-label: debe llamarse «Ver ficha: Guante de ejemplo»/],
+    [card(META_GOOD, { quote: ' aria-label="Cotizar"' }), /se llama «Cotizar»: debe llamarse «Cotizar: Guante de ejemplo»/],
+    [card(META_GOOD, { sheet: ' aria-label="Ver ficha: Otro guante"' }), /debe llamarse «Ver ficha: Guante de ejemplo»/],
+    [`<ul>${navRow('Protección de manos', 1, '')}</ul>`, /no tiene aria-label: debe llamarse «Protección de manos, 1 producto»/],
+    [`<ul>${navRow('Protección de manos', 3, ' aria-label="Protección de manos, 3 producto"')}</ul>`, /debe llamarse «Protección de manos, 3 productos»/],
+    [`<ul>${navRow('Protección de manos', 1, ' aria-label="Protección de manos , 1 producto"')}</ul>`, /se llama «Protección de manos , 1 producto»/],
+  ];
+  for (const [html, expected] of bad) {
+    const problems = await check({ 'catalogo/index.html': page({}, html) }, { ids: ['A-02c'] });
+    assert.equal(problems.length, 1, html);
+    assert.match(problems[0].message, expected, html);
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------
 // Línea de comandos
 // ---------------------------------------------------------------------------------------------------
 

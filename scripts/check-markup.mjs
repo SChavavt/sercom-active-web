@@ -19,6 +19,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { routes } from '../src/lib/routes.mjs';
+import { resultSummary } from '../src/lib/search.mjs';
 
 // ---------------------------------------------------------------------------------------------------
 // Lectura de HTML: un árbol de elementos sencillo (Astro escribe HTML bien formado)
@@ -123,6 +124,13 @@ export const hasClass = (element, name) => classesOf(element).includes(name);
 export const textOf = element => element.content.map(part => (typeof part === 'string' ? part : textOf(part))).join(' ').replace(/\s+/g, ' ').trim();
 /** El texto de un elemento tal como está escrito (entidades resueltas, espacios intactos), sin separar los elementos. */
 export const rawText = element => element.content.map(part => (typeof part === 'string' ? part : rawText(part))).join('');
+/** Lo que no se ve de un elemento: el texto solo para lectores de pantalla (`.vh`) y lo marcado aria-hidden="true". */
+const isUnseen = element => hasClass(element, 'vh') || element.attributes.get('aria-hidden') === 'true';
+/** El texto que se ve de un elemento, tal como está escrito (sin `.vh` ni aria-hidden="true", espacios intactos). */
+export const visibleText = element => element.content
+  .map(part => (typeof part === 'string' ? part : isUnseen(part) ? '' : visibleText(part))).join('');
+/** Un texto para comparar: sin distinguir mayúsculas y con los espacios seguidos como uno. */
+const loose = text => text.replace(/\s+/g, ' ').trim().toLowerCase();
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
 export function closest(node, test) {
   for (let element = node; element && element.name !== '#document'; element = element.parent) if (test(element)) return element;
@@ -760,6 +768,67 @@ export const CHECKS = [
             problems.push(`el separador de «${textOf(meta)}» va precedido por ${shown}: lleva un espacio de no separación (&nbsp;), así que el renglón puede empezar con «·»`);
           }
         }
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'A-02a',
+    title: 'Un enlace o un botón con aria-label y texto visible lleva un nombre que empieza con ese texto (WCAG 2.5.3)',
+    page(page) {
+      const problems = [];
+      for (const element of page.elements) {
+        if (element.name !== 'a' && element.name !== 'button') continue;
+        const label = element.attributes.get('aria-label');
+        const shown = loose(visibleText(element));
+        if (label === undefined || !shown) continue;
+        if (!loose(label).startsWith(shown)) problems.push(`${describe(element)} muestra «${visibleText(element).replace(/\s+/g, ' ').trim()}» y se llama «${label}»: el nombre empieza con las palabras que se ven`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'A-02b',
+    title: 'Un enlace de correo que muestra la dirección se llama con la dirección exacta (aria-label): sin él, el navegador lee un espacio en el <wbr>',
+    page(page) {
+      const problems = [];
+      for (const link of page.elements) {
+        const href = link.attributes.get('href') ?? '';
+        // La franja de servicio de la cabecera muestra la dirección en un solo texto, sin <wbr> (U-11): no entra.
+        if (link.name !== 'a' || !/^mailto:/i.test(href) || closest(link, node => hasClass(node, 'site-header'))) continue;
+        let address = href.slice('mailto:'.length).split('?')[0];
+        try { address = decodeURIComponent(address); } catch { /* se compara tal cual */ }
+        if (visibleText(link).replace(/\s+/g, '') !== address) continue;
+        const label = link.attributes.get('aria-label');
+        if (label !== address) problems.push(`el enlace que muestra ${address} ${label === undefined ? 'no tiene aria-label' : `se llama «${label}»`}: lleva aria-label="${address}"`);
+      }
+      return problems;
+    },
+  },
+  {
+    id: 'A-02c',
+    title: 'Las acciones de cada tarjeta de producto se llaman «Ver ficha: {nombre}» y «Cotizar: {nombre}», y las filas de la barra lateral con productos «{nombre}, {n productos}»',
+    page(page) {
+      const problems = [];
+      const expectLabel = (element, expected) => {
+        const label = element.attributes.get('aria-label');
+        if (label !== expected) problems.push(`${describe(element)} ${label === undefined ? 'no tiene aria-label' : `se llama «${label}»`}: debe llamarse «${expected}»`);
+      };
+      for (const card of page.elements.filter(element => element.name === 'article' && hasClass(element, 'product'))) {
+        const name = allElements(card).find(element => hasClass(element, 'product__name'));
+        if (!name) continue;
+        for (const action of allElements(card).filter(element => element.name === 'a' && hasClass(element, 'product__action'))) {
+          if (hasClass(action, 'product__action--sheet')) expectLabel(action, `Ver ficha: ${textOf(name)}`);
+          else if (hasClass(action, 'product__action--quote')) expectLabel(action, `Cotizar: ${textOf(name)}`);
+        }
+      }
+      for (const row of page.elements.filter(element => element.name === 'a' && hasClass(element, 'catalog-nav__link'))) {
+        const parts = allElements(row);
+        const count = parts.find(element => hasClass(element, 'catalog-nav__count'));
+        const name = parts.find(element => hasClass(element, 'catalog-nav__name'));
+        if (!count || !name) continue;
+        const number = Number(textOf(count.children.find(element => element.attributes.get('aria-hidden') === 'true') ?? count).match(/\d+/)?.[0]);
+        expectLabel(row, `${textOf(name)}, ${resultSummary(number)}`);
       }
       return problems;
     },
