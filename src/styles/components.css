@@ -199,7 +199,7 @@
   justify-content: center;
   gap: var(--s-3);
   min-height: 52px;
-  padding: 0 var(--s-6);
+  padding: var(--s-3) var(--s-6);                 /* el texto que no cabe en una línea pasa a dos y el botón crece */
   border: var(--line) solid var(--blue);
   border-radius: var(--radius);
   background: var(--blue);
@@ -207,8 +207,9 @@
   font-size: var(--type-button-size);
   font-weight: var(--type-button-weight);
   line-height: 1.2;
+  text-align: center;
   text-decoration: none;
-  white-space: nowrap;
+  text-wrap: balance;
   transition: background-color var(--ease), border-color var(--ease), color var(--ease);
 }
 .btn:hover { background: var(--blue-700); border-color: var(--blue-700); }

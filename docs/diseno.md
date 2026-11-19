@@ -156,7 +156,7 @@ Icono del kit como SVG en línea; toma el color del texto. Decorativo por omisi�
 
 ### Button
 
-Botón sólido (`.btn`), un enlace. `<Button href={…} variant="inverse" block iconEnd="arrow-right">Ayúdame a encontrarlo</Button>`.
+Botón sólido (`.btn`), un enlace. `<Button href={…} variant="inverse" block iconEnd="arrow-right">Ayúdame a encontrarlo</Button>`. Mide 52 px de alto como mínimo; si el texto no cabe en una línea (pantalla angosta, texto agrandado o espaciado) pasa a dos, centrado, y el botón crece: nunca se corta ni se sale de su celda.
 
 | Prop | Tipo | Nota |
 | --- | --- | --- |
