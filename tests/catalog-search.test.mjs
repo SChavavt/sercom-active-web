@@ -96,3 +96,11 @@ test('resultSummaryParts separa el término de la frase y une exactamente result
     assert.equal(`${lead}${term}${end}`, resultSummary(count, query), `${count} ${query}`);
   }
 });
+
+test('una búsqueda que no muestra nada es la misma en el catálogo y en la solicitud especial: vacía', () => {
+  for (const query of ['‍', '‌', '­', '️', '\u{E0041}', '͏', '‍‍ ­']) {
+    assert.equal(displayQuery(query), '', JSON.stringify(query));
+    assert.equal(isActiveQuery(query), false, JSON.stringify(query));
+    assert.deepEqual(resultSummaryParts(10, query), { lead: '10 productos', term: '', end: '' });
+  }
+});

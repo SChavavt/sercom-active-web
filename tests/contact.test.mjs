@@ -395,3 +395,12 @@ test('contact.mjs no se puede cargar en un navegador', async () => {
     delete globalThis.document;
   }
 });
+
+test('requestDescription: una búsqueda que no muestra nada (U+200D, U+00AD, U+FE0F…) no entra en el borrador', () => {
+  for (const query of ['\u200D', '\u200C\u200D', '\u00AD', '\u2064', '\uFE0F', '\u{E0041}', '\u180E', '\u034F', '\u206A', '\u200D \u200D\u0000\u202E']) {
+    assert.equal(requestDescription(query), '', JSON.stringify(query));
+    const links = contactLinks.specialRequest();
+    assert.equal(withRequestDescription(links.whatsapp, query), withRequestDescription(links.whatsapp, ''), JSON.stringify(query));
+  }
+  assert.equal(requestDescription('casco\u200D'), 'casco\u200D');
+});

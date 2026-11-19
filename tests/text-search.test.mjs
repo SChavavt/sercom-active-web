@@ -190,3 +190,22 @@ test('cleanQuery conserva las letras, cifras y marcas de cualquier escritura, lo
   assert.equal(cleanQuery('x'.repeat(500)), 'x'.repeat(500));
   assert.equal(cleanQuery(37175), '37175');
 });
+
+test('cleanQuery deja vacía una consulta sin ninguna letra, cifra, símbolo ni signo visible', () => {
+  // Caracteres de formato, de unión o selectores que no se quitan uno por uno (U+200C y U+200D hacen falta en
+  // palabras y emojis), pero que solos no muestran nada: la consulta queda vacía, como en el catálogo.
+  const invisible = ['\u200C', '\u200D', '\u00AD', '\u2064', '\uFE0F', '\u{E0041}', '\u180E', '\u034F', '\u206A', '\u0301', '\u{E0100}'];
+  for (const character of invisible) {
+    const code = `U+${character.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+    assert.equal(cleanQuery(character), '', code);
+    assert.equal(cleanQuery(`  ${character}${character} ${character}\u0001‮`), '', code);
+  }
+  assert.equal(cleanQuery(invisible.join('')), '');
+  // Con texto visible se conservan tal cual: solo se vacía la consulta que no muestra nada.
+  assert.equal(cleanQuery('می‌خواهم'), 'می‌خواهم');
+  assert.equal(cleanQuery('👷🏽‍♀️'), '👷🏽‍♀️');
+  assert.equal(cleanQuery('\u200Dguante'), '\u200Dguante');
+  assert.equal(cleanQuery('co\u00ADllar'), 'co\u00ADllar');
+  // Un signo o un símbolo solos sí se ven: se muestran como los escribió la persona.
+  for (const text of ['-', '¿?', '#', '$', '·', '❤️', '🇲🇽', '1️⃣']) assert.equal(cleanQuery(text), text, text);
+});

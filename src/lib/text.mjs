@@ -38,16 +38,22 @@ export function normalizeCode(value) {
 // suelta de un par sustituto (un emoji partido al pegar): un par completo es un solo carácter y no cuenta.
 // U+200C y U+200D se conservan: varias escrituras y los emojis compuestos los necesitan.
 const UNSAFE_IN_QUERY = /[�\p{Cc}؜‎‏‪-‮⁦-⁩​⁠﻿]|\p{Cs}/gu;
+// Lo que se ve de una consulta: una letra, una cifra, un símbolo (los emojis lo son) o un signo de puntuación. Una
+// consulta sin ninguno (solo U+200C, U+200D, U+00AD, selectores de variante, marcas sueltas u otros caracteres de
+// formato, que no se quitan uno por uno porque el texto real los necesita) no muestra nada: queda vacía, y el
+// catálogo (que ya no la usaba para filtrar, `isActiveQuery`) y la solicitud especial la tratan como sin búsqueda.
+const VISIBLE_IN_QUERY = /[\p{L}\p{N}\p{S}\p{P}]/u;
 
 /**
  * Texto que escribió el visitante, listo para mostrarlo dentro de una frase del sitio o para ponerlo en un
  * borrador: cada carácter de UNSAFE_IN_QUERY pasa a ser un espacio, y luego se recorta y queda un solo espacio
  * entre palabras. Conserva mayúsculas, acentos y las letras, cifras y marcas de cualquier escritura. Un texto
- * hecho solo de esos caracteres queda vacío. Lo usan `displayQuery` (catálogo) y `requestDescription`
- * (solicitud especial y sus borradores), así los dos muestran lo mismo.
+ * hecho solo de esos caracteres, o sin nada visible (VISIBLE_IN_QUERY), queda vacío. Lo usan `displayQuery`
+ * (catálogo) y `requestDescription` (solicitud especial y sus borradores), así los dos muestran lo mismo.
  * @param {unknown} value
  * @returns {string}
  */
 export function cleanQuery(value) {
-  return String(value ?? '').replace(UNSAFE_IN_QUERY, ' ').replace(/\s+/g, ' ').trim();
+  const text = String(value ?? '').replace(UNSAFE_IN_QUERY, ' ').replace(/\s+/g, ' ').trim();
+  return VISIBLE_IN_QUERY.test(text) ? text : '';
 }
