@@ -16,7 +16,7 @@ const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path
 // Un texto entre comillas se salta entero: «'../data/**/*.json'» lleva «/**/», que no es un comentario. Las comillas
 // simples y dobles no pasan de una línea, así que un apóstrofo suelto del texto de una página solo afecta a su línea.
 const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
-const stripComments = text => text.replace(COMMENT_OR_STRING, (match, string, before) => string ?? before ?? '');
+const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, before) => string ?? before ?? '');
 const rawSources = new Map(await Promise.all(sourceFiles.filter(path => /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/.test(path)).map(async path => [path, await readText(path)])));
 const sources = new Map([...rawSources].map(([path, text]) => [path, stripComments(text)]));
 const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);

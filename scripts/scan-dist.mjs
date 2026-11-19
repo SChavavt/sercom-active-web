@@ -124,7 +124,7 @@ const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'do', 'else', 'in'
 function stringLiterals(code) {
   const strings = [];
   const { length } = code;
-  const unescape = text => unescapeScript(text).replace(/\\(?:\r?\n|([\s\S]))/g, (escape, character) => character ?? '');
+  const unescape = text => unescapeScript(text).replace(/\\(?:\r?\n|([\s\S]))/g, (_escape, character) => character ?? '');
   const readQuoted = (start, quote) => {
     for (let index = start + 1; index < length; index += 1) {
       if (code[index] === '\\') index += 1;
