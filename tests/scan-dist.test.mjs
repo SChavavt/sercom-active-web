@@ -505,6 +505,23 @@ test('R-RULE-01: un prefijo de moneda antes de «$» es un precio en el texto, e
   }
 });
 
+test('R-RULE-01: dentro de una cadena de un script o de un JSON, «MX$350» es un precio aunque lo siga un signo', async () => {
+  // La excepción del código («$» pegado a un identificador) no vale dentro de una cadena: ahí todo es texto.
+  const texts = ['Desde MX$350 (IVA incluido)', 'Casco (MX$350)', 'MX$350; envío aparte', '¿Solo MX$350?', 'MX$350: lista', '(desde MX$ 350)'];
+  for (const text of texts) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': `el.textContent=${JSON.stringify(text)};` })), ['R-RULE-01'], `JS ${text}`);
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': `el.textContent=\`${text}\`;` })), ['R-RULE-01'], `plantilla ${text}`);
+    assert.deepEqual(failedIds(await scan({ 'datos.json': JSON.stringify({ t: text }) })), ['R-RULE-01'], `JSON ${text}`);
+  }
+  await assertEachFails('R-RULE-01', ['<script>el.textContent="Desde MX$350 (IVA incluido)";</script>', '<script>el.textContent="Casco (MX$350)";</script>', '<script type="application/json">{"t":"Casco (MX$350)"}</script>']);
+  // Fuera de las cadenas sigue la excepción del código; la cadena de reemplazo de .replace() y una expresión regular no son texto.
+  for (const content of ['var URL$1=globalThis.URL;function f(e){return e.$2}const a=$1;', 'a=b.replace(/x/,"MX$1");', 'const r=/^MX$/;', 'const q=/["\']/g;var A$1=2;A$1(q);', 'const t=`${a}`;var B$2=1;']) {
+    assert.deepEqual(failures(await scan({ '_astro/app.js': content })), [], content);
+  }
+  // Una dirección no es texto: «a$1» en un href no es un precio.
+  await assertNoneFails(['<script>$(1);var A$1=2;</script>', '<a href="/catalogo/?q=a$1">Catálogo</a>']);
+});
+
 test('R-RULE-01: «precio» con «por», «con», «de» o «para» y una palabra antes de la cifra, y las claves de precio en el código', async () => {
   await assertEachFails('R-RULE-01', [
     '<p>Precio por pieza 350.00</p>', '<p>Precio con IVA 350</p>', '<p>Precio de mayoreo 300</p>', '<p>Precio para mayoristas 300</p>', '<p>Costo por unidad 120</p>',

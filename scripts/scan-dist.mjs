@@ -69,6 +69,8 @@ const withoutScripts = html => html.replace(/<script\b[\s\S]*?<\/script>/gi, ' '
 const TEXT_ATTRIBUTES = /^(?:alt|title|aria-label|placeholder|content|value)$/i;
 // Atributos que no llevan texto: nombres de clase, geometría de SVG y similares.
 const NON_TEXT_ATTRIBUTES = /^(?:class|id|style|d|points|viewbox|transform|xmlns(?::\w+)?|width|height|x|y|x1|x2|y1|y2|cx|cy|r|rx|ry|fill|stroke|stroke-\w+|integrity|nonce|crossorigin|rel|type|charset|lang|dir|sizes|media|as|loading|decoding|fetchpriority|role|tabindex|hidden|aria-hidden|aria-labelledby|aria-describedby|aria-controls|aria-current|aria-expanded|for|name|method|target)$/i;
+// Atributos cuyo valor es una dirección.
+const URL_ATTRIBUTES = /^(?:href|xlink:href|src|srcset|action|formaction|poster|cite|ping|background|longdesc)$/i;
 /** Atributos de todas las etiquetas de un documento: [nombre, valor sin entidades]. */
 const attributesOf = html => [...html.matchAll(/<[a-zA-Z][^\s"'>/]*((?:"[^"]*"|'[^']*'|[^'">])*)>/g)]
   .flatMap(tag => [...tag[1].matchAll(/([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g)])
@@ -107,6 +109,109 @@ const scriptText = code => unescapeScript(code
   .replace(/\$\{\s*(["'])((?:(?!\1)[^\\])*)\1\s*\}/g, '$2')
   .replace(/\$\{[^{}`]*\}/g, '')
   .replace(/(["'`])\s*\+\s*(["'`])/g, '');
+// Lo que precede a la cadena de reemplazo de `.replace(…, "$1")`, que no es texto.
+const REPLACEMENT_BEFORE = /\.replace(?:All)?\(\s*(?:\/(?:\\.|[^/\\\n])+\/[a-z]*|[\w$.]+)\s*,\s*$/;
+// Antes de una «/» que abre una expresión regular hay un signo o una palabra clave; después de un nombre o de «)» es una división.
+const REGEX_AFTER_SIGN = /^[(,=:[!&|?{};+\-*%<>~^]$/;
+const REGEX_AFTER_WORD = new Set(['return', 'typeof', 'case', 'do', 'else', 'in', 'of', 'new', 'delete', 'void', 'throw', 'yield', 'await', 'instanceof']);
+/**
+ * Cadenas de un script o de un JSON (entre comillas simples, dobles o invertidas, también las piezas de una plantilla
+ * `…${x}…`), con sus escapes decodificados. Salta los comentarios y las expresiones regulares, y deja fuera la cadena
+ * de reemplazo de `.replace(…, "$1")`. Lo que está dentro de una cadena es texto, no código: la excepción de R-RULE-01
+ * para un «$» pegado a un identificador no le aplica.
+ * @param {string} code
+ * @returns {string[]}
+ */
+function stringLiterals(code) {
+  const strings = [];
+  const { length } = code;
+  const unescape = text => unescapeScript(text).replace(/\\(?:\r?\n|([\s\S]))/g, (escape, character) => character ?? '');
+  const readQuoted = (start, quote) => {
+    for (let index = start + 1; index < length; index += 1) {
+      if (code[index] === '\\') index += 1;
+      else if (code[index] === quote) return [code.slice(start + 1, index), index + 1];
+      else if (code[index] === '\n') return [undefined, index];
+    }
+    return [undefined, length];
+  };
+  const skipRegex = start => {
+    let inClass = false;
+    for (let index = start + 1; index < length; index += 1) {
+      const character = code[index];
+      if (character === '\\') index += 1;
+      else if (character === '[') inClass = true;
+      else if (character === ']') inClass = false;
+      else if (character === '/' && !inClass) return index + 1;
+      else if (character === '\n') return index;
+    }
+    return length;
+  };
+  // Lee código desde `index`; con `untilBrace`, hasta la «}» que cierra un `${`. Devuelve la posición siguiente.
+  const readCode = (start, untilBrace) => {
+    let depth = 0;
+    let previous = '';
+    let index = start;
+    while (index < length) {
+      const character = code[index];
+      if (/\s/.test(character)) {
+        index += 1;
+      } else if (character === '/' && code[index + 1] === '/') {
+        const end = code.indexOf('\n', index);
+        index = end < 0 ? length : end;
+      } else if (character === '/' && code[index + 1] === '*') {
+        const end = code.indexOf('*/', index + 2);
+        index = end < 0 ? length : end + 2;
+      } else if (character === '"' || character === "'") {
+        const [text, end] = readQuoted(index, character);
+        if (text !== undefined && !REPLACEMENT_BEFORE.test(code.slice(Math.max(0, index - 300), index))) strings.push(unescape(text));
+        index = end;
+        previous = 'x';
+      } else if (character === '`') {
+        let piece = '';
+        index += 1;
+        while (index < length && code[index] !== '`') {
+          if (code[index] === '\\') {
+            piece += code.slice(index, index + 2);
+            index += 2;
+          } else if (code[index] === '$' && code[index + 1] === '{') {
+            strings.push(unescape(piece));
+            piece = '';
+            index = readCode(index + 2, true);
+          } else {
+            piece += code[index];
+            index += 1;
+          }
+        }
+        strings.push(unescape(piece));
+        index += 1;
+        previous = 'x';
+      } else if (character === '/' && (previous === '' || REGEX_AFTER_SIGN.test(previous) || REGEX_AFTER_WORD.has(previous))) {
+        index = skipRegex(index);
+        previous = 'x';
+      } else if (/[\w$]/.test(character)) {
+        const word = code.slice(index).match(/^[\w$]+/)[0];
+        index += word.length;
+        previous = word;
+      } else {
+        if (character === '{') depth += 1;
+        if (character === '}') {
+          if (untilBrace && depth === 0) return index + 1;
+          depth -= 1;
+        }
+        index += 1;
+        previous = character;
+      }
+    }
+    return length;
+  };
+  readCode(0, false);
+  return strings.filter(text => text.trim());
+}
+/** Las cadenas de un script, separadas para que ningún patrón una dos cadenas en una frase. */
+const scriptStrings = code => {
+  const strings = stringLiterals(code);
+  return [...strings, ...strings.filter(text => text.includes('<')).map(withoutMarkup)].join('\n|\n');
+};
 /** Cadenas de `content:` de una hoja de estilo, con los escapes de CSS decodificados («\24 350» es «$350»). */
 const cssContent = css => [...css.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/(?<![\w-])content\s*:\s*([^;}]*)/gi)]
   .flatMap(match => [...match[1].matchAll(/"((?:[^"\\]|\\[\s\S])*)"|'((?:[^'\\]|\\[\s\S])*)'/g)].map(string => string[1] ?? string[2]))
@@ -199,12 +304,13 @@ const NOT_QUANTITY = `(?!\\d*(?:,\\d{3})*\\s*${QUANTITY_UNIT}\\b(?![^.!?;\\d]*\\
 // Palabras que, entre «precio por|con|de|para» y una cifra, hacen de la cifra un dato del producto («Precio para talla 9»).
 const NOT_PRICE_NOUN = '(?!(?:modelo|talla|tipo|clase|serie|nivel|numero|calibre|norma)\\b)';
 /**
- * Patrón de R-RULE-01. En el código de un script (`code: true`) un «$» pegado a una letra, a otro «$» o a «=» es
- * código («$2», «a$1», «x=$1»), no un precio, y un prefijo en mayúsculas solo cuenta si no es parte de un
- * identificador («URL$1=…»). En el texto visible, en los atributos y en las cadenas `content:` del CSS no hay excepción.
+ * Patrón de R-RULE-01. En el código de un script (`code: true`) un «$» pegado a una letra, a otro «$», a «=» o a un
+ * punto es código («$2», «a$1», «x=$1», «e.$2»), no un precio, y un prefijo en mayúsculas solo cuenta si no es parte
+ * de un identificador («URL$1=…»). En el texto visible, en los atributos, en las cadenas `content:` del CSS y en las
+ * cadenas de un script o de un JSON no hay excepción.
  */
 const pricePattern = ({ code }) => new RegExp([
-  new RegExp(`(?:${code ? '(?<![\\w$=])\\$' : '\\$'}|€|£|\\bMXN|\\bUSD|\\bEUR|\\bM\\.N\\.)\\s?\\d[\\d.,]*(?:\\s?(?:pesos|MXN|USD|M\\.N\\.))?`),
+  new RegExp(`(?:${code ? '(?<![\\w$=.])\\$' : '\\$'}|€|£|\\bMXN|\\bUSD|\\bEUR|\\bM\\.N\\.)\\s?\\d[\\d.,]*(?:\\s?(?:pesos|MXN|USD|M\\.N\\.))?`),
   // «MX$350» en una cadena de un script: un prefijo en mayúsculas que no continúa como identificador, llamada o asignación.
   ...(code ? [/(?<![\w$])(?-i:[A-Z]{1,3})\$\s?\d[\d.,]*(?![\w$]|[.,][A-Za-z_$]|\s*=(?!=)|\s*\(|\s*[;)}\]?:])/] : []),
   /\d[\d.,]*\s?(?:(?:pesos|dolares|dolar|euros?|dlls?|MXN|USD|EUR)\b|M\.N\b\.?|[€£])/,
@@ -228,10 +334,10 @@ const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 export const RULES = [
   rule('R-RULE-01', 'FAIL', 'words', PUBLIC_PRICE,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cifra seguida de una unidad de cantidad («100 piezas», «12 pares») no es un precio. En el código de un script, un «$» pegado a un identificador («$2», «a$1», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural y sin otra cifra en la misma frase («100 piezas o más», «12 pares»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
   rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
     'precio en el texto, en un atributo o en el CSS',
-    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos y en las cadenas `content:` del CSS, cualquier «$» seguido de una cifra es un precio («MX$350», «Desde MX$ 1,200»).'),
+    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (salvo los que son una dirección, como href o src), en las cadenas `content:` del CSS y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
   rule('R-RULE-01', 'FAIL', 'joined', VISIBLE_PRICE,
     'precio o descuento partido por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
@@ -719,7 +825,9 @@ export async function scanDist(directory, options = {}) {
       // Un atributo que guarda marcado («data-msg="Solicitud &lt;b&gt;enviada&lt;/b&gt;"») se lee también sin sus etiquetas.
       const attributeMarkup = otherAttributes.filter(value => value.includes('<')).map(withoutMarkup);
       readable = [text, ...otherAttributes, ...attributeMarkup, scripts, withoutMarkup(scripts), cssContent(styles)].join('\n');
-      visible = [text, ...otherAttributes, ...attributeMarkup, cssContent(styles)].join('\n');
+      // Una dirección («/catalogo/?q=a$1») no es texto: los atributos de dirección quedan fuera de `prose` (siguen en `words`).
+      const proseAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name) && !URL_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
+      visible = [text, ...proseAttributes, ...attributeMarkup, cssContent(styles), scriptStrings(inlineScripts(raw))].join('\n');
     } else if (extension === '.css') {
       readable = `${raw}\n${cssContent(raw)}`;
       visible = cssContent(raw);
@@ -728,6 +836,8 @@ export async function scanDist(directory, options = {}) {
       readable = `${scripts}\n${withoutMarkup(scripts)}`;
       visible = extension === '.svg' || extension === '.xml' ? visibleText(raw) : '';
       if (visible) readable += `\n${visible}`;
+      // Las cadenas de un script y los valores de un JSON son texto: se leen como `prose`.
+      if (/^\.(?:m?js|json|webmanifest)$/.test(extension)) visible = scriptStrings(raw);
     }
     const comparable = value => (isHtml ? withoutAllowed(oneLine(fold(value))) : withoutAllowed(fold(value)));
     const words = comparable(readable);
