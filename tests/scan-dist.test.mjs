@@ -552,6 +552,24 @@ test('R-RULE-24: un destino codificado más de una vez dentro de otra dirección
   await assertNoneFails([`<a href="https://l.example.com/?u=${encodeURIComponent(encodeURIComponent(WHATSAPP))}">WhatsApp</a>`]);
 });
 
+test('R-RULE-29: colores de la paleta anterior en setProperty, constantes y claves de color, animaciones de SVG y atributos de color antiguos', async () => {
+  for (const content of ["el.style.setProperty('--marca','#0e2a3e');", "el.style.setProperty('--x', '#00a6e4');", "const NAVY='#0e2a3e';el.style.color=NAVY;", "const tema={primary:'#00a6e4'};",
+    'const brand="#0e2a3e";', 'var c={accent:"#00a4e6",bg:"#0e2a3e"};']) {
+    assert.deepEqual(failedIds(await scan({ '_astro/app.js': content })), ['R-RULE-29'], content);
+  }
+  assert.deepEqual(failedIds(await scan({ 'img/a.svg': '<svg xmlns="http://www.w3.org/2000/svg"><rect><animate attributeName="fill" to="#0e2a3e"/></rect></svg>' })), ['R-RULE-29']);
+  await assertEachFails('R-RULE-29', [
+    '<svg><rect><set attributeName="fill" to="#0e2a3e"/></rect></svg>', '<svg><rect><animate attributeName="fill" from="#00a6e4" to="#fff"/></rect></svg>',
+    '<svg><rect><animate attributeName="fill" values="#fff;#0e2a3e"/></rect></svg>', '<table bordercolor="#0e2a3e"><tr><td>x</td></tr></table>',
+    '<table bgcolor="#0e2a3e"><tr><td>x</td></tr></table>', '<font color="#00a6e4">x</font>',
+  ]);
+  // Un ancla, un identificador o un dato con forma de color, fuera de un nombre de color, siguen limpios.
+  await assertNoneFails(['<a href="#00a6e9">Ir</a><p id="00a6e9">Texto</p>', '<svg><a href="#00a6e9"><text>x</text></a></svg>']);
+  for (const [path, content] of [['datos.json', '{"x":"#0e2a40"}'], ['_astro/app.js', 'const ancla="#00a6e9";'], ['_astro/app.js', "el.style.setProperty('--ancho','12px');location.hash='#00a6e9';"]]) {
+    assert.deepEqual(failures(await scan({ [path]: content })), [], content);
+  }
+});
+
 test('R-RULE-11: sin atención presencial confirmada no hay dirección, mapa ni invitación a visitar', async () => {
   const bodies = ['<p>Visítanos</p>', `<p>${data.business.address}</p>`, '<p>C.P. 72090</p>', '<iframe src="https://www.google.com/maps/embed"></iframe>', '<a href="https://maps.app.goo.gl/abc">Cómo llegar</a>'];
   await assertEachFails('R-RULE-11', bodies);
