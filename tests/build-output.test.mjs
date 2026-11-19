@@ -161,7 +161,7 @@ test('vista previa (control): los mismos archivos sí contienen los diez ejemplo
 test('vista previa: la búsqueda del navegador sobre los data-search compilados da los productos esperados', () => {
   // El mismo camino que el script de la página: el atributo escrito en el HTML (con sus entidades), leído como lo
   // devuelve getAttribute, y la consulta leída de la dirección con URLSearchParams. Lo esperado está escrito a mano.
-  const decode = text => text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos|#39));/gi, (entity, decimal, hex, name) => (
+  const decode = text => text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos|#39));/gi, (_entity, decimal, hex, name) => (
     decimal ? String.fromCodePoint(Number(decimal)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }[name.toLowerCase()]));
   const index = builds.preview.files.get('index.html');
   const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }));
