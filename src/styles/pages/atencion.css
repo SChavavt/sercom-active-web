@@ -48,7 +48,9 @@
 .atencion__col > :last-child { flex: 1; }
 .atencion__enough { padding: var(--s-6) var(--pad); background: var(--surface); font-size: 1.0625rem; text-wrap: pretty; }
 
-/* Celda lateral con una entrada breve arriba y una fila de acción abajo (como PageHeader) */
+/* Celda con una entrada breve arriba y una fila de acción abajo (como PageHeader). En «Atención con …» es la
+   celda de 5 columnas a la izquierda de los datos, como la entrada de la portada: la entrada crece y la fila queda
+   abajo, así la celda llena el alto de la fila de la lámina sin dejar azul */
 .atencion__side { display: flex; flex-direction: column; gap: var(--line); }
 .atencion__intro { flex: 1; padding: var(--s-9) var(--pad) var(--s-7); background: var(--surface); }
 .atencion__intro .t-lead { max-width: 30ch; }

@@ -60,12 +60,14 @@ const items = [
     <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
       <Monogram slot="side" />
     </SectionHead>
+    {/* Como en la portada y en Contacto: la entrada en 5 columnas y los datos a la derecha en 7; en tableta y
+        celular se apilan en el mismo orden */}
     <div class="grid12">
-      <ContactData class="span-8 span-md-12" whatsappHref={list.whatsapp} mailHref={list.mailto} />
-      <div class="atencion__side span-4 span-md-12">
+      <div class="atencion__side span-5 span-md-12">
         <div class="atencion__intro"><p class="t-lead">Conoce las categorías y las marcas que manejamos.</p></div>
         <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
       </div>
+      <ContactData class="contact__data span-7" whatsappHref={list.whatsapp} mailHref={list.mailto} />
     </div>
   </section>
 </BaseLayout>
