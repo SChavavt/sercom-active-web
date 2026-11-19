@@ -157,6 +157,18 @@ test('R-STATE-04a: una página de producto es ficha o retirado; el aviso no apar
   assert.deepEqual(await check({ 'categorias/manos/index.html': doc('Categoría', '<h1>Categoría</h1><p>Si un producto retirado te interesa, escríbenos.</p>') }, ['R-STATE-04a']), []);
 });
 
+test('R-STATE-04a: una palabra partida por etiquetas en línea («Produc<b>to</b> retirado») sigue siendo el aviso', async () => {
+  // Los casos de la revisión final: el texto se compara sin mayúsculas, acentos, puntuación ni límites de elementos,
+  // así que una palabra partida por dentro se reconoce, en una página que no es de producto y en una ficha.
+  for (const html of ['<p>Produc<b>to</b> retirado</p>', '<p class="tag">Produc<span>to</span> reti<b>rado</b></p>', '<span>P<i>ro</i>duc<b>to</b> <em>re</em>tirado</span>']) {
+    await assertEachBreaks('R-STATE-04a', [[doc('Contacto', `<h1>Contacto</h1>${html}`), /no es la de un producto/]], 'contacto/index.html');
+    await assertEachBreaks('R-STATE-04a', [[fichaPage(html), /es una ficha o la de un retirado, no las dos/]], 'productos/guante/index.html');
+  }
+  // En la página de un producto, la etiqueta partida (aquí sin la celda .producto__retired, que ya la marcaría) también
+  // la marca como la de un retirado.
+  assert.deepEqual(await check({ 'productos/retirado/index.html': retiredPage({ notice: `<div class="cell"><p class="eyebrow label">Produc<b>to</b> retirado</p>${LEAD}${TEXT}</div>` }) }, ['R-STATE-04a']), []);
+});
+
 test('isRetiredPage: la etiqueta partida o con puntuación también marca la página', () => {
   const label = { name: 'p', attributes: new Map([['class', 'eyebrow label']]), children: [], text: ['Producto'], content: ['Producto'], parent: null, order: 1 };
   const bold = { name: 'b', attributes: new Map(), children: [], text: ['retirado.'], content: ['retirado.'], parent: label, order: 2 };
