@@ -306,8 +306,7 @@
   .dock__link--wa { background: var(--blue); color: var(--white); }
   .dock__link--wa .icon { color: var(--white); }
   .dock__link:focus-visible { outline-offset: -3px; }
-  .dock__link[aria-current="page"] { position: relative; }
-  .dock__link[aria-current="page"]::after { content: ""; position: absolute; left: var(--s-3); right: var(--s-3); bottom: 0; height: 4px; background: var(--blue); }   /* en /cotizar/, como la barra bajo el enlace actual */
+  .dock__link[aria-current="page"] { box-shadow: inset 0 -4px 0 var(--blue); }   /* en /cotizar/: barra azul abajo, como bajo el enlace actual */
   .dock__link--wa:focus-visible { outline-color: var(--white); }
 }
 
@@ -404,10 +403,10 @@
   :where(.icon) { forced-color-adjust: auto; }
 
   /* ubicación actual: la barra bajo el enlace se pinta con el color del texto; las barras hechas con sombra
-     (filas de tableta y celular, categoría actual, bloque Cotizar en /cotizar/) pasan a borde */
-  .nav__link::after, .dock__link[aria-current="page"]::after { forced-color-adjust: none; background: CanvasText; }
+     (filas de tableta y celular, categoría actual, bloque Cotizar y barra fija en /cotizar/) pasan a borde */
+  .nav__link::after { forced-color-adjust: none; background: CanvasText; }
   .catpanel__link[aria-current] { border-left: 4px solid CanvasText; }
-  .masthead__cta[aria-current="page"] { border-bottom: 4px solid CanvasText; }
+  .masthead__cta[aria-current="page"], .dock__link[aria-current="page"] { border-bottom: 4px solid CanvasText; }
 
   /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
   .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }
