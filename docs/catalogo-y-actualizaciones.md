@@ -22,7 +22,7 @@ Cada producto de `catalog.json` es un objeto con estos campos y ningún otro (un
 | `status` | Estado editorial | `draft`, `in_review`, `approved` o `retired` (sección 4). |
 | `description` | Resumen | Texto. Obligatorio para `approved`. |
 | `characteristics` | Características verificadas | Lista de textos; de 3 a 5 para `approved`. |
-| `saleUnit` | Unidad de venta (`par`, `pieza`, `caja`…) | Obligatoria para `approved`. |
+| `saleUnit` | Unidad de venta (`par`, `pieza`, `caja`…) | Obligatoria para `approved`. Corta y en singular (sección 6). |
 | `variants` | Tallas, colores o presentaciones | Lista de `{ id, label, manufacturerCode }`: `id` en el formato de arriba y único en la ficha, etiqueta y código del fabricante no vacíos. |
 | `image` | Fotografía | `{ url, alt, sourceUrl, usageConfirmed }`: `url` y `sourceUrl` con `https`, texto alternativo, y `usageConfirmed: true`. Obligatoria para `approved`. |
 | `source` | Fuente revisada | `{ url, checkedOn }`: `https` y fecha `AAAA-MM-DD` válida. Obligatoria para `approved`. |
@@ -48,7 +48,7 @@ Lo que el validador no revisa todavía: el texto de los campos de producto frent
 4. Revisar el uso de la imagen y de los documentos: no se asumen derechos por estar disponibles en Internet. Registrar `image.sourceUrl` y poner `usageConfirmed: true` solo con el uso confirmado.
 5. Con la revisión del contacto comercial, registrar `approval` (`by`, `on`, `supplyConfirmed: true`) y pasar a `approved`. Si su categoría sigue en borrador, aprobarla también (ver [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría)).
 6. Actualizar las pruebas que fijan «ningún producto real». Hoy varias pruebas dan por hecho que el catálogo real no tiene fichas y que las categorías están en borrador, y algunas agregan una ficha de prueba a una copia del catálogo real esperando conteos fijos: aprobar el primer producto (con su categoría) hace fallar pruebas de `tests/categories.test.mjs`, `tests/site-data.test.mjs`, `tests/build-output.test.mjs`, `tests/scan-dist.test.mjs`, `tests/retired-products.test.mjs` y `tests/text-search.test.mjs` (la lista, en [`datos-y-modos.md`](datos-y-modos.md#62-pruebas)). Se corrigen en el mismo cambio, de modo que sigan probando la regla con el catálogo que haya; conviene hacerlo una vez, al cargar el primer producto del piloto, para que dependan menos de los datos.
-7. Ejecutar `npm run check`, `npm test` y `npm run verify`, revisar la diferencia y la página generada en la compilación de producción (`npm run build` y `npm run preview`). Con el primer producto aparece también la búsqueda del encabezado.
+7. Ejecutar `npm run check` y las pruebas que cambiaron, revisar la diferencia y la página generada en la compilación de producción (`npm run build` y `npm run preview`); la batería completa y `npm run verify` corren en GitHub con la solicitud de cambios. Con el primer producto aparecen también la búsqueda del encabezado, los filtros del catálogo y «Agregar a mi cotización».
 8. Integrar el cambio en `main`. Cuando haya alojamiento conectado, su compilación publicará el cambio (hoy no hay ninguno).
 
 `getPublishedProducts` entrega a las páginas solo lo público (sin aprobación, fuente ni uso de imagen). Un campo booleano no sustituye la revisión humana ni confirma inventario.
@@ -72,10 +72,12 @@ Quien guardó el enlace de una ficha, escaneó una cotización o conserva un men
 **Cómo retirar un producto.**
 
 1. En `src/data/catalog.json`, cambiar su `status` a `retired` y **conservar** su bloque `approval`.
-2. Ejecutar `npm run check`, `npm test` y `npm run verify`.
+2. Ejecutar `npm run check` y las pruebas de lo que cambió; la batería completa y `npm run verify` corren en GitHub con la solicitud de cambios.
 3. Su dirección `/productos/{id}/` sigue funcionando y pasa a ser la página informativa; el producto sale de listados, conteos, búsqueda, «Productos del catálogo» y «Más productos…».
 
 Solo si el producto debe desaparecer por completo (su dirección da 404) se quita también `approval`. Volver a publicarlo es devolverlo a `approved` con sus datos completos.
+
+**Qué pasa con la lista de un visitante.** Un visitante puede tener el producto guardado en «Mi cotización» (en su navegador; el sitio no lo sabe ni puede cambiarlo). Mientras el retirado conserve su página, «Cotizar mi lista» lo muestra con su nombre y «Producto retirado: no se incluye en tu mensaje.», con «Quitar»; no va en el mensaje. Si además se quita `approval`, la página ya no lo conoce: queda entre los productos que no ubica, con «Quitarlo de mi cotización», y tampoco va en el mensaje. En los dos casos el renglón guardado no se borra hasta que el visitante lo quita. Lo mismo pasa con una variante que se borra de una ficha: el renglón que la tenía elegida queda entre los que la página no ubica. Por eso una variante no se borra ni cambia de `id` para corregir su etiqueta: se corrige la etiqueta ([`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador)).
 
 **Qué muestra la página.** La ruta, el pictograma de su categoría (nunca una fotografía), la categoría pública y el nombre (H1), las filas Marca y Código, el aviso «Producto retirado» con «Este producto ya no forma parte del catálogo.» y «Dinos qué necesitas y revisamos alternativas.», las acciones «Consultar alternativas» (WhatsApp) y «Consultar por correo» con el borrador de alternativas, la banda de solicitud especial y «Más productos…». Su título es «{nombre} (producto retirado) · Sercom Active».
 
@@ -89,7 +91,8 @@ Solo si el producto debe desaparecer por completo (su dirección da 404) se quit
 
 - **Imágenes.** Hoy una ficha aprobada tiene una sola fotografía, con dirección absoluta `https`, que la página usa tal cual dentro de un marco de proporción fija. **Pendiente para el paso 3:** ampliar el esquema de imagen (archivo local optimizado o dirección absoluta, con ancho y alto) con sus pruebas, antes de cargar el piloto. No se diseña una galería de varias fotografías mientras el modelo de datos no la admita.
 - **Documentos.** Cada documento se enlaza a su origen (`https`) y se abre en otra pestaña. Sin documentos, la ficha ofrece «Solicitar ficha técnica» por WhatsApp. Los PDF de fabricantes no se copian a `public/`.
-- **Variantes.** Se guardan dentro de su ficha con el código original del fabricante. Se muestran como información (no se eligen: eso llega en el paso 2) y la búsqueda encuentra sus códigos.
+- **Variantes.** Se guardan dentro de su ficha con el código original del fabricante. En la ficha se listan como información y, con JavaScript, se eligen en «Agregar a mi cotización» («Talla o color por definir» o una variante; con una sola variante no hay que elegir). La búsqueda encuentra sus códigos. El `id` de una variante es lo que guarda la lista del visitante: no se cambia una vez publicada.
+- **Unidad de venta (`saleUnit`).** Se escribe corta y en singular («par», «pieza», «caja»), o con una palabra de unidad seguida de su contenido («caja con 100 piezas»). Es lo que el visitante ve elegido en la unidad de «Agregar a mi cotización», junto a pieza, par, caja y paquete, y lo que lee el mensaje con la cantidad («12 pares», «3 cajas con 100 piezas»). Las palabras de unidad conocidas (pieza, par, caja, paquete, bolsa, rollo, juego, kit, metro, litro, galón, cubeta, docena, millar, unidad) se reconocen en singular y en plural y sin distinguir mayúsculas: «pares» y «par» son la misma unidad, y dos renglones del mismo producto con una y otra son iguales. Con otra primera palabra, la unidad se deja como está y el número se separa («3 × tambo de 200 L»). Mide como máximo 60 caracteres.
 
 ## 7. Identidad de un producto
 
@@ -112,3 +115,21 @@ Reglas para el futuro conector:
 - No convertir un catálogo actualizado en una promesa de existencia, precio o entrega.
 
 Las credenciales, costos de proveedor, archivos de clientes y adjuntos no se agregan a Git ni a `public/`. `private-imports/` está excluida del repositorio como ubicación local temporal, no como respaldo durable.
+
+## 9. Cómo busca el catálogo
+
+La búsqueda del catálogo (`src/lib/search.mjs`, con pruebas en `tests/search-words.test.mjs`, `tests/text-search.test.mjs` y `tests/catalog-search.test.mjs`) lee de cada producto el nombre, la marca, el código, los códigos de variante y los nombres de sus categorías, sin distinguir mayúsculas ni acentos y con los códigos también sin separadores («37175» encuentra «37-175»). Un producto aparece si tiene **todas** las palabras de la búsqueda. Cada palabra coincide de una de estas formas:
+
+1. **Tal como se escribió**, en cualquier parte del texto («guant» encuentra «Guante»), o en su forma de código sin separadores.
+2. **En singular.** Una palabra hecha solo de letras se busca también en singular, con la primera de estas reglas que aplique: termina en «ces» y tiene al menos 5 letras → «z» y la palabra sin su última «s» («lapices» → «lapiz» y «lapice»); termina en «es» después de «l», «r», «n», «d», «s», «j» o «y», y le quedan al menos 3 letras → sin «es» («overoles» → «overol», «tapones» → «tapon»); termina en «s» pero no en «is» ni en «us», y le quedan al menos 3 letras → sin la «s» («guantes» → «guante»). Un código no tiene singular.
+3. **Con un sinónimo revisado.** Tres grupos de palabras que un cliente usa para lo mismo al buscar (`SEARCH_SYNONYMS`): «lente» y «gafa»; «bota» y «calzado»; «orejera», «auditiva» y «auditivo». «gafas» encuentra un «Lente…». No son equivalencias técnicas entre productos.
+
+**Exactitud según el largo.** Una forma en singular o un sinónimo es más corto que lo escrito y podría aparecer por casualidad dentro de otra palabra, así que cuanto más corto, más exacto debe ser:
+
+- 5 letras o más: en cualquier parte del texto («guantes» → «guante» encuentra «Sobreguante»);
+- 4 letras: al principio de una palabra («micas» → «mica» encuentra «Mica clara» y no «Protección química»);
+- 3 letras: la palabra completa, sola o seguida de «e» («pares» → «par» encuentra «Par …» y no «para»; «bases» → «bas» encuentra «Base» y no «Bastón»).
+
+**Agregar un sinónimo.** Un grupo nuevo, o una palabra nueva en un grupo, necesita la revisión de la persona de ventas: tiene que ser una palabra que los clientes usan para buscar lo mismo, no una equivalencia técnica. Se escribe ya normalizada (sin acentos, en minúsculas y en singular) en `SEARCH_SYNONYMS` de `src/lib/search.mjs`, se agregan a `tests/search-words.test.mjs` un caso que encuentra y otro que no debe encontrar (una palabra que contenga el sinónimo por casualidad), y se revisa la búsqueda en la vista previa.
+
+**Al cargar productos reales.** Los nombres deben llevar las palabras que un cliente busca («Guante de nitrilo», no solo el código), y las categorías también se buscan por su nombre. Un plural irregular o una palabra con otra terminación que la búsqueda no lleva al singular se encuentra escribiendo su raíz. Una búsqueda mide como máximo 200 caracteres. Sin resultados, el catálogo ofrece «Solicitar este producto» con lo buscado.
