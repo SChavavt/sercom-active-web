@@ -14,7 +14,14 @@
  */
 import { cleanQuery, normalizeText } from './text.mjs';
 
-/** Clave de `localStorage` de la lista: `{ v: 1, lines: [{ productId, variantId, quantity, unit }] }`. */
+/**
+ * Clave de `localStorage` de la lista: `{ v: 1, lines: [{ productId, variantId, quantity, unit }] }`.
+ * La clave y el formato cambian JUNTOS. Una página de una compilación anterior puede seguir abierta en otra pestaña: lo
+ * que no sabe leer (otra versión, un renglón con otra forma, una cantidad o un número de renglones por encima de su
+ * máximo) lo cuenta como si no estuviera (`parseList`) y se pierde la siguiente vez que el visitante cambia su lista en
+ * esa página. Por eso un cambio de lo que un renglón guardado puede llevar, o subir `MAX_LINES` o `MAX_QUANTITY`, usa
+ * una clave nueva (`cotizacion:v2`) que lee la anterior para pasarla: la página vieja nunca toca datos que no entiende.
+ */
 export const QUOTE_STORAGE_KEY = 'cotizacion:v1';
 /** Clave de `sessionStorage` de lo que el visitante escribe en «Cotizar mi lista». */
 export const QUOTE_DRAFT_KEY = 'cotizacion:borrador:v1';
@@ -221,6 +228,9 @@ function validLines(lines) {
  * La lista leída del almacenamiento (el texto guardado, o `null`). Siempre devuelve una lista y nunca lanza: un JSON
  * inválido, otra forma u otra versión dan `[]`. Conserva los renglones válidos en su orden, cada uno con sus cuatro
  * campos, hasta `MAX_LINES` (los primeros). NO une renglones iguales ni cambia ningún valor.
+ * Lo que no se puede leer cuenta como si no estuviera: la página no lo muestra y el siguiente cambio del visitante lo
+ * reemplaza. Solo este código escribe la clave, siempre con renglones válidos; lo demás llega de fuera (una edición a
+ * mano, una extensión del navegador) o de otro formato, que por regla usa otra clave (ver `QUOTE_STORAGE_KEY`).
  * @param {unknown} raw
  * @returns {QuoteLine[]}
  */

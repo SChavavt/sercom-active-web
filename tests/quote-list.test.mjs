@@ -46,10 +46,13 @@ const index = buildQuoteIndex(publicProducts, publicRetired);
 const maps = indexMaps(index);
 
 test('constantes de la lista', () => {
+  // La clave y el formato cambian juntos (quote-list.mjs lo explica junto a la clave): una página de una compilación
+  // anterior, abierta en otra pestaña, descarta al escribir lo que no sabe leer.
+  const rule = 'si cambia lo que un renglón guardado puede llevar o sube un máximo, cambia también QUOTE_STORAGE_KEY';
   assert.equal(QUOTE_STORAGE_KEY, 'cotizacion:v1');
   assert.equal(QUOTE_DRAFT_KEY, 'cotizacion:borrador:v1');
-  assert.equal(MAX_LINES, 200);
-  assert.equal(MAX_QUANTITY, 99999);
+  assert.equal(MAX_LINES, 200, rule);
+  assert.equal(MAX_QUANTITY, 99999, rule);
   assert.deepEqual(STANDARD_UNITS, ['pieza', 'par', 'caja', 'paquete']);
   assert.deepEqual(DRAFT_LIMITS, { note: 10000, delivery: 200, date: 200 });
   assert.ok(Object.isFrozen(STANDARD_UNITS) && Object.isFrozen(DRAFT_LIMITS));
