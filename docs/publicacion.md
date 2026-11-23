@@ -4,7 +4,7 @@ Qué se ejecuta antes de proponer un cambio, qué debe ejecutar un alojamiento, 
 
 ## 1. Repositorio y comprobaciones locales
 
-Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El trabajo del paso 1 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios (pull request) n.º 1, en borrador; `main` todavía no lo tiene.
+Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 2, en borrador; `main` todavía no lo tiene.
 
 ```bash
 git clone https://github.com/SChavavt/sercom-active-web.git
@@ -15,7 +15,7 @@ npm test          # pruebas
 npm run verify    # compila producción y vista previa y revisa reglas, enlaces y marcado en ambas
 ```
 
-Se necesita Node.js 24 (`.nvmrc`). Para aportar cambios se crea una rama, se ejecutan las tres comprobaciones y se revisa el resultado de GitHub Actions (`.github/workflows/quality.yml`), que repite `check`, `test`, `build` y `verify` en cada solicitud de cambios y en cada envío a `main`. Actions no publica nada ni consulta proveedores. Qué revisa cada comprobación: [`datos-y-modos.md`](datos-y-modos.md#6-las-protecciones).
+Se necesita Node.js 24 (`.nvmrc`). Para aportar cambios se crea una rama y se revisa el resultado de GitHub Actions (`.github/workflows/quality.yml`, flujo «Verificar catálogo y sitio»), que ejecuta `check`, `test`, `build` y `verify` en cada solicitud de cambios y en cada envío a `main`. Por decisión de quien dirige el proyecto del 23 de noviembre de 2026, la batería completa y la verificación completa corren ahí; en la computadora se ejecutan `npm run check`, los archivos de prueba de lo que cambió y las compilaciones que haga falta para revisar en el navegador. Actions no publica nada ni consulta proveedores. Qué revisa cada comprobación: [`datos-y-modos.md`](datos-y-modos.md#6-las-protecciones).
 
 El PDF del plan y las fuentes públicas se incluyen por confirmación del propietario. No se agregan contraseñas, tokens, archivos de clientes ni condiciones comerciales privadas.
 
@@ -74,6 +74,18 @@ Ningún punto se hace antes de que el propietario apruebe publicar.
 **Cambiar las comprobaciones:** agregar `--launch` al escáner de producción en `npm run verify` (`package.json`), en `vercel.json` y en la orden de compilación del alojamiento (`node scripts/scan-dist.mjs dist --strict --launch`). Sin `--launch` el escáner exige el `noindex`, el `robots.txt` bloqueante y el aviso (R-RULE-12); con `--launch` exige lo contrario y falla mientras quede cualquiera de los tres, el aviso también oculto (R-PUB-03). Revisar entonces también `--strict` si ya hay normas con fuente (paso 3). En el mismo cambio se actualizan las dos pruebas de `tests/build-mode.test.mjs` que fijan la orden de `npm run verify` y el `buildCommand` de `vercel.json` ([`datos-y-modos.md`](datos-y-modos.md#62-pruebas)); si no, `npm test` falla.
 
 **Probar:** compilar con `SITE_URL`, ejecutar las comprobaciones, revisar el sitio en computadora, tableta y celular, abrir un borrador de WhatsApp y uno de correo desde un teléfono real y confirmar que llegan a la persona de contacto. Documentar en `ESTADO.md` cómo volver a la versión anterior en el alojamiento elegido.
+
+**Probar en teléfonos y navegadores reales lo del paso 2.** Nada de esto se ha probado todavía ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)); el resultado se anota en `ESTADO.md`:
+
+1. Una lista larga enviada por WhatsApp desde un Android y desde un iPhone, y por correo con Outlook en una computadora: que el mensaje llegue entero a la persona de contacto, con una lista que todavía cabe en un enlace y con una que ya no cabe (la página pide copiarla). Con lo que se mida, ajustar `LINK_LIMITS` en `src/lib/contact-core.mjs` (hoy 1,900 caracteres por canal, un límite conservador que no se midió contra ninguna aplicación).
+2. «Copiar solicitud» y pegar la solicitud en WhatsApp y en un correo, en esos mismos teléfonos y en la computadora.
+3. Que la lista siga ahí después de cerrar y volver a abrir el navegador.
+4. En Safari de un iPhone, la lista después de ocho días sin visitar el sitio: si se borró, como se espera, que la página de privacidad y [`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador) ya lo digan (hoy la página de privacidad dice «si pasan varios días»).
+5. Firefox y Safari en computadora, un lector de pantalla real y los colores forzados de un Windows real, en las páginas del paso 2.
+
+**La página de privacidad la revisa la empresa.** El texto de `/privacidad/` dice qué guarda el navegador y qué no sale de él, pero es un borrador y no es el aviso de privacidad de la empresa: la empresa lo revisa, y entrega su aviso, antes de publicar.
+
+**Política de referencia (`Referrer-Policy`).** En la ficha, «Catálogo» de la ruta regresa a los resultados de los que se llegó leyendo la dirección de la página anterior ([`diseno.md`](diseno.md#10-scripts-del-navegador)). Si el alojamiento envía una cabecera `Referrer-Policy`, debe ser `same-origin` o `strict-origin-when-cross-origin` (el valor por omisión de los navegadores, que hoy se usa porque el sitio no fija ninguna). Con `no-referrer`, `origin` o `strict-origin`, el regreso a los resultados desaparece sin ningún aviso: el enlace lleva al catálogo completo, y solo el botón Atrás sigue regresando a los resultados.
 
 **Por comprobar en el alojamiento elegido** (no hay procedimiento escrito todavía, porque no existe la cuenta): cómo se vuelve a un despliegue anterior y quién puede hacerlo; que una dirección desconocida reciba la página `404.html` con estado 404; y cómo trata las direcciones sin diagonal final, ya que el sitio usa `trailingSlash: 'always'` (`/catalogo/`) y cada página es un `index.html` dentro de su carpeta. El resultado se anota en `ESTADO.md` antes de imprimir el QR.
 
