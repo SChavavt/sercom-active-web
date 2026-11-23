@@ -1,0 +1,27 @@
+---
+// Preguntas frecuentes (`.faq`): un elemento <details> por pregunta, nativo (funciona sin JavaScript y con
+// teclado). El signo + se vuelve − sobre azul sólido al abrir. La primera pregunta empieza abierta.
+import Icon from './Icon.astro';
+
+interface Props {
+  items: readonly { question: string; answer: string }[];
+  /** Abre la primera pregunta al cargar (por omisión, sí). */
+  openFirst?: boolean;
+  /** Nivel de cada pregunta; 3 por omisión. */
+  headingLevel?: 2 | 3 | 4;
+}
+
+const { items, openFirst = true, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
+---
+<div class="faq">
+  {items.map((item, index) => (
+    <details class="faq__item" open={openFirst && index === 0}>
+      <summary class="faq__q">
+        <Heading class="t-h3">{item.question}</Heading>
+        <span class="faq__sign" aria-hidden="true"><Icon name="plus" class="icon--plus" /><Icon name="minus" class="icon--minus" /></span>
+      </summary>
+      <p class="faq__a">{item.answer}</p>
+    </details>
+  ))}
+</div>

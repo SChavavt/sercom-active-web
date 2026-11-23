@@ -1,0 +1,40 @@
+---
+// Celdas de marca (`.brands`): los nombres de las marcas como texto, en un solo tratamiento tipográfico
+// (nunca logotipos de terceros), cuatro por fila en computadora. Cada celda lleva a la página de la marca.
+// `allLink` agrega al final la celda azul «Ver todas las marcas» (en la portada; no en /marcas/).
+// `counts` muestra bajo el nombre cuántos productos tiene la marca («3 productos», «1 producto»); con cero
+// no se muestra ningún número (/marcas/).
+// Si la última fila queda incompleta, una celda blanca la completa (cuatro por fila desde 700 px, dos en
+// celular): nunca queda a la vista el azul del fondo.
+// `currentId` marca la marca de la página en que se está (la página de una marca): su celda lleva
+// aria-current="page" y el cuadro azul de 10 px en el margen izquierdo (`.brand__mark`, el mismo de la fila
+// actual de la barra del catálogo); el nombre no se mueve. Sin `currentId` el marcado no cambia.
+import type { PublicBrand } from '../types/site.ts';
+import { fillSpans } from '../lib/grid-fill.mjs';
+import Icon from './Icon.astro';
+
+interface Props {
+  brands: readonly PublicBrand[];
+  /** Celda final en azul sólido. */
+  allLink?: { href: string; label: string };
+  /** `lg`: celdas de 96 px de alto (página de marcas). */
+  size?: 'md' | 'lg';
+  /** Muestra el número de productos de cada marca que tiene alguno. */
+  counts?: boolean;
+  /** Id de la marca de la página actual: su celda se marca. */
+  currentId?: string;
+}
+
+const { brands, allLink, size = 'md', counts = false, currentId } = Astro.props;
+const countLabel = (count: number) => `${count} ${count === 1 ? 'producto' : 'productos'}`;
+const cells = brands.length + (allLink ? 1 : 0);
+const [fillWide = 0] = fillSpans(cells, 3);        // desde 700 px: cuatro celdas de 3 columnas por fila
+const [fillNarrow = 0] = fillSpans(cells, 6);      // celular: dos por fila (la celda toma span 6 con las demás)
+---
+<ul class:list={['brands', 'grid12', { 'brands--lg': size === 'lg' }]}>
+  {brands.map(brand => (
+    <li class="span-3"><a class="brand cell-link" href={brand.url} aria-current={currentId !== undefined && brand.id === currentId ? 'page' : undefined}>{currentId !== undefined && brand.id === currentId && <span class="brand__mark" aria-hidden="true"></span>}<span>{brand.name}{counts && brand.productCount > 0 && <span class="brand__count label">{countLabel(brand.productCount)}</span>}</span><Icon name="arrow-right" class="icon--18" /></a></li>
+  ))}
+  {allLink && <li class="span-3"><a class="brand brand--all cell-link" href={allLink.href}><span>{allLink.label}</span><Icon name="arrow-right" class="icon--24" /></a></li>}
+  {fillWide > 0 && <li class:list={['brands__fill', `span-${fillWide}`, { 'brands__fill--even': fillNarrow === 0 }]} aria-hidden="true"></li>}
+</ul>

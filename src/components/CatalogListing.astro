@@ -1,0 +1,31 @@
+---
+// Cuerpo de las páginas de listado (catálogo, categoría y marca): una fila de la lámina con la barra lateral
+// (CatalogNav, 3 columnas) y el área de productos (9 columnas, CatalogGrid). En tableta y celular la barra
+// se vuelve dos filas plegables sobre las tarjetas.
+// El slot va dentro del área de productos, después de la retícula: el catálogo pone ahí el estado
+// «sin resultados» de la búsqueda (oculto hasta que el script lo muestra).
+// Solo se usa cuando hay productos que listar; una página sin productos muestra EmptyState a todo lo ancho.
+//
+// Uso:  <CatalogListing products={list} categories={categories} brands={brands} currentBrandId={brand.id} />
+import type { PublicBrand, PublicCategory, PublicProduct } from '../types/site.ts';
+import CatalogGrid from './CatalogGrid.astro';
+import CatalogNav from './CatalogNav.astro';
+
+interface Props {
+  products: readonly PublicProduct[];
+  categories: readonly PublicCategory[];
+  brands: readonly PublicBrand[];
+  currentCategoryId?: string;
+  currentBrandId?: string;
+}
+
+const { products, categories, brands, currentCategoryId, currentBrandId } = Astro.props;
+---
+<div class="catalog-body grid12">
+  <CatalogNav class="span-3 span-md-12" categories={categories} brands={brands} currentCategoryId={currentCategoryId} currentBrandId={currentBrandId} />
+  <section class="catalog-body__results span-9 span-md-12" aria-labelledby="productos-title">
+    <h2 class="vh" id="productos-title">Productos</h2>
+    <CatalogGrid products={products} />
+    <slot />
+  </section>
+</div>

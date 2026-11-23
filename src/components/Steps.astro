@@ -1,0 +1,30 @@
+---
+// Pasos numerados (`.steps`): una celda por paso con el número grande en azul y el texto; flecha entre pasos.
+// El número grande es decorativo; los lectores de pantalla leen «1. », «2. »… antes de cada texto.
+// Pensado para tres. Hasta cuatro pasos van en una fila (12, 6, 4 o 3 columnas cada uno); con más, tres por
+// fila, y una celda blanca (GridFill) completa la última. En el celular cada paso es una fila completa.
+import { gridFill } from '../lib/grid-fill.mjs';
+import GridFill from './GridFill.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Textos de los pasos, en orden (pensado para tres). */
+  steps: readonly string[];
+}
+
+const { steps } = Astro.props;
+if (steps.length === 0) throw new Error('Steps necesita al menos un paso.');
+const perRow = steps.length <= 4 ? steps.length : 3;
+const columns = 12 / perRow;
+const span = `span-${columns}`;
+const fill = gridFill(steps.length, { lg: { span: columns }, md: { span: columns }, sm: { span: 12 } });
+---
+<ol class="steps grid12">
+  {steps.map((step, index) => (
+    <li class:list={['step', span]}>
+      <span class="step__num" aria-hidden="true">{index + 1}</span>
+      <p class="step__text t-h3"><span class="vh">{index + 1}. </span>{step}</p>
+      {index < steps.length - 1 && <Icon name="arrow-right" class="step__next icon--24" />}
+    </li>
+  ))}<GridFill as="li" cells={fill} />
+</ol>

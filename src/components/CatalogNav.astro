@@ -1,0 +1,71 @@
+---
+// Barra lateral del catálogo (`.catalog-nav`): navegación por categoría y por marca, no filtros (los filtros
+// combinables llegan en el paso 2). La usan /catalogo/, /categorias/{id}/ y /marcas/{id}/ por medio de
+// CatalogListing, para que las tres páginas no se separen.
+//   - Computadora (1100 px o más): dos grupos con título, «Categorías» y «Marcas», en una celda de 3 columnas;
+//     las marcas se pliegan después de la octava con «Ver todas las marcas».
+//   - Tableta y celular: dos filas plegables (<details>, cerradas al cargar) sobre las tarjetas.
+// Las dos formas están en el HTML y el CSS muestra una; la oculta no llega a los lectores de pantalla.
+// Un grupo sin filas no se imprime (en producción hoy no hay categorías).
+//
+// Uso:  <CatalogNav categories={categories} brands={brands} currentCategoryId={category.id} class="span-3 span-md-12" />
+import type { PublicBrand, PublicCategory } from '../types/site.ts';
+import CatalogNavList, { type CatalogNavItem } from './CatalogNavList.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  categories: readonly PublicCategory[];
+  brands: readonly PublicBrand[];
+  /** Categoría de la página actual: su fila se marca. */
+  currentCategoryId?: string;
+  /** Marca de la página actual: su fila se marca y nunca queda plegada. */
+  currentBrandId?: string;
+  /** Clases de columna. */
+  class?: string;
+}
+
+const { categories, brands, currentCategoryId, currentBrandId, class: className } = Astro.props;
+const categoryItems: CatalogNavItem[] = categories.map(category => ({
+  label: category.name,
+  href: category.url,
+  count: category.productCount,
+  current: category.id === currentCategoryId,
+}));
+const brandItems: CatalogNavItem[] = brands.map(brand => ({
+  label: brand.name,
+  href: brand.url,
+  count: brand.productCount,
+  current: brand.id === currentBrandId,
+}));
+const brandList = { items: brandItems, collapseAfter: 8, moreLabel: 'Ver todas las marcas', lessLabel: 'Ver menos marcas' };
+---
+<nav class:list={['catalog-nav', className]} aria-label="Categorías y marcas">
+  <div class="catalog-nav__groups">
+    {categoryItems.length > 0 && (
+      <div class="catalog-nav__group">
+        <h2 class="catalog-nav__title label">Categorías</h2>
+        <CatalogNavList items={categoryItems} />
+      </div>
+    )}
+    {brandItems.length > 0 && (
+      <div class="catalog-nav__group">
+        <h2 class="catalog-nav__title label">Marcas</h2>
+        <CatalogNavList {...brandList} />
+      </div>
+    )}
+  </div>
+  <div class="catalog-nav__folds">
+    {categoryItems.length > 0 && (
+      <details class="catalog-nav__fold">
+        <summary class="catalog-nav__summary"><span>Categorías</span><Icon name="chevron-down" /></summary>
+        <CatalogNavList items={categoryItems} />
+      </details>
+    )}
+    {brandItems.length > 0 && (
+      <details class="catalog-nav__fold">
+        <summary class="catalog-nav__summary"><span>Marcas</span><Icon name="chevron-down" /></summary>
+        <CatalogNavList {...brandList} />
+      </details>
+    )}
+  </div>
+</nav>

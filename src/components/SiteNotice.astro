@@ -1,0 +1,25 @@
+---
+// Aviso de arriba de todo, después de «Saltar al contenido» y antes de la lámina. Lo imprime BaseLayout:
+//   - vista previa: PREVIEW_NOTICE, con su primera frase en negritas («Aviso de vista previa»);
+//   - producción, hasta el lanzamiento: DEVELOPMENT_NOTICE, «<strong>Sitio en preparación</strong> · Versión
+//     inicial para revisión» («Aviso de sitio en preparación»). Se retira a propósito al publicar (BaseLayout).
+// Una compilación lleva un solo aviso. Los dos se dibujan con la misma banda (components.css, 4.1).
+import { DEVELOPMENT_NOTICE, PREVIEW_NOTICE } from '../lib/site-data.mjs';
+
+interface Props {
+  /** `'preview'` en la vista previa; `'development'` en producción antes del lanzamiento. */
+  kind: 'preview' | 'development';
+}
+
+const { kind } = Astro.props;
+const [text, separator, label] = kind === 'preview'
+  ? [PREVIEW_NOTICE, '. ', 'Aviso de vista previa']
+  : [DEVELOPMENT_NOTICE, ' · ', 'Aviso de sitio en preparación'];
+// La primera parte va en negritas: la primera frase de la vista previa, «Sitio en preparación» en producción.
+const cut = text.indexOf(separator);
+const lead = cut === -1 ? text : kind === 'preview' ? text.slice(0, cut + 1) : text.slice(0, cut);
+const rest = cut === -1 ? '' : kind === 'preview' ? ` ${text.slice(cut + 2)}` : text.slice(cut);
+---
+<aside class="site-notice" aria-label={label}>
+  <p class="site-notice__text"><strong>{lead}</strong>{rest}</p>
+</aside>

@@ -1,0 +1,65 @@
+---
+// Página de categoría (/categorias/{id}/): una por categoría pública (hoy solo en la vista previa).
+// Bloque de título con el pictograma de 64 px, el nombre como H1 y la línea de subcategorías como entrada;
+// «Marcas en esta categoría» (R-CAT-05) solo si alguno de sus productos tiene una marca real; la misma barra
+// lateral y la misma retícula del catálogo (CatalogListing) con la fila de la categoría marcada; sin productos,
+// el estado vacío con WhatsApp a todo lo ancho; al final la banda de solicitud especial.
+// Sin campo de búsqueda: el encabezado ya tiene uno.
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import CatalogBand from '../../components/CatalogBand.astro';
+import CatalogListing from '../../components/CatalogListing.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import MoreLink from '../../components/MoreLink.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import { contactDetails, contactLinks } from '../../lib/contact.mjs';
+import { categoryIcon } from '../../lib/icons.ts';
+import { brands, categories, getBrand, getCategory, paths, productsByCategory, routes } from '../../lib/site-data.mjs';
+import type { PublicBrand } from '../../types/site.ts';
+import '../../styles/pages/catalogo.css';
+
+export const getStaticPaths = (() => paths.categoryIds.map(id => ({ params: { id } }))) satisfies GetStaticPaths;
+
+const category = getCategory(Astro.params.id ?? '');
+if (!category) throw new Error(`Categoría desconocida: ${Astro.params.id}`);
+
+const list = productsByCategory(category.id);
+// R-CAT-05: marcas de la categoría, sacadas de sus productos con marca real (los ejemplos no tienen),
+// en el orden de «Marcas que manejamos».
+const brandIds = new Set(list.map(product => product.brandId).filter(id => id !== null));
+const categoryBrands = [...brandIds].map(id => getBrand(id)).filter((brand): brand is PublicBrand => Boolean(brand));
+categoryBrands.sort((a, b) => brands.indexOf(a) - brands.indexOf(b));
+// Descripción: nombre, línea de subcategorías y lugar, cada uno como frase propia (la línea de subcategorías
+// empieza con mayúscula, así que no va después de dos puntos).
+const description = [category.name, category.summary, contactDetails.locationLabel].filter(Boolean).map(text => `${text.replace(/\.$/, '')}.`).join(' ');
+---
+<BaseLayout title={category.name} description={description}>
+  <PageHeader
+    title={category.name}
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Catálogo', href: routes.catalog }, { label: category.name }]}
+    icon={categoryIcon(category.id)}
+    lead={category.summary || undefined}
+  />
+
+  {categoryBrands.length > 0 && (
+    <section class="catalog-related grid12" aria-labelledby="marcas-categoria-title">
+      <div class="catalog-related__head span-3"><h2 class="catalog-related__title label" id="marcas-categoria-title">Marcas en esta categoría</h2></div>
+      <ul class="catalog-related__list span-9">
+        {categoryBrands.map(brand => <li><MoreLink href={brand.url}>{brand.name}</MoreLink></li>)}
+      </ul>
+    </section>
+  )}
+
+  {list.length > 0 ? (
+    <CatalogListing products={list} categories={categories} brands={brands} currentCategoryId={category.id} />
+  ) : (
+    <EmptyState
+      icon={categoryIcon(category.id)}
+      title="Estamos cargando los productos de esta categoría."
+      text="Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo."
+      action={{ href: contactLinks.category(category.name).whatsapp, label: 'Contactar por WhatsApp', icon: 'whatsapp' }}
+    />
+  )}
+
+  <CatalogBand />
+</BaseLayout>

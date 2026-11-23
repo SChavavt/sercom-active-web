@@ -1,0 +1,21 @@
+---
+// Celdas de relleno de una retícula (`.grid-fill`): celdas blancas, vacías, ocultas a los lectores de pantalla y
+// fuera del orden del teclado, que completan la última fila para que nunca quede a la vista el azul de la lámina
+// (docs/diseno.md, sección 3). Cada celda trae su ancho en computadora (`lg`, 1100 px o más), tableta (`md`,
+// 700 a 1099) y celular (`sm`, hasta 699); con 0 en un punto de corte esa celda no se muestra ahí.
+// Las calcula `gridFill` de src/lib/grid-fill.mjs; con la lista vacía no se imprime nada.
+// Van como hijos directos de la retícula, después de las celdas reales (o antes de la celda final de la placa).
+//
+// Uso:  <GridFill as="li" cells={gridFill(items.length, { lg: { span: 3 }, md: { span: 6 }, sm: { span: 6 } })} />
+interface Props {
+  cells: readonly { lg: number; md: number; sm: number }[];
+  /** `li` dentro de una lista, `div` en una retícula de bloques. */
+  as?: 'li' | 'div';
+}
+
+const { cells, as: Tag = 'div' } = Astro.props;
+const hide = (cell: Props['cells'][number]) => (['lg', 'md', 'sm'] as const).filter(key => cell[key] === 0).join(' ') || undefined;
+---
+{cells.map(cell => (
+  <Tag class="grid-fill" aria-hidden="true" data-hide={hide(cell)} style={`--fill-lg: ${cell.lg}; --fill-md: ${cell.md}; --fill-sm: ${cell.sm}`}></Tag>
+))}

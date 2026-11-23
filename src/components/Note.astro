@@ -1,0 +1,14 @@
+---
+// Nota (`.note`): una fila blanca con un icono azul y texto pequeño gris, bajo una retícula o como aviso
+// breve («Disponibilidad por marca y modelo sujeta a confirmación al cotizar.»).
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Por omisión `info`. */
+  icon?: IconName;
+  class?: string;
+}
+const { icon = 'info', class: className } = Astro.props;
+---
+<p class:list={['note', 't-small', className]}><Icon name={icon} class="icon--18" /><span><slot /></span></p>

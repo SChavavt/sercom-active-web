@@ -1,0 +1,26 @@
+---
+// Ruta de navegación («Inicio / Catálogo / …») en estilo de etiqueta. El último elemento es la página actual:
+// no lleva enlace y se marca con aria-current="page". La usa PageHeader; rara vez hace falta sola.
+// Cada diagonal es un elemento real oculto a las tecnologías de apoyo (`.crumbs__sep`, aria-hidden) al final del
+// elemento anterior: la ruta solo se parte entre elementos y un renglón nunca empieza con «/». Hasta 699 px, con
+// tres o más elementos, la página actual no se ve (el H1 de abajo dice lo mismo) pero sigue en el árbol de
+// accesibilidad con aria-current="page"; con dos se ve entera (responsive.css, sección 6.5).
+export interface Crumb {
+  label: string;
+  /** Ruta con diagonal final. Se ignora en el último elemento. */
+  href?: string;
+}
+
+interface Props {
+  items: readonly Crumb[];
+  class?: string;
+}
+const { items, class: className } = Astro.props;
+---
+<nav class:list={['crumbs', 'label', className]} aria-label="Ruta de navegación">
+  <ol class="crumbs__list">
+    {items.map((item, index) => (
+      <li class="crumbs__item">{item.href && index < items.length - 1 ? <a class="crumbs__link" href={item.href}>{item.label}</a> : <span aria-current="page">{item.label}</span>}{index < items.length - 1 && <span class="crumbs__sep" aria-hidden="true">/</span>}</li>
+    ))}
+  </ol>
+</nav>

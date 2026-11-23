@@ -1,0 +1,58 @@
+/* ==========================================================================
+   3. Composición: la lámina y su retícula de doce columnas
+   Parte de la hoja global del sitio (entrada: global.css). Guía: docs/diseno.md.
+   La idea en una línea: la página es una lámina. `.sheet` se pinta de azul Sercom y cada bloque
+   es una celda blanca; los huecos de 1 px entre celdas son los filetes. Ningún elemento dibuja su
+   propio borde, así que las líneas nunca se duplican y siempre caen en la misma retícula.
+   ========================================================================== */
+/* Márgenes laterales: nunca menores que las zonas seguras del equipo (muesca o esquinas redondas en horizontal, con
+   viewport-fit=cover). Sin zonas seguras valen var(--margin) y la lámina queda centrada como siempre; con una zona
+   segura de un solo lado, el margen de ese lado crece y la lámina se corre lo justo. */
+:root {
+  --edge-left: max(var(--margin), env(safe-area-inset-left, 0px));
+  --edge-right: max(var(--margin), env(safe-area-inset-right, 0px));
+}
+.sheet {
+  --sheet-w: min(100% - var(--edge-left) - var(--edge-right), var(--sheet-max));
+  width: var(--sheet-w);
+  margin: 0 0 var(--s-9) clamp(var(--edge-left), (100% - var(--sheet-w)) / 2, 100% - var(--sheet-w) - var(--edge-right));
+  padding: 0 var(--line) var(--line);
+  background: var(--rule);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--line);
+  /* Contenedor de consultas: con @container lamina (responsive.css 6.9) una regla compara el ancho de la lámina con
+     el tamaño de letra (rem), lo que una consulta de medios no puede: así las celdas se reacomodan solo cuando el
+     texto agrandado ya no cabe. No cambia el dibujo de la lámina. */
+  container: lamina / inline-size;
+}
+
+.sheet > main,
+.section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: var(--line);
+}
+.sheet > main:focus { outline: none; }
+
+/* Una fila de celdas. Todas las filas usan las mismas doce pistas, así que cada filete vertical
+   de la página cae en una de once posiciones. */
+.grid12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--line);
+}
+.cell { background: var(--surface); }
+.cell--pad { padding: var(--s-9) var(--pad); }              /* relleno estándar de una celda de contenido */
+.span-1 { grid-column: span 1; }
+.span-2 { grid-column: span 2; }
+.span-3 { grid-column: span 3; }
+.span-4 { grid-column: span 4; }
+.span-5 { grid-column: span 5; }
+.span-6 { grid-column: span 6; }
+.span-7 { grid-column: span 7; }
+.span-8 { grid-column: span 8; }
+.span-9 { grid-column: span 9; }
+.span-10 { grid-column: span 10; }
+.span-11 { grid-column: span 11; }
+.span-12 { grid-column: span 12; }

@@ -1,0 +1,67 @@
+---
+// Pie del sitio: el lema «Tu mejor opción» y la descripción de la empresa, logotipo, enlaces, categorías,
+// contacto, las dos notas legales y el año. Sin categorías públicas (producción hoy) la columna de
+// categorías no se imprime y las otras tres ocupan 4 columnas cada una.
+// El enlace a la página actual lleva aria-current="page" y el cuadro azul de 10 px (`.footer__mark`).
+import logo from '../assets/brand/logo.svg';
+import { contactDetails, contactLinks } from '../lib/contact.mjs';
+import { categories, routes } from '../lib/site-data.mjs';
+import EmailAddress from './EmailAddress.astro';
+import Icon from './Icon.astro';
+
+const hasCategories = categories.length > 0;
+const span = hasCategories ? 'span-3' : 'span-4';
+const general = contactLinks.general();
+const year = new Date().getFullYear();
+const path = Astro.url.pathname;
+const current = (href: string) => (path === href ? 'page' : undefined);
+const links = [
+  { href: routes.catalog, label: 'Catálogo' },
+  { href: routes.brands, label: 'Marcas' },
+  { href: routes.quoteList, label: 'Cotizar mi lista' },
+  { href: routes.specialRequest, label: 'Solicitud especial' },
+  { href: routes.contact, label: 'Contacto' },
+];
+---
+<footer class:list={['site-footer', { 'site-footer--no-cats': !hasCategories }]}>
+  <div class="footer__signoff">
+    <p class="footer__tagline">Tu mejor opción</p>
+    <p class="footer__about">Venta, entrega y asesoría de productos de seguridad industrial.</p>
+  </div>
+  <div class="grid12">
+    <div class:list={['footer__cell', 'footer__brand', span]}>
+      <a class="footer__logo" href={routes.home}><img src={logo.src} width="194" height="73" alt={contactDetails.businessName} loading="lazy" /></a>
+    </div>
+    <nav class:list={['footer__cell', 'footer__nav', span]} aria-labelledby="footer-nav-title">
+      <h2 class="footer__title label" id="footer-nav-title">{contactDetails.businessName}</h2>
+      <ul class="footer__links">
+        {links.map(link => <li><a href={link.href} aria-current={current(link.href)}>{current(link.href) && <span class="footer__mark" aria-hidden="true"></span>}{link.label}</a></li>)}
+      </ul>
+    </nav>
+    {hasCategories && (
+      <nav class:list={['footer__cell', 'footer__cats', span]} aria-labelledby="footer-cats-title">
+        <h2 class="footer__title label" id="footer-cats-title">Categorías</h2>
+        <ul class="footer__links">
+          {categories.map(category => <li><a href={category.url} aria-current={current(category.url)}>{current(category.url) && <span class="footer__mark" aria-hidden="true"></span>}{category.name}</a></li>)}
+        </ul>
+      </nav>
+    )}
+    <div class:list={['footer__cell', 'footer__reach', span]}>
+      <h2 class="footer__title label">Contacto</h2>
+      <div class="footer__contact">
+        <p class="footer__who"><strong>{contactDetails.contactName}</strong><br />{contactDetails.locationLabel}</p>
+        <p><a href={general.whatsapp}><Icon name="whatsapp" class="icon--16" /><span class="vh">WhatsApp </span><span class="t-code">{contactDetails.whatsappDisplay}</span></a><br />
+        <a href={general.mailto} aria-label={contactDetails.email}><Icon name="mail" class="icon--16" /><EmailAddress /></a></p>
+        <p class="footer__hours">{contactDetails.hoursText}</p>
+      </div>
+    </div>
+  </div>
+  <div class="footer__notes t-small">
+    <p>Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</p>
+    <p>Las marcas mencionadas pertenecen a sus respectivos titulares.</p>
+  </div>
+  <div class="footer__legal t-small">
+    <p>© {year} {contactDetails.businessName}</p>
+    <a href={routes.privacy} aria-current={current(routes.privacy)}>{current(routes.privacy) && <span class="footer__mark" aria-hidden="true"></span>}Privacidad</a>
+  </div>
+</footer>

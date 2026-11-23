@@ -1,0 +1,125 @@
+---
+// Fila de búsqueda del catálogo (`.catalog-search`), a todo lo ancho sobre la barra lateral y las tarjetas:
+// un formulario real (GET a /catalogo/, parámetro SEARCH_PARAM) con el campo de 64 px y «Buscar» sobre
+// 9 columnas, y en las otras 3 la línea de resultados («10 productos», «3 resultados para “guante”»),
+// que es una región viva para los lectores de pantalla, con «Limpiar búsqueda».
+//
+// El texto de ayuda del campo («Producto, marca o código») es corto a propósito: cabe entero desde 320 px,
+// también con el texto espaciado. El nombre completo del campo va en su etiqueta.
+//
+// El script filtra en el navegador las tarjetas de la página (CatalogGrid) con matchesSearchText sobre su
+// `data-search`: al cargar con ?q=… (el campo del encabezado envía aquí), mientras se escribe y al enviar,
+// sin recargar. Mantiene la dirección al día con history.replaceState, muestra el estado sin resultados
+// (`[data-catalog-empty]`) y le pasa la búsqueda a «Solicitar este producto» (?q=…).
+// La consulta es texto no confiable: solo se escribe con textContent, value o como parámetro codificado.
+// Sin JavaScript el formulario envía a /catalogo/?q=… y la página lista todo con el conteo simple:
+// «Limpiar búsqueda» y el estado sin resultados están ocultos (atributo hidden) y solo el script los muestra.
+//
+// Uso:  <CatalogSearch total={products.length} />  seguido de <CatalogListing> con el estado vacío en su slot.
+import { SEARCH_PARAM, resultSummary } from '../lib/search.mjs';
+import { routes } from '../lib/site-data.mjs';
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Productos de la página: la línea de resultados sin búsqueda. */
+  total: number;
+}
+
+const { total } = Astro.props;
+---
+<div class="catalog-search grid12">
+  <form class="catalog-search__form span-9 span-md-12" role="search" aria-label="Buscar productos" action={routes.catalog} method="get" data-catalog-search>
+    <div class="catalog-search__field">
+      <Icon name="search" class="icon--24" />
+      <label class="vh" for="catalogo-q">Buscar por producto, marca o código</label>
+      <input class="catalog-search__input" id="catalogo-q" name={SEARCH_PARAM} type="search" placeholder="Producto, marca o código" autocomplete="off" enterkeyhint="search" />
+    </div>
+    <button class="catalog-search__submit" type="submit">Buscar</button>
+  </form>
+  <div class="catalog-search__status span-3 span-md-12">
+    <p class="catalog-search__count" aria-live="polite" data-catalog-count>{resultSummary(total)}</p>
+    <a class="catalog-search__clear" href={routes.catalog} hidden data-catalog-clear><Icon name="close" class="icon--16" /><span>Limpiar búsqueda</span></a>
+  </div>
+</div>
+
+<script>
+  import { routes } from '../lib/routes.mjs';
+  import { SEARCH_PARAM, displayQuery, isActiveQuery, matchesSearchText, resultSummaryParts } from '../lib/search.mjs';
+
+  const form = document.querySelector<HTMLFormElement>('[data-catalog-search]');
+  const input = form?.querySelector<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`);
+  const count = document.querySelector<HTMLElement>('[data-catalog-count]');
+  const clear = document.querySelector<HTMLAnchorElement>('[data-catalog-clear]');
+  const grid = document.querySelector<HTMLElement>('[data-catalog-grid]');
+  const fill = document.querySelector<HTMLElement>('[data-catalog-fill]');
+  const empty = document.querySelector<HTMLElement>('[data-catalog-empty]');
+  const request = empty?.querySelector<HTMLAnchorElement>('a[href]');
+  const requestBase = request?.getAttribute('href') ?? '';
+  // Campo de búsqueda del encabezado (mismo nombre): muestra la misma consulta que el de la página.
+  const headerInputs = [...document.querySelectorAll<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`)].filter(field => field !== input);
+  const items = [...document.querySelectorAll<HTMLElement>('[data-catalog-grid] [data-search]')];
+
+  /**
+   * Escribe la línea de resultados con nodos de texto, nunca como HTML. El término va en un <bdi>: su dirección
+   * (árabe, hebreo) no reordena las palabras del sitio. Se lee igual que `resultSummary`.
+   */
+  function writeSummary(line: HTMLElement, visible: number, query: string) {
+    const { lead, term, end } = resultSummaryParts(visible, query);
+    if (!term) {
+      line.textContent = lead;
+      return;
+    }
+    const isolated = document.createElement('bdi');
+    isolated.textContent = term;
+    line.replaceChildren(lead, isolated, end);
+  }
+
+  /** Filtra las tarjetas y deja la página (conteo, celda de relleno, estado vacío, enlaces) de acuerdo. */
+  function apply(query: string, updateUrl: boolean) {
+    const active = isActiveQuery(query);
+    let visible = 0;
+    for (const item of items) {
+      const show = !active || matchesSearchText(item.dataset.search, query);
+      item.hidden = !show;
+      if (show) visible += 1;
+    }
+    // Lugares vacíos de la última fila con 4, 3 y 2 tarjetas por fila (ver CatalogGrid).
+    if (fill) for (const perRow of [4, 3, 2]) fill.dataset[`fill${perRow}`] = String((perRow - (visible % perRow)) % perRow);
+    if (grid) grid.hidden = visible === 0;
+    if (empty) empty.hidden = visible > 0;
+    if (count) writeSummary(count, visible, query);
+    if (clear) clear.hidden = !active;
+    if (request) request.href = active ? `${requestBase}?${SEARCH_PARAM}=${encodeURIComponent(displayQuery(query))}` : requestBase;
+    if (updateUrl) history.replaceState(history.state, '', routes.search(active ? displayQuery(query) : ''));
+  }
+
+  if (form && input) {
+    // Tal como se muestra (displayQuery), que es también lo que se busca: una secuencia % mal formada no llega al
+    // campo como «�», ni un carácter de control (los dos pasan a ser un espacio), de dirección o invisible (se quitan
+    // sin dejar espacio); una consulta sin nada visible es como no tener búsqueda.
+    const initial = displayQuery(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
+    if (initial) {
+      input.value = initial;
+      for (const field of headerInputs) field.value = initial;
+      apply(initial, false);
+    }
+
+    input.addEventListener('input', () => {
+      for (const field of headerInputs) field.value = input.value;
+      apply(input.value, true);
+    });
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      apply(input.value, true);
+    });
+
+    clear?.addEventListener('click', event => {
+      event.preventDefault();
+      input.value = '';
+      for (const field of headerInputs) field.value = '';
+      apply('', true);
+      input.focus();
+    });
+  }
+</script>

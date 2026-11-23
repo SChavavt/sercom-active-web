@@ -1,0 +1,19 @@
+---
+// Enlace de texto con flecha (`.more`), azul: «Ver todo el catálogo», «Sitio del fabricante».
+// Con `external` abre otra pestaña, usa el icono de enlace externo y lo dice a los lectores de pantalla.
+import type { HTMLAttributes } from 'astro/types';
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props extends HTMLAttributes<'a'> {
+  href: string;
+  /** Icono final; por omisión `arrow-right` (o `external-link` si `external`). */
+  icon?: IconName;
+  /** Enlace a otro sitio: se abre en otra pestaña. */
+  external?: boolean;
+}
+
+const { href, icon, external = false, class: className, ...attrs } = Astro.props;
+const target = external ? { target: '_blank', rel: 'noopener noreferrer' } : {};
+---
+<a class:list={['more', className]} href={href} {...target} {...attrs}><span><slot />{external && <span class="vh"> (se abre en otra pestaña)</span>}</span><Icon name={icon ?? (external ? 'external-link' : 'arrow-right')} /></a>

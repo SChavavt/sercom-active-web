@@ -1,0 +1,18 @@
+---
+// Fila de acción (`.action`): un enlace que ocupa toda una fila de la lámina, con el texto a la izquierda
+// y una flecha a la derecha. `primary` la pinta de azul sólido (la decisión principal del bloque).
+// Va dentro de una columna de celdas (por ejemplo la columna lateral de PageHeader o de la portada).
+import type { HTMLAttributes } from 'astro/types';
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props extends HTMLAttributes<'a'> {
+  href: string;
+  primary?: boolean;
+  /** Icono final; por omisión una flecha. */
+  icon?: IconName;
+}
+
+const { href, primary = false, icon = 'arrow-right', class: className, ...attrs } = Astro.props;
+---
+<a class:list={['action', 'cell-link', { 'action--primary': primary }, className]} href={href} {...attrs}><span><slot /></span><Icon name={icon} class="icon--24" /></a>

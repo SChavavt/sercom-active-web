@@ -1,0 +1,23 @@
+---
+// Retícula de tarjetas de producto (`.products`): cuatro por fila en computadora sobre las doce columnas,
+// dos en tableta y celular. Si la última fila queda incompleta, una celda blanca (GridFill) la completa en cada
+// ancho. Si la lista está vacía no imprime nada: la página decide qué mostrar (por ejemplo EmptyState).
+import type { PublicProduct } from '../types/site.ts';
+import { gridFill } from '../lib/grid-fill.mjs';
+import GridFill from './GridFill.astro';
+import ProductCard from './ProductCard.astro';
+
+interface Props {
+  products: readonly PublicProduct[];
+  /** Nivel del nombre de cada producto; 3 por omisión. */
+  headingLevel?: 2 | 3 | 4;
+}
+
+const { products, headingLevel = 3 } = Astro.props;
+const fill = gridFill(products.length, { lg: { span: 3 }, md: { span: 6 }, sm: { span: 6 } });
+---
+{products.length > 0 && (
+  <div class="products grid12">
+    {products.map(product => <ProductCard product={product} headingLevel={headingLevel} class="span-3" />)}<GridFill cells={fill} />
+  </div>
+)}

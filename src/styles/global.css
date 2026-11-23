@@ -1,39 +1,14 @@
-:root { color-scheme: light; --navy: #0e2a3d; --cyan: #00a6e5; --muted: #526575; --line: #dce6ed; font-family: Arial, Helvetica, sans-serif; color: var(--navy); background: #fff; }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; font-size: 16px; line-height: 1.6; }
-a { color: inherit; text-underline-offset: .22em; }
-a:focus-visible { outline: 3px solid #006996; outline-offset: 5px; }
-.shell { width: min(1240px, calc(100% - 80px)); margin-inline: auto; }
-.development-note { text-align: center; padding: 8px 20px; background: #edf4f8; color: #405766; font-size: 13px; }
-.header { display: flex; align-items: center; justify-content: space-between; padding-block: 28px; border-bottom: 1px solid var(--line); gap: 24px; }
-.header > a:last-child { font-size: 15px; }
-.wordmark { font-size: 28px; font-weight: 800; letter-spacing: -.05em; text-decoration: none; }
-.wordmark span { font-weight: 400; margin-left: 5px; }
-.hero { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .85fr); align-items: start; gap: 90px; padding-block: 80px 64px; }
-.eyebrow { color: #00658d; font-size: 12px; text-transform: uppercase; letter-spacing: .14em; font-weight: 700; margin: 0 0 22px; }
-h1 { font-size: clamp(38px, 4.6vw, 62px); letter-spacing: -.045em; line-height: 1.08; margin: 0 0 24px; font-weight: 700; max-width: 760px; }
-.lead { font-size: 20px; color: var(--muted); line-height: 1.6; margin: 0 0 32px; max-width: 580px; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 22px; text-decoration: none; background: var(--navy); color: #fff; padding: 15px 24px; border-radius: 5px; font-weight: 700; min-height: 48px; }
-.button:hover { background: #184a68; }
-.supporting { margin: 24px 0 0; max-width: 500px; color: var(--muted); font-size: 14px; }
-.contact-card { background: #f4f8fa; padding: 34px; border-top: 5px solid var(--cyan); border-radius: 4px; }
-h2 { font-size: 28px; line-height: 1.24; letter-spacing: -.025em; margin: 0 0 25px; }
-.contact-card .eyebrow { margin-bottom: 14px; }
-.contact-item { padding-block: 18px; border-top: 1px solid var(--line); }
-.contact-item > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-.contact-item a { overflow-wrap: anywhere; font-weight: 600; }
-.contact-item p { margin: 0; }
-.contact-footnote { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
-.next-step { padding: 35px 0 55px; border-top: 1px solid var(--line); }
-.next-step .eyebrow { margin-bottom: 12px; }
-.next-step h2 { margin-bottom: 12px; }
-.next-step p:last-child { color: var(--muted); max-width: 720px; }
-.footer { border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 24px; padding-block: 26px; font-size: 13px; }
-.footer span { color: var(--muted); }
-.error-page { padding-block: 100px; }
-.skip-link { position: fixed; left: 20px; top: -100px; background: white; padding: 12px; z-index: 10; }
-.skip-link:focus { top: 15px; }
-@media (max-width: 950px) { .hero { gap: 35px; grid-template-columns: minmax(0, 1.15fr) minmax(290px, 1fr); } .shell { width: calc(100% - 48px); } .contact-card { padding: 25px; } }
-@media (max-width: 720px) { .hero { grid-template-columns: 1fr; padding-block: 44px; gap: 38px; } .shell { width: calc(100% - 36px); } .header { padding-block: 18px; } .header > a:last-child { font-size: 12px; } .wordmark { font-size: 24px; } h1 { font-size: 40px; } .lead { font-size: 18px; } .contact-card { padding: 25px; } .footer { flex-direction: column; gap: 6px; } }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* ==========================================================================
+   Sercom Active · hoja global del sitio (dirección «Lámina técnica»)
+   Única entrada de estilos: la importa src/layouts/BaseLayout.astro una vez.
+   El orden de las capas es parte del diseño: cada una puede apoyarse en las anteriores y
+   responsive.css va al final para ganar a todas. Guía de uso: docs/diseno.md.
+   Las páginas no modifican estos archivos: sus estilos propios van en src/styles/pages/.
+   ========================================================================== */
+@import './fonts.css';       /* kit tipográfico: @font-face, respaldos y variables --type-* */
+@import './tokens.css';      /* 1. color, tamaños, espacios, composición */
+@import './base.css';        /* 2. elementos, foco, funciones tipográficas, iconos */
+@import './layout.css';      /* 3. la lámina y la retícula de doce columnas */
+@import './components.css';  /* 4. componentes compartidos */
+@import './sections.css';    /* 5. secciones de la portada */
+@import './responsive.css';  /* 6. adaptación por anchos, movimiento e impresión */

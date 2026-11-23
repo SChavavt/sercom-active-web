@@ -1,0 +1,231 @@
+---
+// Ficha de producto (/productos/{id}/): una hoja técnica sobre la retícula de doce columnas.
+//   1. Fila de ruta: Inicio / Catálogo / {categoría} / {producto} (sin categoría si el producto no tiene).
+//   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
+//      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
+//      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular; un nombre
+//      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección; la fila de
+//      ruta lleva la misma marca y en computadora se queda en un renglón, con el nombre cortado con «…»),
+//      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
+//      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
+//      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
+//      dos partes se apilan, la imagen primero y baja.
+//   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
+//   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
+// Paso 2: «Agregar a mi cotización» irá bajo las dos acciones de cotizar, antes del aviso de disponibilidad;
+// hoy no se imprime nada para él.
+// Las variantes son información, no controles (la elección de variante llega en el paso 2).
+// Producto retirado (R-STATE-04): la misma dirección conserva una página informativa. La ruta y «Más productos…»
+// son los de la ficha; la hoja y la banda de solicitud especial las imprime RetiredProduct (ver su comentario).
+// Textos: brief 6.4 y brief de la ficha. Estilos: src/styles/pages/producto.css.
+import type { GetStaticPaths } from 'astro';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import Band from '../../components/Band.astro';
+import Breadcrumbs from '../../components/Breadcrumbs.astro';
+import Icon from '../../components/Icon.astro';
+import Note from '../../components/Note.astro';
+import PageLinkScript from '../../components/PageLinkScript.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import RetiredProduct from '../../components/RetiredProduct.astro';
+import SectionHead from '../../components/SectionHead.astro';
+import Tag from '../../components/Tag.astro';
+import { categoryIcon } from '../../lib/icons.ts';
+import { isLongProductName } from '../../lib/product-title.mjs';
+import { absoluteUrl, contactDetails, contactLinks } from '../../lib/contact.mjs';
+import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, productsByCategory, products, retiredProducts, routes } from '../../lib/site-data.mjs';
+import type { PublicProduct } from '../../types/site.ts';
+// Después de la plantilla, para que la hoja de la página vaya detrás de la hoja global.
+import '../../styles/pages/producto.css';
+
+// Una página por producto público y otra por producto retirado que fue público, en la misma dirección.
+export const getStaticPaths = (() => [...paths.productIds, ...retiredProducts.map(retired => retired.id)].map(id => ({ params: { id } }))) satisfies GetStaticPaths;
+
+const product = getProduct(Astro.params.id ?? '');
+const retired = product ? undefined : getRetiredProduct(Astro.params.id ?? '');
+// Lo que comparten la ficha y la página del retirado: identificación, categorías y dirección.
+const item = product ?? retired;
+if (!item) throw new Error(`Producto desconocido: ${Astro.params.id}`);
+
+const categoryId = item.categoryIds[0];
+const category = categoryId ? getCategory(categoryId) : undefined;
+const brand = item.brandId ? getBrand(item.brandId) : undefined;
+// Nombre largo (más de 50 caracteres): en computadora el H1 baja un paso y la ruta se queda en un renglón (producto.css).
+const longName = product ? isLongProductName(product.name) : false;
+
+// Mensajes de cotización: llevan la dirección de la ficha. Sin SITE_URL la agrega PageLinkScript al cargar la página.
+const pageUrl = absoluteUrl(item.url, Astro.site);
+const pageLink = pageUrl ? undefined : item.url;
+const reference = { brandName: item.brandName, code: item.code, name: item.name, url: pageUrl };
+const quote = contactLinks.product(reference);
+const datasheet = contactLinks.datasheet(reference);
+// Producto retirado: el mensaje pide una alternativa, con la misma regla para la línea «Enlace».
+const alternatives = contactLinks.retired(reference);
+const title = product ? product.name : `${item.name} (producto retirado)`;
+const description = product ? product.summary : `Este producto ya no forma parte del catálogo. ${contactDetails.locationLabel} para revisar alternativas.`;
+
+// Variantes: una fila por variante en computadora, cuatro celdas por fila en tableta y dos en celular. La
+// celda final pinta de blanco lo que falte de la última fila en tableta y celular (nunca queda azul a la vista).
+const variantCount = product?.variants.length ?? 0;
+const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4': (4 - (variantCount % 4)) % 4 };
+// Un código largo no cabe en una celda de tableta o celular sin partirse: entonces las variantes siguen en filas.
+const CHIP_CODE_MAX = 14;
+const variantRows = product?.variants.some(variant => variant.code.length > CHIP_CODE_MAX) ?? false;
+
+// Más productos: primero los de sus categorías; si no hay otros, una selección variada del catálogo.
+const MORE_LIMIT = 4;
+// En un retirado, «sus categorías» son las públicas en el modo; él nunca está en las listas.
+const unique = (list: readonly PublicProduct[]) => list.filter((entry, index) => entry.id !== item.id && list.findIndex(other => other.id === entry.id) === index);
+const sameCategory = unique(item.categoryIds.flatMap(id => productsByCategory(id))).slice(0, MORE_LIMIT);
+const fromCatalog = unique([...featuredProducts(MORE_LIMIT + 1), ...products]).slice(0, MORE_LIMIT);
+const more = sameCategory.length > 0
+  ? { title: 'Más productos de esta categoría', items: sameCategory }
+  : { title: 'Más productos del catálogo', items: fromCatalog };
+// Cuatro tarjetas por fila en computadora (3 columnas cada una) y dos en tableta y celular: la celda final
+// completa la fila en blanco (en tableta y celular solo hace falta con un número impar de tarjetas).
+const moreFillSpan = (MORE_LIMIT - more.items.length) * 3;
+const moreOdd = more.items.length % 2 === 1;
+---
+<BaseLayout title={title} description={description}>
+  <div class="producto__crumbs cell" data-long={longName ? '' : undefined}>
+    <Breadcrumbs
+      items={[
+        { label: 'Inicio', href: routes.home },
+        { label: 'Catálogo', href: routes.catalog },
+        ...(category ? [{ label: category.name, href: category.url }] : []),
+        { label: item.name },
+      ]}
+    />
+  </div>
+
+  {product ? (<Fragment>
+  <section class="producto grid12" aria-labelledby="titulo">
+    <div class:list={['producto__media', 'span-7', 'span-md-12', { 'producto__media--photo': product.image }]}>
+      <div class="producto__frame">
+        {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
+        {product.image ? (
+          <img class="producto__img" src={product.image.url} alt={product.image.alt} width="800" height="600" decoding="async" />
+        ) : (
+          <span class="producto__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
+        )}
+      </div>
+    </div>
+
+    <div class="producto__body span-5 span-md-12">
+      <div class="producto__head cell">
+        {category && <a class="producto__cat label" href={category.url}>{category.name}</a>}
+        <h1 class="producto__title t-title" id="titulo" data-long={longName ? '' : undefined}>{product.name}</h1>
+      </div>
+
+      <dl class="data producto__data">
+        <div class="data__row">
+          <dt class="data__key label">Marca</dt>
+          <dd class="data__value">
+            {brand ? (
+              <a class="data__link" href={brand.url}><span>{product.brandName}</span><Icon name="arrow-right" /></a>
+            ) : (
+              product.brandName
+            )}
+          </dd>
+        </div>
+        <div class="data__row">
+          <dt class="data__key label">Código</dt>
+          <dd class="data__value"><span class="producto__code t-code">{product.code}</span></dd>
+        </div>
+        {product.saleUnit && (
+          <div class="data__row">
+            <dt class="data__key label">Unidad de venta</dt>
+            <dd class="data__value">{product.saleUnit}</dd>
+          </div>
+        )}
+      </dl>
+
+      {product.summary && <div class="producto__summary cell"><p>{product.summary}</p></div>}
+
+      <div class="producto__actions">
+        <ActionRow href={quote.whatsapp} primary icon="whatsapp" data-page-link={pageLink}>Cotizar este producto</ActionRow>
+        <ActionRow href={quote.mailto} icon="mail" data-page-link={pageLink}>Cotizar por correo</ActionRow>
+      </div>
+
+      <Note class="producto__note">Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</Note>
+
+      {product.characteristics.length > 0 && (
+        <section class="producto__part" aria-labelledby="caracteristicas-title">
+          <h2 class="producto__part-title t-h3" id="caracteristicas-title">Características</h2>
+          <ol class="producto__list">
+            {product.characteristics.map((item, index) => (
+              <li class="producto__item">
+                <span class="producto__num" aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {variantCount > 0 && (
+        <section class="producto__part" aria-labelledby="variantes-title">
+          <h2 class="producto__part-title t-h3" id="variantes-title">Variantes</h2>
+          <ul class:list={['producto__chips', { 'producto__chips--rows': variantRows }]} {...variantFill}>
+            {product.variants.map(variant => (
+              <li class="producto__chip">
+                <span class="producto__chip-label">{variant.label}</span>
+                <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>
+              </li>
+            ))}
+            {!variantRows && <li class="producto__chip-fill" aria-hidden="true"></li>}
+          </ul>
+        </section>
+      )}
+
+      <section class="producto__part" aria-labelledby="documentacion-title">
+        <h2 class="producto__part-title t-h3" id="documentacion-title">Documentación</h2>
+        <ul class="producto__docs">
+          {product.documents.length > 0 ? (
+            product.documents.map(document => (
+              <li>
+                <a class="producto__doc cell-link" href={document.url} target="_blank" rel="noopener noreferrer">
+                  <Icon name="file-text" class="icon--24" />
+                  <span class="producto__doc-label">{document.label}<span class="vh"> (se abre en otra pestaña)</span></span>
+                  <Icon name="external-link" />
+                </a>
+              </li>
+            ))
+          ) : (
+            <li>
+              <a class="producto__doc cell-link" href={datasheet.whatsapp} data-page-link={pageLink}>
+                <Icon name="file-text" class="icon--24" />
+                <span class="producto__doc-label">Solicitar ficha técnica</span>
+                <Icon name="whatsapp" />
+              </a>
+            </li>
+          )}
+        </ul>
+      </section>
+    </div>
+  </section>
+
+  <section class="section producto__help" aria-labelledby="ayuda-title">
+    <Band
+      title="¿Necesitas otra talla, color o presentación?"
+      id="ayuda-title"
+      text="Dinos qué buscas y revisamos opciones."
+      action={{ href: routes.specialRequest, label: 'Ayúdame a encontrarlo' }}
+    />
+  </section>
+  </Fragment>) : retired && (
+    <RetiredProduct product={retired} category={category} brand={brand} alternatives={alternatives} pageLink={pageLink} />
+  )}
+
+  {more.items.length > 0 && (
+    <section class="section" aria-labelledby="mas-title">
+      <SectionHead title={more.title} id="mas-title" more={{ href: routes.catalog, label: 'Ver todo el catálogo' }} />
+      <div class="products grid12">
+        {more.items.map(item => <ProductCard product={item} class="span-3" />)}
+        {moreFillSpan > 0 && <div class:list={['producto__more-fill', 'cell', `span-${moreFillSpan}`, { 'producto__more-fill--odd': moreOdd }]} aria-hidden="true"></div>}
+      </div>
+    </section>
+  )}
+
+  <PageLinkScript />
+</BaseLayout>

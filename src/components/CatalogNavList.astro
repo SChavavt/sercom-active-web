@@ -1,0 +1,63 @@
+---
+// Lista de enlaces de la barra lateral del catálogo (CatalogNav): una fila por categoría o por marca, con el
+// número de productos alineado a la derecha en cifras tabulares (solo si es mayor que cero). La fila de la
+// página actual lleva aria-current="page" y el cuadro azul sólido.
+// Con `collapseAfter`, las filas que siguen quedan dentro de un <details> nativo que se abre en su lugar sin
+// JavaScript («Ver todas las marcas» / «Ver menos marcas»). La fila actual nunca queda escondida: si está más
+// abajo del corte, se muestra justo después de las visibles (y no se repite entre las plegadas).
+//
+// Uso:
+//   <CatalogNavList items={[{ label: 'Ansell', href: '/marcas/ansell/', count: 0, current: false }]}
+//     collapseAfter={8} moreLabel="Ver todas las marcas" lessLabel="Ver menos marcas" />
+import { resultSummary } from '../lib/search.mjs';
+import Icon from './Icon.astro';
+
+export interface CatalogNavItem {
+  label: string;
+  href: string;
+  /** Productos de la fila; no se muestra si es cero. */
+  count: number;
+  /** Página actual. */
+  current?: boolean;
+}
+
+interface Props {
+  items: readonly CatalogNavItem[];
+  /** Filas visibles antes de plegar el resto. Sin él, todas visibles. */
+  collapseAfter?: number;
+  /** Texto del control cuando el resto está plegado. */
+  moreLabel?: string;
+  /** Texto del control cuando el resto está abierto. */
+  lessLabel?: string;
+}
+
+const { items, collapseAfter, moreLabel = '', lessLabel = '' } = Astro.props;
+const cut = collapseAfter ?? items.length;
+// La fila actual que cae después del corte se muestra a continuación de las visibles y sale de las plegadas:
+// la lista sigue plegada después de `collapseAfter` filas aunque la página actual sea la última.
+const late = items.slice(cut).filter(item => item.current);
+const visible = [...items.slice(0, cut), ...late];
+const rest = items.slice(cut).filter(item => !item.current);
+/** Nombre de una fila con productos: «{nombre}, {n productos}». Leído de su contenido, el navegador pone un espacio
+ * entre el nombre y el número oculto («Protección de manos , 1 producto»). Sin productos, el nombre es su texto.
+ * Entre el nombre y el número va un espacio (la fila es flex: no se dibuja) para que el texto que se ve se lea
+ * «Protección de manos 1» y no «Protección de manos1», y siga contenido en el nombre (WCAG 2.5.3). */
+const rowLabel = (item: CatalogNavItem) => (item.count > 0 ? `${item.label}, ${resultSummary(item.count)}` : undefined);
+---
+{visible.length > 0 && (
+  <ul class="catalog-nav__list">
+    {visible.map(item => (
+      <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && ' '}{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+    ))}
+  </ul>
+)}
+{rest.length > 0 && (
+  <details class="catalog-nav__more">
+    <summary class="catalog-nav__toggle"><span class="catalog-nav__toggle-more">{moreLabel}</span><span class="catalog-nav__toggle-less">{lessLabel}</span><Icon name="chevron-down" class="icon--18" /></summary>
+    <ul class="catalog-nav__list">
+      {rest.map(item => (
+        <li><a class="catalog-nav__link" href={item.href} aria-current={item.current ? 'page' : undefined} aria-label={rowLabel(item)}>{item.current && <span class="catalog-nav__mark" aria-hidden="true"></span>}<span class="catalog-nav__name">{item.label}</span>{item.count > 0 && ' '}{item.count > 0 && <span class="catalog-nav__count"><span aria-hidden="true">{item.count}</span><span class="vh">, {resultSummary(item.count)}</span></span>}</a></li>
+      ))}
+    </ul>
+  </details>
+)}

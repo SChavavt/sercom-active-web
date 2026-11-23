@@ -1,0 +1,29 @@
+---
+// Tarjeta de entrada (`.entry`): una de las tres formas de pedir ayuda (explorar, cotizar mi lista,
+// ayúdame a encontrarlo). Pictograma de 56 px, título, antetítulo azul, texto y la esquina azul con flecha;
+// toda la tarjeta es el enlace del título. Ocupa 4 columnas (tres por fila).
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props {
+  href: string;
+  icon: IconName;
+  title: string;
+  kicker: string;
+  text: string;
+  /** 3 bajo un H2 de sección; 2 cuando las tarjetas suben a la portada sin título propio (producción). */
+  headingLevel?: 2 | 3;
+}
+
+const { href, icon, title, kicker, text, headingLevel = 3 } = Astro.props;
+const Heading = `h${headingLevel}` as 'h2' | 'h3';
+---
+<article class="entry span-4">
+  <Icon name={icon} class="entry__icon icon--art" />
+  <div class="entry__body">
+    <Heading class="entry__title"><a href={href}>{title}</a></Heading>
+    <p class="entry__kicker label">{kicker}</p>
+    <p class="entry__text">{text}</p>
+  </div>
+  <span class="entry__go" aria-hidden="true"><Icon name="arrow-right" class="icon--24" /></span>
+</article>

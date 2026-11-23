@@ -1,0 +1,15 @@
+---
+// Banda de solicitud especial al final del catálogo, de las páginas de categoría y de marca y de la página de un
+// producto retirado: «¿Buscas algo que no aparece en el catálogo?» → «Ayúdame a encontrarlo».
+// Uso:  <CatalogBand />   (una por página: el id del título es fijo)
+import { routes } from '../lib/site-data.mjs';
+import Band from './Band.astro';
+---
+<section class="section" aria-labelledby="especial-title">
+  <Band
+    title="¿Buscas algo que no aparece en el catálogo?"
+    id="especial-title"
+    text="Envíanos una descripción, foto, marca o modelo y la cantidad que necesitas. Revisaremos opciones para conseguirlo y cotizarlo."
+    action={{ href: routes.specialRequest, label: 'Ayúdame a encontrarlo' }}
+  />
+</section>

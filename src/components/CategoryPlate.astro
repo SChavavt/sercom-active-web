@@ -1,0 +1,65 @@
+---
+// Placa de categorías de la portada y de la página 404 (`.plate`): un mosaico por categoría con su pictograma
+// de 64 px, el número y el nombre corto, y al final la celda ancha «Solicitud especial · Ayúdame a encontrarlo».
+// Seis mosaicos por fila en computadora, cuatro en tableta y dos en celular; la celda ancha ocupa 4, 6 y 12
+// columnas y cierra la última fila apoyada a la derecha, como en la maqueta (diez categorías). Con otro número
+// de categorías, celdas blancas (GridFill) completan las filas antes de la celda ancha, o al final sin ella.
+// El nombre visible es el corto («Manos»); el nombre accesible es el completo («Protección de manos»).
+// Solo se dibuja si hay categorías: en producción hoy no hay ninguna (la página no debe llamarlo).
+import type { PublicCategory } from '../types/site.ts';
+import { gridFill } from '../lib/grid-fill.mjs';
+import { categoryIcon } from '../lib/icons.ts';
+import { routes } from '../lib/site-data.mjs';
+import GridFill from './GridFill.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  categories: readonly PublicCategory[];
+  /** Agrega la celda de solicitud especial al final (por omisión, sí). */
+  special?: boolean;
+}
+
+const { categories, special = true } = Astro.props;
+const two = (n: number) => String(n).padStart(2, '0');
+const fill = gridFill(categories.length, {
+  lg: { span: 2, tail: special ? 4 : 0 },
+  md: { span: 3, tail: special ? 6 : 0 },
+  sm: { span: 6, tail: special ? 12 : 0 },
+});
+
+/** Parte el nombre completo alrededor del nombre corto: lo que sobra va oculto a la vista pero se lee. */
+function nameParts(category: PublicCategory) {
+  const index = category.name.toLowerCase().indexOf(category.shortName.toLowerCase());
+  if (index === -1) return null;
+  return { pre: category.name.slice(0, index), post: category.name.slice(index + category.shortName.length) };
+}
+---
+<nav class="plate-nav" aria-label="Categorías del catálogo">
+  <ul class="plate grid12">
+    {categories.map((category, index) => {
+      const parts = nameParts(category);
+      return (
+        <li class="span-2">
+          <a class="tile cell-link" href={category.url}>
+            <Icon name={categoryIcon(category.id)} class="tile__icon icon--fine" />
+            <span class="tile__num label" aria-hidden="true">{two(index + 1)}</span>
+            {parts ? (
+              <span class="tile__name">{parts.pre && <span class="vh">{parts.pre}</span>}{category.shortName}{parts.post && <span class="vh">{parts.post}</span>}</span>
+            ) : (
+              <span class="tile__name"><span class="vh">{category.name}</span><span aria-hidden="true">{category.shortName}</span></span>
+            )}
+          </a>
+        </li>
+      );
+    })}<GridFill as="li" cells={fill} />
+    {special && (
+      <li class="plate__special span-4">
+        <a class="tile tile--wide cell-link" href={routes.specialRequest}>
+          <Icon name="zoom-question" class="tile__icon icon--fine" />
+          <span class="tile__name"><span class="tile__kicker label">Solicitud especial</span>Ayúdame a encontrarlo</span>
+          <Icon name="arrow-right" class="tile__go icon--24" />
+        </a>
+      </li>
+    )}
+  </ul>
+</nav>

@@ -1,0 +1,73 @@
+---
+// Cotizar mi lista (/cotizar/). Página honesta del paso 1: qué enviar, el borrador que abrirán los botones
+// y las dos acciones (WhatsApp y correo con la plantilla de lista). El sitio no envía nada ni guarda la
+// lista: abre un borrador en la aplicación del cliente. La lista en el sitio llega en el paso 2.
+// Misma estructura que /solicitud-especial/: título con acciones, registro numerado junto al borrador,
+// notas y datos de contacto. No depende del catálogo: se ve igual en los dos modos.
+// Textos: brief de páginas «atencion», sección 1.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ActionRow from '../../components/ActionRow.astro';
+import ContactData from '../../components/ContactData.astro';
+import DraftMessage from '../../components/DraftMessage.astro';
+import ItemRegister from '../../components/ItemRegister.astro';
+import Monogram from '../../components/Monogram.astro';
+import Note from '../../components/Note.astro';
+import PageHeader from '../../components/PageHeader.astro';
+import SectionHead from '../../components/SectionHead.astro';
+import { contactDetails, contactLinks } from '../../lib/contact.mjs';
+import { routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/atencion.css';
+
+const list = contactLinks.list();
+
+const items = [
+  { label: 'Marca', text: 'La marca del producto, si la conoces.' },
+  { label: 'Código o modelo', text: 'Si no lo tienes, describe el producto.' },
+  { label: 'Cantidad', text: 'Cuántas unidades necesitas de cada producto.' },
+  { label: 'Unidad', text: 'Pieza, par, caja o paquete.' },
+  { label: 'Talla o color', text: 'Solo si aplica.' },
+  { label: 'Lugar de entrega', text: 'Ciudad o código postal.' },
+  { label: 'Fecha requerida', text: 'Para cuándo lo necesitas.' },
+];
+---
+<BaseLayout
+  title="Cotizar mi lista"
+  description="Cómo enviar tu lista de marcas, códigos y cantidades por WhatsApp o por correo para preparar tu cotización."
+>
+  <PageHeader
+    title="Cotizar mi lista"
+    breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Cotizar mi lista' }]}
+    lead="¿Ya tienes marcas, códigos o cantidades? Envíanos tu lista y preparamos la cotización."
+  >
+    <ActionRow href={list.whatsapp} primary icon="whatsapp">Enviar mi lista por WhatsApp</ActionRow>
+    <ActionRow href={list.mailto} icon="mail">Enviar mi lista por correo</ActionRow>
+  </PageHeader>
+
+  <section class="section" aria-labelledby="enviar-title">
+    <SectionHead title="Qué enviar" id="enviar-title" />
+    <div class="grid12">
+      <div class="atencion__col span-8 span-md-12">
+        <ItemRegister items={items} />
+        <p class="atencion__enough">No necesitas tener todos los datos: con el producto o su descripción, la cantidad y la unidad podemos empezar.</p>
+      </div>
+      <DraftMessage text={list.text} id="borrador-title" class="span-4 span-md-12" />
+    </div>
+    <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
+    <Note icon="file-text">Si tienes tu lista en Excel, PDF o foto, adjúntala en la conversación de WhatsApp o en el correo.</Note>
+  </section>
+
+  <section class="section" aria-labelledby="atencion-title">
+    <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
+      <Monogram slot="side" />
+    </SectionHead>
+    {/* Como en la portada y en Contacto: la entrada en 5 columnas y los datos a la derecha en 7; en tableta y
+        celular se apilan en el mismo orden */}
+    <div class="grid12">
+      <div class="atencion__side span-5 span-md-12">
+        <div class="atencion__intro"><p class="t-lead">Conoce las categorías y las marcas que manejamos.</p></div>
+        <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
+      </div>
+      <ContactData class="contact__data span-7" whatsappHref={list.whatsapp} mailHref={list.mailto} />
+    </div>
+  </section>
+</BaseLayout>
