@@ -321,6 +321,7 @@ const items = [
       const writeFailed = document.querySelector<HTMLElement>('[data-quote-write-failed]');
       const tools = document.querySelector<HTMLElement>('[data-quote-tools]');
       const storageNote = document.querySelector<HTMLElement>('[data-storage-note]');
+      const longNotice = main.querySelector<HTMLElement>('[data-long-notice]');
       const labels = list.dataset;
       const available = quoteStore.available();
       // Lo que este navegador guarda ahora, para la nota de abajo (`refreshStorageNote`): la lista y lo escrito en los
@@ -848,7 +849,8 @@ const items = [
       // El foco no se pierde: si lo que lo tenía se va con el cambio (su renglón cambió o ya no está, o era la línea de
       // estado, que se oculta), pasa al mismo control del renglón que quedó en su lugar si es del mismo producto; si no,
       // al título de la sección, y si la sección entera se oculta, al título de la sección de los campos. Un cambio de
-      // otra pestaña se dice en la región viva: llega sin que el visitante haya hecho nada en esta página.
+      // otra pestaña se dice en la región viva: llega sin que el visitante haya hecho nada en esta página. Si además deja
+      // el mensaje sin caber en un enlace, se dice junto con el aviso de la lista larga.
       const rowControls = [
         '[data-row-link]', '[data-quote-remove]', '[data-row-variant]', '[data-stepper-minus]', '[data-stepper-input]',
         '[data-stepper-plus]', '[data-row-unit]', '[data-quote-merge]',
@@ -861,6 +863,7 @@ const items = [
         const heldProduct = heldAt >= 0 ? lines[heldAt]?.productId : undefined;
         const heldControl = held ? rowControls.find(selector => held.matches(selector)) : undefined;
         const changed = JSON.stringify(stored.map(keyOf)) !== JSON.stringify(lines.map(keyOf));
+        const wasLong = longNotice ? !longNotice.hidden : false;
         hideStatus();
         hideWriteFailed();
         setListKept(available);
@@ -873,7 +876,14 @@ const items = [
             : null;
           (twin && !twin.closest('[hidden]') ? twin : section.hidden ? fieldsHeading : heading)?.focus();
         }
-        if (changed && source === 'storage' && status.dataset.changedElsewhere) page.announce(status.dataset.changedElsewhere);
+        if (changed && source === 'storage' && status.dataset.changedElsewhere) {
+          // Si con el cambio el mensaje dejó de caber en un enlace, `render` acaba de pedir que se diga el aviso de la
+          // lista larga, y una segunda frase lo borraría antes de que se lea. Se dicen juntas, como frase del estado
+          // largo: se borra cuando el mensaje vuelve a caber.
+          const notice = !wasLong && longNotice && !longNotice.hidden ? longNotice.querySelector('[data-status-text]')?.textContent ?? '' : '';
+          if (notice) page.announce(`${status.dataset.changedElsewhere} ${notice}`, 'long');
+          else page.announce(status.dataset.changedElsewhere);
+        }
       });
 
       // ---- los campos ------------------------------------------------------------------------------------------------
