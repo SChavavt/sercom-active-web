@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSiteData, DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE, routes } from '../src/lib/site-data-core.mjs';
+import { searchText } from '../src/lib/search.mjs';
 import { allKeys, allStrings, emptiedCatalog, loadProjectData, publicCatalog } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
@@ -19,7 +20,7 @@ const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 
 const CATEGORY_KEYS = ['id', 'name', 'shortName', 'summary', 'isDraft', 'productCount', 'url'];
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'productCount', 'url'];
-const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'image', 'documents', 'isExample'];
+const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'standards', 'image', 'documents', 'isExample'];
 // Nombres de campos internos que nunca deben verse en los datos públicos.
 const INTERNAL_KEYS = ['approval', 'source', 'status', 'sourceUrl', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
 
@@ -177,7 +178,7 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
       { id: 'talla-7', label: 'Talla 7', code: 'EJ-1001-7' }, { id: 'talla-8', label: 'Talla 8', code: 'EJ-1001-8' },
       { id: 'talla-9', label: 'Talla 9', code: 'EJ-1001-9' }, { id: 'talla-10', label: 'Talla 10', code: 'EJ-1001-10' },
     ],
-    image: null, documents: [], isExample: true,
+    standards: [], image: null, documents: [], isExample: true,
   });
 });
 
@@ -215,6 +216,7 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
     brandId: 'ansell', brandName: 'Ansell', code: 'TEST-001/A', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
     summary: 'No es un artículo comercial.', characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'], saleUnit: 'pieza',
     variants: [{ id: 'talla-9', label: 'Talla 9', code: 'TEST-001/A-9' }],
+    standards: [],
     image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     isExample: false,
@@ -253,6 +255,26 @@ test('la foto de una ficha llega a la forma pública como { file, alt } o { url,
   // Los ejemplos de la vista previa siguen sin foto.
   const preview = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog() });
   assert.ok(preview.products.filter(product => product.isExample).every(product => product.image === null));
+});
+
+test('las normas de una ficha llegan a la forma pública como su texto, sin su fuente; un ejemplo no tiene normas', () => {
+  const site = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.standards = [
+      { text: 'Norma sintética 100', sourceUrl: 'https://example.invalid/norma-a' },
+      { text: 'Norma sintética 200 nivel 3', sourceUrl: 'https://example.invalid/norma-b' },
+    ];
+  }) });
+  assert.deepEqual(site.getProduct('test-001')?.standards, ['Norma sintética 100', 'Norma sintética 200 nivel 3']);
+  assert.ok(Object.isFrozen(site.getProduct('test-001')?.standards));
+  // Las normas se muestran en la ficha; la búsqueda del catálogo no las lee.
+  assert.doesNotMatch(searchText(site.getProduct('test-001')), /norma/);
+  assert.ok(site.products.filter(product => product.isExample).every(product => product.standards.length === 0));
+  const data = JSON.parse(JSON.stringify(printable(site)));
+  assert.doesNotMatch(allStrings(data).join(' | '), /norma-a|norma-b/);
+  assert.ok(!new Set(allKeys(data)).has('sourceUrl'));
+  // Sin normas, la lista está vacía.
+  const without = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.deepEqual(without.getProduct('test-001')?.standards, []);
 });
 
 test('una variante sin código propio llega a la forma pública con el código vacío', () => {

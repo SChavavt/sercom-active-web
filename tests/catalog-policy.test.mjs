@@ -320,3 +320,61 @@ test('lo publicado de la imagen es exactamente { file, alt } o { url, width, hei
     assert.equal('usageConfirmed' in product.image, false);
   }
 });
+
+// --- Normas (`standards`): cada una con su texto y la página del fabricante donde consta, en cualquier estado -------
+const NORM_SOURCE = 'https://example.invalid/ficha-del-fabricante';
+const norm = (text, extra = {}) => ({ text, sourceUrl: NORM_SOURCE, ...extra });
+const NORMS_12 = Array.from({ length: 12 }, (_, i) => norm(`Norma sintética de prueba ${i + 1}:2020 nivel ${i % 4 + 1}`));
+
+test('las normas son una lista de 1 a 12, cada una con text y sourceUrl y ninguna otra clave, en cualquier estado', () => {
+  for (const status of STATUSES) {
+    assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A')] }), [], status);
+    assert.deepEqual(errorsOf({ status, standards: NORMS_12 }), [], status);
+    // Sin normas, la clave no va.
+    assert.deepEqual(errorsOf({ status, standards: undefined }), [], status);
+    assert.deepEqual(errorsOf({ status, standards: [] }), ['products[0].standards: está vacía; si el producto no tiene normas, quita la clave.'], status);
+    assert.deepEqual(errorsOf({ status, standards: [...NORMS_12, norm('Otra norma sintética')] }), ['products[0].standards: tiene 13 normas y el máximo es 12; deja las principales.'], status);
+    assert.deepEqual(errorsOf({ status, standards: 'EN 388:2016 4131A' }), ['products[0].standards: debe ser una lista de normas, cada una con text y sourceUrl.'], status);
+    assert.deepEqual(errorsOf({ status, standards: ['EN 388:2016 4131A'] }), ['products[0].standards[0]: debe ser un objeto con text y sourceUrl.'], status);
+    assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A', { nivel: '4131A' })] }), ['products[0].standards[0].nivel: campo no definido.'], status);
+  }
+});
+
+test('el texto de una norma va limpio, en una línea, con 80 caracteres como máximo y sin repetirse en la ficha', () => {
+  const at = (i, field, message) => `products[0].standards[${i}].${field}: ${message}`;
+  for (const status of STATUSES) {
+    const cases = [
+      [[{ sourceUrl: NORM_SOURCE }], [at(0, 'text', 'falta; escribe la norma como la imprime el fabricante.')]],
+      [[norm('')], [at(0, 'text', 'está vacío; escribe la norma como la imprime el fabricante.')]],
+      [[norm(388)], [at(0, 'text', 'debe ser un texto.')]],
+      // La misma regla del texto limpio que los demás campos de la ficha, con sus mismos mensajes.
+      [[norm('EN 388:2016  4131A')], [at(0, 'text', 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.')]],
+      [[norm('EN 388:2016\n4131A')], [at(0, 'text', 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.')]],
+      [[norm('EN 388:2016‍ 4131A')], [at(0, 'text', 'tiene un carácter invisible (U+200D) después de «EN 388:2016»; borra esa parte y escríbela de nuevo.')]],
+      [[norm('A'.repeat(81))], [at(0, 'text', 'tiene 81 caracteres y el máximo es 80; escribe solo la designación de la norma.')]],
+      // Repetida, comparada como compara el sitio: sin acentos, sin mayúsculas.
+      [[norm('EN 388:2016 4131A'), norm('Categoría III'), norm('CATEGORIA III')], [at(2, 'text', 'repite la norma de standards[1]; escribe cada norma una vez.')]],
+    ];
+    for (const [standards, messages] of cases) assert.deepEqual(errorsOf({ status, standards }), messages, `${status} ${JSON.stringify(standards)}`);
+  }
+  // 80 caracteres sí; se cuentan como se leen.
+  assert.deepEqual(errorsOf({ standards: [norm('Á'.repeat(80))] }), []);
+});
+
+test('cada norma lleva la dirección https del fabricante donde consta', () => {
+  const where = 'escribe la página o el documento del fabricante donde consta esta norma para este producto.';
+  for (const status of STATUSES) {
+    assert.deepEqual(errorsOf({ status, standards: [{ text: 'EN 388:2016 4131A' }] }), [`products[0].standards[0].sourceUrl: falta; ${where}`], status);
+    for (const sourceUrl of ['http://example.invalid/ficha', 'ficha del fabricante', '', 'https://usuario:clave@example.invalid/ficha']) {
+      assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A', { sourceUrl })] }), [`products[0].standards[0].sourceUrl: debe ser una dirección https; ${where}`], `${status} ${sourceUrl}`);
+    }
+  }
+});
+
+test('lo publicado de las normas es solo su texto, en el orden de los datos; sin normas, una lista vacía', () => {
+  const [withNorms, without] = getPublishedProducts(catalogWith({ standards: [norm('EN 388:2016 4131A'), norm('ANSI/ISEA 105-2016 A4')] }, {}), registry);
+  assert.deepEqual(withNorms.standards, ['EN 388:2016 4131A', 'ANSI/ISEA 105-2016 A4']);
+  assert.deepEqual(without.standards, []);
+  assert.equal(JSON.stringify(withNorms).includes('sourceUrl'), false);
+  assert.equal(JSON.stringify(withNorms).includes(NORM_SOURCE), false);
+});

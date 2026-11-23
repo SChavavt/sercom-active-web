@@ -16,12 +16,20 @@ const isHttps = value => {
 export const mentionsExcludedBrand = value => /\bgisa\b|guantes?\s+internacionales?/.test(normalize(value));
 const excluded = mentionsExcludedBrand;
 const forbidden = /^(price|prices|precio|precios|cost|costs|costo|costos|stock|inventory|inventario)$/;
-const productKeys = new Set(['id', 'brandId', 'model', 'name', 'categoryIds', 'status', 'description', 'characteristics', 'saleUnit', 'variants', 'image', 'source', 'approval', 'documents']);
+const productKeys = new Set(['id', 'brandId', 'model', 'name', 'categoryIds', 'status', 'description', 'characteristics', 'saleUnit', 'variants', 'standards', 'image', 'source', 'approval', 'documents']);
 const categoryKeys = new Set(['id', 'name', 'shortName', 'summary', 'status']);
 // Claves de los objetos dentro de una ficha. Con `manufacturerCode` opcional, una clave mal escrita
 // (`manufacturerCodes`) diría en silencio «sin código»: por eso cada objeto acepta solo las suyas. La imagen tiene dos
 // formas, cada una con sus claves (abajo).
 const variantKeys = new Set(['id', 'label', 'manufacturerCode']);
+const standardKeys = new Set(['text', 'sourceUrl']);
+// Normas de una ficha (`standards`): de 1 a 12, cada una con la designación tal como la imprime el fabricante (`text`)
+// y la página o el documento del fabricante donde consta para ese producto (`sourceUrl`, que no se publica). Una norma
+// se escribe solo ahí: en los demás campos la revisión de texto la rechaza (scripts/catalog-text.mjs).
+/** Normas que puede llevar una ficha como máximo. */
+export const MAX_STANDARDS = 12;
+/** Largo máximo de la designación de una norma. */
+export const MAX_STANDARD_LENGTH = 80;
 const documentKeys = new Set(['label', 'url']);
 const sourceKeys = new Set(['url', 'checkedOn']);
 const approvalKeys = new Set(['by', 'on', 'supplyConfirmed']);
@@ -127,6 +135,44 @@ function inspectImage(image, productPath, errors, line) {
   if (typeof image.usageConfirmed !== 'boolean') errors.push(`${path}.usageConfirmed: debe ser true o false; true solo con el uso de la foto confirmado.`);
 }
 
+/**
+ * Revisa las normas de una ficha (`standards`), en cualquier estado: una lista de 1 a `MAX_STANDARDS` objetos con
+ * `text` y `sourceUrl` y ninguna otra clave. `text` es texto limpio de una línea, de `MAX_STANDARD_LENGTH` caracteres
+ * como máximo, y no se repite en la ficha (comparado con `normalizeText`); `sourceUrl` es una dirección `https`.
+ * @param {(field: string, value: unknown, covered: boolean, empty: string) => void} line revisa que un texto de la ficha esté limpio
+ */
+function inspectStandards(standards, productPath, errors, line) {
+  const path = `${productPath}.standards`;
+  if (!Array.isArray(standards)) {
+    errors.push(`${path}: debe ser una lista de normas, cada una con text y sourceUrl.`);
+    return;
+  }
+  if (standards.length === 0) errors.push(`${path}: está vacía; si el producto no tiene normas, quita la clave.`);
+  if (standards.length > MAX_STANDARDS) errors.push(`${path}: tiene ${standards.length} normas y el máximo es ${MAX_STANDARDS}; deja las principales.`);
+  // Norma ya vista (con `normalizeText`) → su posición.
+  const seen = new Map();
+  const where = 'escribe la página o el documento del fabricante donde consta esta norma para este producto.';
+  standards.forEach((standard, i) => {
+    const entry = `${path}[${i}]`;
+    if (!isRecord(standard)) {
+      errors.push(`${entry}: debe ser un objeto con text y sourceUrl.`);
+      return;
+    }
+    unknownKeys(standard, standardKeys, entry, errors);
+    const { text } = standard;
+    if (text === undefined) errors.push(`${entry}.text: falta; escribe la norma como la imprime el fabricante.`);
+    else line(`standards[${i}].text`, text, false, 'está vacío; escribe la norma como la imprime el fabricante.');
+    if (isText(text)) {
+      const length = [...text].length;
+      if (length > MAX_STANDARD_LENGTH) errors.push(`${entry}.text: tiene ${length} caracteres y el máximo es ${MAX_STANDARD_LENGTH}; escribe solo la designación de la norma.`);
+      const key = normalizeText(text);
+      if (seen.has(key)) errors.push(`${entry}.text: repite la norma de standards[${seen.get(key)}]; escribe cada norma una vez.`);
+      else seen.set(key, i);
+    }
+    if (!isHttps(standard.sourceUrl)) errors.push(`${entry}.sourceUrl: ${standard.sourceUrl === undefined ? 'falta' : 'debe ser una dirección https'}; ${where}`);
+  });
+}
+
 /** Valida el archivo editorial completo antes de producir una salida pública. */
 export function validateCatalog(catalog, registry) {
   const errors = [];
@@ -202,6 +248,7 @@ export function validateCatalog(catalog, registry) {
       if (isRecord(d)) line(`documents[${i}].label`, d.label, true);
     });
     if (p.image !== undefined) inspectImage(p.image, path, errors, line);
+    if (p.standards !== undefined) inspectStandards(p.standards, path, errors, line);
 
     // Nombres únicos en todo el catálogo, también entre borradores: «Cotizar mi lista» nombra los controles de cada
     // renglón con el nombre del producto y la etiqueta de su variante (`rowControlNames` en quote-list.mjs), y dos
@@ -270,6 +317,8 @@ export function getPublishedProducts(catalog, registry) {
     categoryIds: [...p.categoryIds], description: p.description,
     characteristics: [...p.characteristics], saleUnit: p.saleUnit,
     variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, ...(v.manufacturerCode !== undefined && { manufacturerCode: v.manufacturerCode }) })),
+    // De cada norma, solo su texto: la fuente no se publica.
+    standards: (p.standards ?? []).map(s => s.text),
     image: publicImage(p.image),
     documents: (p.documents ?? []).map(d => ({ label: d.label, url: d.url })),
   }));

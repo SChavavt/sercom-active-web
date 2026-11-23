@@ -7,14 +7,17 @@
 //      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección; la fila de
 //      ruta lleva la misma marca y en computadora se queda en un renglón, con el nombre cortado con «…»),
 //      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
-//      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
-//      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
+//      disponibilidad, «Características», «Normas» (solo con normas en los datos), «Variantes» y «Documentación»: las
+//      acciones quedan a la vista sin bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
 //      dos partes se apilan, la imagen primero y baja.
 //   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
 //   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
 //   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
 //   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
 //   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
+// «Normas»: una fila por norma, con el texto tal como lo imprime el fabricante y en el orden de los datos, y debajo de
+// dónde sale («Según la información publicada por el fabricante.»). Las normas solo se muestran aquí: ni en las
+// tarjetas, ni en la búsqueda, ni en los mensajes, ni en la descripción de la página.
 // La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización». Cada variante
 // lleva su etiqueta y, si tiene código propio, el código.
 // Volver a los resultados: si la ficha se abrió desde el catálogo con una búsqueda o filtros (la dirección de la página
@@ -171,6 +174,16 @@ const moreOdd = more.items.length % 2 === 1;
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {product.standards.length > 0 && (
+        <section class="producto__part" aria-labelledby="normas-title">
+          <h2 class="producto__part-title t-h3" id="normas-title">Normas</h2>
+          <ul class="producto__norms">
+            {product.standards.map(standard => <li class="producto__norm">{standard}</li>)}
+          </ul>
+          <Note>Según la información publicada por el fabricante.</Note>
         </section>
       )}
 

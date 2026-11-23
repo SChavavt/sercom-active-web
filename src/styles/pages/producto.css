@@ -63,7 +63,7 @@
 .producto__summary { padding: var(--s-6) var(--pad) var(--s-7); }
 .producto__summary p { max-width: 62ch; font-size: 1.0625rem; text-wrap: pretty; }
 
-/* Bloques con título: Características, Variantes, Documentación */
+/* Bloques con título: Características, Normas, Variantes, Documentación */
 .producto__part { display: grid; gap: var(--line); }
 .producto__part-title { padding: var(--s-7) var(--pad) var(--s-3); background: var(--surface); }
 
@@ -78,6 +78,11 @@
   text-wrap: pretty;
 }
 .producto__num { color: var(--grey-600); font-size: var(--label-sm); font-variant-numeric: tabular-nums; }
+
+/* Normas: una fila por norma, tal como la imprime el fabricante; una designación larga se parte dentro de su celda
+   (también una sin espacios) y nunca sale de ella. Debajo, la nota de dónde salen (.note) */
+.producto__norms { display: grid; gap: var(--line); }
+.producto__norm { padding: var(--s-4) var(--pad); background: var(--surface); overflow-wrap: anywhere; text-wrap: pretty; }
 
 /* Variantes: información, no controles (sin cursor ni cambio al pasar). En computadora, una fila por variante
    con su código a la derecha: en 5 columnas no cabe una división que caiga sobre la retícula. En tableta y

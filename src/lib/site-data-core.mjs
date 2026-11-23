@@ -338,6 +338,8 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         saleUnit: product.saleUnit,
         // Una variante sin código propio lleva `code: ''`: la ficha muestra solo su etiqueta y el mensaje no lleva código.
         variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
+        // Solo el texto de cada norma: la ficha las muestra en «Normas» y ninguna otra parte del sitio las usa.
+        standards: [...product.standards],
         // Solo lo que dibuja la página: el archivo o la dirección con sus medidas, y el texto alternativo.
         image: 'file' in product.image
           ? { file: product.image.file, alt: product.image.alt }
@@ -359,6 +361,7 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
       characteristics: [...example.characteristics],
       saleUnit: example.saleUnit,
       variants: example.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.code })),
+      standards: [],
       image: null,
       documents: [],
       isExample: true,

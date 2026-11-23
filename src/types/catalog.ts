@@ -30,6 +30,12 @@ export interface Product {
   saleUnit?: string;
   /** `manufacturerCode` es opcional: muchas tallas no tienen un código propio. Si la clave está, no puede ir vacía. */
   variants?: { id: string; label: string; manufacturerCode?: string }[];
+  /**
+   * Normas, de 1 a 12: la designación tal como la imprime el fabricante (`text`, una línea de 80 caracteres como máximo,
+   * sin repetirse) y la página o el documento del fabricante donde consta para este producto (`sourceUrl`, no se
+   * publica). Sin normas, la clave no va. Una norma se escribe solo aquí.
+   */
+  standards?: { text: string; sourceUrl: string }[];
   /** Una de dos formas (ver `ProductImage`). Obligatoria para `approved`, con `usageConfirmed: true`. */
   image?: ProductImage;
   source?: { url: string; checkedOn: string };
@@ -48,6 +54,8 @@ export interface PublishedProduct {
   saleUnit: string;
   /** Sin `manufacturerCode` cuando la variante no tiene código propio. */
   variants: { id: string; label: string; manufacturerCode?: string }[];
+  /** Solo el texto de cada norma, en el orden de los datos; lista vacía sin normas. */
+  standards: string[];
   image: PublishedImage;
   documents: { label: string; url: string }[];
 }

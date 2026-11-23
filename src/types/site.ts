@@ -94,6 +94,8 @@ export interface PublicProduct {
   readonly characteristics: readonly string[];
   readonly saleUnit: string;
   readonly variants: readonly PublicVariant[];
+  /** Normas del fabricante, solo su texto, en el orden de los datos; lista vacía sin normas y en todos los ejemplos. */
+  readonly standards: readonly string[];
   /** `null` cuando no hay fotografía (todos los ejemplos): la página muestra el icono de la categoría. */
   readonly image: PublicImage | null;
   readonly documents: readonly PublicDocument[];
