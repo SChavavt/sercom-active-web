@@ -1,6 +1,8 @@
 // @ts-check
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
-// vista de la lista para esa página y las frases que se muestran.
+// vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
+// funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`) y qué
+// productos van en el mensaje (`listMessageItems`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
 // `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar; lo demás, en el navegador.
 //
@@ -10,7 +12,7 @@
 // agrega lo mismo otra vez desde la página del producto (`addLine`) o pulsa «Unirlos» en la página de cotizar
 // (`mergeLines`). Ninguna función cambia sus argumentos.
 /**
- * @import { QuoteIndex, QuoteIndexMaps, QuoteIndexProduct, QuoteIndexRetired, QuoteIndexVariant, QuoteLine, QuoteRow, RemovedLine } from '../types/quote.ts'
+ * @import { QuoteDuplicate, QuoteIndex, QuoteIndexMaps, QuoteIndexProduct, QuoteIndexRetired, QuoteIndexVariant, QuoteLine, QuoteMessageItem, QuoteRow, QuoteRowOk, QuoteUndo, QuoteUndoResult, RemovedLine } from '../types/quote.ts'
  */
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -395,6 +397,46 @@ export function mergeLines(lines, keep, drop) {
   return { lines: next, ok: true, index: keep > drop ? keep - 1 : keep, previous: kept.quantity, removed };
 }
 
+/**
+ * El visitante pulsó «Deshacer» en la página de cotizar. → `{ lines, focus, kept }`:
+ *   - `'remove'`: el renglón quitado vuelve a su lugar (`restoreLines`); el foco va a ese renglón;
+ *   - `'merge'`: el renglón que se conservó vuelve a su cantidad de antes (`undo.previous`, en `undo.index`) y el otro
+ *     vuelve a su lugar; lo que el visitante cambió en otros renglones después de unir se queda. El foco va al renglón
+ *     que volvió, y `kept` es el que se conservó, ya con su cantidad de antes (la página la escribe en su campo);
+ *   - `'unknown'`: vuelven los renglones que la página no ubica; ningún renglón recibe el foco;
+ *   - `'empty'`: la lista vuelve a ser la de antes de vaciarla (`undo.previous`); ningún renglón recibe el foco.
+ * `focus` es una posición de `lines` (la del primer renglón que volvió, o la última si la lista quedó más corta) o -1;
+ * `kept` es `null` salvo al deshacer una unión. Sin `undo`, la lista como está.
+ * @param {readonly QuoteLine[]} lines
+ * @param {QuoteUndo | null | undefined} undo
+ * @returns {QuoteUndoResult}
+ */
+export function undoLines(lines, undo) {
+  if (undo?.kind === 'empty') return { lines: listOf(undo.previous), focus: -1, kept: null };
+  if (undo?.kind === 'merge') {
+    const restored = updateLine(lines, undo.index, { quantity: undo.previous }).lines;
+    const next = restoreLines(restored, undo.removed);
+    return { lines: next, focus: focusAt(next, undo.removed), kept: restored[undo.index] ?? null };
+  }
+  if (undo?.kind === 'remove') {
+    const next = restoreLines(lines, undo.removed);
+    return { lines: next, focus: focusAt(next, undo.removed), kept: null };
+  }
+  if (undo?.kind === 'unknown') return { lines: restoreLines(lines, undo.removed), focus: -1, kept: null };
+  return { lines: listOf(lines), focus: -1, kept: null };
+}
+
+/**
+ * La posición original del primer renglón quitado, sin pasar del último de `lines`; -1 si no hay renglones quitados o la
+ * lista quedó vacía.
+ * @param {readonly QuoteLine[]} lines
+ * @param {readonly RemovedLine[]} removed
+ */
+function focusAt(lines, removed) {
+  const index = Array.isArray(removed) ? removed[0]?.index ?? -1 : -1;
+  return index >= 0 && lines.length > 0 ? Math.min(index, lines.length - 1) : -1;
+}
+
 // ---- el índice público que imprime una página, y la vista de la lista para esa página ---------------------------
 
 /**
@@ -555,14 +597,22 @@ export function reconcileList(lines, maps) {
 export function duplicateOf(rows, i) {
   const row = rows[i];
   if (!Number.isInteger(i) || row?.status !== 'ok') return -1;
-  const variant = row.variant?.id ?? '';
-  const unit = unitKey(row.line.unit);
+  const identity = rowIdentity(row);
   for (let j = 0; j < i; j += 1) {
     const other = rows[j];
-    if (other?.status === 'ok' && other.product.id === row.product.id && (other.variant?.id ?? '') === variant && unitKey(other.line.unit) === unit) return j;
+    if (other?.status === 'ok' && rowIdentity(other) === identity) return j;
   }
   return -1;
 }
+
+/**
+ * Lo que pide un renglón 'ok' de la vista: el producto, la variante efectiva (`row.variant?.id ?? ''`) y la unidad
+ * (`unitKey`). Dos renglones con la misma identidad son iguales: es la única regla de `duplicateOf` y de
+ * `duplicateStates`.
+ * @param {QuoteRowOk} row
+ * @returns {string}
+ */
+const rowIdentity = row => JSON.stringify([row.product.id, row.variant?.id ?? '', unitKey(row.line.unit)]);
 
 /**
  * ¿Se puede ofrecer «Unirlos» para `rows[i]`? Tiene un renglón anterior igual (`duplicateOf`) y las dos cantidades
@@ -574,6 +624,31 @@ export function duplicateOf(rows, i) {
 export function canMerge(rows, i) {
   const j = duplicateOf(rows, i);
   return j !== -1 && rows[j].line.quantity + rows[i].line.quantity <= MAX_QUANTITY;
+}
+
+/**
+ * El estado de repetido de cada renglón, en una sola pasada (la página lo recalcula con cada tecla, con hasta
+ * `MAX_LINES` renglones): `'none'` si no repite a un renglón anterior (y para todo renglón que no está en estado 'ok');
+ * `'merge'` si lo repite y se puede unir; `'same'` si lo repite y la suma pasaría de `MAX_QUANTITY`. Para cada `i` es
+ * lo mismo que `duplicateOf(rows, i) >= 0 ? (canMerge(rows, i) ? 'merge' : 'same') : 'none'`: el renglón anterior es
+ * el PRIMERO con la misma identidad.
+ * @param {readonly QuoteRow[]} rows
+ * @returns {QuoteDuplicate[]}
+ */
+export function duplicateStates(rows) {
+  /** La posición del primer renglón 'ok' de cada identidad. @type {Map<string, number>} */
+  const first = new Map();
+  const list = Array.isArray(rows) ? rows : [];
+  return list.map((row, i) => {
+    if (row?.status !== 'ok') return 'none';
+    const identity = rowIdentity(row);
+    const j = first.get(identity);
+    if (j === undefined) {
+      first.set(identity, i);
+      return 'none';
+    }
+    return list[j].line.quantity + row.line.quantity <= MAX_QUANTITY ? 'merge' : 'same';
+  });
 }
 
 // ---- frases ----------------------------------------------------------------------------------------------------
@@ -609,6 +684,26 @@ export function lineSummary(row) {
   const quantity = quantityLabel(row.line.quantity, row.line.unit);
   if (row.product.variants.length === 0) return quantity;
   return `${quantity}, ${row.variant ? oneLine(row.variant.label) || VARIANT_PENDING : VARIANT_PENDING}`;
+}
+
+/**
+ * Los productos del mensaje de la lista, en el orden de la lista: uno por cada renglón en estado 'ok', con marca, código
+ * y nombre del índice, la cantidad con la unidad que muestra el renglón (`quantityLabel(row.line.quantity, row.unit)`:
+ * «Par» guardado por otra versión se lee «pares», como en la lista) y la variante de `variantText`. Los renglones de
+ * un producto retirado o que la página no ubica no van. La página pasa cada uno por `listItem` (contact-core.mjs).
+ * @param {readonly QuoteRow[]} rows
+ * @returns {QuoteMessageItem[]}
+ */
+export function listMessageItems(rows) {
+  return (Array.isArray(rows) ? rows : []).flatMap(row => (row?.status === 'ok'
+    ? [{
+      brandName: row.product.brandName,
+      code: row.product.code,
+      name: row.product.name,
+      quantity: quantityLabel(row.line.quantity, row.unit),
+      variant: variantText(row.product, row.variant),
+    }]
+    : []));
 }
 
 /**

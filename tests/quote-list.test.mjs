@@ -3,10 +3,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, formatQuantity, indexMaps, isNewerList,
-  isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel,
-  parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage,
-  removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
+  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, duplicateStates, formatQuantity, indexMaps,
+  isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY,
+  mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY,
+  reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, undoLines, unitKey, unitOptions,
+  unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -505,4 +506,159 @@ test('frases del mensaje y de las líneas de estado', () => {
   assert.equal(nameLabel('Quitar {nombre} ({nombre})', 'Casco $& $1'), 'Quitar Casco $& $1 (Casco $& $1)');
   assert.equal(nameLabel('Cantidad de {nombre}', '  Guante\n rojo '), 'Cantidad de Guante rojo');
   assert.equal(nameLabel('Cantidad', 'Guante'), 'Cantidad');
+});
+
+// ---- decisiones de la página de cotizar ------------------------------------------------------------------------
+// Una lista guardada «rara», como la que deja otra versión del sitio o una lista vieja: la reconcilia un índice propio
+// con productos sintéticos de cada forma (con varias variantes, con una sola, sin variantes, retirado).
+const rareIndex = indexMaps(buildQuoteIndex([
+  { id: 'guante-recubierto', name: 'Guante recubierto sintético', brandName: 'Marca Alfa', code: 'SP-110', url: '/productos/guante-recubierto/', saleUnit: 'par', isExample: false,
+    variants: [{ id: 'talla-8', label: 'Talla 8', code: 'SP-110-8' }, { id: 'talla-9', label: 'Talla 9', code: 'SP-110-9' }] },
+  { id: 'bota-con-casquillo', name: 'Bota sintética con casquillo', brandName: 'Marca Beta', code: 'SP-120', url: '/productos/bota-con-casquillo/', saleUnit: 'par', isExample: false,
+    variants: [{ id: 'talla-26', label: 'Talla 26', code: 'SP-120-26' }, { id: 'talla-27', label: 'Talla 27', code: 'SP-120-27' }] },
+  { id: 'overol', name: 'Overol sintético', brandName: 'Marca Beta', code: 'SP-130', url: '/productos/overol/', saleUnit: 'pieza', isExample: false,
+    variants: [{ id: 'g', label: 'G', code: 'SP-130-G' }, { id: 'xg', label: 'XG', code: 'SP-130-XG' }] },
+  { id: 'cono', name: 'Cono sintético', brandName: 'Marca Gamma', code: 'SP-140', url: '/productos/cono/', saleUnit: 'pieza', isExample: false,
+    variants: [{ id: 'unica', label: 'Única', code: 'SP-140-U' }] },
+  { id: 'guante-de-nitrilo', name: 'Guante de nitrilo sintético', brandName: 'Marca Alfa', code: 'SP-150', url: '/productos/guante-de-nitrilo/', saleUnit: 'caja con 100 piezas', isExample: false,
+    variants: [{ id: 'mediano', label: 'Mediano', code: 'SP-150-M' }, { id: 'grande', label: 'Grande', code: 'SP-150-G' }] },
+  { id: 'respirador', name: 'Respirador sintético', brandName: 'Marca Gamma', code: 'SP-160', url: '/productos/respirador/', saleUnit: 'caja', isExample: false, variants: [] },
+], [
+  { id: 'producto-retirado', name: 'Producto retirado sintético', brandName: 'Marca Alfa', code: 'SP-900', url: '/productos/producto-retirado/', isExample: false },
+]));
+const rareLines = deepFreeze([
+  line('guante-recubierto', 12, 'par', 'talla-8'), // 0
+  line('guante-recubierto', 5, 'pares', 'talla-8'), // 1: igual a 0, la unidad en plural (otra versión)
+  line('bota-con-casquillo', 2, 'par'), // 2: con variantes y ninguna elegida
+  line('producto-que-ya-no-existe', 3, 'pieza', 'x'), // 3: producto desconocido
+  line('producto-retirado', 1, 'pieza', 'unica'), // 4: retirado
+  line('overol', 4, 'pieza', 'xxg'), // 5: una variante que el producto no tiene
+  line('cono', MAX_QUANTITY, 'pieza', 'unica'), // 6: la cantidad máxima
+  line('guante-de-nitrilo', 3, 'tambo de 200 L', 'mediano'), // 7: una unidad que no se ofrece
+  line('respirador', 1, 'caja'), // 8: un producto sin variantes
+  line('guante-recubierto', 99990, 'Par', 'talla-8'), // 9: igual a 0; la suma pasa de 99,999
+]);
+const rareRows = deepFreeze(reconcileList(rareLines, rareIndex).rows);
+/** El estado de repetido como lo dicen duplicateOf y canMerge, renglón por renglón. */
+const expectedDuplicate = (rows, i) => (rows[i].status === 'ok' && duplicateOf(rows, i) >= 0 ? (canMerge(rows, i) ? 'merge' : 'same') : 'none');
+
+test('la lista «rara» se reconcilia como la ve la página', () => {
+  assert.deepEqual(rareRows.map(row => row.status), ['ok', 'ok', 'ok', 'unknown', 'retired', 'unknown', 'ok', 'ok', 'ok', 'ok']);
+});
+
+test('listMessageItems: un producto por renglón \'ok\', con la unidad que muestra el renglón; retirados y desconocidos no van', () => {
+  assert.deepEqual(listMessageItems(rareRows), [
+    { brandName: 'Marca Alfa', code: 'SP-110', name: 'Guante recubierto sintético', quantity: '12 pares', variant: 'Talla 8 (SP-110-8)' },
+    // «pares» guardado por otra versión: la opción de la lista es «par», y se lee igual.
+    { brandName: 'Marca Alfa', code: 'SP-110', name: 'Guante recubierto sintético', quantity: '5 pares', variant: 'Talla 8 (SP-110-8)' },
+    { brandName: 'Marca Beta', code: 'SP-120', name: 'Bota sintética con casquillo', quantity: '2 pares', variant: 'talla o color por definir' },
+    { brandName: 'Marca Gamma', code: 'SP-140', name: 'Cono sintético', quantity: '99,999 piezas', variant: 'Única (SP-140-U)' },
+    { brandName: 'Marca Alfa', code: 'SP-150', name: 'Guante de nitrilo sintético', quantity: '3 × tambo de 200 L', variant: 'Mediano (SP-150-M)' },
+    { brandName: 'Marca Gamma', code: 'SP-160', name: 'Respirador sintético', quantity: '1 caja', variant: '' },
+    // «Par» se escribe con la opción de la lista («par»), no con la mayúscula guardada.
+    { brandName: 'Marca Alfa', code: 'SP-110', name: 'Guante recubierto sintético', quantity: '99,990 pares', variant: 'Talla 8 (SP-110-8)' },
+  ]);
+  // Una unidad de venta en plural y un renglón guardado en singular: el mensaje usa la opción de la lista.
+  const plural = indexMaps(buildQuoteIndex([{ id: 'bota-sintetica', name: 'Bota sintética', brandName: 'Marca Alfa', code: 'SP-700', url: '/productos/bota-sintetica/', saleUnit: 'pares', isExample: false, variants: [] }]));
+  assert.deepEqual(listMessageItems(reconcileList([line('bota-sintetica', 1, 'par'), line('bota-sintetica', 3, 'par')], plural).rows).map(item => item.quantity), ['1 par', '3 pares']);
+  // Sin renglones, o sin ninguno 'ok': ningún producto.
+  assert.deepEqual(listMessageItems([]), []);
+  assert.deepEqual(listMessageItems(null), []);
+  assert.deepEqual(listMessageItems(rareRows.filter(row => row.status !== 'ok')), []);
+});
+
+test('duplicateStates: el singular y el plural son el mismo renglón; con la suma por encima del máximo no se unen', () => {
+  assert.deepEqual(duplicateStates(rareRows), ['none', 'merge', 'none', 'none', 'none', 'none', 'none', 'none', 'none', 'same']);
+  assert.deepEqual(duplicateStates(rareRows), rareRows.map((_, i) => expectedDuplicate(rareRows, i)));
+  // Dos renglones iguales que suman exactamente el máximo sí se unen; uno más, no.
+  const at = reconcileList([line('respirador', 99998, 'caja'), line('respirador', 1, 'Cajas')], rareIndex).rows;
+  assert.deepEqual(duplicateStates(at), ['none', 'merge']);
+  const over = reconcileList([line('respirador', 99998, 'caja'), line('respirador', 2, 'caja')], rareIndex).rows;
+  assert.deepEqual(duplicateStates(over), ['none', 'same']);
+  // El renglón anterior es el PRIMERO igual, como en duplicateOf: el tercero se compara con el primero.
+  const three = reconcileList([line('respirador', 99990, 'caja'), line('respirador', 1, 'caja'), line('respirador', 20, 'caja')], rareIndex).rows;
+  assert.deepEqual(duplicateStates(three), ['none', 'merge', 'same']);
+  assert.deepEqual(duplicateStates([]), []);
+  assert.deepEqual(duplicateStates(null), []);
+});
+
+test('duplicateStates da lo mismo que duplicateOf y canMerge en una lista de 200 renglones con muchos repetidos', () => {
+  // Una lista generada siempre igual (un generador con semilla fija): pocos productos, variantes y unidades, así que se
+  // repiten mucho; también renglones retirados y desconocidos, y cantidades cerca del máximo.
+  let seed = 20261123;
+  const next = limit => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed % limit;
+  };
+  const choices = [
+    ['guante-recubierto', ['talla-8', 'talla-9', '']], ['bota-con-casquillo', ['talla-26', '']], ['cono', ['unica', '']], ['respirador', ['']],
+    ['producto-retirado', ['']], ['no-existe', ['']], ['overol', ['xxg', 'g']],
+  ];
+  const units = ['par', 'pares', 'Par', 'pieza', 'Piezas', 'caja', 'cajas', 'tambo de 200 L'];
+  const quantities = [1, 2, 12, 5000, 50000, 99990, MAX_QUANTITY];
+  const lines = Array.from({ length: MAX_LINES }, () => {
+    const [productId, variants] = choices[next(choices.length)];
+    return line(productId, quantities[next(quantities.length)], units[next(units.length)], variants[next(variants.length)]);
+  });
+  const rows = deepFreeze(reconcileList(deepFreeze(lines), rareIndex).rows);
+  const states = duplicateStates(rows);
+  assert.equal(states.length, MAX_LINES);
+  assert.deepEqual(states, rows.map((_, i) => expectedDuplicate(rows, i)));
+  // La lista sí pone a prueba los tres estados y los renglones que no son 'ok'.
+  for (const state of ['none', 'same', 'merge']) assert.ok(states.filter(value => value === state).length >= 5, state);
+  assert.ok(rows.some(row => row.status === 'retired') && rows.some(row => row.status === 'unknown'));
+});
+
+test('undoLines: deshacer quitar devuelve el renglón a su lugar y le da el foco', () => {
+  const list = deepFreeze([line('cono', 1, 'pieza'), line('respirador', 2, 'caja'), line('overol', 3, 'pieza', 'g'), line('bota-con-casquillo', 4, 'par')]);
+  for (const index of [0, 2, 3]) {
+    const { lines, removed } = removeLines(list, [index]);
+    const undo = deepFreeze({ kind: 'remove', removed });
+    assert.deepEqual(undoLines(deepFreeze(lines), undo), { lines: [...list], focus: index, kept: null }, String(index));
+  }
+});
+
+test('undoLines: deshacer unir, después de cambiar OTRO renglón, devuelve las dos cantidades y conserva el cambio', () => {
+  const list = deepFreeze([line('guante-recubierto', 2, 'par', 'talla-8'), line('cono', 1, 'pieza'), line('guante-recubierto', 3, 'Par', 'talla-8'), line('respirador', 1, 'caja')]);
+  // Se conserva el de arriba (0) y se quita el de abajo (2); luego el visitante cambia el cono.
+  const merged = mergeLines(list, 0, 2);
+  assert.equal(merged.ok, true);
+  const edited = deepFreeze(updateLine(merged.lines, 1, { quantity: 7 }).lines);
+  const undo = deepFreeze({ kind: 'merge', index: merged.index, previous: merged.previous, removed: merged.removed });
+  assert.deepEqual(undoLines(edited, undo), {
+    lines: [line('guante-recubierto', 2, 'par', 'talla-8'), line('cono', 7, 'pieza'), line('guante-recubierto', 3, 'Par', 'talla-8'), line('respirador', 1, 'caja')],
+    focus: 2,
+    kept: line('guante-recubierto', 2, 'par', 'talla-8'),
+  });
+  // Se conserva el de abajo (2) y se quita el de arriba (0): el que se conservó cambia de posición al volver el otro.
+  const reverse = mergeLines(list, 2, 0);
+  const editedReverse = deepFreeze(updateLine(reverse.lines, 2, { quantity: 9 }).lines);
+  const result = undoLines(editedReverse, deepFreeze({ kind: 'merge', index: reverse.index, previous: reverse.previous, removed: reverse.removed }));
+  assert.deepEqual(result.lines, [list[0], list[1], list[2], line('respirador', 9, 'caja')]);
+  assert.equal(result.focus, 0);
+  assert.deepEqual(result.kept, list[2]);
+});
+
+test('undoLines: deshacer quitar los desconocidos y vaciar no dan el foco a ningún renglón', () => {
+  const rows = rareRows;
+  const unknown = rows.flatMap((row, index) => (row.status === 'unknown' ? [index] : []));
+  const { lines, removed } = removeLines(rareLines, unknown);
+  assert.deepEqual(undoLines(deepFreeze(lines), deepFreeze({ kind: 'unknown', removed })), { lines: [...rareLines], focus: -1, kept: null });
+  assert.deepEqual(undoLines([], deepFreeze({ kind: 'empty', previous: rareLines })), { lines: [...rareLines], focus: -1, kept: null });
+  // Sin nada que deshacer, la lista como está.
+  assert.deepEqual(undoLines(rareLines, null), { lines: [...rareLines], focus: -1, kept: null });
+});
+
+test('undoLines: el foco no pasa del último renglón y no cambia sus argumentos', () => {
+  // Una lista llena no recibe el renglón de vuelta (restoreLines): el foco queda en el último que hay.
+  const full = deepFreeze(Array.from({ length: MAX_LINES }, (_, i) => line(`p-${i}`, 1, 'pieza')));
+  const removed = deepFreeze([{ index: MAX_LINES + 5, line: line('otro', 1, 'pieza') }]);
+  assert.deepEqual(undoLines(full, deepFreeze({ kind: 'remove', removed })), { lines: [...full], focus: MAX_LINES - 1, kept: null });
+  // Los argumentos congelados no lanzan, y lo devuelto es otra lista.
+  const list = deepFreeze([line('cono', 1, 'pieza')]);
+  const previous = deepFreeze([line('respirador', 1, 'caja')]);
+  const emptied = undoLines(list, deepFreeze({ kind: 'empty', previous }));
+  assert.notEqual(emptied.lines, previous);
+  assert.deepEqual(previous, [line('respirador', 1, 'caja')]);
+  assert.deepEqual(list, [line('cono', 1, 'pieza')]);
 });

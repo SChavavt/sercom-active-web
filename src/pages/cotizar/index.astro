@@ -20,8 +20,10 @@
 //     notas y el enlace «Privacidad»;
 //   - «Atención con …», como siempre; sus dos enlaces de contacto llevan el mensaje de la página (región `data-cotizar`).
 // El script de abajo atiende la lista y los campos; lo compartido con la solicitud especial (borrador, enlaces, mensaje
-// largo, «Copiar solicitud», región viva) está en src/lib/message-page.mjs. Ganchos: data-quote-* (la lista),
-// data-draft-field (los campos), data-storage-note, data-cotizar (región de los enlaces de mensaje).
+// largo, «Copiar solicitud», región viva) está en src/lib/message-page.mjs, y lo que decide sin tocar la página (qué
+// productos van en el mensaje, qué renglones repiten a otro, qué deja «Deshacer») en src/lib/quote-list.mjs, con
+// pruebas. Ganchos: data-quote-* (la lista), data-draft-field (los campos), data-storage-note, data-cotizar (región de
+// los enlaces de mensaje).
 // Con un catálogo sin productos, una lista vacía y nada escrito, cada enlace de WhatsApp y de correo de la página lleva
 // exactamente lo de siempre (`composeListMessage({ opening })` es `messages.list()`).
 // Textos: brief de páginas «atencion», sección 1, y brief del paso 2 de «Cotizar mi lista».
@@ -281,26 +283,20 @@ const items = [
     import { composeListMessage, listItem } from '../../lib/contact-core.mjs';
     import { createMessagePage } from '../../lib/message-page.mjs';
     import {
-      canMerge, duplicateOf, indexMaps, mergedMessage, mergeLines, nameLabel, parseQuantity, parseQuoteIndex, QUANTITY_ERROR,
-      quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, unitKey, unknownLinesMessage,
-      updateLine, variantText,
+      canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel, parseQuantity,
+      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, undoLines,
+      unknownLinesMessage, updateLine, variantText,
     } from '../../lib/quote-list.mjs';
     import { quoteStore } from '../../lib/quote-store.mjs';
-    import type { QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, RemovedLine } from '../../types/quote.ts';
+    import type { QuoteDuplicate, QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, QuoteUndo } from '../../types/quote.ts';
 
     /** Un renglón dibujado: el renglón guardado que muestra, su elemento y su estado de repetido. */
     interface Drawn {
       line: QuoteLine;
       kind: 'ok' | 'retired';
       element: HTMLLIElement;
-      duplicate: 'none' | 'same' | 'merge';
+      duplicate: QuoteDuplicate;
     }
-    /** La última acción que se puede deshacer (vive en memoria). */
-    type Undo =
-      | { kind: 'remove'; removed: RemovedLine[] }
-      | { kind: 'merge'; index: number; previous: number; removed: RemovedLine[] }
-      | { kind: 'unknown'; removed: RemovedLine[] }
-      | { kind: 'empty'; previous: QuoteLine[] };
 
     const main = document.querySelector('main');
     const section = document.querySelector<HTMLElement>('[data-quote-section]');
@@ -334,7 +330,8 @@ const items = [
       let lines: QuoteLine[] = quoteStore.read();
       let rows: QuoteRow[] = [];
       let drawn: (Drawn | null)[] = [];
-      let undo: Undo | null = null;
+      /** La última acción que se puede deshacer (vive en memoria). */
+      let undo: QuoteUndo | null = null;
       /** Dónde va la línea de estado: antes del renglón en esta posición (o al final, antes del de los desconocidos). */
       let statusAt = 0;
       let counter = 0;
@@ -343,19 +340,10 @@ const items = [
 
       // ---- el mensaje ------------------------------------------------------------------------------------------
       const field = (name: string) => fields.find(element => element.dataset.draftField === name)?.value ?? '';
-      // La cantidad lleva la unidad que muestra el renglón (`row.unit`: la opción que corresponde a la guardada, o la
-      // guardada si no hay opción): «Par» guardado por otra versión se lee «pares» en el mensaje, como en su lista.
+      // Qué productos van y cómo se escriben lo decide `listMessageItems` (quote-list.mjs, con pruebas).
       const message = () => composeListMessage({
         opening,
-        items: rows.flatMap(row => (row.status === 'ok'
-          ? [listItem({
-            brandName: row.product.brandName,
-            code: row.product.code,
-            name: row.product.name,
-            quantity: quantityLabel(row.line.quantity, row.unit),
-            variant: variantText(row.product, row.variant),
-          })]
-          : [])),
+        items: listMessageItems(rows).map(item => listItem(item)),
         note: field('note'),
         delivery: field('delivery'),
         date: field('date'),
@@ -482,15 +470,15 @@ const items = [
         return drawn.slice(0, position).filter(Boolean).length;
       }
 
-      /** Una pasada: qué renglones repiten a uno anterior y si se pueden unir. Solo toca lo que cambió. */
+      /**
+       * Qué renglones repiten a uno anterior y si se pueden unir (`duplicateStates`, una pasada con la misma regla que
+       * `duplicateOf`). Solo toca lo que cambió.
+       */
       function refreshDuplicates() {
-        const counts = new Map<string, number>();
-        const keys = rows.map(row => (row.status === 'ok' ? JSON.stringify([row.product.id, row.variant?.id ?? '', unitKey(row.line.unit)]) : ''));
-        for (const key of keys) if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+        const states = duplicateStates(rows);
         drawn.forEach((item, index) => {
           if (!item || item.kind !== 'ok') return;
-          let state: Drawn['duplicate'] = 'none';
-          if ((counts.get(keys[index]) ?? 0) > 1 && duplicateOf(rows, index) >= 0) state = canMerge(rows, index) ? 'merge' : 'same';
+          const state = states[index];
           if (state === item.duplicate) return;
           item.duplicate = state;
           const notice = item.element.querySelector<HTMLElement>('[data-row-dup]');
@@ -688,23 +676,16 @@ const items = [
         const last = undo;
         if (!last) return;
         hideStatus();
-        let next: QuoteLine[];
-        let focusIndex = -1;
-        if (last.kind === 'empty') next = last.previous;
-        else if (last.kind === 'merge') {
-          const restored = updateLine(lines, last.index, { quantity: last.previous }).lines;
+        // Qué lista queda, qué renglón recibe el foco y la cantidad del que se conservó: `undoLines` (con pruebas).
+        const { lines: next, focus, kept } = undoLines(lines, last);
+        if (last.kind === 'merge') {
           const keptDrawn = drawn[last.index];
           quietRestored(keptDrawn?.element ?? null);
-          if (keptDrawn && restored[last.index]) setQuantity(keptDrawn, restored[last.index]);
-          next = restoreLines(restored, last.removed);
-          focusIndex = last.removed[0]?.index ?? -1;
-        } else {
-          next = restoreLines(lines, last.removed);
-          if (last.kind === 'remove') focusIndex = last.removed[0]?.index ?? -1;
+          if (keptDrawn && kept) setQuantity(keptDrawn, kept);
         }
         store(next);
         render();
-        const item = focusIndex >= 0 ? drawnAt(Math.min(focusIndex, lines.length - 1)) : null;
+        const item = focus >= 0 ? drawnAt(focus) : null;
         // Después de quitar, «Quitar» del renglón que volvió; después de unir, su «Unirlos» (si ya no se puede unir,
         // su «Quitar»); después de vaciar o de quitar los desconocidos, el título de la sección.
         const merge = last.kind === 'merge' ? item?.element.querySelector<HTMLElement>('[data-quote-merge]') : null;

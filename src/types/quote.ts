@@ -92,6 +92,40 @@ export interface RemovedLine {
   line: QuoteLine;
 }
 
+/** ¿Un renglón repite a uno anterior? `'none'` no; `'same'` sí, y no se pueden unir; `'merge'` sí, y se ofrece «Unirlos». */
+export type QuoteDuplicate = 'none' | 'same' | 'merge';
+
+/**
+ * La última acción de la página de cotizar que se puede deshacer: quitar un renglón, unir dos, quitar los que la página
+ * no ubica o vaciar la lista. `index` y `previous` de una unión son los de `mergeLines`.
+ */
+export type QuoteUndo =
+  | { kind: 'remove'; removed: RemovedLine[] }
+  | { kind: 'merge'; index: number; previous: number; removed: RemovedLine[] }
+  | { kind: 'unknown'; removed: RemovedLine[] }
+  | { kind: 'empty'; previous: QuoteLine[] };
+
+/** Lo que deja «Deshacer» (`undoLines`). */
+export interface QuoteUndoResult {
+  /** La lista después de deshacer. */
+  lines: QuoteLine[];
+  /** La posición en `lines` del renglón que recibe el foco, o -1 (el foco va al título de la sección). */
+  focus: number;
+  /** Después de deshacer una unión, el renglón que se conservó, con su cantidad de antes; si no, `null`. */
+  kept: QuoteLine | null;
+}
+
+/** Un producto del mensaje de la lista, con la cantidad y la variante ya escritas (lo que recibe `listItem`). */
+export interface QuoteMessageItem {
+  brandName: string;
+  code: string;
+  name: string;
+  /** «12 pares», con la unidad que muestra el renglón. */
+  quantity: string;
+  /** «Talla 8 (CÓDIGO-8)», «talla o color por definir» o vacío para un producto sin variantes. */
+  variant: string;
+}
+
 /** Lo que el visitante escribe en «Cotizar mi lista». Pertenece a la pestaña. */
 export interface QuoteDraft {
   note: string;
