@@ -210,9 +210,38 @@ test('un mensaje de 200 productos no lanza y draftLink dice que no cabe', () => 
   assert.equal(message.split('\n').length, 1 + 200 + 3);
   assert.deepEqual(draftLink(list.whatsapp, message), { href: WHATSAPP, fits: false });
   assert.equal(draftLinks([list.whatsapp, list.mailto], message).fits, false);
-  // Con unos trece productos todavía cabe.
-  const thirteen = composeListMessage({ opening, items: items.slice(0, 13) });
-  assert.equal(draftLinks([list.whatsapp, list.mailto], thirteen).fits, true);
+});
+
+test('cuántos productos caben en el enlace: unos 10 con renglones largos y unos 13 con renglones comunes', () => {
+  // Renglones como los que arma la página: marca, código, nombre, cantidad con su unidad y variante con su código.
+  const long = listItem({ brandName: 'Marca Gamma Ñandú', code: 'SP-1003', name: 'Guante sintético de nitrilo', quantity: '3 cajas con 100 piezas', variant: 'Mediano (SP-1003-M)' });
+  const common = listItem({ brandName: 'Marca Alfa', code: 'SP-11840', name: 'Guante sintético recubierto', quantity: '12 pares', variant: 'Talla 8 (SP-11840-8)' });
+  const longest = listItem({ brandName: 'Marca Gamma Ñandú', code: 'SP-8002', name: 'Señalización sintética para área de producción', quantity: '10 piezas', variant: 'Tamaño único (SP-8002-U)' });
+  assert.deepEqual([long.length, common.length, longest.length], [100, 81, 111]);
+  const fields = { delivery: 'Puebla, Pue.', date: '15 de diciembre' };
+  /** Cuántos renglones iguales caben en los dos enlaces a la vez. */
+  const fitting = (item, parts = {}) => {
+    let count = 0;
+    while (count < 60 && draftLinks([list.whatsapp, list.mailto], composeListMessage({ opening, items: Array(count + 1).fill(item), ...parts })).fits) count += 1;
+    return count;
+  };
+  // Márgenes de un producto: el número exacto depende del saludo y del largo del correo del negocio.
+  const between = (value, low, high) => assert.ok(value >= low && value <= high, `${value} no está entre ${low} y ${high}`);
+  between(fitting(long, fields), 9, 11);
+  between(fitting(common, fields), 12, 14);
+  // Ni con el renglón más largo, lugar, fecha y una nota caben menos de 6: el aviso de «no cabe» es para listas grandes.
+  between(fitting(longest, { ...fields, note: 'También 10 cascos blancos' }), 6, 9);
+  // El texto con acentos ocupa más en el enlace que en el mensaje: por eso el límite se mide en el enlace codificado.
+  const message = composeListMessage({ opening, items: Array(fitting(long, fields)).fill(long), ...fields });
+  for (const href of [list.whatsapp, list.mailto]) assert.ok(withMessage(href, message).length <= LINK_LIMITS[linkChannel(href)]);
+  assert.ok(withMessage(list.mailto, message).length > message.length);
+});
+
+test('composeListMessage sin argumentos no lanza: la plantilla sin apertura', () => {
+  assert.doesNotThrow(() => composeListMessage());
+  assert.equal(composeListMessage(), composeListMessage({}));
+  assert.equal(composeListMessage(null), composeListMessage({}));
+  assert.deepEqual(composeListMessage().split('\n').slice(-2), ['Entrega en (ciudad o código postal): ', 'Fecha requerida: ']);
 });
 
 test('cleanLines: caracteres de dirección, controles, líneas vacías y el límite en caracteres completos', () => {

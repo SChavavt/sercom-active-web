@@ -24,14 +24,13 @@ export const MESSAGE_LABELS = Object.freeze({
 });
 
 /**
- * Largo máximo, en caracteres, del enlace completo de cada canal: `{ whatsapp: 1900, mailto: 1900 }`. Es conservador a
- * propósito: no se pudo medir contra los servicios y se revisará con la prueba en un teléfono real. Con un enlace más
- * largo, la página abre la aplicación sin texto y pide copiar primero (`draftLinks`).
- * Se arma con pares [canal, largo] y no con un objeto escrito: el empaquetador escribiría la clave como «mailto:1900»,
- * y el escáner de la salida lee eso como un enlace de correo a otra dirección.
+ * Largo máximo, en caracteres, del enlace completo de cada canal. Es conservador a propósito: no se pudo medir contra
+ * los servicios y se revisará con la prueba en un teléfono real. Con un enlace más largo, la página abre la aplicación
+ * sin texto y pide copiar primero (`draftLinks`). Con renglones largos caben unos 10 productos; con renglones comunes,
+ * unos 13.
  * @type {Readonly<Record<LinkChannel, number>>}
  */
-export const LINK_LIMITS = Object.freeze(/** @type {Record<LinkChannel, number>} */ (Object.fromEntries([['whatsapp', 1900], ['mailto', 1900]])));
+export const LINK_LIMITS = Object.freeze({ whatsapp: 1900, mailto: 1900 });
 
 const LINK_LABEL = MESSAGE_LABELS.link;
 const DESCRIPTION_LABEL = MESSAGE_LABELS.description;
@@ -385,11 +384,13 @@ export function listItem({ brandName, code, name, quantity, variant } = {}) {
  *
  * `items` son textos (`listItem`); aquí se numeran. `note` pasa por `cleanLines(note, 10000)`: sin productos, sus líneas
  * siguen directamente a la apertura. `delivery` y `date` van en una línea cada uno (`cleanQuery`, hasta 200 caracteres).
- * Sin productos ni texto aparecen las tres líneas de ejemplo de la plantilla de siempre (`messages.list()`).
- * @param {ListMessageParts} parts
+ * Sin productos ni texto aparecen las tres líneas de ejemplo de la plantilla de siempre (`messages.list()`). Nunca
+ * lanza: sin argumento (o con `null`) da esa plantilla sin apertura.
+ * @param {ListMessageParts | null} [parts]
  * @returns {string}
  */
-export function composeListMessage({ opening, items = [], note = '', delivery = '', date = '' }) {
+export function composeListMessage(parts) {
+  const { opening, items = [], note = '', delivery = '', date = '' } = parts ?? /** @type {Partial<ListMessageParts>} */ ({});
   const lines = [clean(opening)];
   const products = (Array.isArray(items) ? items : []).map(item => clean(item)).filter(Boolean);
   const notes = cleanLines(note, MAX_NOTE_LENGTH);
