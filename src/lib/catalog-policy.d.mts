@@ -10,6 +10,9 @@ export interface BrandScope {
 /** Indica si un texto menciona la marca excluida del alcance. */
 export function mentionsExcludedBrand(value: unknown): boolean;
 
+/** Una dirección `https` escrita completa: «https://», un servidor, sin espacios ni diagonales invertidas, sin usuario. */
+export function isHttpsAddress(value: unknown): value is string;
+
 /** Valida el archivo editorial completo antes de producir una salida pública. Devuelve los errores. */
 export function validateCatalog(catalog: unknown, registry: BrandScope): string[];
 

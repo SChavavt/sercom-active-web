@@ -142,6 +142,17 @@ test('crossCheckBrands rechaza enlaces que no son un recurso accesible y publica
   assert.ok(registry.sources.some(source => source.resources.some(resource => resource.verification.startsWith('accesible') && BLOCKED_TYPES.includes(resource.type))));
 });
 
+test('el enlace de una marca es una dirección https escrita completa', () => {
+  const invalid = url => validateBrands(withBrand('ansell', brand => { brand.manufacturerLinks[0].url = url; }));
+  for (const url of ['https:/www.ansell.com/mx/', 'https:www.ansell.com/mx/', ' https://www.ansell.com/mx/', 'https://www.ansell.com/mx/\n', 'https://www.an\nsell.com/mx/', 'https://www.ansell.com/mx es/', 'https:\\\\www.ansell.com\\mx', 'https://www.ansell.com\\mx', 'https:///mx/']) {
+    assert.match(invalid(url).join('\n'), /URL https/, JSON.stringify(url));
+  }
+  // Una dirección honesta pasa, también con acentos o sin diagonal final.
+  for (const url of ['https://www.ansell.com/mx/es/industrial', 'https://www.ansell.com', 'https://ejemplo.invalid/catálogo/protección', 'https://www.ansell.com:443/mx/?q=guante#ficha']) {
+    assert.deepEqual(invalid(url), [], url);
+  }
+});
+
 test('validateBrands exige la estructura exacta: un enlace como máximo, etiqueta única y https', () => {
   const invalid = change => validateBrands(withBrand('ansell', change));
   assert.match(invalid(brand => { brand.manufacturerLinks.push({ label: 'Sitio del fabricante', url: 'https://example.invalid/' }); }).join('\n'), /un enlace como máximo/);

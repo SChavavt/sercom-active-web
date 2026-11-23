@@ -274,6 +274,27 @@ test('la dirección es https y el ancho y el alto son enteros de 1 a 10000', () 
   }
 });
 
+test('una dirección va escrita completa: https://, un servidor y sin espacios, saltos de línea ni diagonales invertidas, en cada campo que la lleva', () => {
+  const broken = ['https:/example.invalid/a.jpg', 'https:example.invalid/a.jpg', ' https://example.invalid/a.jpg', 'https://example.invalid/a.jpg ', 'https://exa\nmple.invalid/a.jpg',
+    'https://example.invalid/a b.jpg', 'https://example.invalid/a\tb.jpg', 'https://example.invalid/a\u00a0b.jpg', 'https:\\\\example.invalid\\a.jpg', 'https://example.invalid\\a.jpg', 'https:///a.jpg', 'https://'];
+  const fields = [
+    ['image.url', url => ({ image: { ...URL_IMAGE, url } }), 'products[0].image.url: debe ser una dirección https completa, sin usuario ni contraseña.'],
+    ['image.sourceUrl', sourceUrl => ({ image: { ...FILE_IMAGE, sourceUrl } }), 'products[0].image.sourceUrl: debe ser una dirección https; escribe la página de donde viene la foto.'],
+    ['standards[0].sourceUrl', sourceUrl => ({ standards: [{ text: 'EN 388:2016 4131A', sourceUrl }] }), 'products[0].standards[0].sourceUrl: debe ser una dirección https; escribe la página o el documento del fabricante donde consta esta norma para este producto.'],
+    ['source.url', url => ({ source: { url, checkedOn: '2026-11-18' } }), 'products[0]: fuente o fecha inválida.'],
+    ['documents[0].url', url => ({ documents: [{ label: 'Ficha técnica', url }] }), 'products[0]: documento inválido.'],
+  ];
+  for (const status of STATUSES) {
+    for (const [field, change, message] of fields) {
+      for (const url of broken) assert.deepEqual(errorsOf({ status, ...change(url) }), [message], `${status} ${field} ${JSON.stringify(url)}`);
+      // Una dirección honesta pasa: con acentos, sin diagonal final, con puerto, consulta o fragmento.
+      for (const url of ['https://example.invalid', 'https://example.invalid/catálogo/protección-de-manos', 'https://example.invalid:8443/a.pdf?id=7#pagina=2', 'https://xn--fabricacin-9db.invalid/ficha']) {
+        assert.deepEqual(errorsOf({ status, ...change(url) }), [], `${status} ${field} ${url}`);
+      }
+    }
+  }
+});
+
 test('la dirección de la foto no lleva lo reservado a los ejemplos ni la marca excluida, en cualquier estado', () => {
   const reserved = 'products[0].image.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.';
   const brand = 'products[0].image.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.';

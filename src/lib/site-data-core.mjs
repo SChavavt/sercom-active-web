@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { getPublishedProducts, getRetiredProducts, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { normalizeText } from './text.mjs';
 
@@ -39,15 +39,8 @@ const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
-/** @param {unknown} value */
-const isHttps = value => {
-  try {
-    const url = new URL(String(value));
-    return url.protocol === 'https:' && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-};
+/** Una dirección `https` escrita completa, con la misma regla que las direcciones de una ficha. */
+const isHttps = isHttpsAddress;
 /** @param {Record<string, unknown>} record @param {string[]} allowed */
 const unknownKeys = (record, allowed) => Object.keys(record).filter(key => !allowed.includes(key));
 /** ¿Aparece `needle` como palabra completa dentro de `haystack`? Ambos ya normalizados. */

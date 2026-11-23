@@ -8,10 +8,18 @@ const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diac
 const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
-const isHttps = value => {
-  try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; }
+/**
+ * Una dirección `https` escrita completa: empieza con «https://» seguido de un servidor, no tiene espacios, saltos de
+ * línea ni diagonales invertidas, se puede leer como dirección y no lleva usuario ni contraseña. Un navegador lee
+ * «https:/servidor/x» o «https:servidor/x» como una dirección dentro del propio sitio. No se exige que la dirección esté
+ * escrita como la reescribe el navegador: una con acentos o sin la diagonal final es correcta.
+ */
+export const isHttpsAddress = value => {
+  if (typeof value !== 'string' || !/^https:\/\/[^\s\\/?#]/.test(value) || /[\s\\]/.test(value)) return false;
+  try { const url = new URL(value); return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password; }
   catch { return false; }
 };
+const isHttps = isHttpsAddress;
 /** Indica si un texto menciona la marca excluida del alcance. */
 export const mentionsExcludedBrand = value => /\bgisa\b|guantes?\s+internacionales?/.test(normalize(value));
 const excluded = mentionsExcludedBrand;
