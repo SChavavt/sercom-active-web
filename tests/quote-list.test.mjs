@@ -4,9 +4,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addedMessage, addLine, addStatusStands, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf,
-  duplicateStates, formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
+  duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
   listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
-  QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage,
+  QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, REPEATED_PRESS, restoredMessage,
   restoreLines, rowControlNames, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
   unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
@@ -826,4 +826,30 @@ test('addStatusStands: tras el cambio de otra pestaña, en la ficha solo se qued
   // Sin frase no hay nada que conservar.
   assert.equal(addStatusStands(null, full), false);
   assert.equal(addStatusStands(undefined, full), false);
+});
+
+test('isRepeatedPress: un clic en el mismo punto y enseguida es el segundo de un doble clic; más tarde o más lejos, no', () => {
+  const first = { time: 1000, x: 400, y: 300 };
+  const press = (ms, dx = 0, dy = 0) => ({ time: first.time + ms, x: first.x + dx, y: first.y + dy });
+  assert.deepEqual(REPEATED_PRESS, { ms: 500, px: 24 });
+  // El segundo clic de un doble clic: unas décimas de segundo después, sin moverse o casi.
+  assert.equal(isRepeatedPress(first, press(150)), true);
+  assert.equal(isRepeatedPress(first, press(0)), true);
+  assert.equal(isRepeatedPress(first, press(500)), true);
+  assert.equal(isRepeatedPress(first, press(150, 3, -2)), true);
+  assert.equal(isRepeatedPress(first, press(150, 24, 0)), true);
+  // Con un dedo el segundo toque cae un poco más lejos; en diagonal cuenta la distancia, no cada eje.
+  assert.equal(isRepeatedPress(first, press(150, 17, 17)), false);
+  assert.equal(isRepeatedPress(first, press(150, 16, 16)), true);
+  // Después de una pausa, o apuntando a otro control, es un clic nuevo.
+  assert.equal(isRepeatedPress(first, press(501)), false);
+  assert.equal(isRepeatedPress(first, press(150, 25, 0)), false);
+  assert.equal(isRepeatedPress(first, press(150, 0, -70)), false);
+  // Un evento anterior al clic guardado, o sin clic guardado, nunca.
+  assert.equal(isRepeatedPress(first, press(-1)), false);
+  assert.equal(isRepeatedPress(null, press(150)), false);
+  assert.equal(isRepeatedPress(undefined, press(150)), false);
+  assert.equal(isRepeatedPress(first, null), false);
+  assert.equal(isRepeatedPress(first, { time: Number.NaN, x: 400, y: 300 }), false);
+  assert.equal(isRepeatedPress(first, { time: 1100, x: Number.NaN, y: 300 }), false);
 });

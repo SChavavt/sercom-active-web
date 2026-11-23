@@ -805,6 +805,26 @@ export function unknownLinesMessage(count) {
   return `${formatQuantity(total)} productos de tu cotización no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.`;
 }
 
+/** Un clic «repetido»: a lo más este tiempo después del anterior y a esta distancia de él, en píxeles de CSS. */
+export const REPEATED_PRESS = Object.freeze({ ms: 500, px: 24 });
+
+/**
+ * ¿Es `press` un clic repetido de `previous`: en el mismo punto y enseguida (`REPEATED_PRESS`)? Lo usa «Cotizar mi
+ * lista» después de un clic que cambia la lista de lugar (quitar, unir, vaciar, deshacer): el segundo clic de un doble
+ * clic caería en lo que quedó bajo el puntero, que ya es otra cosa. El medio segundo es el tiempo de un doble clic; la
+ * distancia, la mitad de un control de 48 px: un clic más lejos ya apunta a otra cosa, y sí cuenta. `time` es el de los
+ * eventos (`event.timeStamp`); `x` e `y`, su posición en la ventana.
+ * @param {{ time: number, x: number, y: number } | null | undefined} previous
+ * @param {{ time: number, x: number, y: number } | null | undefined} press
+ * @returns {boolean}
+ */
+export function isRepeatedPress(previous, press) {
+  if (!previous || !press) return false;
+  const elapsed = press.time - previous.time;
+  if (!(elapsed >= 0 && elapsed <= REPEATED_PRESS.ms)) return false;
+  return Math.hypot(press.x - previous.x, press.y - previous.y) <= REPEATED_PRESS.px;
+}
+
 /**
  * La frase de la nota de lo que se guarda en «Cotizar mi lista», según lo que este navegador guarda AHORA: la lista
  * (`listKept`) y lo escrito en los campos (`draftKept`). `printed` es la frase impresa, la de cuando se guardan las dos

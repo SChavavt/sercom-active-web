@@ -284,7 +284,7 @@ const items = [
     import { composeListMessage, listItem } from '../../lib/contact-core.mjs';
     import { createMessagePage } from '../../lib/message-page.mjs';
     import {
-      canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel,
+      canMerge, duplicateOf, duplicateStates, indexMaps, isRepeatedPress, listMessageItems, mergedMessage, mergeLines, nameLabel,
       parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage,
       rowControlNames, storageNoteText, undoLines, unknownLinesMessage, updateLine, variantText,
     } from '../../lib/quote-list.mjs';
@@ -808,6 +808,31 @@ const items = [
         afterEdit();
       });
 
+      // ---- el puntero -------------------------------------------------------------------------------------------------
+      // Quitar, unir, vaciar y deshacer cambian la lista de lugar: bajo el puntero queda otra cosa (el enlace de otro
+      // producto, «Deshacer», la cantidad de otro renglón). El segundo clic de un doble clic no es para eso: durante
+      // medio segundo, un clic repetido en ese mismo punto (`isRepeatedPress`, con pruebas) no activa nada ni mueve el
+      // foco. Un clic en otro lugar, o después de esa pausa, cuenta como siempre; con el teclado no hay nada que cuidar.
+      // Se decide al oprimir, y el clic sigue a su presión: si el puntero oprimió dentro del medio segundo y soltó después,
+      // ese clic tampoco cuenta.
+      let moved: { time: number; x: number; y: number } | null = null;
+      /** Lo que se decidió de la presión en curso (`null`: no hay ninguna): su clic corre la misma suerte. */
+      let strayPress: boolean | null = null;
+      const stray = (event: MouseEvent) => {
+        if (event.detail === 0) return;
+        let repeated = isRepeatedPress(moved, { time: event.timeStamp, x: event.clientX, y: event.clientY });
+        if (event.type === 'mousedown') strayPress = repeated;
+        else {
+          repeated = strayPress ?? repeated;
+          strayPress = null;
+        }
+        if (!repeated) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      document.addEventListener('mousedown', stray, true);
+      document.addEventListener('click', stray, true);
+
       // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, desde que oprime hasta que suelta: dice si el foco sale de
       // un campo porque el visitante está por activar un control con el puntero. Se sigue con `mousedown` y `mouseup`, que
       // el navegador envía también con el dedo y con el lápiz: `mousedown` es el que saca el foco del campo.
@@ -900,12 +925,15 @@ const items = [
         const target = event.target instanceof Element ? event.target : null;
         if (!target) return;
         const remove = target.closest('[data-quote-remove]');
-        if (remove && list.contains(remove)) return removeRow(indexOf(remove));
         const merge = target.closest('[data-quote-merge]');
-        if (merge && list.contains(merge)) return mergeRow(indexOf(merge));
-        if (target.closest('[data-quote-remove-unknown]')) return removeUnknown();
-        if (target.closest('[data-quote-clear]')) return emptyList();
-        if (target.closest('[data-quote-undo]')) return undoLast();
+        if (remove && list.contains(remove)) removeRow(indexOf(remove));
+        else if (merge && list.contains(merge)) mergeRow(indexOf(merge));
+        else if (target.closest('[data-quote-remove-unknown]')) removeUnknown();
+        else if (target.closest('[data-quote-clear]')) emptyList();
+        else if (target.closest('[data-quote-undo]')) undoLast();
+        else return;
+        // La lista cambió de lugar bajo el puntero: un clic repetido aquí mismo no activa nada (`stray`).
+        if (event.detail > 0) moved = { time: event.timeStamp, x: event.clientX, y: event.clientY };
       });
 
       // Otra pestaña cambió la lista, o el navegador restauró la página: se muestra lo guardado, sin escribir nada.
