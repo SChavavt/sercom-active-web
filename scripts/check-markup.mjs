@@ -138,6 +138,14 @@ const isUnseen = element => hasClass(element, 'vh') || element.attributes.get('a
 /** El texto que se ve de un elemento, tal como está escrito (sin `.vh` ni aria-hidden="true", espacios intactos). */
 export const visibleText = element => element.content
   .map(part => (typeof part === 'string' ? part : isUnseen(part) ? '' : visibleText(part))).join('');
+/**
+ * El nombre accesible de un enlace como lo calcula esta revisión: su `aria-label` o, sin él, su texto, también el oculto
+ * para la vista (`.vh`), sin lo marcado aria-hidden="true".
+ */
+const accessibleName = element => (element.attributes.get('aria-label') ?? element.content
+  .map(part => (typeof part === 'string' ? part : part.attributes.get('aria-hidden') === 'true' ? '' : accessibleName(part))).join(' ')).replace(/\s+/g, ' ').trim();
+/** Lo que dice, para los lectores de pantalla, un enlace que abre otra pestaña (MoreLink y ActionRow con `external`). */
+const NEW_TAB_TEXT = '(se abre en otra pestaña)';
 /** Un texto para comparar: sin distinguir mayúsculas y con los espacios seguidos como uno. */
 const loose = text => text.replace(/\s+/g, ' ').trim().toLowerCase();
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
@@ -1491,6 +1499,39 @@ export const CHECKS = [
           const label = textOf(labels[0] ?? chip);
           if (!hidden.some(element => /^código$/i.test(textOf(element)))) problems.push(`${where}, «${label}», lleva ${describe(code)} sin la palabra oculta «Código» (.vh) antes del código`);
           if (!visibleText(code).trim()) problems.push(`${where}, «${label}», lleva ${describe(code)} sin código: si la variante no tiene código propio, la página no imprime ese elemento`);
+        }
+      }
+      return problems;
+    },
+  },
+  // R-ENLACE-01 · Los enlaces a otro sitio (los catálogos y el sitio de cada fabricante, el crédito de una foto): cada
+  // enlace que abre otra pestaña (`target="_blank"`) lleva `rel` con `noopener` y, para los lectores de pantalla, el
+  // texto oculto «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. Y en /marcas/,
+  // donde cada marca repite «Catálogo del fabricante (PDF)» o «Catálogo en línea del fabricante», dos enlaces con el
+  // mismo nombre accesible llevan al mismo lugar: si no, la lista de enlaces de un lector de pantalla los confunde (cada
+  // catálogo lleva la marca en su nombre, con texto oculto). Dos enlaces con el mismo nombre y el mismo destino (la
+  // celda de una marca y su nombre en la lista de catálogos) sí pueden ir.
+  {
+    id: 'R-ENLACE-01',
+    title: 'Cada enlace que abre otra pestaña lleva rel con noopener y el texto oculto «(se abre en otra pestaña)», y en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo lugar',
+    page(page) {
+      const problems = [];
+      for (const link of page.elements.filter(element => element.name === 'a' && (element.attributes.get('target') ?? '').trim().toLowerCase() === '_blank')) {
+        const href = link.attributes.get('href') ?? '';
+        const where = `el enlace «${accessibleName(link)}» (${href.slice(0, 80)})`;
+        if (!(link.attributes.get('rel') ?? '').toLowerCase().split(/\s+/).includes('noopener')) problems.push(`${where} abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external`);
+        const hidden = allElements(link).filter(element => hasClass(element, 'vh'));
+        if (!hidden.some(element => textOf(element).includes(NEW_TAB_TEXT))) problems.push(`${where} abre otra pestaña sin decirlo: lleva el texto oculto «${NEW_TAB_TEXT}» (.vh), como MoreLink con external`);
+      }
+      if (page.route === routes.brands) {
+        /** @type {Map<string, string>} */
+        const seen = new Map();
+        for (const link of inMain(page).filter(element => element.name === 'a' && element.attributes.has('href'))) {
+          const name = loose(accessibleName(link));
+          const href = link.attributes.get('href') ?? '';
+          if (!name) continue;
+          if (seen.has(name) && seen.get(name) !== href) problems.push(`dos enlaces se llaman «${accessibleName(link)}» y llevan a lugares distintos (${seen.get(name).slice(0, 60)} y ${href.slice(0, 60)}): agrega a cada uno, con texto oculto, lo que los distingue (la marca)`);
+          else if (!seen.has(name)) seen.set(name, href);
         }
       }
       return problems;
