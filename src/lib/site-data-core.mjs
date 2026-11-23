@@ -25,9 +25,11 @@ export const EXAMPLE_TAG = 'Ejemplo';
 export const EXAMPLE_BRAND_NAME = 'Marca de ejemplo';
 /**
  * Las únicas marcas que puede llevar un producto de ejemplo: tres, para revisar en la vista previa el grupo de marcas de
- * los filtros. Ninguna es una marca real ni tiene página de marca (los ejemplos llevan `brandId: null`).
+ * los filtros. Ninguna es una marca real ni tiene página de marca (los ejemplos llevan `brandId: null`). La segunda y la
+ * tercera terminan en una palabra completa («Beta», «Gamma») para que la búsqueda las distinga: una sola letra coincide
+ * con casi cualquier texto.
  */
-export const EXAMPLE_BRAND_NAMES = Object.freeze([EXAMPLE_BRAND_NAME, 'Marca de ejemplo B', 'Marca de ejemplo C']);
+export const EXAMPLE_BRAND_NAMES = Object.freeze([EXAMPLE_BRAND_NAME, 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
 /** Única etiqueta permitida para el enlace de una marca. */
 export const MANUFACTURER_LINK_LABEL = 'Sitio del fabricante';
 
@@ -65,7 +67,7 @@ const LINK_KEYS = ['label', 'url'];
 // `retired: true` marca el ejemplo de producto retirado: tiene su página, pero no entra en ningún listado.
 const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants', 'retired'];
 const VARIANT_KEYS = ['id', 'label', 'code'];
-/** «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C»: las marcas que acepta un ejemplo, para los errores. */
+/** «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma»: las marcas que acepta un ejemplo, para los errores. */
 const BRAND_CHOICES = `${EXAMPLE_BRAND_NAMES.slice(0, -1).map(name => `«${name}»`).join(', ')} o «${EXAMPLE_BRAND_NAMES.at(-1)}»`;
 /** Tipos de recurso del registro que nunca se publican como enlace. */
 const BLOCKED_RESOURCE_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];

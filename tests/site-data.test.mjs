@@ -81,10 +81,10 @@ test('vista previa con los datos reales: diez categorías en borrador y diecisé
   assert.equal(site.getProduct(RETIRED_EXAMPLE_ID), undefined);
   // Cada ejemplo conserva su marca de ejemplo (la proyección no la cambia): tres marcas, ninguna con página.
   assert.deepEqual(site.products.map(product => product.brandName), examples.filter(example => example.retired !== true).map(example => example.brandName));
-  assert.deepEqual([...new Set(site.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo B', 'Marca de ejemplo C']);
+  assert.deepEqual([...new Set(site.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
   assert.deepEqual(site.products.filter(product => product.brandName !== 'Marca de ejemplo').map(product => [product.code, product.brandName]), [
-    ['EJ-1003', 'Marca de ejemplo B'], ['EJ-1004', 'Marca de ejemplo C'], ['EJ-2002', 'Marca de ejemplo B'],
-    ['EJ-3002', 'Marca de ejemplo C'], ['EJ-4002', 'Marca de ejemplo B'], ['EJ-8002', 'Marca de ejemplo C'],
+    ['EJ-1003', 'Marca de ejemplo Beta'], ['EJ-1004', 'Marca de ejemplo Gamma'], ['EJ-2002', 'Marca de ejemplo Beta'],
+    ['EJ-3002', 'Marca de ejemplo Gamma'], ['EJ-4002', 'Marca de ejemplo Beta'], ['EJ-8002', 'Marca de ejemplo Gamma'],
   ]);
   for (const product of site.products) {
     assert.equal(product.isExample, true);
@@ -307,7 +307,7 @@ test('site-data.mjs en vista previa: diez categorías y dieciséis ejemplos', as
   assert.deepEqual(site.retiredProducts.map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID)?.categoryIds[0], 'manos');
   assert.equal(site.getCategory('manos')?.productCount, 3);
-  assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.brandName, 'Marca de ejemplo B');
+  assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.brandName, 'Marca de ejemplo Beta');
 });
 
 test('site-data.mjs no se puede cargar en un navegador ni fuera de una compilación', async () => {

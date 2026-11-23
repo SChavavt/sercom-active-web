@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getPublishedProducts, validateCatalog } from '../src/lib/catalog-policy.mjs';
 import { buildFacetGroups } from '../src/lib/catalog-filters.mjs';
+import { filterProducts } from '../src/lib/search.mjs';
 import { createSiteData, EXAMPLE_BRAND_NAME, EXAMPLE_BRAND_NAMES, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { normalizeText } from '../src/lib/text.mjs';
 import { allStrings, loadProjectData } from './helpers.mjs';
@@ -18,8 +19,8 @@ const sizes = (code, from, to) => Array.from({ length: to - from + 1 }, (_, inde
 // diez primeros, uno por categoría; los seis siguientes dan a la vista previa tres marcas, los tres tipos de producto
 // (varias variantes, una sola y ninguna) y una unidad de venta compuesta («caja con 100 piezas»).
 const A = 'Marca de ejemplo';
-const B = 'Marca de ejemplo B';
-const C = 'Marca de ejemplo C';
+const B = 'Marca de ejemplo Beta';
+const C = 'Marca de ejemplo Gamma';
 const EXPECTED = [
   ['ejemplo-guante-recubierto', 'Guante de ejemplo recubierto', A, 'EJ-1001', 'manos', 'par', sizes('EJ-1001', 7, 10)],
   ['ejemplo-lente-de-seguridad', 'Lente de seguridad de ejemplo', A, 'EJ-2001', 'ojos-y-cara', 'pieza', [['Mica clara', 'EJ-2001-CL'], ['Mica gris', 'EJ-2001-GR']]],
@@ -78,7 +79,7 @@ test('el archivo contiene exactamente los dieciséis ejemplos del diseño y un e
 
 test('cada ejemplo es inconfundible: id «ejemplo-», códigos «EJ-», nombre «de ejemplo» y una «Marca de ejemplo»', () => {
   assert.equal(EXAMPLE_BRAND_NAME, 'Marca de ejemplo');
-  assert.deepEqual(EXAMPLE_BRAND_NAMES, ['Marca de ejemplo', 'Marca de ejemplo B', 'Marca de ejemplo C']);
+  assert.deepEqual(EXAMPLE_BRAND_NAMES, ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
   assert.ok(Object.isFrozen(EXAMPLE_BRAND_NAMES));
   assert.deepEqual([...new Set(examples.map(example => example.brandName))], EXAMPLE_BRAND_NAMES);
   for (const example of examples) {
@@ -131,9 +132,16 @@ test('los filtros de la vista previa: un grupo «Marcas» con las tres marcas y 
   const [categoryGroup, brandGroup] = groups;
   assert.deepEqual(brandGroup.options, [
     { id: 'marca-de-ejemplo', label: 'Marca de ejemplo', count: 10 },
-    { id: 'marca-de-ejemplo-b', label: 'Marca de ejemplo B', count: 3 },
-    { id: 'marca-de-ejemplo-c', label: 'Marca de ejemplo C', count: 3 },
+    { id: 'marca-de-ejemplo-beta', label: 'Marca de ejemplo Beta', count: 3 },
+    { id: 'marca-de-ejemplo-gamma', label: 'Marca de ejemplo Gamma', count: 3 },
   ]);
+  // La búsqueda distingue las dos marcas que terminan en una palabra completa, por esa palabra o por el nombre entero.
+  const found = query => filterProducts(site.products, query).map(product => product.code);
+  assert.deepEqual(found('Marca de ejemplo Beta'), ['EJ-1003', 'EJ-2002', 'EJ-4002']);
+  assert.deepEqual(found('beta'), ['EJ-1003', 'EJ-2002', 'EJ-4002']);
+  assert.deepEqual(found('Marca de ejemplo Gamma'), ['EJ-1004', 'EJ-3002', 'EJ-8002']);
+  assert.deepEqual(found('gamma'), ['EJ-1004', 'EJ-3002', 'EJ-8002']);
+  assert.equal(found('Marca de ejemplo').length, 16);
   // Cada ejemplo tiene una sola categoría: los conteos suman los dieciséis productos.
   assert.deepEqual(categoryGroup.options.map(option => option.id), categoryIds);
   assert.equal(categoryGroup.options.reduce((sum, option) => sum + option.count, 0), site.products.length);
@@ -187,9 +195,9 @@ test('un ejemplo sin variantes se acepta y llega a la vista previa con la lista 
   // La proyección conserva la marca validada de cada ejemplo (también la del retirado).
   for (const example of listed) assert.equal(site.getProduct(example.id)?.brandName, example.brandName, example.id);
   const retiredCopy = structuredClone(examples);
-  retiredCopy.at(-1).brandName = 'Marca de ejemplo C';
+  retiredCopy.at(-1).brandName = 'Marca de ejemplo Gamma';
   const withRetired = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: retiredCopy });
-  assert.equal(withRetired.getRetiredProduct('ejemplo-producto-retirado')?.brandName, 'Marca de ejemplo C');
+  assert.equal(withRetired.getRetiredProduct('ejemplo-producto-retirado')?.brandName, 'Marca de ejemplo Gamma');
 });
 
 test('validateExampleProducts rechaza un ejemplo que pueda confundirse con una ficha real', () => {
@@ -198,9 +206,9 @@ test('validateExampleProducts rechaza un ejemplo que pueda confundirse con una f
   assert.match(mutated(example => { example.code = '11-800'; }), /el código debe tener la forma EJ-0000/);
   assert.match(mutated((example, list) => { example.code = list[1].code; }), /el código debe tener la forma EJ-0000 y no repetirse/);
   assert.match(mutated(example => { example.name = 'Guante recubierto'; }), /el nombre debe contener «de ejemplo»/);
-  assert.match(mutated(example => { example.brandName = 'Ansell'; }), /la marca debe ser «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C»/);
-  for (const name of ['Marca de ejemplo D', 'marca de ejemplo b', 'Marca de ejemplo  B', ' Marca de ejemplo', '', null]) {
-    assert.match(mutated(example => { example.brandName = name; }), /la marca debe ser «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C»/, String(name));
+  assert.match(mutated(example => { example.brandName = 'Ansell'; }), /la marca debe ser «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma»/);
+  for (const name of ['Marca de ejemplo Delta', 'Marca de ejemplo B', 'Marca de ejemplo C', 'marca de ejemplo beta', 'Marca de ejemplo  Beta', ' Marca de ejemplo', '', null]) {
+    assert.match(mutated(example => { example.brandName = name; }), /la marca debe ser «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma»/, String(name));
   }
   assert.match(mutated(example => { example.brandName = 'Ansell'; }), /menciona la marca real «Ansell»/);
   assert.match(mutated(example => { example.summary = 'Parecido a un guante de 3M.'; }), /menciona la marca real «3M»/);

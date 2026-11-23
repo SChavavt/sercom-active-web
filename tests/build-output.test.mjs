@@ -166,7 +166,7 @@ test('vista previa (control): los mismos archivos sí contienen los dieciséis e
   assert.ok(json.products.every(product => product.isExample === true && product.brandId === null));
   // Cada ejemplo llega con su marca de ejemplo, sin cambiarla.
   assert.deepEqual(json.products.map(product => product.brandName), listedExamples.map(example => example.brandName));
-  assert.deepEqual([...new Set(json.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo B', 'Marca de ejemplo C']);
+  assert.deepEqual([...new Set(json.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
   assert.equal(json.categories.length, 10);
   // Con la bandera activa, el script que importa el módulo de datos sí carga el archivo de ejemplos:
   // es la rama que la compilación de producción elimina.

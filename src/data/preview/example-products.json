@@ -187,7 +187,7 @@
   {
     "id": "ejemplo-guante-de-nitrilo",
     "name": "Guante de ejemplo de nitrilo",
-    "brandName": "Marca de ejemplo B",
+    "brandName": "Marca de ejemplo Beta",
     "code": "EJ-1003",
     "categoryIds": ["manos"],
     "saleUnit": "caja con 100 piezas",
@@ -206,7 +206,7 @@
   {
     "id": "ejemplo-guante-de-carnaza",
     "name": "Guante de ejemplo de carnaza",
-    "brandName": "Marca de ejemplo C",
+    "brandName": "Marca de ejemplo Gamma",
     "code": "EJ-1004",
     "categoryIds": ["manos"],
     "saleUnit": "par",
@@ -223,7 +223,7 @@
   {
     "id": "ejemplo-goggle-ventilado",
     "name": "Goggle de ejemplo ventilado",
-    "brandName": "Marca de ejemplo B",
+    "brandName": "Marca de ejemplo Beta",
     "code": "EJ-2002",
     "categoryIds": ["ojos-y-cara"],
     "saleUnit": "pieza",
@@ -240,7 +240,7 @@
   {
     "id": "ejemplo-casco-de-ala-completa",
     "name": "Casco de ejemplo de ala completa",
-    "brandName": "Marca de ejemplo C",
+    "brandName": "Marca de ejemplo Gamma",
     "code": "EJ-3002",
     "categoryIds": ["cabeza"],
     "saleUnit": "pieza",
@@ -258,7 +258,7 @@
   {
     "id": "ejemplo-respirador-desechable",
     "name": "Respirador de ejemplo desechable",
-    "brandName": "Marca de ejemplo B",
+    "brandName": "Marca de ejemplo Beta",
     "code": "EJ-4002",
     "categoryIds": ["respiratoria"],
     "saleUnit": "caja",
@@ -273,7 +273,7 @@
   {
     "id": "ejemplo-zapato-tipo-choclo",
     "name": "Zapato de ejemplo tipo choclo",
-    "brandName": "Marca de ejemplo C",
+    "brandName": "Marca de ejemplo Gamma",
     "code": "EJ-8002",
     "categoryIds": ["calzado"],
     "saleUnit": "par",

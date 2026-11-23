@@ -66,7 +66,7 @@ export interface PublicProduct {
   readonly name: string;
   /** `null` en los ejemplos: no pertenecen a una marca real y no tienen página de marca. */
   readonly brandId: string | null;
-  /** Nombre visible de la marca; en los ejemplos, «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C». */
+  /** Nombre visible de la marca; en los ejemplos, «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma». */
   readonly brandName: string;
   /** Modelo o código exacto del fabricante. */
   readonly code: string;
