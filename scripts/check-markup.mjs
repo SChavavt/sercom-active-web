@@ -1471,6 +1471,31 @@ export const CHECKS = [
       return problems;
     },
   },
+  // R-VARIANTE-01 · Las variantes de una ficha (src/pages/productos/[id].astro): cada <li class="producto__chip"> lleva
+  // su etiqueta (.producto__chip-label) con texto. El código es opcional (muchas tallas no tienen uno propio): cuando
+  // está, .producto__chip-code lleva la palabra oculta «Código» (.vh) y, después, el código; un elemento de código sin
+  // código se leería «Código» y nada más. Una página sin foto también se revisa (R-FOTO-01 solo mira las fotos que hay).
+  {
+    id: 'R-VARIANTE-01',
+    title: 'En la página de un producto, cada variante (li.producto__chip) lleva una etiqueta (.producto__chip-label) no vacía, y su código (.producto__chip-code), cuando lo lleva, tiene un código después de la palabra oculta «Código»',
+    page(page) {
+      if (!isProductRoute(page.route)) return [];
+      const problems = [];
+      for (const [index, chip] of page.elements.filter(element => element.name === 'li' && hasClass(element, 'producto__chip')).entries()) {
+        const inside = allElements(chip);
+        const where = `la variante ${index + 1} (${describe(chip)})`;
+        const labels = inside.filter(element => hasClass(element, 'producto__chip-label'));
+        if (!labels.some(label => textOf(label))) problems.push(`${where} no lleva una etiqueta con texto (.producto__chip-label): el visitante no sabe qué variante es`);
+        for (const code of inside.filter(element => hasClass(element, 'producto__chip-code'))) {
+          const hidden = allElements(code).filter(element => element !== code && hasClass(element, 'vh'));
+          const label = textOf(labels[0] ?? chip);
+          if (!hidden.some(element => /^código$/i.test(textOf(element)))) problems.push(`${where}, «${label}», lleva ${describe(code)} sin la palabra oculta «Código» (.vh) antes del código`);
+          if (!visibleText(code).trim()) problems.push(`${where}, «${label}», lleva ${describe(code)} sin código: si la variante no tiene código propio, la página no imprime ese elemento`);
+        }
+      }
+      return problems;
+    },
+  },
   // I-04 · Qué reconoce y qué no.
   // Reconoce, en el aviso, en lo que va dentro y en lo que lo contiene: hidden, popover, aria-hidden="true" y un
   // style en línea con display:none, visibility:hidden o collapse, o content-visibility:hidden. En las hojas de la

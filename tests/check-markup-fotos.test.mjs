@@ -47,6 +47,17 @@ test('una foto con alt y medidas, en tarjetas y en la ficha, de archivo o de dir
   assert.deepEqual(problems, []);
 });
 
+test('una ficha o una tarjeta sin foto, con el pictograma de su categoría, no es un problema', async () => {
+  // Como las imprimen ProductCard.astro y la ficha cuando `image` es null: la placa con el pictograma, sin <img>.
+  const plateCard = '<article class="product span-3"><div class="product__media"><span class="product__plate"><svg class="icon" width="40" height="40"></svg></span></div><h3 class="product__name t-h3">Guante sin foto</h3></article>';
+  const plateFicha = '<section class="producto grid12"><div class="producto__media span-7"><div class="producto__frame"><span class="producto__plate"><svg class="icon" width="64" height="64"></svg></span></div></div>'
+    + '<div class="producto__body span-5"><a class="action cell-link action--primary" href="https://wa.me/5212214002219?text=Hola"><span>Cotizar este producto</span></a></div></section>';
+  assert.deepEqual(await check({
+    'catalogo/index.html': doc('Catálogo', `<h1>Catálogo</h1>${plateCard}${card(picture('product__img'))}`),
+    'productos/guante-sin-foto/index.html': doc('Guante sin foto', plateFicha + `<section class="section"><div class="products grid12">${plateCard}${card(remote('product__img'))}</div></section>`),
+  }), []);
+});
+
 test('una foto de producto sin alt, con alt vacío o sin medidas enteras positivas es un problema', async () => {
   const cases = [
     ['alt="" width="1600" height="1200"', /no lleva un alt no vacío$/],
