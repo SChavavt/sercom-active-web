@@ -1,14 +1,45 @@
 // @ts-check
 // Enlaces de contacto y plantillas de mensaje, sin datos del negocio: todo llega como argumento.
 // Apto para el navegador y para node:test: solo importa `text.mjs` (la limpieza del texto del visitante).
-// Las páginas usan `contact.mjs` al compilar; un <script> de navegador solo necesita de aquí
-// `withPageLink` y `withRequestDescription`, que completan un enlace ya construido.
-/** @import { Contact, ContactLinkPair, ContactLinks, ContactMessages, ContactSettings, ContactSubjects, EmailParts, ProductReference } from '../types/contact.ts' */
+// Las páginas usan `contact.mjs` al compilar. Un <script> de navegador usa de aquí lo que trabaja sobre un enlace ya
+// construido (`withPageLink`, `withRequestDescription`, `linkChannel`, `messageOf`, `withMessage`, `withFieldValues`,
+// `draftLink`, `draftLinks`) y lo que arma el texto de un borrador (`cleanLines`, `listItem`, `composeListMessage`).
+// Nunca recibe un número, un correo ni un nombre del contacto: los trae el `href` que imprimió la página.
+/** @import { Contact, ContactLinkPair, ContactLinks, ContactMessages, ContactSettings, ContactSubjects, DraftLinks, EmailParts, LinkChannel, ListItemParts, ListMessageParts, ProductReference } from '../types/contact.ts' */
 import { cleanQuery } from './text.mjs';
 
-const LINK_LABEL = 'Enlace';
-const DESCRIPTION_LABEL = 'Descripción o uso';
-const DELIVERY_LABEL = 'Entrega en (ciudad o código postal)';
+/**
+ * Etiquetas de las líneas «Etiqueta: valor» de los mensajes. Las plantillas de `createContact` las usan, y un script de
+ * navegador completa esas líneas con `withFieldValues`: una sola fuente para cada etiqueta.
+ */
+export const MESSAGE_LABELS = Object.freeze({
+  link: 'Enlace',
+  variant: 'Variante (talla o color)',
+  quantity: 'Cantidad y unidad',
+  also: 'También necesito',
+  delivery: 'Entrega en (ciudad o código postal)',
+  date: 'Fecha requerida',
+  description: 'Descripción o uso',
+  model: 'Marca o modelo (si lo tengo)',
+});
+
+/**
+ * Largo máximo, en caracteres, del enlace completo de cada canal. Es conservador a propósito: no se pudo medir contra
+ * los servicios y se revisará con la prueba en un teléfono real. Con un enlace más largo, la página abre la aplicación
+ * sin texto y pide copiar primero (`draftLinks`).
+ */
+export const LINK_LIMITS = Object.freeze({ whatsapp: 1900, mailto: 1900 });
+
+const LINK_LABEL = MESSAGE_LABELS.link;
+const DESCRIPTION_LABEL = MESSAGE_LABELS.description;
+const DELIVERY_LABEL = MESSAGE_LABELS.delivery;
+/** Límite de una línea que completa `withFieldValues`. */
+const MAX_FIELD_LENGTH = 1000;
+/** Límites de lo que el visitante escribe en la lista: el texto libre y las dos líneas de entrega y fecha. */
+const MAX_NOTE_LENGTH = 10000;
+const MAX_LINE_LENGTH = 200;
+/** Lo que dice el mensaje de lista mientras no tiene productos ni texto: la plantilla de siempre. */
+const LIST_PLACEHOLDERS = ['1. (marca y código o descripción), (cantidad y unidad), (talla o color)', '2. ', '3. '];
 /** Palabras iniciales de un nombre de categoría que se escribe en minúsculas dentro de una frase. */
 const COMMON_FIRST_WORDS = ['Protección', 'Trabajo', 'Ropa', 'Calzado', 'Vial', 'Soldadura'];
 /** Límite de la descripción que llega desde el buscador, para no producir enlaces enormes. */
@@ -151,14 +182,17 @@ function setDescriptionLine(text, description) {
     .join('\n');
 }
 
+const WHATSAPP_PREFIX = 'https://wa.me/';
+const MAILTO_PREFIX = 'mailto:';
+
 /**
- * Aplica un cambio al texto del mensaje de un enlace de WhatsApp o de correo ya construido.
- * Cualquier otro enlace, o uno con codificación inválida, se devuelve igual.
+ * Las partes de un enlace de WhatsApp o de correo ya construido: canal, destino (los dígitos o el correo) y el asunto y
+ * el texto decodificados (los saltos de línea como `\n`). `null` para cualquier otro enlace o uno con codificación
+ * inválida.
  * @param {unknown} href
- * @param {(text: string) => string} transform
- * @returns {string}
+ * @returns {{ channel: LinkChannel, destination: string, subject: string, text: string } | null}
  */
-function rewriteMessage(href, transform) {
+function parseMessageLink(href) {
   const value = href === undefined || href === null ? '' : String(href);
   const queryStart = value.indexOf('?');
   const base = queryStart === -1 ? value : value.slice(0, queryStart);
@@ -169,18 +203,203 @@ function rewriteMessage(href, transform) {
     return param === undefined ? '' : decodeURIComponent(param.slice(name.length + 1));
   };
   try {
-    if (base.startsWith('https://wa.me/')) {
-      const text = read('text');
-      return text ? buildWhatsappUrl(base.slice('https://wa.me/'.length), transform(text)) : value;
-    }
-    if (base.startsWith('mailto:')) {
-      const body = read('body').replace(/\r\n?/g, '\n');
-      return body ? buildMailtoUrl(base.slice('mailto:'.length), { subject: read('subject'), body: transform(body) }) : value;
+    if (base.startsWith(WHATSAPP_PREFIX)) return { channel: 'whatsapp', destination: base.slice(WHATSAPP_PREFIX.length), subject: '', text: read('text') };
+    if (base.startsWith(MAILTO_PREFIX)) {
+      return { channel: 'mailto', destination: base.slice(MAILTO_PREFIX.length), subject: read('subject'), text: read('body').replace(/\r\n?/g, '\n') };
     }
   } catch {
-    // Codificación inválida: el enlace se deja como estaba.
+    // Codificación inválida: no es un enlace que se pueda leer.
   }
-  return value;
+  return null;
+}
+
+/**
+ * Construye de nuevo un enlace leído con `parseMessageLink`, con otro texto.
+ * @param {{ channel: LinkChannel, destination: string, subject: string }} link
+ * @param {string} text
+ */
+const buildMessageLink = (link, text) => (link.channel === 'whatsapp'
+  ? buildWhatsappUrl(link.destination, text)
+  : buildMailtoUrl(link.destination, { subject: link.subject, body: text }));
+
+/**
+ * Aplica un cambio al texto del mensaje de un enlace de WhatsApp o de correo ya construido.
+ * Cualquier otro enlace, uno sin texto o uno con codificación inválida, se devuelve igual.
+ * @param {unknown} href
+ * @param {(text: string) => string} transform
+ * @returns {string}
+ */
+function rewriteMessage(href, transform) {
+  const value = href === undefined || href === null ? '' : String(href);
+  const link = parseMessageLink(value);
+  if (!link || !link.text) return value;
+  try {
+    return buildMessageLink(link, transform(link.text));
+  } catch {
+    return value;
+  }
+}
+
+/**
+ * Canal de un enlace: «whatsapp» para `https://wa.me/…`, «mailto» para `mailto:…` y `null` para cualquier otro.
+ * @param {unknown} href
+ * @returns {LinkChannel | null}
+ */
+export function linkChannel(href) {
+  const value = href === undefined || href === null ? '' : String(href);
+  if (value.startsWith(WHATSAPP_PREFIX)) return 'whatsapp';
+  if (value.startsWith(MAILTO_PREFIX)) return 'mailto';
+  return null;
+}
+
+/**
+ * Para el navegador: el texto del mensaje de un enlace de WhatsApp, o el cuerpo de un enlace de correo, decodificado y
+ * con los saltos de línea como `\n`. Cadena vacía si no tiene, si es otro enlace o si su codificación es inválida.
+ * La línea de apertura de un mensaje es `messageOf(href).split('\n')[0]`.
+ * @param {unknown} href
+ * @returns {string}
+ */
+export function messageOf(href) {
+  return parseMessageLink(href)?.text ?? '';
+}
+
+/**
+ * Para el navegador: el mismo destino (y el mismo asunto, en un correo) con `text` como mensaje completo; con `''` el
+ * enlace queda sin texto. Cualquier otro enlace, o uno con codificación inválida, se devuelve igual.
+ * @param {unknown} href
+ * @param {unknown} text
+ * @returns {string}
+ */
+export function withMessage(href, text) {
+  const value = href === undefined || href === null ? '' : String(href);
+  const link = parseMessageLink(value);
+  if (!link) return value;
+  return buildMessageLink(link, text === undefined || text === null ? '' : String(text));
+}
+
+/**
+ * Para el navegador: completa líneas «Etiqueta: valor» del mensaje de un enlace. `values` es `{ [etiqueta]: texto }`:
+ * cada línea que empieza con `${etiqueta}:` queda `${etiqueta}: ${valor}`, con el valor en una sola línea (`cleanQuery`:
+ * los saltos de línea pasan a ser espacios) y hasta 1000 caracteres completos; con `''` la línea queda vacía. Las líneas
+ * cuya etiqueta no está en `values` no cambian, las etiquetas que el mensaje no tiene se ignoran y nunca se agrega una
+ * línea. Aplicarla dos veces da lo mismo que una.
+ * @param {unknown} href
+ * @param {Record<string, unknown> | null | undefined} values
+ * @returns {string}
+ */
+export function withFieldValues(href, values) {
+  const entries = Object.entries(values && typeof values === 'object' ? values : {})
+    .map(([label, value]) => [label, Array.from(cleanQuery(value)).slice(0, MAX_FIELD_LENGTH).join('').trim()])
+    .filter(([label]) => label !== '')
+    // Si una etiqueta empieza como otra, cuenta la más larga.
+    .sort((a, b) => b[0].length - a[0].length);
+  if (entries.length === 0) return href === undefined || href === null ? '' : String(href);
+  return rewriteMessage(href, text => text
+    .split('\n')
+    .map(line => {
+      const entry = entries.find(([label]) => line.startsWith(`${label}:`));
+      return entry ? field(entry[0], entry[1]) : line;
+    })
+    .join('\n'));
+}
+
+/**
+ * Para el navegador: el enlace con `text` como mensaje si cabe en `LINK_LIMITS` para su canal (`fits: true`). Si no
+ * cabe, el enlace sin texto (`fits: false`): abre la aplicación y el visitante pega lo que copió. Un enlace que no es de
+ * ninguno de los dos canales se devuelve igual, con `fits: true`.
+ * @param {unknown} href
+ * @param {unknown} text
+ * @returns {{ href: string, fits: boolean }}
+ */
+export function draftLink(href, text) {
+  const value = href === undefined || href === null ? '' : String(href);
+  const channel = linkChannel(value);
+  if (!channel) return { href: value, fits: true };
+  const full = withMessage(value, text);
+  if (full.length <= LINK_LIMITS[channel]) return { href: full, fits: true };
+  return { href: withMessage(value, ''), fits: false };
+}
+
+/**
+ * Para el navegador: la regla de una página que arma UN mensaje. `fits` es `true` solo si TODOS los enlaces caben con
+ * el texto; si uno no cabe, todos los enlaces de WhatsApp y de correo de la lista vuelven sin texto. Los demás enlaces
+ * pasan igual. Mismo orden que `hrefs`.
+ * @param {readonly unknown[]} hrefs
+ * @param {unknown} text
+ * @returns {DraftLinks}
+ */
+export function draftLinks(hrefs, text) {
+  const list = Array.isArray(hrefs) ? hrefs : [];
+  const drafts = list.map(href => draftLink(href, text));
+  const fits = drafts.every(draft => draft.fits);
+  if (fits) return { hrefs: drafts.map(draft => draft.href), fits };
+  return { hrefs: list.map(href => (linkChannel(href) ? withMessage(href, '') : href === undefined || href === null ? '' : String(href))), fits };
+}
+
+/**
+ * Texto de varias líneas que escribió el visitante: cada línea limpia como `cleanQuery` (sin caracteres invisibles ni de
+ * dirección, los controles como espacios), sin líneas vacías al principio ni al final, con a lo más una línea vacía
+ * seguida, y recortado a `limit` caracteres completos (puntos de código: nunca parte un emoji en dos mitades). Cadena
+ * vacía si no queda nada visible.
+ * @param {unknown} value
+ * @param {number} [limit]
+ * @returns {string}
+ */
+export function cleanLines(value, limit = Infinity) {
+  const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(Number(limit))) : Infinity;
+  /** @type {string[]} */
+  const lines = [];
+  for (const line of (value === undefined || value === null ? '' : String(value)).split(/\r\n|\r|\n/)) {
+    const cleaned = cleanQuery(line);
+    if (cleaned || (lines.length > 0 && lines[lines.length - 1] !== '')) lines.push(cleaned);
+  }
+  while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  const text = Array.from(lines.join('\n')).slice(0, max).join('');
+  // El recorte puede dejar un espacio o una línea vacía al final.
+  return text.replace(/\s+$/u, '');
+}
+
+/**
+ * Un renglón del mensaje de lista: la etiqueta del producto como la escriben los demás mensajes («Marca CÓDIGO
+ * (Nombre)»), luego la cantidad y la variante cuando no están vacías: «Marca CÓDIGO (Nombre), 12 pares, Talla 8
+ * (CÓDIGO-8)».
+ * @param {ListItemParts} parts
+ * @returns {string}
+ */
+export function listItem({ brandName, code, name, quantity, variant } = {}) {
+  return [productLabel({ brandName, code, name }), clean(quantity), clean(variant)].filter(Boolean).join(', ');
+}
+
+/**
+ * El mensaje de la lista:
+ *
+ *     {opening}
+ *     1. {renglón}
+ *     2. …
+ *     También necesito: {texto}            ← solo con productos; un texto de varias líneas va en las líneas siguientes
+ *     Entrega en (ciudad o código postal): {texto}
+ *     Fecha requerida: {texto}
+ *
+ * `items` son textos (`listItem`); aquí se numeran. `note` pasa por `cleanLines(note, 10000)`: sin productos, sus líneas
+ * siguen directamente a la apertura. `delivery` y `date` van en una línea cada uno (`cleanQuery`, hasta 200 caracteres).
+ * Sin productos ni texto aparecen las tres líneas de ejemplo de la plantilla de siempre (`messages.list()`).
+ * @param {ListMessageParts} parts
+ * @returns {string}
+ */
+export function composeListMessage({ opening, items = [], note = '', delivery = '', date = '' }) {
+  const lines = [clean(opening)];
+  const products = (Array.isArray(items) ? items : []).map(item => clean(item)).filter(Boolean);
+  const notes = cleanLines(note, MAX_NOTE_LENGTH);
+  products.forEach((item, index) => lines.push(`${index + 1}. ${item}`));
+  if (products.length > 0 && notes) {
+    const [first, ...rest] = notes.split('\n');
+    if (rest.length === 0) lines.push(field(MESSAGE_LABELS.also, first));
+    else lines.push(`${MESSAGE_LABELS.also}:`, first, ...rest);
+  } else if (notes) lines.push(...notes.split('\n'));
+  else if (products.length === 0) lines.push(...LIST_PLACEHOLDERS);
+  const oneLine = (/** @type {unknown} */ value) => Array.from(cleanQuery(value)).slice(0, MAX_LINE_LENGTH).join('').trim();
+  lines.push(field(DELIVERY_LABEL, oneLine(delivery)), field(MESSAGE_LABELS.date, oneLine(date)));
+  return lines.join('\n');
 }
 
 /**
@@ -249,27 +468,22 @@ export function createContact(settings) {
     product: product => addLinkLine(lines(
       quoteOpening,
       field('Producto', productLabel(product)),
-      field('Variante (talla o color)'),
-      field('Cantidad y unidad'),
+      field(MESSAGE_LABELS.variant),
+      field(MESSAGE_LABELS.quantity),
       field(DELIVERY_LABEL),
-      field('Fecha requerida'),
-      field('También necesito'),
+      field(MESSAGE_LABELS.date),
+      field(MESSAGE_LABELS.also),
     ), product?.url),
-    list: () => lines(
-      `${hello} Quiero cotizar esta lista con ${business}:`,
-      '1. (marca y código o descripción), (cantidad y unidad), (talla o color)',
-      '2. ',
-      '3. ',
-      field(DELIVERY_LABEL),
-      field('Fecha requerida'),
-    ),
+    // La plantilla de siempre: la lista sin productos ni texto. La página de cotizar la completa en el navegador con
+    // `composeListMessage`, tomando la apertura del enlace (`messageOf(href).split('\n')[0]`).
+    list: () => composeListMessage({ opening: `${hello} Quiero cotizar esta lista con ${business}:` }),
     specialRequest: options => setDescriptionLine(lines(
       `${hello} Busco un producto que no encuentro en el catálogo de ${business}.`,
       field(DESCRIPTION_LABEL),
-      field('Marca o modelo (si lo tengo)'),
-      field('Cantidad y unidad'),
+      field(MESSAGE_LABELS.model),
+      field(MESSAGE_LABELS.quantity),
       field(DELIVERY_LABEL),
-      field('Fecha requerida'),
+      field(MESSAGE_LABELS.date),
       'Puedo enviar una foto o archivo en esta conversación.',
     ), options?.query),
     brand: brandName => {
@@ -277,7 +491,7 @@ export function createContact(settings) {
       return lines(
         brand ? `${hello} Busco un producto de la marca ${brand}.` : `${hello} Busco un producto.`,
         field('Modelo o descripción'),
-        field('Cantidad y unidad'),
+        field(MESSAGE_LABELS.quantity),
       );
     },
     category: categoryName => {
@@ -285,7 +499,7 @@ export function createContact(settings) {
       return lines(
         category ? `${hello} Busco productos de ${category}.` : `${hello} Busco productos.`,
         field('Qué necesito'),
-        field('Cantidad y unidad'),
+        field(MESSAGE_LABELS.quantity),
       );
     },
     datasheet: product => {
@@ -298,9 +512,9 @@ export function createContact(settings) {
       `${hello} Busco una alternativa a un producto que ya no está en el catálogo de ${business}.`,
       field('Producto', productLabel(product)),
       field('Para qué lo uso'),
-      field('Cantidad y unidad'),
+      field(MESSAGE_LABELS.quantity),
       field(DELIVERY_LABEL),
-      field('Fecha requerida'),
+      field(MESSAGE_LABELS.date),
     ), product?.url),
   };
 

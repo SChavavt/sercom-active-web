@@ -1,4 +1,5 @@
-// Tipos de los enlaces de contacto y de las plantillas de mensaje (`src/lib/contact.mjs`).
+// Tipos de los enlaces de contacto, de las plantillas de mensaje (`src/lib/contact.mjs`) y de los borradores que arma
+// el navegador (`src/lib/contact-core.mjs`).
 
 /** Campos de `src/data/business.json` que usan los enlaces y los mensajes. */
 export interface ContactSettings {
@@ -106,4 +107,39 @@ export interface Contact {
   messages: ContactMessages;
   subjects: ContactSubjects;
   contactLinks: ContactLinks;
+}
+
+/** Canal de un enlace de contacto: `https://wa.me/…` o `mailto:…`. */
+export type LinkChannel = 'whatsapp' | 'mailto';
+
+/** Resultado de `draftLinks`: los enlaces en el mismo orden y si el texto cupo en todos. */
+export interface DraftLinks {
+  hrefs: string[];
+  /** `false`: algún enlace pasaba de su límite y todos los de WhatsApp y correo vuelven sin texto. */
+  fits: boolean;
+}
+
+/** Partes de un renglón del mensaje de lista (`listItem`). Las vacías se omiten. */
+export interface ListItemParts {
+  brandName?: string | null;
+  code?: string | null;
+  name?: string | null;
+  /** Cantidad con su unidad, ya escrita: «12 pares». */
+  quantity?: string | null;
+  /** Variante, ya escrita: «Talla 8 (EJ-1001-8)» o «talla o color por definir». */
+  variant?: string | null;
+}
+
+/** Partes del mensaje de lista (`composeListMessage`). */
+export interface ListMessageParts {
+  /** Primera línea del mensaje: la de la plantilla, leída del enlace con `messageOf(href).split('\n')[0]`. */
+  opening: string;
+  /** Renglones ya escritos (`listItem`); aquí se numeran. */
+  items?: readonly string[];
+  /** Lo que el visitante escribió aparte; puede tener varias líneas. */
+  note?: string;
+  /** Ciudad o código postal de entrega. */
+  delivery?: string;
+  /** Fecha requerida, como la escribió el visitante. */
+  date?: string;
 }
