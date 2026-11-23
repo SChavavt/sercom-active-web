@@ -126,6 +126,15 @@ export interface QuoteMessageItem {
   variant: string;
 }
 
+/**
+ * Las líneas de los enlaces directos de la página de un producto (`directLinkValues`): solo las de los campos que el
+ * visitante tocó. `variant` va en «Variante (talla o color)» y `quantity` en «Cantidad y unidad».
+ */
+export interface DirectLinkValues {
+  variant?: string;
+  quantity?: string;
+}
+
 /** Lo que el visitante escribe en «Cotizar mi lista». Pertenece a la pestaña. */
 export interface QuoteDraft {
   note: string;

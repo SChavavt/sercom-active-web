@@ -3,11 +3,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, duplicateStates, formatQuantity, indexMaps,
-  isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY,
-  mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY,
-  reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, undoLines, unitKey, unitOptions,
-  unknownLinesMessage, updateLine, variantText,
+  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf, duplicateStates,
+  formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems,
+  MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel,
+  QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS,
+  undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -661,4 +661,35 @@ test('undoLines: el foco no pasa del último renglón y no cambia sus argumentos
   assert.notEqual(emptied.lines, previous);
   assert.deepEqual(previous, [line('respirador', 1, 'caja')]);
   assert.deepEqual(list, [line('cono', 1, 'pieza')]);
+});
+
+// ---- decisiones de la página de un producto --------------------------------------------------------------------
+
+test('directLinkValues: solo los campos tocados, vacíos con «por definir» o una cantidad no válida', () => {
+  const guante = rareIndex.products.get('guante-recubierto');
+  const cono = rareIndex.products.get('cono');
+  const respirador = rareIndex.products.get('respirador');
+  const talla8 = guante.variants[0];
+  const state = (touched, variant, quantity, unit = 'par', product = guante) => directLinkValues(deepFreeze({ product, touched, variant, quantity, unit }));
+  // Nada tocado: ninguna línea, aunque los campos tengan valores.
+  for (const touched of [{}, { variant: false, quantity: false }]) {
+    assert.deepEqual(state(touched, talla8, '12'), {});
+    assert.deepEqual(state(touched, null, 'doce'), {});
+  }
+  // Solo la variante: elegida, o de vuelta en «Talla o color por definir» (la línea queda vacía).
+  assert.deepEqual(state({ variant: true }, talla8, '12'), { variant: 'Talla 8 (SP-110-8)' });
+  assert.deepEqual(state({ variant: true, quantity: false }, null, '12'), { variant: '' });
+  // La única variante de un producto cuenta como elegida.
+  assert.deepEqual(state({ variant: true }, cono.variants[0], '1', 'pieza', cono), { variant: 'Única (SP-140-U)' });
+  // Solo la cantidad (o la unidad): con la unidad elegida; vacía mientras la cantidad no es válida.
+  assert.deepEqual(state({ quantity: true }, talla8, '12'), { quantity: '12 pares' });
+  assert.deepEqual(state({ quantity: true }, talla8, '1', 'caja'), { quantity: '1 caja' });
+  assert.deepEqual(state({ quantity: true }, null, '99,999', 'pieza'), { quantity: '99,999 piezas' });
+  assert.deepEqual(state({ quantity: true }, null, ' 1,200 ', 'tambo de 200 L'), { quantity: '1200 × tambo de 200 L' });
+  for (const invalid of ['', '0', 'doce', '1.5', '100000', '-3']) assert.deepEqual(state({ quantity: true }, talla8, invalid), { quantity: '' }, invalid);
+  // Las dos: cada una con su regla.
+  assert.deepEqual(state({ variant: true, quantity: true }, talla8, '3'), { variant: 'Talla 8 (SP-110-8)', quantity: '3 pares' });
+  assert.deepEqual(state({ variant: true, quantity: true }, null, ''), { variant: '', quantity: '' });
+  // Un producto sin variantes: la línea de la variante (si se tocara) queda vacía.
+  assert.deepEqual(state({ variant: true, quantity: true }, null, '2', 'caja', respirador), { variant: '', quantity: '2 cajas' });
 });

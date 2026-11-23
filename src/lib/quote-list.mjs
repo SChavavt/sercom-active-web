@@ -1,8 +1,8 @@
 // @ts-check
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
 // vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
-// funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`) y qué
-// productos van en el mensaje (`listMessageItems`).
+// funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`), qué
+// productos van en el mensaje (`listMessageItems`) y qué llevan los enlaces directos de la ficha (`directLinkValues`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
 // `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar; lo demás, en el navegador.
 //
@@ -12,7 +12,7 @@
 // agrega lo mismo otra vez desde la página del producto (`addLine`) o pulsa «Unirlos» en la página de cotizar
 // (`mergeLines`). Ninguna función cambia sus argumentos.
 /**
- * @import { QuoteDuplicate, QuoteIndex, QuoteIndexMaps, QuoteIndexProduct, QuoteIndexRetired, QuoteIndexVariant, QuoteLine, QuoteMessageItem, QuoteRow, QuoteRowOk, QuoteUndo, QuoteUndoResult, RemovedLine } from '../types/quote.ts'
+ * @import { DirectLinkValues, QuoteDuplicate, QuoteIndex, QuoteIndexMaps, QuoteIndexProduct, QuoteIndexRetired, QuoteIndexVariant, QuoteLine, QuoteMessageItem, QuoteRow, QuoteRowOk, QuoteUndo, QuoteUndoResult, RemovedLine } from '../types/quote.ts'
  */
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -704,6 +704,30 @@ export function listMessageItems(rows) {
       variant: variantText(row.product, row.variant),
     }]
     : []));
+}
+
+/**
+ * Las líneas de «Cotizar este producto» y «Cotizar por correo» en la página de un producto, según lo que el visitante
+ * eligió en «Agregar a mi cotización». Cada línea se completa solo después de que el visitante tocó SU campo
+ * (`touched`); la de un campo que no tocó no va (el enlace conserva la suya):
+ *   - `variant` (al tocar la variante): `variantText(product, variant)`, o `''` si volvió a «Talla o color por definir»
+ *     (`variant` nulo): el visitante no eligió nada;
+ *   - `quantity` (al tocar la cantidad o la unidad): `quantityLabel` de la cantidad escrita (`parseQuantity`) con la
+ *     unidad elegida, o `''` mientras la cantidad no es válida.
+ * La página pone cada valor en su línea (`MESSAGE_LABELS` y `withFieldValues` de contact-core.mjs).
+ * @param {{ product: { variants: readonly unknown[] } | null | undefined, touched: { variant?: boolean, quantity?: boolean }, variant: { label: string, code?: string } | null | undefined, quantity: unknown, unit: unknown }} state
+ *   `variant`: la variante elegida (la única, si el producto tiene una), o `null`; `quantity`: lo escrito en el campo.
+ * @returns {DirectLinkValues}
+ */
+export function directLinkValues({ product, touched, variant, quantity, unit }) {
+  /** @type {DirectLinkValues} */
+  const values = {};
+  if (touched?.variant) values.variant = variant ? variantText(product, variant) : '';
+  if (touched?.quantity) {
+    const number = parseQuantity(quantity);
+    values.quantity = number === null ? '' : quantityLabel(number, unit);
+  }
+  return values;
 }
 
 /**

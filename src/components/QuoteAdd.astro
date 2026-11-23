@@ -30,7 +30,8 @@
 //   - Enlaces directos (`[data-quote-direct]`, «Cotizar este producto» y «Cotizar por correo»): cada línea de su
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
-//     mientras la cantidad no es válida). Con `withFieldValues` sobre el `href` de cada enlace: no guarda una copia.
+//     mientras la cantidad no es válida; lo decide `directLinkValues` de quote-list.mjs). Con `withFieldValues` sobre el
+//     `href` de cada enlace: no guarda una copia.
 import { buildQuoteIndex, jsonForScript, LIST_FULL_MESSAGE, MAX_QUANTITY, QUANTITY_ERROR, unitOptions } from '../lib/quote-list.mjs';
 import { routes } from '../lib/site-data.mjs';
 import type { PublicProduct } from '../types/site.ts';
@@ -89,7 +90,9 @@ const chooseVariant = product.variants.length > 1;
 
 <script>
   import { MESSAGE_LABELS, withFieldValues } from '../lib/contact-core.mjs';
-  import { addedMessage, addLine, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel, reconcileList, variantText } from '../lib/quote-list.mjs';
+  import {
+    addedMessage, addLine, directLinkValues, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel, reconcileList,
+  } from '../lib/quote-list.mjs';
   import { quoteStore } from '../lib/quote-store.mjs';
 
   /** Las piezas del formulario, o null si falta alguna (entonces no se muestra). */
@@ -215,16 +218,12 @@ const chooseVariant = product.variants.length > 1;
     const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-quote-direct]')];
     const touched = { variant: false, quantity: false };
     const applyLinks = () => {
+      // Qué va en cada línea lo decide `directLinkValues` (quote-list.mjs, con pruebas): nada de un campo sin tocar,
+      // vacía con «Talla o color por definir» o con una cantidad no válida.
+      const lineValues = directLinkValues({ product, touched, variant: chosenVariant(), quantity: input.value, unit: unit.value });
       const values: Record<string, string> = {};
-      if (touched.variant) {
-        // De vuelta en «Talla o color por definir», la línea queda vacía: el visitante no eligió nada.
-        const variant = chosenVariant();
-        values[MESSAGE_LABELS.variant] = variant ? variantText(product, variant) : '';
-      }
-      if (touched.quantity) {
-        const quantity = parseQuantity(input.value);
-        values[MESSAGE_LABELS.quantity] = quantity === null ? '' : quantityLabel(quantity, unit.value);
-      }
+      if (lineValues.variant !== undefined) values[MESSAGE_LABELS.variant] = lineValues.variant;
+      if (lineValues.quantity !== undefined) values[MESSAGE_LABELS.quantity] = lineValues.quantity;
       if (Object.keys(values).length === 0) return;
       for (const link of links) link.href = withFieldValues(link.href, values);
     };
