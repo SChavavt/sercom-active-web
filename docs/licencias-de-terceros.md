@@ -22,9 +22,9 @@ El texto completo de la licencia está en `src/assets/fonts/OFL-Archivo.txt` y d
 
 ## Fotografías de producto
 
-Hoy ninguna ficha está aprobada y no hay ninguna fotografía en el repositorio ni en el sitio compilado. Cuando las haya, cada ficha aprobada lleva una foto de su producto, normalmente del fabricante, que no es de la empresa ni tiene una licencia común a todas:
+Hoy ninguna ficha está aprobada y no hay ninguna fotografía en el repositorio ni en el sitio compilado. Una ficha aprobada lleva una foto de su producto o ninguna (entonces se muestra el pictograma de su categoría). La foto es la que el fabricante publica en su sitio oficial, con la página de donde salió; no es de la empresa ni tiene una licencia común a todas:
 
-- Se usa solo con su uso confirmado: la ficha registra de dónde viene (`image.sourceUrl`, la página `https` de origen) y `image.usageConfirmed: true`, y el validador no aprueba una ficha sin las dos cosas. Que una foto esté en Internet no da derecho a usarla ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#3-flujo-para-agregar-un-producto-real), paso 4).
+- La ficha registra de dónde viene (`image.sourceUrl`, la página `https` de origen) y `image.usageConfirmed: true`; el validador rechaza la foto de una ficha aprobada sin las dos cosas ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#3-flujo-para-agregar-un-producto-real), paso 4).
 - Una foto guardada como archivo está en `src/assets/productos/`, que solo guarda las de fichas aprobadas porque el repositorio es público; la compilación la copia a `dist/_astro/` convertida a WebP y en varios anchos. Una foto por dirección (`image.url`) no se copia: la página la pide a ese servidor.
 - Las condiciones de cada foto (crédito, plazo, dónde se puede usar) son las que dé su titular, y se cumplen ficha por ficha; este archivo no las lista una por una.
 
