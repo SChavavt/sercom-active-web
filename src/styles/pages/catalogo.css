@@ -310,11 +310,12 @@
   .catalog-nav__link, .catalog-nav__toggle { min-height: 48px; font-size: 1rem; }
 
   /* Filtros: los títulos de los grupos son filas a todo lo ancho (como los pliegues de la barra de enlaces), cada
-     lista se abre bajo su título y «Limpiar filtros» va en una fila después de ellos (en el documento va primero, como
-     en computadora: el orden del teclado es el mismo en todos los anchos). Hasta que el script prepara los pliegues
-     (cerrados por debajo de 1100 px), las listas no se muestran: no se ven abiertas un instante al cargar. */
+     lista se abre bajo su título y «Limpiar filtros» va en una fila después de ellos: ahí no empuja la lista abierta
+     cuando aparece. También va después en el documento (el script de CatalogSearch lo coloca según el ancho): el
+     orden del teclado es el que se ve. Hasta que el script prepara los pliegues (cerrados por debajo de 1100 px), las
+     listas no se muestran: no se ven abiertas un instante al cargar. */
   .catalog-filters { background: transparent; }
-  .catalog-filters__clear { order: 1; align-items: center; min-height: 60px; padding-block: var(--s-2); }
+  .catalog-filters__clear { align-items: center; min-height: 60px; padding-block: var(--s-2); }
   .catalog-filters:not([data-filters-ready]) .catalog-filters__panel { display: none; }
   .catalog-filters:not([data-filters-ready]) .disclosure .icon { transform: none; }
   /* Estado sin resultados con dos acciones: bajo el texto, lado a lado si caben */

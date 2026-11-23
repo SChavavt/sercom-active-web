@@ -23,7 +23,13 @@
 //     pasa al título del primer grupo, o al campo de búsqueda si se pulsó en el estado sin resultados), los títulos de
 //     los grupos ([data-filter-toggle]: abren y cierran su lista) y pageshow (vuelve a leer la dirección sin tocarla:
 //     página restaurada de la caché de Atrás y Adelante, o campos que el navegador restauró por su cuenta).
-//   - Pliegues: abiertos desde 1100 px y cerrados por debajo al cargar, y de nuevo al cruzar los 1100 px.
+//   - Pliegues: abiertos desde 1100 px y cerrados por debajo al cargar, y de nuevo al cruzar los 1100 px; el grupo
+//     que tiene el foco dentro de su lista se queda abierto (cerrarlo dejaría el foco en ninguna parte).
+//   - «Limpiar filtros» de los filtros: en el documento va donde se ve, para que el orden del teclado sea el de la
+//     pantalla. Primero desde 1100 px (arriba de los grupos) y último por debajo (después de ellos, donde no empuja
+//     la lista abierta al aparecer). El script lo coloca al cargar y al cruzar los 1100 px, y conserva su foco.
+//   - La línea de resultados es una región viva: solo se escribe cuando su frase cambia (al cargar sin búsqueda ni
+//     filtros ya dice lo que diría, y volver a escribirla la haría anunciarse sola).
 //   - Búsqueda del encabezado (formulario GET a /catalogo/): repite la consulta de la página y lleva un campo oculto
 //     por opción marcada ([data-filter-hidden]), así su envío normal llega a /catalogo/?q=…&categoria=…. No se
 //     intercepta.
@@ -121,6 +127,8 @@ const { total } = Astro.props;
    */
   function writeSummary(line: HTMLElement, visible: number, query: string, filtered: boolean) {
     const { lead, term, end } = resultSummaryParts(visible, query, { filtered });
+    // Región viva: una frase que no cambia no se vuelve a escribir.
+    if (line.textContent === `${lead}${term}${end}`) return;
     if (!term) {
       line.textContent = lead;
       return;
@@ -223,17 +231,35 @@ const { total } = Astro.props;
 
   /** Pliegues: abiertos desde 1100 px, cerrados por debajo. */
   const wide = window.matchMedia('(min-width: 1100px)');
+  const panelOf = (toggle: HTMLButtonElement) => document.getElementById(toggle.getAttribute('aria-controls') ?? '');
   function setOpen(toggle: HTMLButtonElement, open: boolean) {
     toggle.setAttribute('aria-expanded', String(open));
-    const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+    const panel = panelOf(toggle);
     if (panel) panel.hidden = !open;
   }
+  /** Cada pliegue a su estado del ancho; el que tiene el foco dentro de su lista se queda abierto. */
   function resetFolds() {
-    for (const toggle of toggles) setOpen(toggle, wide.matches);
+    for (const toggle of toggles) setOpen(toggle, wide.matches || (panelOf(toggle)?.contains(document.activeElement) ?? false));
+  }
+
+  /**
+   * «Limpiar filtros» de los filtros, donde se ve: primero en su columna desde 1100 px y último por debajo. Moverlo le
+   * quita el foco, así que se le devuelve.
+   */
+  const sideClear = filterClears.find(button => filtersBlock?.contains(button)) ?? null;
+  function placeClear() {
+    const cells = sideClear?.parentElement;
+    if (!sideClear || !cells) return;
+    if ((wide.matches ? cells.firstElementChild : cells.lastElementChild) === sideClear) return;
+    const focused = document.activeElement === sideClear;
+    if (wide.matches) cells.prepend(sideClear);
+    else cells.append(sideClear);
+    if (focused) sideClear.focus();
   }
 
   // Al cargar
   resetFolds();
+  placeClear();
   if (filtersBlock) filtersBlock.dataset.filtersReady = '';
   {
     const { query, filters } = readAddress();
@@ -242,7 +268,10 @@ const { total } = Astro.props;
     if (`${window.location.pathname}${window.location.search}` !== canonical) history.replaceState(history.state, '', canonical);
   }
 
-  wide.addEventListener('change', resetFolds);
+  wide.addEventListener('change', () => {
+    resetFolds();
+    placeClear();
+  });
 
   for (const toggle of toggles) {
     toggle.addEventListener('click', () => setOpen(toggle, toggle.getAttribute('aria-expanded') !== 'true'));
