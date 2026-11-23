@@ -714,9 +714,9 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
 }
 .field__error .icon { margin-top: calc((1.35em - 18px) / 2); }
 .field__error > span { min-width: 0; }
-/* Un error que ya no vale pero conserva su lugar mientras el puntero oprime otro control y sigue sobre él: si la línea
-   se fuera en ese momento, lo que está debajo se movería y el clic, o el clic siguiente, caería en otro lado. Lo pone
-   y lo quita el script de la página (cotizar). */
+/* Un error que ya no vale pero conserva su lugar mientras el puntero oprime otro control o sigue más abajo que la
+   línea: si se fuera en ese momento, lo que está debajo se movería y el clic, o el clic siguiente, caería en otro
+   lado. Lo pone y lo quita el script de la página (cotizar). */
 .field__error--unseen { visibility: hidden; }
 /* Dentro de una celda blanca más ancha: su propio filete y un relleno más corto; dos seguidos comparten el filete */
 .field--framed { padding: var(--s-3) var(--s-4) var(--s-2); border: var(--line) solid var(--rule); }

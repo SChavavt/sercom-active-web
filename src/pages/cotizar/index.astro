@@ -747,12 +747,12 @@ const items = [
         input.closest('.field')?.classList.add('field--invalid');
         if (document.activeElement !== input) input.focus();
       }
-      /** Alguna línea de error conserva su lugar sin verse (`hideError` con `keepPlace`), hasta `collapseUnseen`. */
+      /** Alguna línea de error conserva su lugar sin verse (`hideError` con `keepPlace`), hasta que se quite del todo. */
       let kept = false;
       /**
        * Quita el error de un campo. Con `keepPlace`, la línea del error deja de verse y de describir al campo, pero
-       * conserva su lugar hasta `collapseUnseen`: mientras el puntero oprime, y después mientras sigue sobre el control
-       * que oprimió, nada se mueve debajo de él.
+       * conserva su lugar mientras quitarla movería lo que el puntero tiene debajo: mientras oprime, y después mientras
+       * siga a la altura de la línea o más abajo (`collapseBelow`).
        */
       function hideError(input: HTMLInputElement, keepPlace = false) {
         const error = document.getElementById(`${input.id}-error`);
@@ -852,21 +852,28 @@ const items = [
       // un campo porque el visitante está por activar un control con el puntero. Se sigue con `mousedown` y `mouseup`, que
       // el navegador envía también con el dedo y con el lápiz: `mousedown` es el que saca el foco del campo.
       let pressed: Element | null = null;
-      /**
-       * El control que el puntero oprimió y soltó, mientras alguna línea de error conserva su lugar por él: hasta que el
-       * puntero sale de ese control, un segundo clic (otro «+», un doble clic) cae en el mismo lugar que el primero.
-       */
-      let resting: Element | null = null;
-      const controls = 'a[href], button, input, select, textarea, label, summary';
       document.addEventListener('mousedown', event => {
         pressed = event.target instanceof Element ? event.target : null;
       }, true);
       /** Las líneas de error que conservaban su lugar se quitan del todo. */
       function collapseUnseen() {
-        resting = null;
         if (!kept) return;
         kept = false;
         for (const error of list!.querySelectorAll<HTMLElement>(`.${UNSEEN}`)) collapseError(error);
+      }
+      /**
+       * Se quitan las líneas que conservan su lugar y están más abajo que el puntero (`y`, su altura en la ventana).
+       * Cuando una línea se va, sube lo que está debajo de ella y nada de lo que está arriba: con el puntero arriba de la
+       * línea, lo que tiene debajo no se mueve. Las líneas que están a su altura o más arriba se quedan, porque quitarlas
+       * le cambiaría al visitante lo que está por oprimir (el control de al lado, el renglón siguiente).
+       */
+      function collapseBelow(y: number) {
+        if (!kept) return;
+        kept = false;
+        for (const error of list!.querySelectorAll<HTMLElement>(`.${UNSEEN}`)) {
+          if (error.getBoundingClientRect().top > y) collapseError(error);
+          else kept = true;
+        }
       }
       /**
        * La cantidad que volvió sin decirse se dice si su renglón sigue en la lista (el visitante oprimió «Quitar» y soltó
@@ -880,25 +887,24 @@ const items = [
         page.announce(waiting.sentence, 'quantity');
       }
       // El puntero soltó. El clic llega justo después de `mouseup`, en el mismo turno: lo demás va en el turno siguiente,
-      // con el clic ya atendido. Si soltó sobre el control que oprimió y ese control sigue en la página, las líneas de
-      // error conservan su lugar mientras el puntero siga ahí. Si no (soltó en otro lado, el clic quitó el control, o no
-      // hubo `mouseup`: se abrió un menú contextual, empezó un arrastre), se quitan de una vez.
-      const release = (event: Event) => {
+      // con el clic ya atendido. Las líneas de error que quedaron más abajo que el puntero se quitan ahí mismo; las demás
+      // conservan su lugar, y así ni otro clic en el mismo control ni el clic en el control de al lado caen en otro lado.
+      // Después de un arrastre no se sabe dónde quedó el puntero (`dragend` no siempre lo dice): se quitan todas.
+      const release = (event: MouseEvent) => {
         if (!pressed) return;
-        const from = pressed.closest(controls);
-        const to = event.type === 'mouseup' && event.target instanceof Element ? event.target.closest(controls) : null;
         pressed = null;
-        resting = from !== null && from === to ? from : null;
+        const y = event.type === 'dragend' ? null : event.clientY;
         setTimeout(() => {
           sayUnsaid();
-          if (!kept || !resting?.isConnected) collapseUnseen();
+          if (y === null) collapseUnseen();
+          else collapseBelow(y);
         }, 0);
       };
-      for (const type of ['mouseup', 'dragend', 'contextmenu']) document.addEventListener(type, release, true);
-      // El puntero salió del control que había oprimido: ya nada se mueve bajo un clic. Solo el ratón y el lápiz avisan
-      // dónde están sin tocar; con el dedo, las líneas se quitan al desplazar la página o al usar el teclado. Un puntero
-      // que se mueve sin ningún botón oprimido ya soltó, aunque `mouseup` no haya llegado (se lo quedó la lista de un
-      // `<select>` al abrirse, por ejemplo).
+      for (const type of ['mouseup', 'dragend', 'contextmenu'] as const) document.addEventListener(type, release, true);
+      // El puntero se movió: las líneas que quedaron más abajo que él ya se pueden quitar. Solo el ratón y el lápiz avisan
+      // dónde están sin tocar; con el dedo, las líneas que quedan se quitan con el siguiente toque más arriba que ellas, al
+      // desplazar la página o al usar el teclado. Un puntero que se mueve sin ningún botón oprimido ya soltó, aunque
+      // `mouseup` no haya llegado (se lo quedó la lista de un `<select>` al abrirse, por ejemplo).
       document.addEventListener('pointermove', event => {
         if (event.pointerType === 'touch' || (!pressed && !kept)) return;
         if (pressed) {
@@ -906,8 +912,7 @@ const items = [
           pressed = null;
           sayUnsaid();
         }
-        const over = event.target instanceof Node ? event.target : null;
-        if (!resting?.isConnected || !over || !resting.contains(over)) collapseUnseen();
+        collapseBelow(event.clientY);
       }, { capture: true, passive: true });
       // Al desplazarse la página, lo que estaba bajo el puntero ya no lo está.
       document.addEventListener('scroll', () => {
@@ -942,10 +947,10 @@ const items = [
         const row = rows[index];
         const element = input.closest('li');
         input.value = String(line.quantity);
-        // Con el puntero oprimiendo, la línea del error conserva su lugar hasta que el puntero suelta y sale del control
-        // que oprimió. Si el renglón se encogiera ahora, todo lo que está debajo subiría entre oprimir y soltar, el clic
-        // caería en otro lado y el control que el visitante oprimió (otro renglón, «Vaciar cotización», un envío) no
-        // haría nada; si se encogiera al soltar, ahí caería su segundo clic.
+        // Con el puntero oprimiendo, la línea del error conserva su lugar. Si el renglón se encogiera ahora, todo lo que
+        // está debajo subiría entre oprimir y soltar, el clic caería en otro lado y el control que el visitante oprimió
+        // (otro renglón, «Vaciar cotización», un envío) no haría nada; si se encogiera al soltar o al mover el puntero,
+        // ahí caería su siguiente clic. Se quita cuando el puntero queda más arriba que ella (`collapseBelow`).
         hideError(input, pressed !== null);
         input.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
         const sentence = restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit));
