@@ -18,7 +18,14 @@
 // Anchos y `sizes`: salen de los marcos medidos en el navegador a 1440, 1280, 768, 390 y 360 px de ancho. El marco
 // tiene proporción fija y la foto se contiene en él, así que el ancho que ocupa depende de la proporción de la foto:
 // `sizes` se calcula para cada foto con su ancho y su alto, y un navegador no baja una foto de más del doble del ancho
-// que ocupa (entre un ancho de la lista y el siguiente hay 1.5 veces como máximo).
+// que ocupa (entre un ancho de la lista y el siguiente hay 1.5 veces como máximo), con dos límites:
+//   - El piso es 160 px, el ancho más chico de las dos listas. Una foto que se dibuja con menos de 80 px de ancho (una
+//     muy alta en una tarjeta: una de 1:4 ocupa unos 33 px a 360 px de pantalla) baja igual el archivo de 160 px, más
+//     del doble de lo que ocupa; son unos 4 KB.
+//   - El techo es la foto misma: el validador acepta desde 400 px por el lado más largo (scripts/product-photos.mjs),
+//     y ningún archivo generado es más ancho que el original. El marco de la ficha mide como máximo 690 × 470 px, así
+//     que una foto de 400 px se ve como mucho 1.2 veces más grande en una pantalla común; en una de densidad 2 el
+//     navegador amplía el original, el más ancho que hay.
 //   - Tarjeta: marco de 4:3 en computadora y celular, del ancho de la tarjeta (de 242 a 323 px desde 1100 px, la mitad
 //     de la pantalla en celular), y de 16:10 en tableta, de casi la mitad de la pantalla (359 px a 768).
 //   - Ficha: en computadora, el contenido del marco de 4:3 mide hasta 690 × 470 px (a 1440 px; 641 × 421 a 1280); en

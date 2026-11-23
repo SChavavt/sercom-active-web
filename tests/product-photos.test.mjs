@@ -32,8 +32,8 @@ async function check(catalog, files) {
   }
 }
 
-test('los límites son los acordados: de 600 a 4000 px por el lado más largo y 1.5 MB', () => {
-  assert.equal(PHOTO_MIN_SIDE, 600);
+test('los límites son los acordados: de 400 a 4000 px por el lado más largo y 1.5 MB', () => {
+  assert.equal(PHOTO_MIN_SIDE, 400);
   assert.equal(PHOTO_MAX_SIDE, 4000);
   assert.equal(PHOTO_MAX_BYTES, 1_572_864);
 });
@@ -75,15 +75,16 @@ test('la carpeta tiene solo fotos de fichas aprobadas: un archivo suelto, la fot
   assert.deepEqual(await check(catalogOf(approved), { ...base, viejas: 'carpeta' }), ['src/assets/productos/viejas/: es una carpeta; aquí solo van las fotos de fichas aprobadas. Quita la carpeta.']);
 });
 
-test('cada foto es una imagen real del formato de su extensión, de 600 a 4000 px por su lado más largo y de 1.5 MB como máximo', async () => {
+test('cada foto es una imagen real del formato de su extensión, de 400 a 4000 px por su lado más largo y de 1.5 MB como máximo', async () => {
   const at = (file, content) => check(catalogOf(product(1, 'approved', file)), { [file]: content });
   // En el límite: pasan.
-  assert.deepEqual(await at('guante-de-prueba.png', png(600, 400)), []);
+  assert.deepEqual(await at('guante-de-prueba.png', png(400, 300)), []);
+  assert.deepEqual(await at('guante-de-prueba.jpg', jpegHeader(300, 400)), []);
   assert.deepEqual(await at('guante-de-prueba.jpeg', jpegHeader(3000, 4000)), []);
   assert.deepEqual(await at('guante-de-prueba.webp', webpHeader(4000, 4000)), []);
-  // Muy chica: 300 px.
-  assert.deepEqual(await at('guante-de-prueba.png', png(300, 225)), ['src/assets/productos/guante-de-prueba.png: su lado más largo mide 300 px y el mínimo es 600 px; usa una foto más grande.']);
-  assert.deepEqual(await at('guante-de-prueba.jpg', jpegHeader(599, 599)), ['src/assets/productos/guante-de-prueba.jpg: su lado más largo mide 599 px y el mínimo es 600 px; usa una foto más grande.']);
+  // Muy chica: 300 px, y 399 px en el borde.
+  assert.deepEqual(await at('guante-de-prueba.png', png(300, 225)), ['src/assets/productos/guante-de-prueba.png: su lado más largo mide 300 px y el mínimo es 400 px; usa una foto más grande.']);
+  assert.deepEqual(await at('guante-de-prueba.jpg', jpegHeader(399, 399)), ['src/assets/productos/guante-de-prueba.jpg: su lado más largo mide 399 px y el mínimo es 400 px; usa una foto más grande.']);
   // Muy grande.
   assert.deepEqual(await at('guante-de-prueba.webp', webpHeader(1000, 4001)), ['src/assets/productos/guante-de-prueba.webp: su lado más largo mide 4001 px y el máximo es 4000 px; reduce la foto.']);
   // Muy pesada: un PNG real sin comprimir de 800 × 700.
@@ -101,7 +102,7 @@ test('cada foto es una imagen real del formato de su extensión, de 600 a 4000 p
   // Varios problemas a la vez: todos.
   assert.deepEqual(await at('guante-de-prueba.jpg', png(300, 200)), [
     'src/assets/productos/guante-de-prueba.jpg: es una imagen PNG con la extensión .jpg; guárdala como JPEG o cambia la extensión del archivo y de image.file a .png.',
-    'src/assets/productos/guante-de-prueba.jpg: su lado más largo mide 300 px y el mínimo es 600 px; usa una foto más grande.',
+    'src/assets/productos/guante-de-prueba.jpg: su lado más largo mide 300 px y el mínimo es 400 px; usa una foto más grande.',
   ]);
 });
 

@@ -15,7 +15,7 @@
 //      Sin carpeta no hay fotos todavía, y está bien, aunque haya fichas aprobadas.
 //   3. Cada archivo es una imagen del formato que dice su extensión (JPEG para .jpg y .jpeg, PNG o WebP): se revisan
 //      su cabecera y su final, así que un archivo cortado no pasa (JPEG: termina con su marca de fin; PNG: con su
-//      último bloque, IEND; WebP: mide lo que declara). Su lado más largo mide de 600 a 4000 px, y pesa como máximo
+//      último bloque, IEND; WebP: mide lo que declara). Su lado más largo mide de 400 a 4000 px, y pesa como máximo
 //      1.5 MB. No se decodifica la imagen entera: eso lo hace la compilación.
 //   4. Cada cosa de la carpeta es un archivo o una subcarpeta (que es un error, regla 2), nunca un enlace simbólico,
 //      apunte a donde apunte: la foto se copia en la carpeta. La carpeta misma tampoco es un archivo ni un enlace.
@@ -30,7 +30,7 @@ import { imageMetadata } from 'astro/assets/utils';
 /** Carpeta de las fotos, relativa a la raíz del proyecto, como la nombran los mensajes. */
 export const PHOTO_FOLDER = 'src/assets/productos';
 /** Lado más largo mínimo y máximo de una foto, en píxeles. */
-export const PHOTO_MIN_SIDE = 600;
+export const PHOTO_MIN_SIDE = 400;
 export const PHOTO_MAX_SIDE = 4000;
 /** Peso máximo de una foto: 1.5 MB. */
 export const PHOTO_MAX_BYTES = 1_572_864;
