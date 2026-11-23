@@ -9,7 +9,7 @@ Sitio de presentación y catálogo de Sercom Active, con atención comercial en 
 | Paso | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Diseño y navegación completa | Aprobado el 22 de noviembre de 2026 (solicitud de cambios n.º 1) |
-| **2** | **Buscador, filtros y «Mi cotización»** | **Construido; en revisión (solicitud de cambios n.º 2, en borrador)** |
+| **2** | **Buscador, filtros y «Mi cotización»** | **Construido; en revisión (solicitud de cambios n.º 2)** |
 | 3 | Catálogo piloto (30 a 50 productos reales) | Pendiente |
 | 4 | Publicación y QR | Pendiente |
 

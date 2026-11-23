@@ -16,7 +16,7 @@ El propietario aprobó cuatro pasos el 18 de noviembre de 2026, con la indicaci�
 
 **Se acepta cuando** la búsqueda encuentra por código, marca y sin acentos; los filtros se combinan; la lista funciona con teclado, vacía y con muchos productos, con cantidades y unidades; ninguna página dice «recibimos tu solicitud» al abrir otra aplicación. Registrar la recepción en un sistema exigiría un servidor y un canal real, que no forman parte de este paso.
 
-**Estado.** Construido en la solicitud de cambios n.º 2, que sigue en borrador: nada de este paso está aprobado, integrado ni publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
+**Estado.** Construido en la solicitud de cambios n.º 2, que espera la revisión de quien dirige el proyecto: nada de este paso está aprobado, integrado ni publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
 
 ## Paso 3. Catálogo piloto (30 a 50 productos reales) — pendiente
 

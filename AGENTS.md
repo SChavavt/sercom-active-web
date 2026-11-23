@@ -4,7 +4,7 @@
 
 Crear un sitio profesional de Sercom Active para que clientes exploren categorías, marcas y modelos y contacten a Yosmara con un requerimiento claro. Prioridad: experiencia web de computadora; adaptar también celular y tableta. Leer `README.md`, `docs/ESTADO.md`, el plan maestro y `docs/arquitectura.md` antes de cambiar la arquitectura.
 
-Cuatro pasos aprobados por el propietario (`docs/plan-de-trabajo.md`): (1) diseño y navegación completa, **aprobado** el 22 de noviembre de 2026 (solicitud de cambios n.º 1); (2) buscador, filtros y «Mi cotización», **construido y en revisión** (solicitud de cambios n.º 2, en borrador; nada aprobado, integrado ni publicado); (3) catálogo piloto de 30 a 50 productos reales; (4) publicación y QR.
+Cuatro pasos aprobados por el propietario (`docs/plan-de-trabajo.md`): (1) diseño y navegación completa, **aprobado** el 22 de noviembre de 2026 (solicitud de cambios n.º 1); (2) buscador, filtros y «Mi cotización», **construido y en revisión** (solicitud de cambios n.º 2, en espera de revisión; nada aprobado, integrado ni publicado); (3) catálogo piloto de 30 a 50 productos reales; (4) publicación y QR.
 
 Identidad (decisión del propietario): el sitio es de Sercom Active y se ve como su logotipo, con fondos blancos, tinta `#19171A` y azul `#0067B0`, diseño «Lámina técnica». Sin estilo oscuro y sin la paleta azul marino y celeste del plan maestro. Técnicamente es un proyecto aparte: no modifica `sercomactive.com` ni supone acceso a ese dominio. Guía de diseño: `docs/diseno.md`.
 
