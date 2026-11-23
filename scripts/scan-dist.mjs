@@ -9,7 +9,10 @@
 //                 «Sitio en preparación» deben haberse retirado (R-PUB-03)
 //   --in-person   la atención presencial fue confirmada: se permiten dirección, «Visítanos» y mapa
 //   --strict      un WARN también hace fallar la revisión. `npm run verify` y el alojamiento lo usan para la
-//                 compilación de producción: en la etapa 1 la lista de normas y certificaciones debe estar vacía
+//                 compilación de producción: cada aviso (una norma, una certificación, un número con forma de
+//                 teléfono…) se retira o se respalda en los datos. Lo que los datos respaldan no da aviso: en la
+//                 página de una ficha aprobada, las normas de su `standards` (R-RULE-04), y en cualquier página, los
+//                 códigos públicos de las fichas (R-RULE-24)
 //   --rules       imprime la lista de reglas y termina
 //
 // Solo compara patrones de texto y datos del proyecto. No ve imágenes ni diseño, y no puede saber si una
@@ -873,10 +876,10 @@ export const RULES = [
   rule('R-RULE-04', strictInPreview, 'text',
     /\bANSI\b|\bASTM\b|\bOSHA\b|\bNIOSH\b|\bNRR\b|\bEN[\s-]?\d{3,5}\b|\bISO[\s-]?\d{3,5}\b/,
     'norma o valor técnico',
-    'Una norma solo se muestra si consta en la fuente del producto. Producción: WARN para rastrear cada mención hasta su fuente. Vista previa: FAIL, porque un ejemplo nunca lleva normas. Las siglas se buscan en mayúsculas para no confundir «EN 388» con «en 2026».'),
+    'Una norma solo se muestra si consta en la fuente del producto: se escribe en el campo standards de su ficha, cada una con la página o el documento del fabricante donde consta (sourceUrl), y la ficha la muestra en «Normas». En la página de su ficha aprobada (productos/<id>/index.html o productos/<id>.html), los textos exactos de ese standards se quitan del texto antes de buscar, enteros (no pegados a una letra o una cifra, ni a través de «-», «.», «:», «/», «_» o «+»), así que no dan aviso; cualquier otra mención sí: la misma norma en otra página, otra norma en esa página, una norma en la página de un ejemplo o de un retirado. Producción: WARN para rastrear cada mención hasta su fuente. Vista previa: FAIL, porque un ejemplo nunca lleva normas. Las siglas se buscan en mayúsculas para no confundir «EN 388» con «en 2026».'),
   rule('R-RULE-04', strictInPreview, 'text', /\bNOM-\d|\bnivel(?:es)? de (?:corte|protecci[oó]n)\b|\bresistencia al corte\b/i,
     'norma mexicana o nivel de protección',
-    'Igual que la anterior, para las NOM y los niveles de corte o de protección, sin distinguir mayúsculas.'),
+    'Igual que la anterior, para las NOM y los niveles de corte o de protección, sin distinguir mayúsculas, con la misma excepción para las normas de la ficha en su propia página.'),
   rule('R-RULE-05', 'FAIL', 'text',
     /\brese[ñn]as?\b|\btestimonios?\b|\bopiniones de (?:nuestros )?clientes\b|\bcasos de [eé]xito\b|\bclientes (?:satisfechos|que conf[ií]an)\b|\bnuestros clientes\b|★|⭐|\b\d(?:[.,]\d)?\s?estrellas\b/i,
     'reseña, testimonio o cliente',
@@ -981,7 +984,7 @@ export const CHECKS = [
   ['R-PUB-03', `Con --launch se exige lo contrario de R-RULE-12: ningún grupo de robots.txt bloquea el sitio entero, ninguna página lleva noindex y ninguna lleva el aviso «${DEVELOPMENT_NOTICE}», tampoco oculto: al lanzar el aviso se quita de la página, no se esconde (${ALL_TEXT_DOC}).`],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
-  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. En el código de un script, «mailto:», «tel:» o «sms:» como clave de un objeto («{whatsapp:e,mailto:t}») o como propiedad leída en una condición («a?t.mailto:t.whatsapp») no es un destino; con una «@» detrás, o con siete cifras o más bajo «tel:» o «sms:», sí falla. Los números con forma de teléfono del texto visible se listan (WARN).'],
+  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. En el código de un script, «mailto:», «tel:» o «sms:» como clave de un objeto («{whatsapp:e,mailto:t}») o como propiedad leída en una condición («a?t.mailto:t.whatsapp») no es un destino; con una «@» detrás, o con siete cifras o más bajo «tel:» o «sms:», sí falla. Los números con forma de teléfono del texto visible que no son el confirmado se listan (WARN), salvo una aparición de uno de los códigos públicos de las fichas, exacto y entero (el model y cada manufacturerCode de variante de una ficha aprobada, y el model de un retirado que fue público), en cualquier página: un código no es un teléfono. Un número que no es uno de esos códigos se lista igual, también junto a un código. La revisión de los destinos (tel:, wa.me, mailto: en enlaces, scripts y JSON) no tiene esa excepción.'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…; la palabra cuenta en cualquier lugar del nombre: «textcolor», «MAINCOLOR», «navbg», «darktheme»; salvo «tema», que cuenta solo al principio del nombre o de una de sus partes, después de «_», «-» o «$» o en camelCase: «temaOscuro», «tema_claro», «miTema»; no dentro de otra palabra, como «sistema», ni en «temas», que son asuntos, ni en «temática», «temático» o «temario», que son otras palabras; pegado a otra palabra sí cuenta: «temaoscuro»), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
@@ -1008,8 +1011,12 @@ export async function loadProjectData(root = ROOT) {
   return { business, catalog, brands, examples, registry };
 }
 
-/** Enlaces y notas del registro de investigación que nunca deben publicarse. */
-function registryLeaks(registry, brands) {
+/**
+ * Enlaces y notas del registro de investigación que nunca deben publicarse (R-RULE-13). El validador de fichas usa la
+ * misma lista (scripts/catalog-text.mjs).
+ * @returns {{ urls: string[], notes: string[] }}
+ */
+export function registryLeaks(registry, brands) {
   const allowed = new Set((brands ?? []).flatMap(brand => (brand.manufacturerLinks ?? []).map(link => link.url)));
   const urls = new Set();
   const notes = new Set();
@@ -1033,6 +1040,124 @@ function registryLeaks(registry, brands) {
   return { urls: [...urls], notes: [...notes] };
 }
 
+/**
+ * Los enlaces y las notas de `registryLeaks` que aparecen en un texto (con sus entidades ya decodificadas): un enlace,
+ * seguido de algo que no continúa la dirección; una nota, en el texto leído en una línea.
+ * @param {string} text
+ * @param {{ urls: string[], notes: string[] }} leaks
+ */
+export function registryFindings(text, leaks) {
+  const line = oneLine(text);
+  return {
+    urls: leaks.urls.filter(url => new RegExp(`${escapeRegExp(url)}(?![A-Za-z0-9/_%?#=&-])`).test(text)),
+    notes: leaks.notes.filter(note => line.includes(note)),
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Lo que respaldan los datos de las fichas
+// ---------------------------------------------------------------------------------------------------
+
+const isFilled = value => typeof value === 'string' && value.trim() !== '';
+/** Los textos de las normas de una ficha (`standards[].text`). */
+const standardTexts = product => (Array.isArray(product?.standards) ? product.standards : []).map(standard => standard?.text).filter(isFilled);
+/**
+ * Los códigos públicos de las fichas: el `model` y cada `manufacturerCode` de variante de una ficha aprobada, y el
+ * `model` de un retirado que fue público (su página lo muestra).
+ */
+function publicProductCodes(products) {
+  const codes = new Set();
+  for (const product of products) {
+    if (product?.status === 'approved') {
+      codes.add(product.model);
+      for (const variant of Array.isArray(product.variants) ? product.variants : []) codes.add(variant?.manufacturerCode);
+    } else if (isPublicRetired(product)) codes.add(product.model);
+  }
+  return [...codes].filter(isFilled);
+}
+// Una norma o un código cuentan enteros: no pegados a una letra o a una cifra, ni a través de un signo que une partes
+// de una designación («EN 388» no es el principio de «EN 3880», «EN 388-1» ni «EN 388:2016»).
+const JOINER = '[-.:/_+]';
+const whole = text => new RegExp(`(?<![\\p{L}\\p{N}])(?<![\\p{L}\\p{N}]${JOINER})${escapeRegExp(text)}(?![\\p{L}\\p{N}])(?!${JOINER}[\\p{L}\\p{N}])`, 'gu');
+/**
+ * El texto comparable de una página (ámbito `text`) sin las normas de su ficha: cada texto de `standards`, en la misma
+ * forma comparable, se quita donde aparece entero. Las más largas primero, para que una norma que empieza como otra
+ * más corta se quite completa.
+ */
+function withoutStandards(text, standards) {
+  const needles = [...new Set(standards.map(standard => oneLine(fold(standard))).filter(Boolean))].sort((a, b) => b.length - a.length);
+  return needles.reduce((rest, needle) => rest.replace(whole(needle), ' '), text);
+}
+/** Dónde aparece entero cada código en un texto: [inicio, fin) de cada aparición. */
+const codeSpans = (text, codes) => codes.flatMap(code => [...text.matchAll(whole(code))].map(match => [match.index ?? 0, (match.index ?? 0) + match[0].length]));
+
+/** Las reglas de patrón de una página de producción mientras la atención presencial no está confirmada. */
+const PRODUCTION_PATTERN_RULES = [...RULES, ...IN_PERSON_RULES, ...PRODUCTION_RULES];
+/**
+ * Un texto suelto en forma comparable (`fold`, en una línea), con el lugar del original de donde sale cada unidad:
+ * `start[i]` y `end[i]` delimitan el carácter original que produjo `folded[i]`. Así un hallazgo se cita como está
+ * escrito («fabricación», no «fabricacion»).
+ * @param {string} value
+ */
+function foldedWithOrigin(value) {
+  let folded = '';
+  const start = [];
+  const end = [];
+  let offset = 0;
+  for (const character of value) {
+    const piece = fold(character).replace(/\s/g, ' ');
+    for (const unit of piece) {
+      if (unit === ' ' && (folded === '' || folded.endsWith(' '))) continue;
+      folded += unit;
+      for (let k = 0; k < unit.length; k += 1) {
+        start.push(offset);
+        end.push(offset + character.length);
+      }
+    }
+    offset += character.length;
+  }
+  while (folded.endsWith(' ')) {
+    folded = folded.slice(0, -1);
+    start.pop();
+    end.pop();
+  }
+  return { folded, start, end };
+}
+
+/**
+ * Aplica a un texto suelto, como el campo de una ficha, las reglas de patrón con que se revisa una página de
+ * producción (las comunes, las que valen mientras la atención presencial no está confirmada y las de producción), cada
+ * una sobre el texto leído como texto visible en forma comparable. Sin las frases permitidas (`ALLOWED_SENTENCES`, que
+ * son textos del sitio). Un WARN cuenta como hallazgo: producción se revisa con --strict. `skip`: identificadores de
+ * reglas que no se aplican (las normas de `standards` no pasan por R-RULE-04). Cada regla y texto encontrado, una vez.
+ * @param {unknown} value
+ * @param {{ skip?: string[] }} [options]
+ * @returns {{ id: string, level: 'FAIL' | 'WARN', title: string, found: string }[]} `found`: lo encontrado, como está escrito
+ */
+export function textFindings(value, { skip = [] } = {}) {
+  if (typeof value !== 'string') return [];
+  const { folded, start, end } = foldedWithOrigin(value);
+  // Si la lectura carácter por carácter no da la misma forma comparable que la del texto entero, se cita lo encontrado
+  // en forma comparable.
+  const comparable = oneLine(fold(value));
+  const haystack = folded === comparable ? folded : comparable;
+  const findings = [];
+  const seen = new Set();
+  for (const { id, level, pattern, title } of PRODUCTION_PATTERN_RULES) {
+    if (skip.includes(id)) continue;
+    for (const match of haystack.matchAll(globalPattern(pattern))) {
+      if (!match[0]) continue;
+      const key = `${id}\u0000${match[0].toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const index = match.index ?? 0;
+      const found = haystack === folded ? value.slice(start[index], end[index + match[0].length - 1]) : match[0];
+      findings.push({ id, level: typeof level === 'function' ? level({ preview: false }) : level, title, found: oneLine(found) });
+    }
+  }
+  return findings;
+}
+
 // ---------------------------------------------------------------------------------------------------
 // Contacto, paleta y robots.txt
 // ---------------------------------------------------------------------------------------------------
@@ -1047,6 +1172,13 @@ const MAILTO = new RegExp(`\\bmailto:(${URL_REST})`, 'gi');
 const PHONE_LINK = new RegExp(`\\b(tel|sms):((?:[^\\s"'<>\`\\\\]|\\s(?=[\\d(+]))*)`, 'gi');
 // Forma de correo. «logo@2x.png» o «paquete@5.2.8» tienen forma parecida, pero no son direcciones.
 const EMAIL_SHAPE = /[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[a-z]{2,}\b(?<!\.(?:png|jpe?g|webp|avif|gif|svg|ico|woff2?|ttf|otf|css|m?js|map|json))/gi;
+/** Las direcciones de correo escritas en un texto (`EMAIL_SHAPE`). */
+export const emailAddresses = text => [...String(text).matchAll(EMAIL_SHAPE)].map(match => match[0]);
+// Un número con forma de teléfono en el texto visible: con o sin el 52 y el 1 de México, en grupos de cifras
+// separados o no por un espacio, un punto, un guion o un paréntesis.
+const PHONE_IN_TEXT = /(?:\+?52[\s().-]*)?(?:1[\s().-]*)?\b\d{2,3}[\s().-]?\d{3,4}[\s().-]?\d{4}\b/g;
+/** Los números con forma de teléfono de un texto que tienen diez cifras o más (R-RULE-24), con su posición. */
+export const phoneShapedNumbers = text => [...String(text).matchAll(PHONE_IN_TEXT)].filter(match => match[0].replace(/\D/g, '').length >= 10);
 // Comentario de licencia («/*! (c) autor <dev@example.org> */»): el correo de un autor no es un destino de contacto.
 const LICENSE_COMMENT = /\/\*![\s\S]*?\*\//g;
 /** Principio de una dirección que un script completa («`https://wa.me/${número}`», `a[href^="mailto:"]`): no es un destino. */
@@ -1346,6 +1478,11 @@ export async function scanDist(directory, options = {}) {
   const previewNotice = oneLine(fold(PREVIEW_NOTICE)).toLowerCase();
   const developmentNotice = oneLine(fold(DEVELOPMENT_NOTICE)).toLowerCase();
   const pages = files.filter(file => /\.html?$/i.test(file));
+  // Lo que los datos respaldan: las normas de cada ficha aprobada, que no dan aviso en su propia página (R-RULE-04), y
+  // los códigos públicos, que no son teléfonos en ninguna (R-RULE-24).
+  const catalogProducts = Array.isArray(data.catalog?.products) ? data.catalog.products : [];
+  const ownStandards = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, standardTexts(product)]));
+  const publicCodes = publicProductCodes(catalogProducts);
 
   for (const file of files) {
     const path = name(file);
@@ -1411,12 +1548,16 @@ export async function scanDist(directory, options = {}) {
     const words = comparable(readable);
     const prose = comparable(visible);
     const scopes = { text, joined, words, prose, norm, raw };
+    // R-RULE-04 lee el texto de la página de una ficha aprobada sin las normas de su `standards`.
+    const pageId = isHtml ? path.match(/^productos\/([^/]+?)(?:\/index\.html?|\.html?)$/)?.[1] : undefined;
+    const pageStandards = pageId === undefined ? [] : ownStandards.get(pageId) ?? [];
+    const normsText = pageStandards.length ? withoutStandards(text, pageStandards) : text;
 
     // Un mismo hallazgo (regla y texto encontrado) se informa una sola vez aunque lo encuentren varios ámbitos.
     const seen = new Set();
     for (const { id, level, scope, pattern, title } of rules) {
       if ((scope === 'text' || scope === 'joined') && !isHtml) continue;
-      const haystack = scopes[scope];
+      const haystack = id === 'R-RULE-04' && scope === 'text' ? normsText : scopes[scope];
       for (const match of haystack.matchAll(globalPattern(pattern))) {
         const key = `${id}\u0000${oneLine(fold(match[0])).toLowerCase()}`;
         if (seen.has(key)) continue;
@@ -1427,11 +1568,9 @@ export async function scanDist(directory, options = {}) {
 
     // R-RULE-13: enlaces y notas del registro de investigación.
     const decoded = decodeEntities(raw);
-    for (const url of leaks.urls) {
-      const found = decoded.match(new RegExp(`${escapeRegExp(url)}(?![A-Za-z0-9/_%?#=&-])`));
-      if (found) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un «Sitio del fabricante» publicado: ${url.slice(0, 90)}`);
-    }
-    for (const note of leaks.notes) if (oneLine(decoded).includes(note)) add('FAIL', 'R-RULE-13', file, `nota interna del registro de investigación: «${note.slice(0, 60)}»`);
+    const registryFound = registryFindings(decoded, leaks);
+    for (const url of registryFound.urls) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un «Sitio del fabricante» publicado: ${url.slice(0, 90)}`);
+    for (const note of registryFound.notes) add('FAIL', 'R-RULE-13', file, `nota interna del registro de investigación: «${note.slice(0, 60)}»`);
     // R-RULE-11: la dirección exacta de business.json.
     if (!inPerson && addressNeedle && oneLine(norm).toLowerCase().includes(addressNeedle)) add('FAIL', 'R-RULE-11', file, 'dirección del negocio publicada sin atención presencial confirmada');
     // R-RULE-03, producción: el aviso de vista previa delata una compilación de vista previa.
@@ -1498,9 +1637,14 @@ export async function scanDist(directory, options = {}) {
     for (const match of markup.matchAll(/<meta\b[^>]*>/gi)) {
       if (/^color-scheme$/i.test(attribute(match[0], 'name') ?? '') && /\bdark\b/i.test(attribute(match[0], 'content') ?? '')) add('FAIL', 'R-RULE-29', file, `tema oscuro declarado: ${match[0].slice(0, 80)}`);
     }
-    for (const match of shown.matchAll(/(?:\+?52[\s().-]*)?(?:1[\s().-]*)?\b\d{2,3}[\s().-]?\d{3,4}[\s().-]?\d{4}\b/g)) {
+    // Un número con forma de teléfono que no es el confirmado, salvo cuando es, entero, una aparición de un código
+    // público de las fichas: un código no es un teléfono.
+    const codes = codeSpans(shown, publicCodes);
+    for (const match of phoneShapedNumbers(shown)) {
       const number = match[0].replace(/\D/g, '');
-      if (number.length >= 10 && !knownNumbers.has(number)) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
+      const start = match.index ?? 0;
+      const insideCode = codes.some(([from, to]) => from <= start && start + match[0].length <= to);
+      if (!knownNumbers.has(number) && !insideCode) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
     }
 
     // R-RULE-28, R-A11Y-06 y R-A11Y-07.

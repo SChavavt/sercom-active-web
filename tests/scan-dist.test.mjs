@@ -754,6 +754,146 @@ test('R-RULE-14: un producto retirado tiene página solo si fue público, y el e
   }
 });
 
+// Normas y códigos de las fichas: lo que los datos respaldan. Fichas sintéticas sobre el catálogo vaciado; las normas
+// tienen la forma de las que imprimen los fabricantes (año, enmienda y niveles), no son las de ningún producto.
+const STANDARD_SOURCE = 'https://fabricante.example/ficha-sintetica';
+const standardsOf = (...texts) => texts.map(text => ({ text, sourceUrl: STANDARD_SOURCE }));
+const SYNTHETIC_NORMS = ['EN 388:2016 +A1:2018 3121X', 'ANSI/ISEA 105-2016 A4', 'EN407:2004 X2XXXX', 'FDA 21 CFR 177.1520', 'Nivel de corte A2'];
+const APPROVAL = { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true };
+/** El catálogo vaciado con la primera categoría aprobada y estas fichas. */
+function catalogWith(...products) {
+  const catalog = structuredClone(emptiedData.catalog);
+  catalog.categories[0].status = 'approved';
+  catalog.products.push(...products);
+  return { ...emptiedData, catalog };
+}
+const normsList = norms => `<ul>${norms.map(norm => `<li>${norm}</li>`).join('')}</ul>`;
+// En la vista previa, con páginas de producto, deben estar también las de todos los ejemplos (R-RULE-14).
+const examplePages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
+
+test('R-RULE-04: en la página de una ficha aprobada, sus propias normas no son aviso; la misma norma en otra página sí', async () => {
+  const withNorms = catalogWith(
+    { id: 'guante-con-normas', status: 'approved', standards: standardsOf(...SYNTHETIC_NORMS) },
+    { id: 'guante-sin-normas', status: 'approved' },
+  );
+  const own = `<h1>Guante sintético</h1><h2>Normas</h2>${normsList(SYNTHETIC_NORMS)}<p>Según la información publicada por el fabricante.</p>`;
+  const other = '<h1>Otro guante sintético</h1>';
+  // Producción, con --strict: la página de la ficha con sus normas queda limpia, sin un solo aviso.
+  const production = await scan({ 'productos/guante-con-normas/index.html': page(own), 'productos/guante-sin-normas/index.html': page(other) }, { data: withNorms });
+  assert.deepEqual(production.findings, []);
+  // También con la forma productos/<id>.html.
+  assert.deepEqual((await scan({ 'productos/guante-con-normas.html': page(own), 'productos/guante-sin-normas.html': page(other) }, { data: withNorms })).findings, []);
+  // Vista previa: una ficha aprobada también está en ella.
+  const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/guante-con-normas/index.html': previewPage(own), 'productos/guante-sin-normas/index.html': previewPage(other) }, { preview: true, data: withNorms });
+  assert.deepEqual(failures(preview), []);
+
+  // La misma norma en cualquier otra página sigue dando el aviso: la de otra ficha, el catálogo, la portada.
+  // (Una designación sin las siglas que busca la regla, como «FDA 21 CFR …», no da aviso en ninguna página.)
+  for (const path of ['productos/guante-sin-normas/index.html', 'catalogo/index.html', 'index.html']) {
+    for (const norm of SYNTHETIC_NORMS.filter(text => !text.startsWith('FDA'))) {
+      const result = await scan({ 'productos/guante-con-normas/index.html': page(own), 'productos/guante-sin-normas/index.html': page(other), [path]: page(`<h1>Página</h1><p>${norm}</p>`) }, { data: withNorms });
+      assert.deepEqual([failedIds(result), result.findings.map(finding => finding.file)], [[], [path]], `${path}: ${norm}`);
+      assert.deepEqual(warnedIds(result), ['R-RULE-04'], `${path}: ${norm}`);
+      const inPreview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/guante-con-normas/index.html': previewPage(own), 'productos/guante-sin-normas/index.html': previewPage(other), [path]: previewPage(`<h1>Página</h1><p>${norm}</p>`) }, { preview: true, data: withNorms });
+      assert.deepEqual(failures(inPreview).map(finding => [finding.id, finding.file]), [['R-RULE-04', path]], `vista previa, ${path}: ${norm}`);
+    }
+  }
+});
+
+test('R-RULE-04: otra norma en la página de la ficha, una norma en un ejemplo o en un retirado siguen dando el aviso', async () => {
+  const norms = SYNTHETIC_NORMS.slice(0, 2);
+  const withNorms = catalogWith(
+    { id: 'guante-con-normas', status: 'approved', standards: standardsOf(...norms) },
+    { id: 'guante-retirado', status: 'retired', approval: APPROVAL, standards: standardsOf(...norms) },
+  );
+  const files = (extra, make = page) => ({ 'productos/guante-retirado/index.html': make('<h1>Guante retirado</h1>'), 'productos/guante-con-normas/index.html': make(`<h1>Guante</h1>${normsList(norms)}${extra}`) });
+  assert.deepEqual((await scan(files(''), { data: withNorms })).findings, []);
+  // Otra norma u otra forma de la misma norma: aviso.
+  for (const extra of ['<p>EN 1149-5:2008</p>', '<p>Cumple ANSI Z87.1</p>', '<p>NOM-017-STPS</p>', '<p>Nivel de protección 3</p>', `<p>${norms[0].replace(' +', '+')}</p>`]) {
+    const result = await scan(files(extra), { data: withNorms });
+    assert.deepEqual([failedIds(result), warnedIds(result)], [[], ['R-RULE-04']], extra);
+  }
+  // Una norma que no es de la ficha, pegada a una de las suyas, también.
+  const glued = await scan(files(`<p>${norms[0]}/ISO 13997</p>`), { data: withNorms });
+  assert.deepEqual(warnedIds(glued), ['R-RULE-04']);
+  // Una norma de la ficha solo se descuenta entera: «EN 388» no se lleva el principio de «EN 3880», «EN 388-1» ni
+  // «EN 388:2016», que son otras normas.
+  const short = catalogWith({ id: 'guante-norma-corta', status: 'approved', standards: standardsOf('EN 388') });
+  assert.deepEqual((await scan({ 'productos/guante-norma-corta/index.html': page('<h1>Guante</h1><p>EN 388</p>') }, { data: short })).findings, []);
+  for (const body of ['<p>EN 3880</p>', '<p>EN 388-1</p>', '<p>EN 388:2016</p>']) {
+    const result = await scan({ 'productos/guante-norma-corta/index.html': page(`<h1>Guante</h1><p>EN 388</p>${body}`) }, { data: short });
+    assert.deepEqual(warnedIds(result), ['R-RULE-04'], body);
+  }
+  // La página de un retirado no muestra normas: si las muestra, aviso, aunque estén en sus datos.
+  const retired = await scan({ ...files(''), 'productos/guante-retirado/index.html': page(`<h1>Guante retirado</h1>${normsList(norms)}`) }, { data: withNorms });
+  assert.deepEqual([...new Set(retired.findings.map(finding => `${finding.level} ${finding.id} ${finding.file}`))], ['WARN R-RULE-04 productos/guante-retirado/index.html']);
+  // Un borrador con normas no tiene página, y sus normas no se descuentan en ninguna otra.
+  const draft = catalogWith({ id: 'guante-borrador', status: 'draft', standards: standardsOf(...norms) });
+  assert.deepEqual(warnedIds(await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${norms[0]}</p>`) }, { data: draft })), ['R-RULE-04']);
+  // Vista previa: la página de un ejemplo con una norma falla, también si es la norma de una ficha aprobada.
+  for (const norm of [norms[0], 'EN 1149-5:2008']) {
+    const [first] = data.examples;
+    const result = await scan({
+      'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, ...files('', previewPage),
+      [`productos/${first.id}/index.html`]: previewPage(`${exampleCard(first)}<p>${norm}</p>`),
+    }, { preview: true, data: withNorms });
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-04', `productos/${first.id}/index.html`]], norm);
+  }
+});
+
+test('R-RULE-04: varias fichas con la misma norma, cada una en su página, quedan limpias', async () => {
+  const norm = SYNTHETIC_NORMS[0];
+  const withNorms = catalogWith(
+    { id: 'guante-a', status: 'approved', standards: standardsOf(norm, SYNTHETIC_NORMS[1]) },
+    { id: 'guante-b', status: 'approved', standards: standardsOf(norm) },
+  );
+  const result = await scan({
+    'productos/guante-a/index.html': page(`<h1>Guante A</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+    'productos/guante-b/index.html': page(`<h1>Guante B</h1>${normsList([norm])}`),
+  }, { data: withNorms });
+  assert.deepEqual(result.findings, []);
+  // La segunda norma de A en la página de B no está en los datos de B.
+  const crossed = await scan({
+    'productos/guante-a/index.html': page(`<h1>Guante A</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+    'productos/guante-b/index.html': page(`<h1>Guante B</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+  }, { data: withNorms });
+  assert.deepEqual(crossed.findings.map(finding => [finding.level, finding.id, finding.file]), [['WARN', 'R-RULE-04', 'productos/guante-b/index.html']]);
+});
+
+test('R-RULE-24: el código de una ficha pública no es un teléfono; otro número con forma de teléfono sí, también junto a un código', async () => {
+  const withCodes = catalogWith(
+    { id: 'guante-codigo-largo', status: 'approved', model: '7000123456', variants: [{ id: 'talla-8', label: 'Talla 8', manufacturerCode: '70009876543' }, { id: 'talla-9', label: 'Talla 9' }] },
+    { id: 'guante-retirado', status: 'retired', approval: APPROVAL, model: '7000555123' },
+    { id: 'guante-borrador', status: 'draft', model: '7000444321' },
+  );
+  const pages = body => ({
+    'productos/guante-codigo-largo/index.html': page('<h1>Guante</h1><p>Código 7000123456</p><p>Talla 8 <span>Código </span>70009876543</p>'),
+    'productos/guante-retirado/index.html': page('<h1>Guante retirado</h1><p>Código 7000555123</p>'),
+    'catalogo/index.html': page(`<h1>Catálogo</h1>${body}`),
+  });
+  // Los códigos públicos, en cualquier página: la ficha, el retirado que fue público y una lista.
+  assert.deepEqual((await scan(pages('<p>Marca · 7000123456</p><p>70009876543</p>'), { data: withCodes })).findings, []);
+  // Un número que no es uno de esos códigos: aviso, como hoy, también pegado a un código o en la misma página.
+  for (const body of ['<p>Llámanos al 55 1122 3344</p>', '<p>70009876543 5511223344</p>', '<p>Código 7000444321</p>', '<p>Código 7000123457</p>','<p>70009876543 y 55 1122 3344</p>']) {
+    const result = await scan(pages(body), { data: withCodes });
+    assert.deepEqual([failedIds(result), warnedIds(result), result.findings.map(finding => finding.file)], [[], ['R-RULE-24'], ['catalogo/index.html']], body);
+  }
+  // La revisión de los destinos de contacto no cambia: un código en un enlace de teléfono o de WhatsApp sigue fallando.
+  for (const body of ['<a href="tel:70009876543">Llamar</a>', '<a href="https://wa.me/70009876543">WhatsApp</a>']) {
+    assert.deepEqual(failedIds(await scan(pages(body), { data: withCodes })), ['R-RULE-24'], body);
+  }
+});
+
+test('--rules y el encabezado del escáner dicen qué normas y qué códigos deja pasar', async () => {
+  const doc = RULES.filter(rule => rule.id === 'R-RULE-04').map(rule => rule.doc).join('\n');
+  assert.match(doc, /standards/);
+  assert.match(doc, /página de su ficha aprobada/);
+  const phones = CHECKS.filter(([id]) => id === 'R-RULE-24').map(([, text]) => text).join('\n');
+  assert.match(phones, /códigos públicos/);
+  const header = (await readText('scripts/scan-dist.mjs')).split('\nimport ')[0];
+  assert.doesNotMatch(header, /la lista de normas y certificaciones debe estar vacía/);
+});
+
 test('R-RULE-24 y R-QUOTE-06: el contacto es el confirmado y el texto de WhatsApp va codificado', async () => {
   await assertEachFails('R-RULE-24', [
     '<a href="https://wa.me/5215511223344?text=Hola">WhatsApp</a>', '<a href="https://wa.me/522214002219">WhatsApp</a>',
