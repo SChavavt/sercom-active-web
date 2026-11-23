@@ -23,7 +23,10 @@
 //     agrega nada (nada se valida mientras se escribe; el error se va en cuanto la cantidad es válida). Si no,
 //     `addLine` sobre la lista guardada y `quoteStore.write(result.lines)`; la frase (agregado, sumado, lista llena o
 //     el navegador no deja guardar) va en la línea de estado y en la región viva. El foco y los campos se quedan como
-//     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder.
+//     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder. El mismo
+//     renglón enviado otra vez a menos de medio segundo (un doble clic, Enter sostenido) no se agrega de nuevo. En una
+//     página que el navegador restaura de su caché de ida y vuelta la línea de estado no se muestra: habla de una
+//     lista que pudo cambiar mientras tanto.
 //   - Enlaces directos (`[data-quote-direct]`, «Cotizar este producto» y «Cotizar por correo»): cada línea de su
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
@@ -160,6 +163,13 @@ const chooseVariant = product.variants.length > 1;
       frame = requestAnimationFrame(() => { live.textContent = sentence; });
     };
 
+    // Un doble clic en el botón (o Enter sostenido) envía el formulario varias veces seguidas. El mismo renglón enviado
+    // otra vez a menos de REPEAT_MS del envío anterior no se agrega de nuevo: guardaría el doble de lo que muestra el
+    // campo. Para agregar lo mismo dos veces a propósito basta esperar ese medio segundo.
+    const REPEAT_MS = 500;
+    let lastSent = '';
+    let lastSentAt = Number.NEGATIVE_INFINITY;
+
     form.addEventListener('submit', event => {
       event.preventDefault();
       const quantity = parseQuantity(input.value);
@@ -174,6 +184,11 @@ const chooseVariant = product.variants.length > 1;
       }
       hideError();
       const line = { productId: product.id, variantId: chosenVariant()?.id ?? '', quantity, unit: unit.value };
+      const sent = JSON.stringify([line.variantId, line.quantity, line.unit]);
+      const repeated = sent === lastSent && event.timeStamp - lastSentAt < REPEAT_MS;
+      lastSent = sent;
+      lastSentAt = event.timeStamp;
+      if (repeated) return;
       const result = addLine(quoteStore.read(), line);
       if (result.status === 'full') {
         say(messages.full, 'alert-circle', false);
@@ -224,6 +239,15 @@ const chooseVariant = product.variants.length > 1;
       applyLinks();
     };
     restored();
-    window.addEventListener('pageshow', restored);
+    window.addEventListener('pageshow', event => {
+      // Página restaurada de la caché de ida y vuelta: la frase de la última vez («Agregado a tu cotización…») puede
+      // hablar de una lista que el visitante cambió o vació mientras tanto. No se muestra ni queda en la región viva.
+      if (event.persisted) {
+        status.hidden = true;
+        cancelAnimationFrame(frame);
+        live.textContent = '';
+      }
+      restored();
+    });
   }
 </script>
