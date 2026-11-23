@@ -908,6 +908,6 @@ html:not(.js) .stepper { grid-template-columns: minmax(0, 1fr); }
 .status__icon { display: flex; flex: none; margin-top: calc((1.45em - 20px) / 2); color: var(--blue); }
 .status__text { min-width: 0; overflow-wrap: break-word; text-wrap: pretty; }
 /* La acción empieza donde el texto (el ancho del icono más el hueco): su ancho máximo descuenta ese margen, para que
-   una acción de varias palabras («Quitarlos de mi lista») se parta en renglones en lugar de salirse de la fila */
+   una acción de varias palabras («Quitarlos de mi cotización») se parta en renglones en lugar de salirse de la fila */
 .status__action { display: flex; flex: none; max-width: calc(100% - 20px - var(--s-3)); margin-left: calc(20px + var(--s-3)); }
 .status__action > .more { white-space: normal; }

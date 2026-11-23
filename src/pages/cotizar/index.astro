@@ -118,9 +118,9 @@ const items = [
             slot="action"
             type="button"
             data-quote-remove-unknown
-            data-one="Quitarlo de mi lista"
-            data-many="Quitarlos de mi lista"
-          ><Icon name="trash" class="icon--18" /><span>Quitarlos de mi lista</span></button>
+            data-one="Quitarlo de mi cotización"
+            data-many="Quitarlos de mi cotización"
+          ><Icon name="trash" class="icon--18" /><span>Quitarlos de mi cotización</span></button>
         </StatusLine>
       </li>
       {/* La línea de estado de la última acción que se puede deshacer: el script la pone en el lugar del renglón */}
@@ -146,7 +146,7 @@ const items = [
             headingLevel={3}
           />
         </div>
-        <StatusLine icon="info" data-quote-blocked>Tu navegador no permite guardar la lista en este equipo. Escribe abajo los productos que necesitas.</StatusLine>
+        <StatusLine icon="info" data-quote-blocked>Tu navegador no permite guardar tu cotización en este equipo. Escribe abajo los productos que necesitas.</StatusLine>
         <StatusLine icon="alert-circle" data-quote-write-failed>Tu navegador no permitió guardar el cambio. Copia o manda tu solicitud antes de salir de esta página.</StatusLine>
         <div class="grid12" data-quote-tools hidden>
           <ActionRow class="span-6 span-sm-12" href={routes.catalog}>Seguir agregando productos</ActionRow>
@@ -179,7 +179,7 @@ const items = [
             <Field label="Unidad" for="fila-unidad" class="cotizar__cell">
               <Select id="fila-unidad" name="unidad" data-row-unit></Select>
             </Field>
-            <StatusLine icon="copy" class="cotizar__dup" data-row-dup>Este renglón es igual a otro de tu lista.<button class="text-btn" slot="action" type="button" data-quote-merge><Icon name="layers" class="icon--18" /><span>Unirlos</span></button></StatusLine>
+            <StatusLine icon="copy" class="cotizar__dup" data-row-dup>Este renglón es igual a otro de tu cotización.<button class="text-btn" slot="action" type="button" data-quote-merge><Icon name="layers" class="icon--18" /><span>Unirlos</span></button></StatusLine>
           </li>
         </template>
       </Fragment>

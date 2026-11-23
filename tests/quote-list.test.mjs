@@ -473,8 +473,8 @@ test('frases del mensaje y de las líneas de estado', () => {
   assert.equal(mergedMessage('24 pares'), 'Unimos dos renglones iguales: ahora son 24 pares.');
   assert.equal(restoredMessage('12 pares'), 'La cantidad volvió a 12 pares.');
   assert.equal(unknownLinesMessage(0), '');
-  assert.equal(unknownLinesMessage(1), '1 producto de tu lista no aparece en esta página y no se incluye en tu mensaje. Vuelve a cargar la página; si sigue igual, ya no está en el catálogo.');
-  assert.equal(unknownLinesMessage(2), '2 productos de tu lista no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.');
+  assert.equal(unknownLinesMessage(1), '1 producto de tu cotización no aparece en esta página y no se incluye en tu mensaje. Vuelve a cargar la página; si sigue igual, ya no está en el catálogo.');
+  assert.equal(unknownLinesMessage(2), '2 productos de tu cotización no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.');
   assert.equal(listCountLabel(0), '0 productos');
   assert.equal(listCountLabel(1), '1 producto');
   assert.equal(listCountLabel(3), '3 productos');

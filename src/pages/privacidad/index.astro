@@ -6,8 +6,9 @@
 // (localStorage) y lo que se escribe en «Cotizar mi lista» solo en la pestaña (sessionStorage); lo de la solicitud
 // especial no se guarda. NO es el aviso de privacidad de la empresa: ese texto lo debe entregar la empresa antes de
 // publicar. Revisar esta página si cambia lo que se guarda o se agrega cualquier medición.
-// La fila «Tu lista de cotización» solo se imprime cuando la compilación tiene productos (`products.length`): sin
-// productos no hay cómo agregar uno ni botón «Vaciar cotización», y la fila describiría algo que no está.
+// La fila «Lo que agregas a tu cotización» solo se imprime cuando la compilación tiene productos
+// (`products.length`): sin productos no hay cómo agregar uno ni botón «Vaciar cotización», y la fila describiría algo
+// que no está.
 // Textos: brief de páginas «atencion», sección 4, y brief del paso 2.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import EmailAddress from '../../components/EmailAddress.astro';
@@ -32,7 +33,7 @@ const hasProducts = products.length > 0;
     </div>
     {hasProducts && (
       <div class="privacidad__row grid12">
-        <dt class="privacidad__key cell span-4">Tu lista de cotización</dt>
+        <dt class="privacidad__key cell span-4">Lo que agregas a tu cotización</dt>
         <dd class="privacidad__value cell span-8"><p>Los productos, variantes, cantidades y unidades que agregas a tu cotización se guardan solo en este navegador, en este equipo. Se quedan ahí hasta que vacíes tu cotización o borres los datos del sitio; algunos navegadores, como Safari, los borran si pasan varios días sin que visites el sitio. No salen de tu navegador hasta que tú abres WhatsApp o tu correo, o copias tu solicitud.</p></dd>
       </div>
     )}

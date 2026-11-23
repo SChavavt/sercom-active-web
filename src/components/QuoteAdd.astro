@@ -55,7 +55,7 @@ const chooseVariant = product.variants.length > 1;
   novalidate
   data-quantity-error={QUANTITY_ERROR}
   data-full-message={LIST_FULL_MESSAGE}
-  data-storage-message="Tu navegador no permite guardar la lista en este equipo. Usa “Cotizar este producto” para pedirlo directamente o escríbelo en “Cotizar mi lista”."
+  data-storage-message="Tu navegador no permite guardar tu cotización en este equipo. Usa “Cotizar este producto” para pedirlo directamente o escríbelo en “Cotizar mi lista”."
 >
   <script type="application/json" data-quote-index set:html={jsonForScript(index)}></script>
   {chooseVariant && (

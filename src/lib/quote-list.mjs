@@ -642,8 +642,8 @@ export function restoredMessage(label) {
 export function unknownLinesMessage(count) {
   const total = Math.max(0, Math.trunc(Number(count)) || 0);
   if (total === 0) return '';
-  if (total === 1) return '1 producto de tu lista no aparece en esta página y no se incluye en tu mensaje. Vuelve a cargar la página; si sigue igual, ya no está en el catálogo.';
-  return `${formatQuantity(total)} productos de tu lista no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.`;
+  if (total === 1) return '1 producto de tu cotización no aparece en esta página y no se incluye en tu mensaje. Vuelve a cargar la página; si sigue igual, ya no está en el catálogo.';
+  return `${formatQuantity(total)} productos de tu cotización no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.`;
 }
 
 /**
