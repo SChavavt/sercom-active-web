@@ -27,7 +27,8 @@
 //     izquierdo (con :has(); donde no lo hay, la página pone además la clase `field--invalid` en el campo).
 //     Quitarlo: lo contrario, y vaciar el texto. Si el error se quita porque el foco salió del campo con el puntero
 //     oprimiendo otro control, la línea conserva su lugar sin verse (clase `field__error--unseen`) hasta que el puntero
-//     suelta: si se fuera antes, lo que está debajo se movería y el clic caería en otro lado.
+//     suelta y sale de ese control: si se fuera antes, lo que está debajo se movería y el clic, o un segundo clic en
+//     el mismo control, caería en otro lado.
 //   - Foco: con :has() el anillo se dibuja en la casilla entera y no en el control; sin :has(), el control conserva
 //     el anillo de siempre. Los tres elementos del Stepper llevan cada uno su anillo, dentro de su casilla.
 //   - El texto de ayuda es texto real: no se usa el placeholder para dar instrucciones.
