@@ -39,7 +39,7 @@ function syntheticCatalog(change = () => {}) {
     description: 'No es un artículo comercial.', saleUnit: 'pieza',
     characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'],
     variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-001/A-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
     approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
@@ -215,7 +215,7 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
     brandId: 'ansell', brandName: 'Ansell', code: 'TEST-001/A', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
     summary: 'No es un artículo comercial.', characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'], saleUnit: 'pieza',
     variants: [{ id: 'talla-9', label: 'Talla 9', code: 'TEST-001/A-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba' },
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     isExample: false,
   }]);
@@ -241,6 +241,18 @@ test('vista previa con una ficha aprobada: la ficha real va primero y los ejempl
   // Los destacados recorren las categorías por turnos: no se agotan en la primera.
   assert.deepEqual(site.featuredProducts(3).map(product => product.code), ['TEST-001/A', 'EJ-2001', 'EJ-3001']);
   assert.deepEqual(site.featuredProducts(11).at(-1)?.code, 'EJ-1001');
+});
+
+test('la foto de una ficha llega a la forma pública como { file, alt } o { url, width, height, alt }, sin su fuente ni su uso', () => {
+  const fromFile = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.image = { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true };
+  }) });
+  assert.deepEqual(fromFile.getProduct('test-001')?.image, { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba' });
+  const fromUrl = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.deepEqual(fromUrl.getProduct('test-001')?.image, { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' });
+  // Los ejemplos de la vista previa siguen sin foto.
+  const preview = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.ok(preview.products.filter(product => product.isExample).every(product => product.image === null));
 });
 
 test('una variante sin código propio llega a la forma pública con el código vacío', () => {

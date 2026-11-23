@@ -338,7 +338,10 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         saleUnit: product.saleUnit,
         // Una variante sin código propio lleva `code: ''`: la ficha muestra solo su etiqueta y el mensaje no lleva código.
         variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
-        image: { url: product.image.url, alt: product.image.alt },
+        // Solo lo que dibuja la página: el archivo o la dirección con sus medidas, y el texto alternativo.
+        image: 'file' in product.image
+          ? { file: product.image.file, alt: product.image.alt }
+          : { url: product.image.url, width: product.image.width, height: product.image.height, alt: product.image.alt },
         documents: product.documents.map(document => ({ label: document.label, url: document.url })),
         isExample: false,
       };

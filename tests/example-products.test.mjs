@@ -168,7 +168,7 @@ test('los ejemplos nunca están en catalog.json ni pueden pasar por getPublished
     products: [{
       id: example.id, brandId: 'ansell', model: example.code, name: example.name, categoryIds: ['manos'], status: 'approved',
       description: example.summary, saleUnit: example.saleUnit, characteristics: example.characteristics,
-      image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+      image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
       source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
       approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
     }],

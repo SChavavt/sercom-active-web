@@ -1,7 +1,7 @@
 ---
 // Ficha de producto (/productos/{id}/): una hoja técnica sobre la retícula de doce columnas.
 //   1. Fila de ruta: Inicio / Catálogo / {categoría} / {producto} (sin categoría si el producto no tiene).
-//   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
+//   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida, ProductPhoto, o, sin ella, el pictograma de la
 //      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
 //      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular; un nombre
 //      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección; la fila de
@@ -33,6 +33,7 @@ import Note from '../../components/Note.astro';
 import PageLinkScript from '../../components/PageLinkScript.astro';
 import QuoteAdd from '../../components/QuoteAdd.astro';
 import ProductCard from '../../components/ProductCard.astro';
+import ProductPhoto from '../../components/ProductPhoto.astro';
 import RetiredProduct from '../../components/RetiredProduct.astro';
 import SectionHead from '../../components/SectionHead.astro';
 import StepperScript from '../../components/StepperScript.astro';
@@ -112,7 +113,7 @@ const moreOdd = more.items.length % 2 === 1;
       <div class="producto__frame">
         {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
         {product.image ? (
-          <img class="producto__img" src={product.image.url} alt={product.image.alt} width="800" height="600" decoding="async" />
+          <ProductPhoto image={product.image} place="page" class="producto__img" productId={product.id} />
         ) : (
           <span class="producto__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
         )}

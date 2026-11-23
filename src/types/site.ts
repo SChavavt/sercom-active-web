@@ -48,8 +48,25 @@ export interface PublicVariant {
   readonly code: string;
 }
 
-export interface PublicImage {
+/**
+ * Fotografía de un producto, en una de dos formas: un archivo de `src/assets/productos/` que la compilación optimiza
+ * (`file`; el ancho y el alto se leen del archivo) o una dirección que la página usa tal cual, con su ancho y alto
+ * (`url`). La dibuja `ProductPhoto.astro`.
+ */
+export type PublicImage = PublicFileImage | PublicUrlImage;
+
+export interface PublicFileImage {
+  /** Nombre del archivo en `src/assets/productos/`, sin carpeta. */
+  readonly file: string;
+  readonly alt: string;
+}
+
+export interface PublicUrlImage {
+  /** Dirección absoluta `https`. */
   readonly url: string;
+  /** Ancho y alto de la foto en píxeles. */
+  readonly width: number;
+  readonly height: number;
   readonly alt: string;
 }
 

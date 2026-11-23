@@ -25,7 +25,7 @@ const record = (fields = {}) => ({
   description: 'No es un artículo comercial.', saleUnit: 'pieza',
   characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'],
   variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-001/A-9' }],
-  image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+  image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
   documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
   source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
   approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },

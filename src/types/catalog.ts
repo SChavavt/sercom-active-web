@@ -8,6 +8,16 @@ export interface Category {
   summary?: string;
   status: 'draft' | 'approved';
 }
+/**
+ * Fotografía de una ficha: un archivo de `src/assets/productos/` (`file`; el ancho y el alto se leen del archivo) o una
+ * dirección absoluta `https` con su ancho y alto en píxeles (`url`). Nunca las dos. `sourceUrl` dice de dónde viene la
+ * foto y `usageConfirmed`, si su uso está confirmado; ninguno de los dos se publica.
+ */
+export type ProductImage =
+  | { file: string; alt: string; sourceUrl: string; usageConfirmed: boolean }
+  | { url: string; width: number; height: number; alt: string; sourceUrl: string; usageConfirmed: boolean };
+/** Lo público de una fotografía (`getPublishedProducts`): sin su fuente ni su marca de uso. */
+export type PublishedImage = { file: string; alt: string } | { url: string; width: number; height: number; alt: string };
 export interface Product {
   id: string;
   brandId: string;
@@ -20,7 +30,8 @@ export interface Product {
   saleUnit?: string;
   /** `manufacturerCode` es opcional: muchas tallas no tienen un código propio. Si la clave está, no puede ir vacía. */
   variants?: { id: string; label: string; manufacturerCode?: string }[];
-  image?: { url: string; alt: string; sourceUrl: string; usageConfirmed: boolean };
+  /** Una de dos formas (ver `ProductImage`). Obligatoria para `approved`, con `usageConfirmed: true`. */
+  image?: ProductImage;
   source?: { url: string; checkedOn: string };
   approval?: { by: string; on: string; supplyConfirmed: boolean };
   documents?: { label: string; url: string }[];
@@ -37,7 +48,7 @@ export interface PublishedProduct {
   saleUnit: string;
   /** Sin `manufacturerCode` cuando la variante no tiene código propio. */
   variants: { id: string; label: string; manufacturerCode?: string }[];
-  image: { url: string; alt: string };
+  image: PublishedImage;
   documents: { label: string; url: string }[];
 }
 /**

@@ -222,6 +222,62 @@ test('vista previa: la búsqueda del navegador sobre los data-search compilados 
   for (const [location, expected] of expectations) assert.deepEqual(found(location), expected, location);
 });
 
+test('la sonda dibuja una foto local con el mismo componente que las fichas: WebP en varios anchos, el formato del archivo, sizes, medidas y alt', () => {
+  const { files } = builds.production;
+  const html = files.get('foto/index.html');
+  assert.ok(html, 'la sonda debe tener la página de la foto');
+  const block = id => html.match(new RegExp(`<div id="${id}">([\\s\\S]*?)</div>`))[1];
+  const attribute = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+  const entries = srcset => srcset.split(',').map(entry => entry.trim().split(/\s+/));
+  // La imagen sintética mide 1200 × 900 (4:3).
+  for (const [id, place] of [['tarjeta', 'card'], ['ficha', 'page']]) {
+    const markup = block(id);
+    const source = markup.match(/<source\b[^>]*>/)[0];
+    const img = markup.match(/<img\b[^>]*>/)[0];
+    assert.match(markup, /^\s*<picture>/, id);
+    assert.equal(attribute(source, 'type'), 'image/webp', id);
+    // Los anchos de cada lugar, sin agrandar la foto: lo que pasa de 1200 se cambia por 1200.
+    const widths = place === 'card' ? ['160w', '240w', '320w', '400w', '480w', '640w'] : ['160w', '240w', '320w', '480w', '640w', '960w', '1200w'];
+    for (const [srcset, extension] of [[attribute(source, 'srcset'), 'webp'], [attribute(img, 'srcset'), 'png']]) {
+      const list = entries(srcset);
+      assert.deepEqual(list.map(([, width]) => width), widths, `${id} ${extension}`);
+      for (const [url] of list) {
+        assert.match(url, new RegExp(`^/_astro/foto-sintetica\\.[\\w-]+\\.${extension}$`), `${id} ${url}`);
+        assert.ok(files.has(url.slice(1)), `${id}: falta ${url}`);
+      }
+    }
+    // Para un navegador sin WebP, el formato del archivo (PNG).
+    assert.match(attribute(img, 'src'), /^\/_astro\/foto-sintetica\.[\w-]+\.png$/, id);
+    assert.ok(files.has(attribute(img, 'src').slice(1)), id);
+    // `sizes`: el ancho que ocupa una foto de 4:3 contenida en el marco de cada lugar.
+    const sizes = place === 'card' ? '(max-width: 699px) 50vw, (max-width: 1099px) 39.2vw, 323px' : '(max-width: 699px) 213px, (max-width: 1099px) 347px, 627px';
+    assert.equal(attribute(source, 'sizes'), sizes, id);
+    assert.equal(attribute(img, 'sizes'), sizes, id);
+    // Medidas del archivo, texto alternativo, clase del lugar y carga.
+    assert.equal(attribute(img, 'width'), '1200', id);
+    assert.equal(attribute(img, 'height'), '900', id);
+    assert.equal(attribute(img, 'alt'), 'Foto sintética de la sonda', id);
+    assert.equal(attribute(img, 'class'), place === 'card' ? 'product__img' : 'producto__img', id);
+    assert.equal(attribute(img, 'decoding'), 'async', id);
+    assert.equal(attribute(img, 'loading'), place === 'card' ? 'lazy' : 'eager', id);
+    assert.equal(attribute(img, 'fetchpriority'), place === 'card' ? undefined : 'high', id);
+  }
+  // Ningún archivo generado es más ancho que la foto.
+  assert.ok(![...files.keys()].some(path => /foto-sintetica.*\.(?:webp|png)$/.test(path) && /1280|1600/.test(path)));
+  // Una foto por dirección: un <img> con la dirección tal cual, sus medidas, y sin decirle al otro servidor de qué página viene.
+  const remote = block('direccion').trim();
+  assert.doesNotMatch(remote, /<picture|<source/);
+  assert.equal(attribute(remote, 'src'), 'https://fotos.sonda.invalid/foto.jpg');
+  assert.equal(attribute(remote, 'width'), '1600');
+  assert.equal(attribute(remote, 'height'), '1200');
+  assert.equal(attribute(remote, 'alt'), 'Foto de la sonda por dirección');
+  assert.equal(attribute(remote, 'referrerpolicy'), 'no-referrer');
+  assert.equal(attribute(remote, 'loading'), 'lazy');
+  assert.equal(attribute(remote, 'decoding'), 'async');
+  // La compilación no descarga la dirección.
+  assert.ok(![...files.keys()].some(path => path.includes('sonda.invalid') || /^_astro\/foto\./.test(path)));
+});
+
 test('vista previa (control): el escáner en modo producción detecta los ejemplos en HTML, JSON y scripts', async () => {
   const { findings } = await scanDist(builds.preview.directory, { data });
   const leaked = new Set(findings.filter(finding => finding.level === 'FAIL' && finding.id === 'R-RULE-03').map(finding => finding.file));

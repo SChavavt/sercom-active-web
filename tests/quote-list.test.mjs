@@ -28,7 +28,7 @@ const publicProducts = [
     id: 'guante-sintetico', url: '/productos/guante-sintetico/', name: 'Guante sintético de prueba', brandId: 'marca-alfa', brandName: 'Marca Alfa', code: 'SP-100',
     categoryIds: ['manos'], categoryNames: ['Protección de manos'], summary: 'Resumen sintético.', characteristics: ['Dato sintético A'], saleUnit: 'par',
     variants: [{ id: 'talla-8', label: 'Talla 8', code: 'SP-100-8' }, { id: 'talla-9', label: 'Talla 9', code: 'SP-100-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba' }, documents: [{ label: 'Ficha', url: 'https://example.invalid/ficha.pdf' }], isExample: false,
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' }, documents: [{ label: 'Ficha', url: 'https://example.invalid/ficha.pdf' }], isExample: false,
   },
   {
     id: 'casco-sintetico', url: '/productos/casco-sintetico/', name: 'Casco sintético de prueba', brandId: null, brandName: 'Marca Beta', code: 'SP-200',

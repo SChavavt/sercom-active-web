@@ -19,12 +19,30 @@ const forbidden = /^(price|prices|precio|precios|cost|costs|costo|costos|stock|i
 const productKeys = new Set(['id', 'brandId', 'model', 'name', 'categoryIds', 'status', 'description', 'characteristics', 'saleUnit', 'variants', 'image', 'source', 'approval', 'documents']);
 const categoryKeys = new Set(['id', 'name', 'shortName', 'summary', 'status']);
 // Claves de los objetos dentro de una ficha. Con `manufacturerCode` opcional, una clave mal escrita
-// (`manufacturerCodes`) diría en silencio «sin código»: por eso cada objeto acepta solo las suyas. `image` no se
-// revisa aquí.
+// (`manufacturerCodes`) diría en silencio «sin código»: por eso cada objeto acepta solo las suyas. La imagen tiene dos
+// formas, cada una con sus claves (abajo).
 const variantKeys = new Set(['id', 'label', 'manufacturerCode']);
 const documentKeys = new Set(['label', 'url']);
 const sourceKeys = new Set(['url', 'checkedOn']);
 const approvalKeys = new Set(['by', 'on', 'supplyConfirmed']);
+// Fotografía de una ficha: exactamente una de dos formas.
+//   - `file`: un archivo de src/assets/productos/, la forma habitual. El sitio sirve su propia copia optimizada y el
+//     ancho y el alto se leen del archivo, así que no se escriben. Que el archivo exista y su formato, medidas y peso
+//     los revisa `scripts/product-photos.mjs`, porque este módulo no lee el disco.
+//   - `url`: una dirección absoluta `https` que el sitio imprime tal cual (nunca la descarga al compilar), con el
+//     ancho y el alto en píxeles, para una foto que sigue en un servidor que controla el negocio o cuyo dueño pide
+//     enlazarla.
+// El nombre del archivo es público: forma parte del nombre de los archivos que genera la compilación.
+/** Nombre de archivo de una fotografía: sin carpeta, minúsculas, cifras y guiones, y una extensión de imagen. */
+export const PHOTO_FILE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:jpg|jpeg|png|webp)$/;
+/** Largo máximo del texto alternativo de una fotografía. */
+export const MAX_IMAGE_ALT = 160;
+/** Ancho y alto máximos que se aceptan para una fotografía con `url`. */
+const MAX_IMAGE_SIDE = 10000;
+const fileImageKeys = new Set(['file', 'alt', 'sourceUrl', 'usageConfirmed']);
+const urlImageKeys = new Set(['url', 'width', 'height', 'alt', 'sourceUrl', 'usageConfirmed']);
+// Lo reservado a los ejemplos tampoco puede ir en el nombre de un archivo publicado (el escáner lo busca en producción).
+const reservedFileName = value => /ejemplo|ej-\d/.test(value);
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 const unknownKeys = (value, allowed, path, errors) => {
   if (isRecord(value)) for (const key of Object.keys(value)) if (!allowed.has(key)) errors.push(`${path}.${key}: campo no definido.`);
@@ -43,6 +61,52 @@ function inspectFields(value, path, errors) {
     if (forbidden.test(normalize(key))) errors.push(`${path}.${key}: campo comercial no permitido en este catálogo.`);
     inspectFields(child, `${path}.${key}`, errors);
   }
+}
+
+/**
+ * Revisa la forma de la fotografía de una ficha, en cualquier estado: `file` o `url` (nunca los dos), con sus claves y
+ * ninguna otra, el texto alternativo, la fuente y la marca de uso. Que una ficha aprobada tenga fotografía con el uso
+ * confirmado se revisa aparte, con los demás requisitos de `approved`.
+ * @param {(field: string, value: unknown, covered: boolean, empty: string) => void} line revisa que un texto de la ficha esté limpio
+ */
+function inspectImage(image, productPath, errors, line) {
+  const path = `${productPath}.image`;
+  if (!isRecord(image)) {
+    errors.push(`${path}: debe ser un objeto con file o url, alt, sourceUrl y usageConfirmed.`);
+    return;
+  }
+  const hasFile = Object.hasOwn(image, 'file');
+  const hasUrl = Object.hasOwn(image, 'url');
+  if (hasFile && hasUrl) errors.push(`${path}: lleva file y url; usa solo uno: file para una foto guardada en src/assets/productos/ o url para una dirección.`);
+  else if (!hasFile && !hasUrl) errors.push(`${path}: falta file o url; escribe el nombre del archivo de src/assets/productos/ (file) o la dirección de la foto (url).`);
+  else if (hasFile) {
+    for (const key of Object.keys(image)) {
+      if (key === 'width' || key === 'height') errors.push(`${path}.${key}: no va con file; el ancho y el alto se leen del archivo. Quita la clave.`);
+      else if (!fileImageKeys.has(key)) errors.push(`${path}.${key}: campo no definido.`);
+    }
+    const { file } = image;
+    if (typeof file !== 'string' || !PHOTO_FILE.test(file)) {
+      errors.push(`${path}.file: ${typeof file === 'string' ? `«${file}» no es un nombre válido` : 'debe ser un nombre de archivo'}; usa solo minúsculas, cifras y guiones, sin carpeta, con la extensión .jpg, .jpeg, .png o .webp, como «guante-nitrilo-37-175.jpg».`);
+    } else {
+      if (reservedFileName(file)) errors.push(`${path}.file: el nombre lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otro nombre.`);
+      if (excluded(file.replace(/[-.]/g, ' '))) errors.push(`${path}.file: marca excluida.`);
+    }
+  } else {
+    for (const key of Object.keys(image)) if (!urlImageKeys.has(key)) errors.push(`${path}.${key}: campo no definido.`);
+    if (!isHttps(image.url)) errors.push(`${path}.url: debe ser una dirección https completa, sin usuario ni contraseña.`);
+    for (const [key, side] of [['width', 'ancho'], ['height', 'alto']]) {
+      const value = image[key];
+      if (value === undefined) errors.push(`${path}.${key}: falta; con url se escribe el ${side} de la foto en píxeles.`);
+      else if (!Number.isInteger(value) || value < 1 || value > MAX_IMAGE_SIDE) errors.push(`${path}.${key}: debe ser un número entero de 1 a ${MAX_IMAGE_SIDE}, el ${side} de la foto en píxeles.`);
+    }
+  }
+  if (image.alt === undefined) errors.push(`${path}.alt: falta; describe la foto en una línea.`);
+  else {
+    line('image.alt', image.alt, false, 'está vacío; describe la foto en una línea.');
+    if (typeof image.alt === 'string' && [...image.alt].length > MAX_IMAGE_ALT) errors.push(`${path}.alt: tiene ${[...image.alt].length} caracteres y el máximo es ${MAX_IMAGE_ALT}; describe la foto en una línea más corta.`);
+  }
+  if (!isHttps(image.sourceUrl)) errors.push(`${path}.sourceUrl: ${image.sourceUrl === undefined ? 'falta' : 'debe ser una dirección https'}; escribe la página de donde viene la foto.`);
+  if (typeof image.usageConfirmed !== 'boolean') errors.push(`${path}.usageConfirmed: debe ser true o false; true solo con el uso de la foto confirmado.`);
 }
 
 /** Valida el archivo editorial completo antes de producir una salida pública. */
@@ -110,6 +174,7 @@ export function validateCatalog(catalog, registry) {
       unknownKeys(d, documentKeys, `${path}.documents[${i}]`, errors);
       if (isRecord(d)) line(`documents[${i}].label`, d.label, true);
     });
+    if (p.image !== undefined) inspectImage(p.image, path, errors, line);
 
     // Nombres únicos en todo el catálogo, también entre borradores: «Cotizar mi lista» nombra los controles de cada
     // renglón con el nombre del producto y la etiqueta de su variante (`rowControlNames` en quote-list.mjs), y dos
@@ -157,7 +222,8 @@ export function validateCatalog(catalog, registry) {
     if (!Array.isArray(p.characteristics) || p.characteristics.length < 3 || p.characteristics.length > 5 || p.characteristics.some(v => !isText(v))) errors.push(`${path}: requiere de 3 a 5 características verificadas.`);
     if (!p.source) errors.push(`${path}: falta fuente revisada.`);
     if (!hasApproval(p)) errors.push(`${path}: falta aprobación comercial.`);
-    if (!p.image || !isHttps(p.image.url) || !isText(p.image.alt) || !isHttps(p.image.sourceUrl) || p.image.usageConfirmed !== true) errors.push(`${path}: falta imagen verificable con uso confirmado.`);
+    // La forma de la imagen ya se revisó arriba; aquí, que esté y que su uso esté confirmado.
+    if (p.image === undefined || (isRecord(p.image) && p.image.usageConfirmed === false)) errors.push(`${path}: falta imagen verificable con uso confirmado.`);
     if (Array.isArray(p.categoryIds) && p.categoryIds.some(id => categories.get(id)?.status !== 'approved')) errors.push(`${path}: categoría pendiente de aprobación.`);
   }
   return errors;
@@ -172,10 +238,15 @@ export function getPublishedProducts(catalog, registry) {
     categoryIds: [...p.categoryIds], description: p.description,
     characteristics: [...p.characteristics], saleUnit: p.saleUnit,
     variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, ...(v.manufacturerCode !== undefined && { manufacturerCode: v.manufacturerCode }) })),
-    image: { url: p.image.url, alt: p.image.alt },
+    image: publicImage(p.image),
     documents: (p.documents ?? []).map(d => ({ label: d.label, url: d.url })),
   }));
 }
+
+/** Lo público de una fotografía: `{ file, alt }` o `{ url, width, height, alt }`; nunca su fuente ni su uso. */
+const publicImage = image => (Object.hasOwn(image, 'file')
+  ? { file: image.file, alt: image.alt }
+  : { url: image.url, width: image.width, height: image.height, alt: image.alt });
 
 /**
  * Producto retirado que fue público: estado `retired` con una aprobación comercial completa. Conserva una página
