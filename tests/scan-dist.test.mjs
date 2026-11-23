@@ -1880,3 +1880,34 @@ test('R-FOTO-02 está documentada en --rules', () => {
   assert.match(doc, /_astro\//);
   assert.match(doc, /src\/assets\/productos\//);
 });
+
+// Revisión del texto y escáner listos para miles de fichas: lo que deja pasar cada excepción, fijado caso por caso.
+
+test('R-RULE-24: un número que solo toca un código público, o que lo contiene, sigue dando el aviso; el código entero no', async () => {
+  const code = '7000123456';
+  const withCode = catalogWith({ id: 'guante-codigo-largo', status: 'approved', model: code });
+  const pages = body => ({
+    'productos/guante-codigo-largo/index.html': page(`<h1>Guante</h1><p>Código ${code}</p>`),
+    'catalogo/index.html': page(`<h1>Catálogo</h1>${body}`),
+  });
+  // El código solo, y escrito dos veces, no es un teléfono.
+  for (const body of [`<p>${code}</p>`, `<p>${code} ${code}</p>`, `<p>Códigos ${code} y ${code}</p>`]) {
+    assert.deepEqual((await scan(pages(body), { data: withCode })).findings, [], body);
+  }
+  // Junto al código, un número que lo toca o que lo contiene es otro número.
+  for (const body of [`<p>+52 ${code}</p>`, `<p>1 ${code}</p>`, `<p>1${code}</p>`, `<p>${code}7</p>`, `<p>${code}-1</p>`, `<p>A-${code}</p>`]) {
+    const result = await scan(pages(body), { data: withCode });
+    assert.deepEqual([failedIds(result), warnedIds(result), result.findings.map(finding => finding.file)], [[], ['R-RULE-24'], ['catalogo/index.html']], body);
+  }
+});
+
+test('R-RULE-04: las normas de la ficha en su propia página solo se descuentan para R-RULE-04; una palabra de otra regla en ellas sigue contando', async () => {
+  const norms = ['Certificado EN 166', 'EN 388:2016 100 % probado'];
+  const withNorms = catalogWith({ id: 'lente-certificado', status: 'approved', standards: standardsOf(...norms) });
+  const body = `<h1>Lente sintético</h1>${normsList(norms)}`;
+  const production = await scan({ 'productos/lente-certificado/index.html': page(body) }, { data: withNorms });
+  assert.deepEqual([failedIds(production), warnedIds(production)], [[], ['R-RULE-06']]);
+  assert.deepEqual(production.findings.map(finding => finding.message.split(' … ')[0]).sort(), ['certificación o distintivo: «100 %»', 'certificación o distintivo: «Certificado»']);
+  const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/lente-certificado/index.html': previewPage(body) }, { preview: true, data: withNorms });
+  assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-06', 'productos/lente-certificado/index.html'], ['R-RULE-06', 'productos/lente-certificado/index.html']]);
+});
