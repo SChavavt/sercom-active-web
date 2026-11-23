@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
-// (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
-// de un producto retirado), del aviso de arriba (que nada lo oculte), de los controles (que cada uno tenga una
-// función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de un <template>) y de la
-// página de cotizar (que lleve lo que su script necesita según las páginas de producto de la compilación), que se
-// leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
+// (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual, página
+// de un producto retirado y fotografías de producto), del aviso de arriba (que nada lo oculte), de los controles
+// (que cada uno tenga una función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de
+// un <template>) y de la página de cotizar (que lleve lo que su script necesita según las páginas de producto de la
+// compilación), que se leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -1439,6 +1439,34 @@ export const CHECKS = [
       for (const svg of page.elements.filter(element => element.name === 'svg' && hasClass(element, 'icon'))) {
         const missing = ['width', 'height'].filter(key => !numeric(svg.attributes.get(key)));
         if (missing.length) problems.push(`${describe(svg)}${svg.parent ? ` dentro de ${describe(svg.parent)}` : ''} no lleva ${missing.map(key => `${key} numérico`).join(' ni ')}: sin la hoja de estilo crece al ancho de la página`);
+      }
+      return problems;
+    },
+  },
+  // R-FOTO-01 · La fotografía de un producto (ProductPhoto.astro) es un <img> con la clase de su lugar: product__img en
+  // la tarjeta y producto__img en la ficha, también dentro de un <picture>. Las medidas son las del archivo o las
+  // declaradas en los datos: sin ellas, la página salta cuando la foto termina de cargar. La página de un retirado
+  // muestra el pictograma de su categoría, nunca su foto (R-STATE-04); las tarjetas de «Más productos…» sí llevan las
+  // suyas.
+  {
+    id: 'R-FOTO-01',
+    title: 'Cada fotografía de producto (img.product__img, img.producto__img) lleva un alt no vacío y width y height enteros positivos, y la página de un producto retirado no lleva su fotografía',
+    page(page) {
+      const problems = [];
+      const positive = value => value !== undefined && /^[1-9]\d*$/.test(value.trim());
+      for (const img of page.elements.filter(element => element.name === 'img' && (hasClass(element, 'product__img') || hasClass(element, 'producto__img')))) {
+        const missing = [];
+        if (!(img.attributes.get('alt') ?? '').trim()) missing.push('un alt no vacío');
+        for (const key of ['width', 'height']) if (!positive(img.attributes.get(key))) missing.push(`${key} entero positivo`);
+        if (missing.length) problems.push(`${describe(img)} (${img.attributes.get('src') ?? 'sin src'}) no lleva ${missing.join(' ni ')}`);
+      }
+      if (isRetiredPage(page)) {
+        const media = page.elements.filter(element => hasClass(element, 'producto__media')).flatMap(allElements);
+        const photos = new Set([
+          ...page.elements.filter(element => element.name === 'img' && hasClass(element, 'producto__img')),
+          ...media.filter(element => ['img', 'picture', 'source'].includes(element.name)),
+        ]);
+        for (const photo of photos) problems.push(`la página de un producto retirado lleva ${describe(photo)}: muestra el pictograma de su categoría, nunca una fotografía`);
       }
       return problems;
     },
