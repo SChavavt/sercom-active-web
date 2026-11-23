@@ -21,6 +21,8 @@ import { cleanQuery, normalizeText } from './text.mjs';
  * máximo) lo cuenta como si no estuviera (`parseList`) y se pierde la siguiente vez que el visitante cambia su lista en
  * esa página. Por eso un cambio de lo que un renglón guardado puede llevar, o subir `MAX_LINES` o `MAX_QUANTITY`, usa
  * una clave nueva (`cotizacion:v2`) que lee la anterior para pasarla: la página vieja nunca toca datos que no entiende.
+ * Por si alguna vez se rompe esa regla, hay una segunda defensa: `quoteStore.write` no escribe encima de una lista
+ * guardada con una versión mayor que la suya (`isNewerList`).
  */
 export const QUOTE_STORAGE_KEY = 'cotizacion:v1';
 /** Clave de `sessionStorage` de lo que el visitante escribe en «Cotizar mi lista». */
@@ -245,6 +247,28 @@ export function parseList(raw) {
   }
   if (!isRecord(data) || own(data, 'v') !== VERSION) return [];
   return validLines(own(data, 'lines'));
+}
+
+/**
+ * ¿El texto guardado es una lista de una versión MÁS NUEVA que la de este código (un objeto cuyo `v` propio es un número
+ * mayor)? Por regla no debería existir bajo esta clave (ver `QUOTE_STORAGE_KEY`); si existe, la escribió una compilación
+ * posterior y esta página, que no la entiende (`parseList` da `[]`), no debe reemplazarla: `quoteStore.write` se niega.
+ * Cualquier otra cosa ilegible (JSON inválido, otra forma, una versión menor o que no es un número) no cuenta.
+ * @param {unknown} raw
+ * @returns {boolean}
+ */
+export function isNewerList(raw) {
+  if (typeof raw !== 'string') return false;
+  /** @type {unknown} */
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return false;
+  }
+  if (!isRecord(data)) return false;
+  const version = own(data, 'v');
+  return typeof version === 'number' && version > VERSION;
 }
 
 /**

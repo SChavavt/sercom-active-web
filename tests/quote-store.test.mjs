@@ -89,6 +89,33 @@ test('write() solo guarda una lista completa de renglones válidos: con otra cos
   assert.equal(notices, 3);
 });
 
+test('write() no reemplaza una lista guardada con una versión más nueva del formato', () => {
+  // Una página de una compilación anterior sigue abierta y otra más nueva ya guardó su lista bajo la MISMA clave (contra
+  // la regla de cambiar la clave con el formato): la vieja no la entiende, la muestra vacía y no la borra al cambiar algo.
+  const newer = JSON.stringify({ v: 2, lines: [{ id: 'guante', n: 12 }, { id: 'casco', n: 1 }] });
+  const local = fakeStorage({ [QUOTE_STORAGE_KEY]: newer });
+  const store = createQuoteStore({ local, session: fakeStorage(), target: new EventTarget() });
+  let notices = 0;
+  store.subscribe(() => { notices += 1; });
+  assert.equal(store.available(), true);
+  assert.deepEqual(store.read(), []);
+  assert.equal(store.write([line('guante')]), false);
+  assert.equal(store.write([]), false);
+  assert.equal(local.data.get(QUOTE_STORAGE_KEY), newer);
+  assert.ok(local.calls.every(([method]) => method === 'getItem'), JSON.stringify(local.calls));
+  assert.equal(notices, 0);
+  // Lo ilegible que no es una versión más nueva cuenta como si no estuviera: el siguiente cambio lo reemplaza.
+  for (const raw of ['{basura', '[]', '{"v":0,"lines":[]}', '{"v":"2","lines":[]}', '{"lines":[]}', JSON.stringify({ v: 1, lines: [null, 7, { productId: 'X' }] })]) {
+    local.data.set(QUOTE_STORAGE_KEY, raw);
+    assert.equal(store.write([line('guante')]), true, raw);
+    assert.equal(local.data.get(QUOTE_STORAGE_KEY), JSON.stringify({ v: 1, lines: [line('guante')] }), raw);
+  }
+  // Y si la clave ya no está (la compilación nueva pasó la lista a su clave propia), se escribe como siempre.
+  local.data.delete(QUOTE_STORAGE_KEY);
+  assert.equal(store.write([line('casco', 2, 'pieza')]), true);
+  assert.deepEqual(store.read(), [line('casco', 2, 'pieza')]);
+});
+
 test('available() nunca escribe: no hay clave de prueba', () => {
   const local = fakeStorage();
   const store = createQuoteStore({ local, session: fakeStorage(), target: new EventTarget() });

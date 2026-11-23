@@ -118,7 +118,8 @@ export interface QuoteStore {
   read(): QuoteLine[];
   /**
    * Guarda la lista (una lista vacía quita la clave) y avisa con `'write'`. `false`, sin guardar ni avisar, si `lines`
-   * no es una lista de hasta `MAX_LINES` renglones válidos (`isValidLine`) o si el navegador no dejó guardar.
+   * no es una lista de hasta `MAX_LINES` renglones válidos (`isValidLine`), si el navegador no dejó guardar o si lo
+   * guardado es una lista de una versión más nueva del formato (`isNewerList`).
    */
   write(lines: readonly QuoteLine[]): boolean;
   /** Escucha los cambios; devuelve la función que cancela esa suscripción (cada llamada es una suscripción propia). */

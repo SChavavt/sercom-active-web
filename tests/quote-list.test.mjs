@@ -3,8 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, formatQuantity, indexMaps, isValidLine,
-  jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel,
+  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, formatQuantity, indexMaps, isNewerList,
+  isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel,
   parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage,
   removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
@@ -199,6 +199,20 @@ test('parseList: con basura siempre devuelve una lista, sin lanzar', () => {
   assert.deepEqual(read.at(-1), many[MAX_LINES - 1]);
   const huge = parseList(stored([...Array.from({ length: 100000 }, () => 'basura'), ok]));
   assert.deepEqual(huge, [ok]);
+});
+
+test('isNewerList: solo una lista con una versión mayor que la de este código', () => {
+  const ok = line('guante', 2, 'par', 'talla-8');
+  // Una compilación posterior que no cambió la clave: esta página no la entiende y no debe reemplazarla.
+  for (const raw of [stored([ok]).replace('"v":1', '"v":2'), '{"v":2}', '{"v":3,"lines":"otra forma"}', '{"v":1.5,"lines":[]}', '{"v":1e400}']) {
+    assert.equal(isNewerList(raw), true, raw);
+    assert.deepEqual(parseList(raw), [], raw);
+  }
+  // Lo de hoy y lo ilegible no son «más nuevos»: lo ilegible cuenta como si no estuviera y el siguiente cambio lo reemplaza.
+  for (const raw of [null, undefined, 42, '', 'no es JSON', '{', '[]', 'null', '"texto"', '2', stored([ok]), stored([]), '{"v":0,"lines":[]}', '{"v":-3}',
+    '{"v":"2","lines":[]}', '{"v":[2]}', '{"v":null}', '{"v":true}', '{"lines":[]}', '[{"v":2}]', '{"__proto__":{"v":2}}', '{"V":2}']) {
+    assert.equal(isNewerList(raw), false, String(raw));
+  }
 });
 
 test('parseList conserva dos renglones iguales, en su orden, sin unirlos ni cambiar valores', () => {

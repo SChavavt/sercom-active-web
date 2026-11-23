@@ -16,12 +16,13 @@
 //
 // `write()` guarda solo una lista completa de renglones válidos. Con cualquier otra cosa (el objeto que devuelve
 // `addLine` en lugar de su `lines`, las filas de `reconcileList`, una cantidad en texto) devuelve `false` y no toca nada:
-// un descuido de quien llama nunca borra la lista del visitante.
+// un descuido de quien llama nunca borra la lista del visitante. Tampoco escribe encima de una lista guardada por una
+// versión más nueva del formato (`isNewerList`): una página vieja que sigue abierta no borra lo que no entiende.
 //
 // Sin efectos hasta que se llama un método: el almacenamiento y la ventana se buscan cuando hacen falta, dentro de
 // try/catch (leer `window.localStorage` lanza cuando el navegador lo bloquea).
 /** @import { QuoteDraft, QuoteLine, QuoteListener, QuoteStore, StorageLike } from '../types/quote.ts' */
-import { DRAFT_LIMITS, isValidLine, MAX_LINES, parseList, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, serializeList } from './quote-list.mjs';
+import { DRAFT_LIMITS, isNewerList, isValidLine, MAX_LINES, parseList, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, serializeList } from './quote-list.mjs';
 
 /** @typedef {Pick<EventTarget, 'addEventListener' | 'removeEventListener'>} ListenerTarget */
 
@@ -148,6 +149,7 @@ export function createQuoteStore({ local, session, target } = {}) {
       try {
         const area = localArea();
         if (!area) return false;
+        if (isNewerList(area.getItem(QUOTE_STORAGE_KEY))) return false;
         if (stored.length === 0) area.removeItem(QUOTE_STORAGE_KEY);
         else area.setItem(QUOTE_STORAGE_KEY, text);
       } catch {
