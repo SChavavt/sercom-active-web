@@ -91,18 +91,6 @@ export function cleanUnit(value) {
   return oneLine(value, MAX_UNIT_LENGTH);
 }
 
-/**
- * Unidades que se ofrecen para un producto: su unidad de venta (si tiene) y luego las de `STANDARD_UNITS` que no son
- * ella (comparadas sin acentos ni mayúsculas).
- * @param {unknown} saleUnit
- * @returns {string[]}
- */
-export function unitOptions(saleUnit) {
-  const unit = cleanUnit(saleUnit);
-  const key = normalizeText(unit);
-  return [...(unit ? [unit] : []), ...STANDARD_UNITS.filter(standard => normalizeText(standard) !== key)];
-}
-
 // Palabras de unidad conocidas: singular y plural, como se escriben. Se reconocen en las dos formas, sin acentos ni
 // mayúsculas.
 const UNIT_WORDS = [
@@ -115,6 +103,32 @@ const UNIT_FORMS = new Map(UNIT_WORDS.flatMap(([singular, plural]) => [
   [normalizeText(singular), /** @type {[string, string]} */ ([singular, plural])],
   [normalizeText(plural), /** @type {[string, string]} */ ([singular, plural])],
 ]));
+
+/**
+ * Clave para comparar dos unidades: sin acentos ni mayúsculas y con la primera palabra en singular cuando es una unidad
+ * conocida. «Par», «PARES» y «pares» dan «par»; «Cajas con 100 piezas» da «caja con 100 piezas»; «galones» da «galon».
+ * Dos unidades con la misma clave son la misma unidad: con la misma cantidad se leen igual (`quantityLabel`), salvo por
+ * las mayúsculas. Una unidad de una palabra y otra compuesta («caja» y «caja con 100 piezas») son distintas.
+ * @param {unknown} unit
+ * @returns {string}
+ */
+export function unitKey(unit) {
+  const [first = '', ...rest] = normalizeText(cleanUnit(unit)).split(' ');
+  const forms = UNIT_FORMS.get(first);
+  return [forms ? normalizeText(forms[0]) : first, ...rest].join(' ');
+}
+
+/**
+ * Unidades que se ofrecen para un producto: su unidad de venta (si tiene) y luego las de `STANDARD_UNITS` que no son
+ * ella (comparadas con `unitKey`: con la unidad de venta «pares» no se ofrece además «par»).
+ * @param {unknown} saleUnit
+ * @returns {string[]}
+ */
+export function unitOptions(saleUnit) {
+  const unit = cleanUnit(saleUnit);
+  const key = unitKey(unit);
+  return [...(unit ? [unit] : []), ...STANDARD_UNITS.filter(standard => unitKey(standard) !== key)];
+}
 
 /**
  * Escribe `form` con las mayúsculas de `written`: todo en mayúsculas («PAR» → «PARES»), con mayúscula inicial
@@ -152,13 +166,13 @@ export function quantityLabel(quantity, unit) {
 // ---- la lista guardada -----------------------------------------------------------------------------------------
 
 /**
- * Identidad de un renglón tal como se guarda: producto, variante y unidad comparada sin acentos ni mayúsculas
- * («Par» = «par»).
+ * Identidad de un renglón tal como se guarda: producto, variante y unidad comparada con `unitKey`
+ * («Par» = «par» = «pares»).
  * @param {QuoteLine} line
  * @returns {string}
  */
 export function lineKey(line) {
-  return JSON.stringify([String(line?.productId ?? ''), String(line?.variantId ?? ''), normalizeText(line?.unit)]);
+  return JSON.stringify([String(line?.productId ?? ''), String(line?.variantId ?? ''), unitKey(line?.unit)]);
 }
 
 /**
@@ -452,9 +466,11 @@ export function indexMaps(index) {
  * Una VISTA de los renglones guardados para la página que tiene `maps` (`indexMaps`). No cambia ni descarta nada.
  * → `{ rows, unknown }` con `rows[i].line === lines[i]`:
  *   - el producto está en `maps.products` y la variante es `''` o una de las suyas → `{ line, status: 'ok', product,
- *     variant, units }`. `variant` es la del renglón; con `''` y exactamente UNA variante, esa (es la única posible: se
- *     muestra y va en el mensaje; el renglón guardado queda como está); si no, `null`. `units` son `unitOptions` de su
- *     unidad de venta, más la unidad del renglón al final si no es ninguna de ellas;
+ *     variant, units, unit }`. `variant` es la del renglón; con `''` y exactamente UNA variante, esa (es la única
+ *     posible: se muestra y va en el mensaje; el renglón guardado queda como está); si no, `null`. `units` son
+ *     `unitOptions` de su unidad de venta, más la unidad del renglón al final si no es ninguna de ellas (`unitKey`).
+ *     `unit` es la opción de `units` que es la unidad del renglón: la que la lista muestra elegida (con el renglón en
+ *     «Par» y la opción «par», es «par»; el renglón guardado queda como está);
  *   - el producto está en `maps.retired` → `{ line, status: 'retired', product }`;
  *   - cualquier otro caso (la página no conoce el producto, o el producto no tiene esa variante en esta página) →
  *     `{ line, status: 'unknown' }`.
@@ -476,9 +492,14 @@ export function reconcileList(lines, maps) {
       const variant = variantId === '' ? (variants.length === 1 ? variants[0] : null) : variants.find((/** @type {QuoteIndexVariant} */ candidate) => candidate.id === variantId);
       if (variant !== undefined) {
         const units = unitOptions(product.saleUnit);
-        const unit = cleanUnit(line.unit);
-        if (unit && !units.some(option => normalizeText(option) === normalizeText(unit))) units.push(unit);
-        return { line, status: 'ok', product, variant, units };
+        const written = cleanUnit(line.unit);
+        const key = unitKey(written);
+        let unit = units.find(option => unitKey(option) === key);
+        if (unit === undefined) {
+          unit = written;
+          if (written) units.push(written);
+        }
+        return { line, status: 'ok', product, variant, units, unit };
       }
       return { line, status: 'unknown' };
     }
@@ -491,8 +512,8 @@ export function reconcileList(lines, maps) {
 
 /**
  * La posición de un renglón ANTERIOR, en estado 'ok', que pide lo mismo que `rows[i]`: el mismo producto, la misma
- * variante efectiva (`rows[i].variant?.id ?? ''`) y la misma unidad sin acentos ni mayúsculas. -1 si no hay o si
- * `rows[i]` no está en estado 'ok'.
+ * variante efectiva (`rows[i].variant?.id ?? ''`) y la misma unidad (`unitKey`: «par» = «Par» = «pares»). -1 si no hay
+ * o si `rows[i]` no está en estado 'ok'.
  * @param {readonly QuoteRow[]} rows
  * @param {number} i
  * @returns {number}
@@ -501,10 +522,10 @@ export function duplicateOf(rows, i) {
   const row = rows[i];
   if (!Number.isInteger(i) || row?.status !== 'ok') return -1;
   const variant = row.variant?.id ?? '';
-  const unit = normalizeText(row.line.unit);
+  const unit = unitKey(row.line.unit);
   for (let j = 0; j < i; j += 1) {
     const other = rows[j];
-    if (other?.status === 'ok' && other.product.id === row.product.id && (other.variant?.id ?? '') === variant && normalizeText(other.line.unit) === unit) return j;
+    if (other?.status === 'ok' && other.product.id === row.product.id && (other.variant?.id ?? '') === variant && unitKey(other.line.unit) === unit) return j;
   }
   return -1;
 }

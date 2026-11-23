@@ -6,7 +6,7 @@ import {
   addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, DRAFT_LIMITS, duplicateOf, formatQuantity, indexMaps, isValidLine,
   jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel,
   parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage,
-  removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, unitOptions, unknownLinesMessage, updateLine, variantText,
+  removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -95,6 +95,33 @@ test('unidades: limpieza y opciones', () => {
   assert.deepEqual(unitOptions(undefined), ['pieza', 'par', 'caja', 'paquete']);
 });
 
+test('unitKey: la misma unidad en singular o plural, con o sin acentos y mayúsculas', () => {
+  for (const [written, key] of [
+    ['par', 'par'], ['Par', 'par'], ['PARES', 'par'], ['pares', 'par'], ['  pares  ', 'par'], ['Piezas', 'pieza'], ['pieza', 'pieza'],
+    ['galón', 'galon'], ['Galones', 'galon'], ['galon', 'galon'], ['kits', 'kit'], ['unidades', 'unidad'], ['millares', 'millar'],
+    // En una unidad compuesta solo cuenta la primera palabra; lo demás se compara tal como está.
+    ['Cajas con 100 piezas', 'caja con 100 piezas'], ['caja con 100 piezas', 'caja con 100 piezas'], ['caja  con\n100 Piezas', 'caja con 100 piezas'],
+    // Una palabra que no es una unidad conocida no cambia, aunque termine en «s».
+    ['tambo de 200 L', 'tambo de 200 l'], ['tambos', 'tambos'], ['mes', 'mes'], ['', ''], [null, ''], ['\u200B', ''],
+  ]) assert.equal(unitKey(written), key, JSON.stringify(written));
+  // Una unidad de una palabra y otra compuesta no son la misma.
+  assert.notEqual(unitKey('caja'), unitKey('caja con 100 piezas'));
+  assert.notEqual(unitKey('caja con 100 piezas'), unitKey('caja con 50 piezas'));
+  // Dos unidades con la misma clave se leen igual con la misma cantidad (salvo por las mayúsculas).
+  for (const [a, b] of [['par', 'pares'], ['galon', 'galones'], ['caja con 100 piezas', 'cajas con 100 piezas']]) {
+    assert.equal(unitKey(a), unitKey(b));
+    for (const quantity of [1, 2, 12000]) assert.equal(quantityLabel(quantity, a), quantityLabel(quantity, b), `${quantity} ${a}`);
+  }
+});
+
+test('una unidad de venta escrita en plural no ofrece además su singular', () => {
+  assert.deepEqual(unitOptions('pares'), ['pares', 'pieza', 'caja', 'paquete']);
+  assert.deepEqual(unitOptions('Piezas'), ['Piezas', 'par', 'caja', 'paquete']);
+  assert.deepEqual(unitOptions('PAQUETES'), ['PAQUETES', 'pieza', 'par', 'caja']);
+  // Una compuesta sí deja la sencilla: son unidades distintas.
+  assert.deepEqual(unitOptions('cajas con 100 piezas'), ['cajas con 100 piezas', 'pieza', 'par', 'caja', 'paquete']);
+});
+
 test('quantityLabel: singular, plural, compuestas, en plural, desconocidas, 1, 1200 y 12,000', () => {
   assert.equal(quantityLabel(1, 'par'), '1 par');
   assert.equal(quantityLabel(12, 'par'), '12 pares');
@@ -130,6 +157,8 @@ test('quantityLabel: singular, plural, compuestas, en plural, desconocidas, 1, 1
 
 test('lineKey e isValidLine: lo que escribe este código y nada más', () => {
   assert.equal(lineKey(line('guante', 1, 'Par', 'talla-8')), lineKey(line('guante', 5, 'par', 'talla-8')));
+  assert.equal(lineKey(line('guante', 1, 'pares', 'talla-8')), lineKey(line('guante', 5, 'par', 'talla-8')));
+  assert.notEqual(lineKey(line('guante', 1, 'caja')), lineKey(line('guante', 1, 'caja con 100 piezas')));
   assert.notEqual(lineKey(line('guante', 1, 'par', 'talla-8')), lineKey(line('guante', 1, 'par', 'talla-9')));
   assert.notEqual(lineKey(line('guante', 1, 'par')), lineKey(line('guante', 1, 'pieza')));
   assert.ok(isValidLine(line('guante', 1, 'par')));
@@ -337,6 +366,7 @@ test('reconcileList: una vista que no cambia ni descarta nada', () => {
   assert.equal(rows[0].product, maps.products.get('guante-sintetico'));
   assert.deepEqual(rows[0].variant, { id: 'talla-8', label: 'Talla 8', code: 'SP-100-8' });
   assert.deepEqual(rows[0].units, ['par', 'pieza', 'caja', 'paquete']);
+  assert.equal(rows[0].unit, 'par');
   assert.equal(rows[1].product.code, 'SP-900');
   assert.deepEqual(rows[2], { line: lines[2], status: 'unknown' });
   assert.deepEqual(rows[3], { line: lines[3], status: 'unknown' });
@@ -345,9 +375,19 @@ test('reconcileList: una vista que no cambia ni descarta nada', () => {
   assert.deepEqual(rows[5].variant, null);
   assert.deepEqual(rows[5].units, ['caja con 100 piezas', 'pieza', 'par', 'caja', 'paquete', 'tambo']);
   assert.equal(rows[5].line.unit, 'tambo');
+  assert.equal(rows[5].unit, 'tambo');
   assert.equal(rows[6].variant, null);
-  // Una unidad con otras mayúsculas no se repite.
-  assert.deepEqual(reconcileList([line('guante-sintetico', 1, 'PAR', 'talla-8')], maps).rows[0].units, ['par', 'pieza', 'caja', 'paquete']);
+  // Una unidad con otras mayúsculas o en plural no se repite: `unit` es la opción que la lista muestra elegida, y el
+  // renglón guardado queda como está.
+  for (const written of ['PAR', 'Pares', 'pares']) {
+    const stored = line('guante-sintetico', 1, written, 'talla-8');
+    const [row] = reconcileList([stored], maps).rows;
+    assert.deepEqual(row.units, ['par', 'pieza', 'caja', 'paquete'], written);
+    assert.equal(row.unit, 'par', written);
+    assert.equal(row.line.unit, written);
+  }
+  // Siempre: `unit` es una de `units` (lo que necesita el `<select>` para mostrar la unidad del renglón).
+  for (const row of rows) if (row.status === 'ok') assert.ok(row.units.includes(row.unit), row.line.unit);
   // Un índice vacío o que falta: todo desconocido.
   for (const other of [indexMaps(null), indexMaps({}), null, undefined, {}]) {
     const view = reconcileList(lines, other);
@@ -386,6 +426,23 @@ test('duplicateOf y canMerge', () => {
   assert.equal(canMerge(over, 1), false); // 100000 pasa del máximo
   assert.equal(duplicateOf(rows, 99), -1);
   assert.equal(duplicateOf(rows, -1), -1);
+});
+
+test('la misma unidad en singular y en plural es un solo renglón: se suma al agregar y se ofrece unir', () => {
+  // Un producto cuya unidad de venta está escrita en plural, como puede llegar de un proveedor.
+  const plural = indexMaps(buildQuoteIndex([{ id: 'bota-sintetica', name: 'Bota sintética de prueba', brandName: 'Marca Alfa', code: 'SP-700', url: '/productos/bota-sintetica/', saleUnit: 'pares', isExample: false, variants: [] }]));
+  const stored = [line('bota-sintetica', 1, 'pares'), line('bota-sintetica', 1, 'par'), line('bota-sintetica', 1, 'caja')];
+  const { rows } = reconcileList(stored, plural);
+  assert.deepEqual(rows.map(row => row.units), [['pares', 'pieza', 'caja', 'paquete'], ['pares', 'pieza', 'caja', 'paquete'], ['pares', 'pieza', 'caja', 'paquete']]);
+  assert.deepEqual(rows.map(row => row.unit), ['pares', 'pares', 'caja']);
+  assert.deepEqual(rows.map(row => lineSummary(row)), ['1 par', '1 par', '1 caja']);
+  assert.deepEqual(rows.map((_, i) => duplicateOf(rows, i)), [-1, 0, -1]);
+  assert.equal(canMerge(rows, 1), true);
+  // Agregar lo mismo en la otra forma suma al renglón que ya estaba, que conserva su unidad tal como se guardó.
+  const added = addLine([line('bota-sintetica', 2, 'pares')], line('bota-sintetica', 3, 'par'));
+  assert.equal(added.status, 'merged');
+  assert.deepEqual(added.lines, [line('bota-sintetica', 5, 'pares')]);
+  assert.equal(addLine([line('bota-sintetica', 2, 'caja')], line('bota-sintetica', 3, 'par')).status, 'added');
 });
 
 test('frases del mensaje y de las líneas de estado', () => {

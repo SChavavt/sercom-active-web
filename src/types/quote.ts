@@ -67,6 +67,8 @@ export interface QuoteRowOk {
   variant: QuoteIndexVariant | null;
   /** Unidades que se ofrecen para el renglón (la del renglón al final si no es una de ellas). */
   units: string[];
+  /** La opción de `units` que es la unidad del renglón (`unitKey`): la que la lista muestra elegida. */
+  unit: string;
 }
 
 /** Un renglón de un producto retirado. */
@@ -114,9 +116,12 @@ export interface QuoteStore {
   available(): boolean;
   /** La lista guardada (`parseList`); `[]` ante cualquier falla. */
   read(): QuoteLine[];
-  /** Guarda la lista (una lista vacía quita la clave) y avisa con `'write'`. `false`, sin avisar, si no se pudo. */
+  /**
+   * Guarda la lista (una lista vacía quita la clave) y avisa con `'write'`. `false`, sin guardar ni avisar, si `lines`
+   * no es una lista de hasta `MAX_LINES` renglones válidos (`isValidLine`) o si el navegador no dejó guardar.
+   */
   write(lines: readonly QuoteLine[]): boolean;
-  /** Escucha los cambios; devuelve la función que deja de escuchar. */
+  /** Escucha los cambios; devuelve la función que cancela esa suscripción (cada llamada es una suscripción propia). */
   subscribe(listener: QuoteListener): () => void;
   readDraft(): QuoteDraft;
   writeDraft(fields: Partial<QuoteDraft>): boolean;
