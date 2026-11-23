@@ -1,0 +1,40 @@
+---
+// Fila con casilla de verificación (`.check-row`) para una opción de filtro: la casilla nativa, dibujada encima
+// como un cuadro de 18 px (blanco con filete azul de 1 px; azul sólido con la palomita blanca del kit cuando está
+// marcada), el nombre y, a la derecha, el número de productos en cifras tabulares. Mismas medidas que las filas de la
+// barra lateral del catálogo (44 px de alto como mínimo, 48 en tableta y celular, filete suave entre filas). Toda la
+// fila es la etiqueta: un clic en cualquier parte marca o desmarca. El anillo de foco rodea el cuadro. En colores
+// forzados se ve la casilla nativa del sistema (responsive.css 6.8). Las opciones nunca se deshabilitan.
+// Un nombre largo pasa a otro renglón y el número se queda en el primero.
+//
+// Número (`count`, opcional; se imprime también con 0): como en la barra lateral, la cifra visible (oculta al lector)
+// y «, N productos» solo para el lector, dentro de `[data-check-count]`. Un script que cambia el número reescribe con
+// textContent la cifra (`[data-check-count-value]`) y el texto oculto (`[data-check-count-text]`, «, 1 producto»,
+// «, 12 productos»: `resultSummary` de search.mjs). El nombre accesible de la casilla es el de la fila:
+// «Protección de manos, 12 productos».
+// Los demás atributos (`data-*`, `id`, `aria-*`, `form`) pasan a la casilla. Va dentro de un <li> de una lista
+// `.check-list` (o de cualquier lista: la fila lleva su filete superior).
+//
+// Uso:  <ul class="check-list"><li><CheckRow name="categoria" value="manos" label="Protección de manos" count={12} /></li></ul>
+import type { HTMLAttributes } from 'astro/types';
+import { resultSummary } from '../lib/search.mjs';
+import Icon from './Icon.astro';
+
+interface Props extends Omit<HTMLAttributes<'input'>, 'type' | 'name' | 'value' | 'checked'> {
+  name: string;
+  value: string;
+  /** Nombre visible de la opción. */
+  label: string;
+  /** Productos de la opción; sin él no se imprime número. */
+  count?: number;
+  checked?: boolean;
+  /** Clases extra de la fila. */
+  class?: string;
+}
+
+const { name, value, label, count, checked = false, class: className, ...attrs } = Astro.props;
+---
+<label class:list={['check-row', className]}>
+  <span class="check-row__control"><input class="check-row__input" type="checkbox" name={name} value={value} checked={checked} {...attrs} /><span class="check-row__box" aria-hidden="true"><Icon name="check" class="icon--16" /></span></span>
+  <span class="check-row__name">{label}</span>{count !== undefined && ' '}{count !== undefined && <span class="check-row__count" data-check-count><span aria-hidden="true" data-check-count-value>{count}</span><span class="vh" data-check-count-text>, {resultSummary(count)}</span></span>}
+</label>

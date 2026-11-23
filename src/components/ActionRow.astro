@@ -1,18 +1,37 @@
 ---
-// Fila de acción (`.action`): un enlace que ocupa toda una fila de la lámina, con el texto a la izquierda
-// y una flecha a la derecha. `primary` la pinta de azul sólido (la decisión principal del bloque).
+// Fila de acción (`.action`): ocupa toda una fila de la lámina, con el texto a la izquierda y una flecha (u otro
+// icono) a la derecha. `primary` la pinta de azul sólido (la decisión principal del bloque).
 // Va dentro de una columna de celdas (por ejemplo la columna lateral de PageHeader o de la portada).
+//   - Con `href` es un enlace <a>, con los atributos que reciba (como siempre).
+//   - Sin `href` es un <button type={type}> (por omisión `button`; `submit` para enviar su formulario) con el mismo
+//     dibujo. Úsalo solo si un script de la página le da una función o envía un formulario: el botón lleva su propio
+//     gancho `data-*` (que el script de la página nombra) y recibe todos los demás atributos (`data-*`, `aria-*`,
+//     `id`, `hidden`). Con aria-disabled="true" se ve apagado y no cambia al pasar el puntero; el script decide qué
+//     hace (o no hace) un clic.
+//
+// Uso:
+//   <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
+//   <ActionRow type="submit" icon="clipboard-plus">Agregar a mi cotización</ActionRow>
+//   <ActionRow icon="copy" data-copy-request>Copiar solicitud</ActionRow>
 import type { HTMLAttributes } from 'astro/types';
 import type { IconName } from '../lib/icons.ts';
 import Icon from './Icon.astro';
 
-interface Props extends HTMLAttributes<'a'> {
-  href: string;
+interface Props extends Omit<HTMLAttributes<'a'>, 'type'> {
+  /** Destino. Sin él se imprime <button type={type}>. */
+  href?: string;
   primary?: boolean;
   /** Icono final; por omisión una flecha. */
   icon?: IconName;
+  /** Solo para <button>: `button` (por omisión) o `submit`. */
+  type?: 'button' | 'submit';
 }
 
-const { href, primary = false, icon = 'arrow-right', class: className, ...attrs } = Astro.props;
+const { href, primary = false, icon = 'arrow-right', type = 'button', class: className, ...attrs } = Astro.props;
+const classes = ['action', 'cell-link', { 'action--primary': primary }, className];
 ---
-<a class:list={['action', 'cell-link', { 'action--primary': primary }, className]} href={href} {...attrs}><span><slot /></span><Icon name={icon} class="icon--24" /></a>
+{href ? (
+  <a class:list={classes} href={href} {...attrs}><span><slot /></span><Icon name={icon} class="icon--24" /></a>
+) : (
+  <button class:list={classes} type={type} {...(attrs as HTMLAttributes<'button'>)}><span><slot /></span><Icon name={icon} class="icon--24" /></button>
+)}

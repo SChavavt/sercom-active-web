@@ -364,6 +364,10 @@
   .empty { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-6); padding: var(--s-8) var(--pad); }
   .empty__action { grid-column: 2; justify-self: start; }
   .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-md); }
+  /* formularios (components.css 4.18): objetivos táctiles de 44 px y las filas con casilla como las de la barra
+     lateral del catálogo en estos anchos */
+  .check-row { min-height: 48px; font-size: 1rem; }
+  .text-btn { min-height: 44px; }
 }
 @media (max-width: 699px) {
   .page-head__main { padding: var(--s-7) var(--pad) var(--s-5); }
@@ -447,6 +451,22 @@
 
   /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
   .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }
+
+  /* formularios (components.css 4.18). Los controles ya reciben su contorno arriba; el selector de cantidad pierde
+     los filetes de su fondo azul y quedan los contornos de sus tres casillas. Las filas con casilla muestran la
+     casilla nativa del sistema (marcada, foco) en lugar del cuadro dibujado. La barra de error y lo apagado toman
+     colores del sistema. */
+  :where(.field-group) > * { outline: var(--line) solid CanvasText; }
+  .check-row__input { opacity: 1; }
+  .check-row__box { visibility: hidden; }
+  .field--invalid::before { forced-color-adjust: none; background: CanvasText; }
+  .stepper__btn[aria-disabled="true"], .action[aria-disabled="true"], .btn[aria-disabled="true"], .text-btn[aria-disabled="true"] { color: GrayText; }
+  .action[aria-disabled="true"] .icon, .stepper__btn[aria-disabled="true"] .icon { color: GrayText; }
+}
+@supports selector(:has(*)) {
+  @media (forced-colors: active) {
+    .field:has([aria-invalid="true"])::before { forced-color-adjust: none; background: CanvasText; }
+  }
 }
 @media (forced-colors: active) and (max-width: 1099px) {
   :where(.masthead__nav-list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
@@ -658,4 +678,15 @@
   @container lamina (width < calc((1rem - 27px) * 100000)) {
     .data__row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   }
+}
+
+/* Campos de formulario (components.css 4.18): la opción más larga de las listas de hoy, «Talla o color por definir»,
+   mide 9.84rem; con el relleno del celular (2 × 20 px) y la flecha (32 px) no cabe en la lámina con la letra al 200 %
+   de 360 a 388 px. Chromium pasa el texto de la lista a otro renglón (components.css 4.18); un navegador que no lo
+   hace lo cortaría con «…»: ahí el campo toma 8 px de relleno lateral y la flecha se acerca al texto, y la opción
+   cabe en un renglón. Con la letra normal (y a 150 % desde 320 px) la condición no se cumple. Las páginas apilan sus campos antes de
+   que una columna quede tan angosta (en computadora y tableta este umbral nunca se cumple). */
+@container lamina (width < calc(9.9rem + 72px)) {
+  .field, .field--framed { padding-inline: var(--s-2); }
+  .select__control { padding-right: calc(20px + var(--s-1)); }
 }

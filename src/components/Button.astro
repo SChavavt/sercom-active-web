@@ -1,7 +1,13 @@
 ---
 // Botón sólido (`.btn`): un enlace con aspecto de botón para la acción principal de un bloque.
-// Variantes: azul (por omisión) e `inverse` (blanco, para usarlo sobre la banda azul). `block` ocupa todo el ancho.
-// Sin `href` se imprime un <button>: úsalo solo si un script le da una función (nunca un control que no hace nada).
+// Variantes: azul (por omisión), `inverse` (blanco, para usarlo sobre la banda azul) y `outline` (blanco con filete
+// azul de 1 px y texto azul: la acción secundaria de un bloque). `block` ocupa todo el ancho.
+// Sin `href` se imprime un <button type={type}>: úsalo solo si un script le da una función (nunca un control que no
+// hace nada). El botón lleva su propio gancho `data-*` y recibe todos los demás atributos (`data-*`, `aria-*`, `id`,
+// `hidden`). Con aria-disabled="true" se ve apagado y no cambia al pasar el puntero.
+//
+// Uso:  <Button href={general.whatsapp} icon="whatsapp">Contactar por WhatsApp</Button>
+//       <Button variant="outline" icon="copy" data-copy-request>Copiar solicitud</Button>
 import type { HTMLAttributes } from 'astro/types';
 import type { IconName } from '../lib/icons.ts';
 import Icon from './Icon.astro';
@@ -9,7 +15,7 @@ import Icon from './Icon.astro';
 interface Props extends Omit<HTMLAttributes<'a'>, 'type'> {
   /** Destino. Sin él se imprime <button type={type}>. */
   href?: string;
-  variant?: 'primary' | 'inverse';
+  variant?: 'primary' | 'inverse' | 'outline';
   /** Ocupa todo el ancho de su celda. */
   block?: boolean;
   /** Icono antes del texto (por ejemplo `whatsapp`). */
@@ -21,7 +27,7 @@ interface Props extends Omit<HTMLAttributes<'a'>, 'type'> {
 }
 
 const { href, variant = 'primary', block = false, icon, iconEnd, type = 'button', class: className, ...attrs } = Astro.props;
-const classes = ['btn', { 'btn--inverse': variant === 'inverse', 'btn--block': block }, className];
+const classes = ['btn', { 'btn--inverse': variant === 'inverse', 'btn--outline': variant === 'outline', 'btn--block': block }, className];
 ---
 {href ? (
   <a class:list={classes} href={href} {...attrs}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</a>

@@ -1,0 +1,21 @@
+---
+// Lista desplegable de un campo (`.select`): el <select> nativo con el dibujo de los controles (sin borde propio,
+// 44 px de alto como mínimo, letra de 16 px) y la flecha `chevron-down` del kit a la derecha. El texto de la opción
+// elegida nunca pasa bajo la flecha: si no cabe en un renglón pasa al siguiente donde el navegador lo permite
+// (Chromium) y, si no, se corta con «…»; la lista abierta muestra siempre las opciones enteras. Va en el slot de
+// Field. En colores forzados conserva su contorno y la flecha toma el color del texto del sistema (responsive.css 6.8).
+// Las <option> van en el slot; todos los demás atributos (`id`, `name`, `aria-*`, `data-*`, `required`) pasan al
+// <select>. Su `id` es el `for` del Field que lo contiene.
+//
+// Uso:  <Select id="variante" name="variante"><option value="" selected>Talla o color por definir</option>…</Select>
+import type { HTMLAttributes } from 'astro/types';
+import Icon from './Icon.astro';
+
+interface Props extends HTMLAttributes<'select'> {
+  /** Clases extra del <select>. */
+  class?: string;
+}
+
+const { class: className, ...attrs } = Astro.props;
+---
+<div class="select"><select class:list={['control', 'select__control', className]} {...attrs}><slot /></select><Icon name="chevron-down" class="select__icon" /></div>

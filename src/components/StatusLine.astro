@@ -1,0 +1,52 @@
+---
+// Línea de estado (`.status`): una fila blanca con un icono azul, una frase en tinta y, si hace falta, una acción al
+// final (un enlace `.more` o un botón `.text-btn`). Si la acción no cabe junto a la frase, baja al renglón siguiente,
+// alineada con el texto. Sirve para «Agregado a tu cotización…» + «Ver mi cotización», «Quitaste …» + «Deshacer»,
+// «Solicitud copiada…» y como aviso («Tu lista es larga…»). Es una celda: va en una columna de celdas o como fila
+// de una retícula.
+//
+// Se imprime oculta (`hidden`, por omisión) y vacía: el script de la página escribe la frase con textContent en
+// `[data-status-text]` y quita `hidden`. Con `icons` se imprimen varios iconos (cada uno con
+// `data-status-icon="{nombre}"`, todos ocultos menos el primero) y el script deja visible el que corresponde con el
+// atributo `hidden` (por ejemplo `check` al agregar, `alert-circle` si no se pudo guardar).
+// La frase del slot por omisión es el texto inicial (para un aviso que ya se ve al cargar, con hidden={false}).
+// Los demás atributos (`data-*`, `id`, `tabindex`) pasan a la fila. Una fila que recibe el foco desde un script lleva
+// tabindex="-1"; su anillo se dibuja por dentro.
+//
+// Región viva (el patrón que siguen las páginas): la fila visible NO lleva role. Junto a ella, la página imprime UNA
+// región siempre presente y oculta a la vista:  <p class="vh" role="status" data-live></p>
+// El script escribe la misma frase en la fila y en la región, con textContent. Para repetir la misma frase, primero
+// vacía la región y la escribe en el cuadro siguiente (requestAnimationFrame). Sin role="alert" y sin mover el foco
+// para una confirmación; si la fila recibe el foco (por ejemplo, después de quitar un renglón), su frase no se
+// escribe también en la región (se leería dos veces). Un error de un campo lleva el foco al campo (Field.astro).
+// Nunca una confirmación de envío o de recepción: abrir WhatsApp o el correo no es enviar.
+//
+// Uso:
+//   <StatusLine icons={['check', 'alert-circle']} data-quote-status>
+//     <a class="more" slot="action" href={routes.quoteList}>Ver mi cotización<Icon name="arrow-right" /></a>
+//   </StatusLine>
+//   <p class="vh" role="status" data-live></p>
+import type { HTMLAttributes } from 'astro/types';
+import type { IconName } from '../lib/icons.ts';
+import Icon from './Icon.astro';
+
+interface Props extends HTMLAttributes<'div'> {
+  /** Icono de la fila; por omisión `check`. */
+  icon?: IconName;
+  /** Varios iconos para que el script elija uno (el primero se ve al cargar). Reemplaza a `icon`. */
+  icons?: readonly IconName[];
+  /** Oculta al cargar. Por omisión true. */
+  hidden?: boolean;
+  class?: string;
+}
+
+const { icon = 'check', icons, hidden = true, class: className, ...attrs } = Astro.props;
+const names = icons && icons.length > 0 ? icons : [icon];
+const hasAction = Astro.slots.has('action');
+// Atributos de cada icono: su nombre para el script y `hidden` en todos menos el primero.
+const iconAttrs = (name: IconName, index: number) => ({ 'data-status-icon': name, hidden: index > 0 });
+---
+<div class:list={['status', className]} hidden={hidden} {...attrs}>
+  <p class="status__body">{names.map((name, index) => <Icon name={name} class="status__icon" {...iconAttrs(name, index)} />)}<span class="status__text" data-status-text><slot /></span></p>
+  {hasAction && <span class="status__action"><slot name="action" /></span>}
+</div>
