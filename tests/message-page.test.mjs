@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { contactLinks } from '../src/lib/contact.mjs';
-import { composeListMessage, LINK_LIMITS, messageOf } from '../src/lib/contact-core.mjs';
+import { composeListMessage, LINK_LIMITS, messageOf, withMessage } from '../src/lib/contact-core.mjs';
 import { messageLinkHrefs, otherLinkHref } from '../src/lib/message-page.mjs';
 
 const list = contactLinks.list();
@@ -42,6 +42,26 @@ test('un mensaje que no cabe en un enlace deja TODOS los enlaces sin texto', () 
   assert.equal(state.fits, false);
   assert.equal(state.changed, true);
   assert.equal(messageOf(state.hrefs[0]), '');
+  assert.equal(messageOf(state.hrefs[1]), '');
+  assert.ok(state.hrefs[0].startsWith('https://wa.me/') && !state.hrefs[0].includes('?'));
+  assert.equal(state.hrefs[2], '/catalogo/');
+});
+
+test('si el mensaje cabe en el enlace de WhatsApp pero no en el de correo, NINGUNO lleva el texto', () => {
+  // Con el mismo mensaje el enlace de correo es más largo (lleva el asunto). Se busca un mensaje justo entre los dos
+  // límites: cada enlace decidiendo por su cuenta dejaría el texto en el de WhatsApp, y la regla de la página es todos
+  // o ninguno.
+  const opening = template.split('\n')[0];
+  let mixed = '';
+  for (let length = 1; length <= 3000 && !mixed; length += 1) {
+    const message = composeListMessage({ opening, note: 'ñ'.repeat(length) });
+    if (withMessage(list.whatsapp, message).length <= LINK_LIMITS.whatsapp && withMessage(list.mailto, message).length > LINK_LIMITS.mailto) mixed = message;
+  }
+  assert.ok(mixed, 'no se encontró un mensaje que quepa en WhatsApp y no en el correo: revisar esta prueba si cambiaron los límites');
+  const state = messageLinkHrefs(originals, mixed, template);
+  assert.equal(state.fits, false);
+  assert.equal(state.changed, true);
+  assert.equal(messageOf(state.hrefs[0]), '', 'el enlace de WhatsApp tampoco lleva el texto');
   assert.equal(messageOf(state.hrefs[1]), '');
   assert.ok(state.hrefs[0].startsWith('https://wa.me/') && !state.hrefs[0].includes('?'));
   assert.equal(state.hrefs[2], '/catalogo/');
