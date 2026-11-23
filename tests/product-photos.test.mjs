@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, symlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { checkProductPhotos, PHOTO_MAX_BYTES, PHOTO_MAX_SIDE, PHOTO_MIN_SIDE } from '../scripts/product-photos.mjs';
 import { jpegHeader, makeTree, png, removeTree, webpHeader } from './helpers.mjs';
@@ -89,7 +89,7 @@ test('cada foto es una imagen real del formato de su extensión, de 600 a 4000 p
   // Muy pesada: un PNG real sin comprimir de 800 × 700.
   const heavy = png(800, 700, { level: 0 });
   assert.ok(heavy.length > PHOTO_MAX_BYTES);
-  assert.deepEqual(await at('guante-de-prueba.png', heavy), [`src/assets/productos/guante-de-prueba.png: pesa 1.6 MB (${heavy.length.toLocaleString('es-MX')} bytes) y el máximo es 1.5 MB (1,572,864 bytes); guárdala con más compresión o más chica.`]);
+  assert.deepEqual(await at('guante-de-prueba.png', heavy), [`src/assets/productos/guante-de-prueba.png: pesa ${heavy.length.toLocaleString('es-MX')} bytes y el máximo es 1,572,864 bytes (1.5 MB); guárdala con más compresión o más chica.`]);
   // Otro formato con la extensión equivocada: un PNG que se llama .jpg, un JPEG que se llama .png o .webp.
   assert.deepEqual(await at('guante-de-prueba.jpg', png(1000, 800)), ['src/assets/productos/guante-de-prueba.jpg: es una imagen PNG con la extensión .jpg; guárdala como JPEG o cambia la extensión del archivo y de image.file a .png.']);
   assert.deepEqual(await at('guante-de-prueba.png', jpegHeader(1000, 800)), ['src/assets/productos/guante-de-prueba.png: es una imagen JPEG con la extensión .png; guárdala como PNG o cambia la extensión del archivo y de image.file a .jpg.']);
@@ -103,6 +103,73 @@ test('cada foto es una imagen real del formato de su extensión, de 600 a 4000 p
     'src/assets/productos/guante-de-prueba.jpg: es una imagen PNG con la extensión .jpg; guárdala como JPEG o cambia la extensión del archivo y de image.file a .png.',
     'src/assets/productos/guante-de-prueba.jpg: su lado más largo mide 300 px y el mínimo es 600 px; usa una foto más grande.',
   ]);
+});
+
+/** Un JPEG de cabecera de `bytes` bytes en total: relleno antes de su marca de fin, así que sigue completo. */
+const jpegOfSize = bytes => {
+  const header = jpegHeader(1600, 1200);
+  return Buffer.concat([header.subarray(0, -2), Buffer.alloc(bytes - header.length), header.subarray(-2)]);
+};
+
+test('el peso en su borde exacto: 1,572,864 bytes pasa y uno más no, con un mensaje cuyas dos cifras nunca son iguales', async () => {
+  const at = content => check(catalogOf(product(1, 'approved', 'guante-de-prueba.jpg')), { 'guante-de-prueba.jpg': content });
+  assert.equal(jpegOfSize(PHOTO_MAX_BYTES).length, 1_572_864);
+  assert.deepEqual(await at(jpegOfSize(PHOTO_MAX_BYTES)), []);
+  assert.deepEqual(await at(jpegOfSize(PHOTO_MAX_BYTES + 1)), ['src/assets/productos/guante-de-prueba.jpg: pesa 1,572,865 bytes y el máximo es 1,572,864 bytes (1.5 MB); guárdala con más compresión o más chica.']);
+});
+
+test('una foto cortada no pasa: el archivo termina como dice su formato', async () => {
+  const at = (file, content) => check(catalogOf(product(1, 'approved', file)), { [file]: content });
+  const cut = file => `src/assets/productos/${file}: el archivo está incompleto o dañado; vuelve a guardarlo o a descargarlo.`;
+  // JPEG sin su marca de fin, PNG sin su último bloque y WebP más corto de lo que declara.
+  assert.deepEqual(await at('guante-de-prueba.jpg', jpegHeader(1600, 1200).subarray(0, -2)), [cut('guante-de-prueba.jpg')]);
+  assert.deepEqual(await at('guante-de-prueba.jpg', jpegOfSize(3000).subarray(0, 2500)), [cut('guante-de-prueba.jpg')]);
+  assert.deepEqual(await at('guante-de-prueba.png', png(800, 600).subarray(0, 40)), [cut('guante-de-prueba.png')]);
+  assert.deepEqual(await at('guante-de-prueba.png', png(800, 600).subarray(0, -1)), [cut('guante-de-prueba.png')]);
+  const shortWebp = webpHeader(1200, 1200);
+  shortWebp.writeUInt32LE(shortWebp.readUInt32LE(4) + 2000, 4);
+  assert.deepEqual(await at('guante-de-prueba.webp', shortWebp), [cut('guante-de-prueba.webp')]);
+  // Con bytes de más después del final también.
+  assert.deepEqual(await at('guante-de-prueba.webp', Buffer.concat([webpHeader(1200, 1200), Buffer.alloc(2)])), [cut('guante-de-prueba.webp')]);
+  // Completas: pasan.
+  assert.deepEqual(await at('guante-de-prueba.jpg', jpegOfSize(3000)), []);
+  assert.deepEqual(await at('guante-de-prueba.png', png(800, 600)), []);
+  assert.deepEqual(await at('guante-de-prueba.webp', webpHeader(1200, 1200)), []);
+  // Cortada y con la extensión de otro formato: se dicen las dos cosas; el final se revisa según lo que el archivo es.
+  assert.deepEqual(await at('guante-de-prueba.jpg', png(800, 600).subarray(0, 40)), [
+    'src/assets/productos/guante-de-prueba.jpg: es una imagen PNG con la extensión .jpg; guárdala como JPEG o cambia la extensión del archivo y de image.file a .png.',
+    cut('guante-de-prueba.jpg'),
+  ]);
+});
+
+test('un enlace simbólico en la carpeta, o una carpeta que no es carpeta, se informan con un mensaje y nunca detienen la revisión', async () => {
+  const approved = catalogOf(product(1, 'approved', 'guante-de-prueba.jpg'));
+  const link = 'src/assets/productos/guante-de-prueba.jpg: es un enlace; copia aquí la foto en lugar de enlazarla.';
+  // Arma la carpeta con `setup(folder, directory)` y la revisa.
+  async function checkWith(catalog, setup) {
+    const directory = await makeTree({ 'fuera/guante.jpg': jpegHeader(1600, 1200) });
+    const folder = join(directory, 'productos');
+    try {
+      await setup(folder, directory);
+      return await checkProductPhotos(catalog, folder, LABEL);
+    } finally {
+      await removeTree(directory);
+    }
+  }
+  // Un enlace a un archivo de fuera, aunque sea una foto válida; uno roto; uno a una carpeta.
+  assert.deepEqual(await checkWith(approved, async (folder, directory) => { await mkdir(folder); await symlink(join(directory, 'fuera', 'guante.jpg'), join(folder, 'guante-de-prueba.jpg')); }), [link]);
+  assert.deepEqual(await checkWith(approved, async (folder, directory) => { await mkdir(folder); await symlink(join(directory, 'no-existe.jpg'), join(folder, 'guante-de-prueba.jpg')); }), [link]);
+  assert.deepEqual(await checkWith(approved, async (folder, directory) => { await mkdir(folder); await symlink(join(directory, 'fuera'), join(folder, 'guante-de-prueba.jpg')); }), [link]);
+  assert.deepEqual(await checkWith(catalogOf(), async (folder, directory) => { await mkdir(folder); await symlink(join(directory, 'fuera'), join(folder, 'viejas')); }),
+    ['src/assets/productos/viejas: es un enlace; copia aquí la foto en lugar de enlazarla.']);
+  // La carpeta es un archivo, o es un enlace a otra carpeta.
+  const missing = 'products[0].image.file: «guante-de-prueba.jpg» no está en src/assets/productos/; agrega la foto con ese nombre exacto (también las mayúsculas y minúsculas) o corrige el nombre.';
+  assert.deepEqual(await checkWith(catalogOf(), async folder => { await writeFile(folder, 'x'); }),
+    ['src/assets/productos: es un archivo y debe ser una carpeta; quita el archivo y guarda las fotos en una carpeta con ese nombre.']);
+  assert.deepEqual(await checkWith(approved, async folder => { await writeFile(folder, 'x'); }),
+    ['src/assets/productos: es un archivo y debe ser una carpeta; quita el archivo y guarda las fotos en una carpeta con ese nombre.', missing]);
+  assert.deepEqual(await checkWith(approved, async (folder, directory) => { await symlink(join(directory, 'fuera'), folder); }),
+    ['src/assets/productos: es un enlace a otra carpeta; guarda las fotos en la carpeta misma, sin enlazarla.', missing]);
 });
 
 test('una ficha aprobada sin foto no pide ningún archivo, y la carpeta puede no existir', async () => {
