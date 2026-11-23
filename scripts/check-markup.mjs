@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
 // (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
-// de un producto retirado), del aviso de arriba (que nada lo oculte) y de los controles (que cada uno tenga una
-// función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de un <template>), que se
+// de un producto retirado), del aviso de arriba (que nada lo oculte), de los controles (que cada uno tenga una
+// función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de un <template>) y de la
+// página de cotizar (que lleve lo que su script necesita según las páginas de producto de la compilación), que se
 // leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
@@ -12,7 +13,8 @@
 //
 // Cada comprobación vive en CHECKS con su identificador (el del hallazgo de la revisión que la originó). Una
 // comprobación recibe cada página ya leída (árbol de elementos, ruta publicada, el código de sus scripts) y cada hoja
-// de estilo, y devuelve mensajes; agregar otra es agregar una entrada a CHECKS.
+// de estilo, con las opciones (el modo y todas las páginas de la compilación, para comparar una página con las demás),
+// y devuelve mensajes; agregar otra es agregar una entrada a CHECKS.
 //
 // Qué no revisa: el resultado visual (anchos, solapes, foco, colores) ni lo que hace un control al usarlo (solo que
 // un script de su página lo nombra). Eso se revisa a mano en un navegador (docs/diseno.md, sección 15): el
@@ -462,7 +464,8 @@ export const classAttributeIsRetired = attribute => classAttributeCouldMatch(att
  * `pageCode`); vacío si no lleva ninguno.
  * @typedef {{ file: string, route: string, root: Element, elements: Element[], code?: string }} Page
  * @typedef {{ file: string, css: string, selectors: string[] }} Sheet
- * @typedef {{ preview: boolean }} Options
+ * `pages` son todas las páginas de la compilación: una comprobación que compara una página con las demás las lee ahí.
+ * @typedef {{ preview: boolean, pages: Page[] }} Options
  * @typedef {{ id: string, title: string, page?: (page: Page, options: Options) => string[], sheet?: (sheet: Sheet, options: Options) => string[] }} Check
  */
 
@@ -912,6 +915,81 @@ export async function pageCode({ file, root }, directory, load) {
     }
   }
   return parts.join('\n');
+}
+
+// La página de cotizar (R-QUOTE-12) -----------------------------------------------------------------------------
+
+/**
+ * Los ganchos de la página de cotizar (src/pages/cotizar/index.astro) que revisa R-QUOTE-12, y el del selector de
+ * cantidad (Stepper.astro), que solo atiende su script (StepperScript.astro). Una prueba avisa si las plantillas dejan
+ * de escribirlos.
+ */
+export const QUOTE_PAGE_HOOKS = {
+  index: 'data-quote-index',
+  rowTemplate: 'data-quote-row-template',
+  retiredTemplate: 'data-quote-retired-template',
+  tools: 'data-quote-tools',
+  unknown: 'data-quote-unknown',
+  statusRow: 'data-quote-status-row',
+  writeFailed: 'data-quote-write-failed',
+  stepper: 'data-stepper',
+};
+/** ¿Está dentro de un <template>? Lo que va ahí no está en el documento hasta que se clona: un script no lo encuentra. */
+const inTemplate = element => closest(element.parent, node => node.name === 'template') !== null;
+/**
+ * Las páginas de producto de la compilación (/productos/{id}/), por su ruta: las fichas y las de un retirado (las que
+ * llevan el aviso «Producto retirado», `isRetiredPage`).
+ * @param {Page[]} pages
+ */
+function productPages(pages) {
+  const fichas = new Set();
+  const retired = new Set();
+  for (const page of pages) if (isProductRoute(page.route)) (isRetiredPage(page) ? retired : fichas).add(page.route);
+  return { fichas, retired };
+}
+/**
+ * Lo que no cuadra entre el índice público impreso (el texto de su bloque JSON) y las páginas de producto de la
+ * compilación: cada entrada de «products» es una ficha de la compilación y cada entrada de «retired» la página de un
+ * retirado, en la ruta de su id (`routes.product(id)`) y con esa ruta como url; y cada ficha y cada página de retirado
+ * de la compilación está en su lista.
+ * @param {string} source
+ * @param {{ fichas: Set<string>, retired: Set<string> }} built
+ */
+function quoteIndexProblems(source, built) {
+  let data;
+  try {
+    data = JSON.parse(source);
+  } catch {
+    return ['el índice público (data-quote-index) no es JSON válido: la página no puede leer ningún producto'];
+  }
+  if (typeof data !== 'object' || data === null || !Array.isArray(data.products) || !Array.isArray(data.retired)) {
+    return ['el índice público (data-quote-index) no tiene las listas «products» y «retired»'];
+  }
+  const problems = [];
+  const lists = [
+    { list: 'products', own: built.fichas, kind: 'una ficha', other: built.retired, otherKind: 'la de un retirado' },
+    { list: 'retired', own: built.retired, kind: 'la página de un retirado', other: built.fichas, otherKind: 'una ficha' },
+  ];
+  for (const { list, own, kind, other, otherKind } of lists) {
+    const listed = new Set();
+    for (const entry of data[list]) {
+      const id = entry?.id;
+      if (typeof id !== 'string' || !id) {
+        problems.push(`una entrada de «${list}» del índice público no tiene id: la página no la puede ubicar`);
+        continue;
+      }
+      const route = routes.product(id);
+      listed.add(route);
+      if (entry.url !== route) problems.push(`«${id}» («${list}» del índice público) lleva url «${entry.url ?? ''}» y su página es ${route}`);
+      if (!own.has(route)) {
+        problems.push(other.has(route)
+          ? `«${id}» está en «${list}» del índice público y su página (${route}) es ${otherKind}`
+          : `«${id}» está en «${list}» del índice público y la compilación no tiene su página (${route})`);
+      }
+    }
+    for (const route of own) if (!listed.has(route)) problems.push(`${route} es ${kind} de la compilación y no está en «${list}» del índice público: la página de cotizar no la ubicaría`);
+  }
+  return problems;
 }
 
 /** @type {Check[]} */
@@ -1492,6 +1570,66 @@ export const CHECKS = [
       return problems;
     },
   },
+  // R-QUOTE-12 · La página de cotizar lleva lo que su script necesita, según la compilación.
+  // La lista guardada solo tiene ids (productId, variantId, cantidad y unidad); la página de cotizar recupera nombre y
+  // código del índice público que imprime al compilar. Lo que imprime depende de las páginas de producto de la
+  // compilación (src/pages/cotizar/index.astro), y su script trabaja con lo que encuentra: sin el índice, cada renglón
+  // guardado sería «un producto que no aparece en esta página»; sin la plantilla de renglón, ningún producto se
+  // dibujaría; sin el script del selector de cantidad, sus botones no harían nada. Hechos, en la página /cotizar/:
+  // - siempre: el renglón de los productos que la página no ubica (data-quote-unknown), la línea de estado
+  //   (data-quote-status-row) y el aviso de que el navegador no guardó un cambio (data-quote-write-failed), uno de cada
+  //   uno;
+  // - con alguna página de producto (ficha o retirado): un índice público (<script type="application/json"
+  //   data-quote-index>) que cuadra con la compilación (cada ficha en «products», cada retirado en «retired», cada
+  //   entrada con su página en la ruta de su id y esa ruta como url) y la plantilla del renglón de un retirado
+  //   (template[data-quote-retired-template]); sin ninguna, ninguno de los dos;
+  // - con alguna ficha: la plantilla de renglón (template[data-quote-row-template]), el bloque de herramientas
+  //   (data-quote-tools) y el script del selector de cantidad; sin ninguna, ninguno de los tres.
+  // Hoy las dos condiciones coinciden (la vista previa tiene fichas y un retirado; producción, ninguna página de
+  // producto). Todo se cuenta fuera de un <template>, donde el script de la página lo encuentra.
+  // Límites: el script del selector de cantidad se reconoce porque el código de la página (sus scripts y los archivos que
+  // cargan) nombra data-stepper, el gancho que solo él atiende; otro script que lo nombrara contaría como él. Del índice
+  // compara ids y url con las páginas, no los nombres, códigos ni variantes. Sin una página /cotizar/ en la carpeta no
+  // dice nada. No ejecuta el script: lo que hace con lo impreso se revisa en el navegador.
+  {
+    id: 'R-QUOTE-12',
+    title: 'La página de cotizar lleva lo que su script necesita según las páginas de producto de la compilación: siempre, el renglón de los productos que no ubica, la línea de estado y el aviso de que el navegador no guardó un cambio; con alguna página de producto (ficha o retirado), el índice público, que cuadra con la compilación (cada ficha en «products» y cada retirado en «retired», en la ruta de su id), y la plantilla del renglón retirado, y sin ninguna, ninguno de los dos; con alguna ficha, la plantilla de renglón, el bloque de herramientas y el script del selector de cantidad, y sin ninguna, ninguno de los tres',
+    page(page, options) {
+      if (page.route !== routes.quoteList) return [];
+      const built = productPages(options.pages ?? []);
+      const anyProduct = built.fichas.size + built.retired.size > 0;
+      const anyFicha = built.fichas.size > 0;
+      const reachable = page.elements.filter(element => !inTemplate(element));
+      const withHook = (hook, name) => reachable.filter(element => element.attributes.has(hook) && (!name || element.name === name));
+      const indexes = withHook(QUOTE_PAGE_HOOKS.index, 'script').filter(script => (script.attributes.get('type') ?? '').trim().toLowerCase() === 'application/json');
+      const stepperScript = namesHook(page.code ?? '', QUOTE_PAGE_HOOKS.stepper);
+      const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+      const fichasNote = anyFicha ? `la compilación tiene ${plural(built.fichas.size, 'ficha', 'fichas')}` : 'la compilación no tiene fichas';
+      const productsNote = anyProduct
+        ? `la compilación tiene ${plural(built.fichas.size, 'ficha', 'fichas')} y ${plural(built.retired.size, 'página de retirado', 'páginas de retirado')}`
+        : 'la compilación no tiene páginas de producto';
+      const problems = [];
+      /** `what` lleva su artículo; `note` dice por qué va o no va. */
+      const expect = (found, wanted, what, note) => {
+        if (found === wanted) return;
+        if (wanted === 0) problems.push(`la página lleva ${what}${found > 1 ? ` (${found} veces)` : ''} y ${note}`);
+        else if (found === 0) problems.push(`falta ${what}: ${note}`);
+        else problems.push(`${what} aparece ${found} veces; va una sola vez (el script de la página usa el primero)`);
+      };
+      const always = 'va siempre: aun sin productos, la página quita de una lista guardada los que no ubica, lo deja deshacer y avisa si el navegador no guarda el cambio';
+      expect(withHook(QUOTE_PAGE_HOOKS.unknown).length, 1, 'el renglón de los productos que la página no ubica ([data-quote-unknown])', always);
+      expect(withHook(QUOTE_PAGE_HOOKS.statusRow).length, 1, 'la línea de estado ([data-quote-status-row])', always);
+      expect(withHook(QUOTE_PAGE_HOOKS.writeFailed).length, 1, 'el aviso de que el navegador no guardó un cambio ([data-quote-write-failed])', always);
+      expect(indexes.length, anyProduct ? 1 : 0, 'el índice público (<script type="application/json" data-quote-index>)', productsNote);
+      expect(withHook(QUOTE_PAGE_HOOKS.retiredTemplate, 'template').length, anyProduct ? 1 : 0, 'la plantilla del renglón retirado (template[data-quote-retired-template])', productsNote);
+      expect(withHook(QUOTE_PAGE_HOOKS.rowTemplate, 'template').length, anyFicha ? 1 : 0, 'la plantilla de renglón (template[data-quote-row-template])', fichasNote);
+      expect(withHook(QUOTE_PAGE_HOOKS.tools).length, anyFicha ? 1 : 0, 'el bloque de herramientas ([data-quote-tools])', fichasNote);
+      if (anyFicha && !stepperScript) problems.push(`falta el script del selector de cantidad (ningún script de la página nombra [${QUOTE_PAGE_HOOKS.stepper}]) y ${fichasNote}: los botones de cantidad de los renglones no harían nada`);
+      if (!anyFicha && stepperScript) problems.push(`la página carga el script del selector de cantidad (un script nombra [${QUOTE_PAGE_HOOKS.stepper}]) y ${fichasNote}: no hay ningún selector que atender`);
+      if (indexes.length === 1) problems.push(...quoteIndexProblems(indexes[0].source ?? '', built));
+      return problems;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------------
@@ -1515,12 +1653,13 @@ async function walk(directory) {
  * @returns {Promise<{ problems: { id: string, file: string, message: string }[], pages: number, sheets: number }>}
  */
 export async function checkMarkup(directory, options = {}) {
-  const settings = { preview: Boolean(options.preview) };
   const checks = options.checks ?? CHECKS;
   const files = (await walk(directory)).sort();
   const name = file => relative(directory, file).split('\\').join('/');
   /** @type {Page[]} */
   const pages = [];
+  /** @type {Options} */
+  const settings = { preview: Boolean(options.preview), pages };
   /** @type {Sheet[]} */
   const sheets = [];
   // Cada archivo de código se lee una sola vez, aunque lo carguen muchas páginas.
