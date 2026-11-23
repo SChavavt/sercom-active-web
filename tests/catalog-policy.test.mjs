@@ -168,5 +168,9 @@ test('la unidad de venta mide como máximo 60 caracteres y su primera palabra va
     const long = `caja con 100 piezas ${'x'.repeat(MAX_UNIT_LENGTH - 19)}`;
     assert.equal([...long].length, 61);
     assert.deepEqual(errorsOf({ status, saleUnit: long }), ['products[0].saleUnit: tiene 61 caracteres y el máximo es 60; escribe una unidad corta, como «par» o «caja con 100 piezas».'], status);
+    // Una sola palabra más larga que el máximo: un mensaje, el del largo, y ninguno sobre el singular.
+    assert.deepEqual(errorsOf({ status, saleUnit: 'x'.repeat(MAX_UNIT_LENGTH + 1) }), ['products[0].saleUnit: tiene 61 caracteres y el máximo es 60; escribe una unidad corta, como «par» o «caja con 100 piezas».'], status);
+    // Larga y además en plural: también solo el del largo; al acortarla, el validador dirá lo del singular.
+    assert.deepEqual(errorsOf({ status, saleUnit: `cajas con 100 piezas ${'x'.repeat(MAX_UNIT_LENGTH - 20)}` }), ['products[0].saleUnit: tiene 61 caracteres y el máximo es 60; escribe una unidad corta, como «par» o «caja con 100 piezas».'], status);
   }
 });

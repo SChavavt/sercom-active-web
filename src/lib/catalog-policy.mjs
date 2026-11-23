@@ -29,18 +29,6 @@ const isRecord = value => typeof value === 'object' && value !== null && !Array.
 const unknownKeys = (value, allowed, path, errors) => {
   if (isRecord(value)) for (const key of Object.keys(value)) if (!allowed.has(key)) errors.push(`${path}.${key}: campo no definido.`);
 };
-/**
- * Texto de una línea, como lo deja `cleanQuery` (text.mjs): recortado, con un solo espacio común entre palabras y sin
- * saltos de línea, espacios de no separación ni caracteres invisibles. Lo que se pega de un PDF suele traerlos.
- * Devuelve el problema, o `null` si el texto está limpio.
- */
-const lineProblem = value => {
-  if (typeof value !== 'string') return 'debe ser un texto.';
-  const clean = cleanQuery(value);
-  if (!clean) return 'está vacío; escríbelo o quita el campo.';
-  if (clean !== value) return 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.';
-  return null;
-};
 // Los ejemplos de la vista previa viven en src/data/preview y nunca entran al catálogo: sus marcas quedan reservadas.
 const exampleCode = value => /^ej-\d/i.test(String(value ?? '').trim());
 const reservedForExamples = p => /^ejemplo(?:-|$)/.test(String(p.id ?? '')) || /\bde ejemplo\b/.test(normalize(p.name))
@@ -136,9 +124,11 @@ export function validateCatalog(catalog, registry) {
     // según la cantidad («12 pares»).
     if (isText(p.saleUnit)) {
       const length = [...p.saleUnit].length;
-      if (length > MAX_UNIT_LENGTH) errors.push(`${path}.saleUnit: tiene ${length} caracteres y el máximo es ${MAX_UNIT_LENGTH}; escribe una unidad corta, como «par» o «caja con 100 piezas».`);
       const [first, ...rest] = p.saleUnit.split(' ');
-      if (unitKey(first) !== normalizeText(first)) errors.push(`${path}.saleUnit: la primera palabra va en singular; escribe «${[singularUnit(first), ...rest].join(' ')}».`);
+      // Una unidad demasiado larga recibe solo ese mensaje: `unitKey` la recorta al máximo antes de compararla, y una
+      // primera palabra más larga que el máximo parecería estar en plural.
+      if (length > MAX_UNIT_LENGTH) errors.push(`${path}.saleUnit: tiene ${length} caracteres y el máximo es ${MAX_UNIT_LENGTH}; escribe una unidad corta, como «par» o «caja con 100 piezas».`);
+      else if (unitKey(first) !== normalizeText(first)) errors.push(`${path}.saleUnit: la primera palabra va en singular; escribe «${[singularUnit(first), ...rest].join(' ')}».`);
     }
 
     if (p.variants) {
