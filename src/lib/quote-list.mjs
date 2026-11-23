@@ -7,7 +7,7 @@
 // controles (`rowLabelName`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
 // `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar, y el validador del catálogo
-// (`catalog-policy.mjs`) usa `MAX_UNIT_LENGTH`, `unitKey` y `singularUnit`; lo demás, en el navegador.
+// (`catalog-policy.mjs`) usa `MAX_UNIT_LENGTH`, `unitKey`, `singularUnit` e `isUnitWord`; lo demás, en el navegador.
 //
 // El modelo: la lista guardada es una lista simple de renglones, en el orden en que el visitante los agregó. Nada aquí la
 // «repara»: `parseList` solo descarta lo que este código nunca pudo haber escrito, y `reconcileList` es una VISTA para
@@ -121,6 +121,17 @@ const UNIT_FORMS = new Map(UNIT_WORDS.flatMap(([singular, plural]) => [
   [normalizeText(singular), /** @type {[string, string]} */ ([singular, plural])],
   [normalizeText(plural), /** @type {[string, string]} */ ([singular, plural])],
 ]));
+
+/**
+ * Indica si un texto es, él solo, una palabra de unidad conocida, en singular o en plural y sin importar acentos ni
+ * mayúsculas: «par», «PARES», «galon». Con un signo pegado («pares,») o con más palabras no lo es, igual que para
+ * `quantityLabel`, que entonces deja la unidad como está. La usa el validador del catálogo.
+ * @param {unknown} word
+ * @returns {boolean}
+ */
+export function isUnitWord(word) {
+  return typeof word === 'string' && UNIT_FORMS.has(normalizeText(word));
+}
 
 /**
  * Clave para comparar dos unidades: sin acentos ni mayúsculas y con la primera palabra en singular cuando es una unidad

@@ -140,8 +140,24 @@ test('el texto de una ficha va limpio y en una sola línea, en cualquier estado'
     ['variants[0].manufacturerCode', { variants: [{ id: 'talla-7', label: 'Talla 7', manufacturerCode: 'TEST-001-7\r\n' }] }],
     ['documents[0].label', { documents: [{ label: 'Ficha⁠técnica', url: 'https://example.invalid/ficha.pdf' }] }],
   ];
+  // Lo que no se ve y `cleanQuery` conserva (U+200C, U+200D, un selector de variante): en una ficha tampoco pasa. El
+  // mensaje nombra el carácter y dice después de qué texto está, porque quien corrige no puede verlo.
+  const hidden = (field, code, where) => `products[0].${field}: tiene un carácter invisible (${code}) ${where}; borra esa parte y escríbela de nuevo.`;
+  const hiddenCases = [
+    [{ name: 'Guante\u200Dde nitrilo' }, hidden('name', 'U+200D', 'después de «Guante»')],
+    [{ name: '\u200DGuante de nitrilo' }, hidden('name', 'U+200D', 'al principio')],
+    [{ description: 'Guante de\u200C nitrilo para químicos.' }, hidden('description', 'U+200C', 'después de «Guante de»')],
+    [{ characteristics: ['Dato sintético A', 'Marca registrada ®\uFE0F', 'Dato sintético C'] }, hidden('characteristics[1]', 'U+FE0F', 'después de «Marca registrada ®»')],
+    [{ variants: [{ id: 'talla-7', label: 'Talla\u200D 7', manufacturerCode: 'TEST-001-7' }] }, hidden('variants[0].label', 'U+200D', 'después de «Talla»')],
+    [{ variants: [{ id: 'talla-7', label: 'Talla 7', manufacturerCode: 'TEST-001\u200C-7' }] }, hidden('variants[0].manufacturerCode', 'U+200C', 'después de «TEST-001»')],
+    [{ documents: [{ label: 'Ficha técnica\u{E0100}', url: 'https://example.invalid/ficha.pdf' }] }, hidden('documents[0].label', 'U+E0100', 'después de «Ficha técnica»')],
+    // De un texto largo se cita solo el final, desde el principio de una palabra; solo se dice el primero que haya.
+    [{ description: 'Guante reutilizable de nitrilo para químicos\u200D y solventes\u200C.' }, hidden('description', 'U+200D', 'después de «…de nitrilo para químicos»')],
+    [{ description: 'Guante reutilizable con recubrimiento antideslizante\u200D.' }, hidden('description', 'U+200D', 'después de «…antideslizante»')],
+  ];
   for (const status of STATUSES) {
     for (const [field, change] of cases) assert.deepEqual(errorsOf({ status, ...change }), [dirty(field)], `${status} ${JSON.stringify(change)}`);
+    for (const [change, message] of hiddenCases) assert.deepEqual(errorsOf({ status, ...change }), [message], `${status} ${JSON.stringify(change)}`);
   }
   // Texto limpio con acentos, «ñ», comillas, fracciones, guiones y símbolos.
   assert.deepEqual(errorsOf({ name: 'Guante «Señal» talla 9½ — 33 cm', description: 'Nitrilo/algodón, 0.125 mm; uso: químicos.', characteristics: ['Puño tipo guantelete', 'Longitud de 330 mm', 'Forro flocado de algodón'] }), []);
@@ -156,14 +172,29 @@ test('el texto de una ficha va limpio y en una sola línea, en cualquier estado'
   assert.deepEqual(errorsOf({ status: 'draft', description: undefined, saleUnit: undefined, characteristics: undefined }), []);
 });
 
-test('la unidad de venta mide como máximo 60 caracteres y su primera palabra va en singular, en cualquier estado', () => {
+test('la unidad de venta mide como máximo 60 caracteres y su primera palabra va en singular y sin signos pegados, en cualquier estado', () => {
   assert.equal(MAX_UNIT_LENGTH, 60);
   for (const unit of ['par', 'pieza', 'caja con 100 piezas', 'Caja con 100 piezas', 'galón', 'PAR', 'tambo de 200 L', 'juego de 3 piezas', 'x'.repeat(MAX_UNIT_LENGTH)]) {
     assert.deepEqual(errorsOf({ saleUnit: unit }), [], unit);
   }
+  // Con una palabra de unidad conocida y un signo pegado, la lista no la reconoce y escribiría «3 × par, talla única».
+  // Con otra primera palabra, el signo se queda: la lista la escribe tal cual.
+  for (const unit of ['par (talla única)', 'caja c/100 piezas', 'tambo, 200 L', 'pza.', 'pieza(s)', 'par/caja', '½ docena']) {
+    assert.deepEqual(errorsOf({ saleUnit: unit }), [], unit);
+  }
   for (const status of STATUSES) {
-    for (const [unit, singular] of [['pares', 'par'], ['Cajas con 100 piezas', 'Caja con 100 piezas'], ['GALONES', 'GALÓN'], ['piezas', 'pieza'], ['Juegos de 3 piezas', 'Juego de 3 piezas']]) {
-      assert.deepEqual(errorsOf({ status, saleUnit: unit }), [`products[0].saleUnit: la primera palabra va en singular; escribe «${singular}».`], `${status} ${unit}`);
+    // El mensaje dice solo la palabra que cambia: lo que sigue a la unidad puede concordar con ella («piezas sueltas»).
+    for (const [unit, plural, singular] of [
+      ['pares', 'pares', 'par'], ['Cajas con 100 piezas', 'Cajas', 'Caja'], ['GALONES', 'GALONES', 'GALÓN'], ['piezas', 'piezas', 'pieza'],
+      ['Juegos de 3 piezas', 'Juegos', 'Juego'], ['piezas sueltas', 'piezas', 'pieza'], ['cajas surtidas', 'cajas', 'caja'],
+    ]) {
+      assert.deepEqual(errorsOf({ status, saleUnit: unit }), [`products[0].saleUnit: la primera palabra va en singular; cambia «${plural}» por «${singular}».`], `${status} ${unit}`);
+    }
+    for (const [unit, written, alone] of [
+      ['par, talla única', 'par,', 'par'], ['pares, talla única', 'pares,', 'par'], ['pares.', 'pares.', 'par'], ['(Caja) con 100 piezas', '(Caja)', 'Caja'],
+      ['CAJAS: 100 piezas', 'CAJAS:', 'CAJA'], ['"galones"', '"galones"', 'galón'],
+    ]) {
+      assert.deepEqual(errorsOf({ status, saleUnit: unit }), [`products[0].saleUnit: la primera palabra lleva un signo pegado («${written}»); escríbela sola y en singular, «${alone}», para que la lista de cotización la escriba según la cantidad.`], `${status} ${unit}`);
     }
     const long = `caja con 100 piezas ${'x'.repeat(MAX_UNIT_LENGTH - 19)}`;
     assert.equal([...long].length, 61);

@@ -4,7 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addedMessage, addLine, addStatusStands, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf,
-  duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
+  duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isUnitWord, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
   listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, MAX_UNIT_LENGTH, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
   QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, REPEATED_PRESS, restoredMessage,
   restoreLines, rowControlNames, rowLabelName, serializeList, singularUnit, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
@@ -117,6 +117,14 @@ test('unitKey: la misma unidad en singular o plural, con o sin acentos y mayúsc
     assert.equal(unitKey(a), unitKey(b));
     for (const quantity of [1, 2, 12000]) assert.equal(quantityLabel(quantity, a), quantityLabel(quantity, b), `${quantity} ${a}`);
   }
+});
+
+test('isUnitWord: una palabra de unidad conocida, en singular o en plural, sola', () => {
+  for (const word of ['par', 'pares', 'PAR', 'Piezas', 'galón', 'galon', 'GALONES', 'kit', 'unidades', 'millar', 'docena']) assert.equal(isUnitWord(word), true, word);
+  // Solo la palabra sola: con un signo pegado o con más palabras no es una palabra de unidad, y la lista no la cambia.
+  for (const word of ['par,', 'pares.', '(caja)', 'caja con 100 piezas', 'tambo', 'tambos', 'mes', 'pza', '', ' ', null, undefined, 5]) assert.equal(isUnitWord(word), false, JSON.stringify(word));
+  // Es lo que `quantityLabel` reconoce: una palabra conocida cambia con la cantidad y otra lleva «×».
+  for (const word of ['par', 'cajas', 'tambo', 'par,']) assert.equal(quantityLabel(3, word).includes('×'), !isUnitWord(word), word);
 });
 
 test('singularUnit: la primera palabra en singular, con sus mayúsculas; MAX_UNIT_LENGTH es el largo que recorta cleanUnit', () => {

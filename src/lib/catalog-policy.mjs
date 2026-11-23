@@ -2,7 +2,7 @@
 // módulos para el navegador `text.mjs` y `quote-list.mjs` para comparar y limpiar el texto y las unidades como el sitio;
 // ninguno de ellos puede importar este.
 import { cleanQuery, normalizeText } from './text.mjs';
-import { MAX_UNIT_LENGTH, singularUnit, unitKey } from './quote-list.mjs';
+import { isUnitWord, MAX_UNIT_LENGTH, singularUnit, unitKey } from './quote-list.mjs';
 
 const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 const isText = value => typeof value === 'string' && value.trim().length > 0;
@@ -51,6 +51,24 @@ const unknownKeys = (value, allowed, path, errors) => {
 const exampleCode = value => /^ej-\d/i.test(String(value ?? '').trim());
 const reservedForExamples = p => /^ejemplo(?:-|$)/.test(String(p.id ?? '')) || /\bde ejemplo\b/.test(normalize(p.name))
   || exampleCode(p.model) || (Array.isArray(p.variants) && p.variants.some(v => exampleCode(v?.manufacturerCode)));
+
+// Lo que no se ve y `cleanQuery` conserva porque el texto de un visitante puede necesitarlo: U+200C y U+200D, los
+// selectores de variante, los caracteres de etiqueta y los demás que Unicode marca para ignorar al dibujar (\p{DI}).
+// En una ficha no hacen falta y sí estorban: una palabra pegada de un PDF con uno dentro («nitri<U+200C>lo») se ve
+// bien, pero no se encuentra al buscarla ni se compara igual que la misma palabra limpia.
+const HIDDEN_CHARACTER = /\p{DI}/u;
+/** El final de un texto para citarlo en un mensaje: hasta 24 caracteres, desde el principio de una palabra. */
+const TAIL_LENGTH = 24;
+function tailOf(text) {
+  const characters = [...text.trimEnd()];
+  if (characters.length <= TAIL_LENGTH) return characters.join('');
+  const cut = characters.slice(-TAIL_LENGTH).join('');
+  const space = cut.indexOf(' ');
+  const wholeWord = characters[characters.length - TAIL_LENGTH - 1] === ' ' || space === -1;
+  return `…${wholeWord ? cut : cut.slice(space + 1)}`;
+}
+// Los signos pegados al principio o al final de una palabra («pares,», «(caja)»): todo lo que no es letra ni cifra.
+const EDGE_SIGNS = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
 
 /** Aprobación comercial completa: quién aprobó, cuándo y con el suministro confirmado. */
 const hasApproval = p => Boolean(p?.approval) && isText(p.approval.by) && validDate(p.approval.on) && p.approval.supplyConfirmed === true;
@@ -153,13 +171,22 @@ export function validateCatalog(catalog, registry) {
     if (p.documents && (!Array.isArray(p.documents) || p.documents.some(d => !d || !isText(d.label) || !isHttps(d.url)))) errors.push(`${path}: documento inválido.`);
 
     // La forma del texto se revisa en cualquier estado: un borrador ya debe estar bien escrito. `covered`: otra regla ya
-    // dice que el campo falta o está vacío, y aquí solo se revisa que esté limpio.
+    // dice que el campo falta o está vacío, y aquí solo se revisa que esté limpio: igual a como lo deja `cleanQuery` y,
+    // además, sin ninguno de los caracteres que no se ven y que `cleanQuery` conserva (`HIDDEN_CHARACTER`). De esos se
+    // dice el primero y después de qué texto está, porque quien corrige no puede verlo.
     const line = (field, value, covered, empty = 'está vacío; escríbelo o quítalo.') => {
       if (value === undefined) return;
       if (typeof value !== 'string' || !value.trim()) {
         if (!covered) errors.push(`${path}.${field}: ${typeof value === 'string' ? empty : 'debe ser un texto.'}`);
       } else if (cleanQuery(value) !== value) {
         errors.push(`${path}.${field}: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.`);
+      } else {
+        const hidden = HIDDEN_CHARACTER.exec(value);
+        if (hidden) {
+          const code = `U+${hidden[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+          const before = tailOf(value.slice(0, hidden.index));
+          errors.push(`${path}.${field}: tiene un carácter invisible (${code}) ${before ? `después de «${before}»` : 'al principio'}; borra esa parte y escríbela de nuevo.`);
+        }
       }
     };
     const approved = p.status === 'approved';
@@ -185,15 +212,20 @@ export function validateCatalog(catalog, registry) {
     else if (nameKey) names.set(nameKey, path);
 
     // Unidad de venta, en cualquier estado: corta, porque la lista de cotización la recorta a `MAX_UNIT_LENGTH`, y con
-    // su primera palabra en singular cuando es una unidad conocida (`unitKey`), porque la lista la escribe en plural
-    // según la cantidad («12 pares»).
+    // su primera palabra, cuando es una unidad conocida, sola y en singular: la lista la escribe en plural según la
+    // cantidad («12 pares») y solo reconoce la palabra sola («3 × par, talla única» con un signo pegado). El mensaje
+    // dice solo la palabra que cambia: lo que sigue a la unidad puede concordar con ella («piezas sueltas») y una
+    // frase completa armada aquí saldría mal escrita. Con otra primera palabra («tambo, 200 L», «pza.») no hay regla:
+    // la lista deja esa unidad como está.
     if (isText(p.saleUnit)) {
       const length = [...p.saleUnit].length;
-      const [first, ...rest] = p.saleUnit.split(' ');
+      const [first] = p.saleUnit.split(' ');
+      const bare = first.replace(EDGE_SIGNS, '');
       // Una unidad demasiado larga recibe solo ese mensaje: `unitKey` la recorta al máximo antes de compararla, y una
       // primera palabra más larga que el máximo parecería estar en plural.
       if (length > MAX_UNIT_LENGTH) errors.push(`${path}.saleUnit: tiene ${length} caracteres y el máximo es ${MAX_UNIT_LENGTH}; escribe una unidad corta, como «par» o «caja con 100 piezas».`);
-      else if (unitKey(first) !== normalizeText(first)) errors.push(`${path}.saleUnit: la primera palabra va en singular; escribe «${[singularUnit(first), ...rest].join(' ')}».`);
+      else if (bare !== first && isUnitWord(bare)) errors.push(`${path}.saleUnit: la primera palabra lleva un signo pegado («${first}»); escríbela sola y en singular, «${singularUnit(bare)}», para que la lista de cotización la escriba según la cantidad.`);
+      else if (unitKey(first) !== normalizeText(first)) errors.push(`${path}.saleUnit: la primera palabra va en singular; cambia «${first}» por «${singularUnit(first)}».`);
     }
 
     if (p.variants) {
