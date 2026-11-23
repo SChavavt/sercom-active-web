@@ -708,6 +708,9 @@ const items = [
       }
 
       // ---- la cantidad ---------------------------------------------------------------------------------------------
+      /** Lo que describe a un control además de su error (una ayuda, si un día la lleva): el error se agrega y se quita solo. */
+      const describedBy = (input: HTMLElement, errorId: string) =>
+        (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(id => id && id !== errorId);
       function showError(input: HTMLInputElement) {
         const error = document.getElementById(`${input.id}-error`);
         if (!error || !error.hidden) return;
@@ -715,7 +718,7 @@ const items = [
         if (text) text.textContent = QUANTITY_ERROR;
         error.hidden = false;
         input.setAttribute('aria-invalid', 'true');
-        input.setAttribute('aria-describedby', error.id);
+        input.setAttribute('aria-describedby', [...describedBy(input, error.id), error.id].join(' '));
         input.closest('.field')?.classList.add('field--invalid');
         if (document.activeElement !== input) input.focus();
       }
@@ -726,7 +729,9 @@ const items = [
         const text = error.querySelector('[data-field-error]');
         if (text) text.textContent = '';
         input.removeAttribute('aria-invalid');
-        input.removeAttribute('aria-describedby');
+        const rest = describedBy(input, error.id);
+        if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
+        else input.removeAttribute('aria-describedby');
         input.closest('.field')?.classList.remove('field--invalid');
       }
 
