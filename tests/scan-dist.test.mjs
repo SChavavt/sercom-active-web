@@ -2050,3 +2050,24 @@ test('--rules nombra las familias de normas que reconoce R-RULE-04 y dice que un
   for (const family of ['ANSI', 'ISEA', 'NFPA', 'CSA', 'NMX', 'AS/NZS', 'IEC', 'UL', 'NRF', 'CFR', 'LAPEM', 'SNR', 'NOM', 'CE']) assert.match(doc, new RegExp(`«[^»]*${family.replace('/', '\\/')}`), family);
   assert.match(doc, /no da aviso/);
 });
+
+test('R-FOTO-02: el nombre de una imagen cuenta solo entero, entre signos que no forman parte de un nombre de archivo', async () => {
+  const name = 'suelta.A1.png';
+  const named = async (body, extra = {}) => failedIds(await scan({ [`_astro/${name}`]: 'imagen', 'pagina/index.html': page(body), ...extra }));
+  // Entero, después de «/» y antes de comillas, un paréntesis, un espacio, una coma, «?» o «#»: la usa.
+  for (const body of [`<img src="/_astro/${name}" alt="A">`, `<img src='/_astro/${name}' alt="A">`, `<img srcset="/_astro/${name} 320w, /_astro/otra.B2.png 640w" alt="A">`,
+    `<div style="background:url(/_astro/${name})"></div>`, `<img src="/_astro/${name}?v=1" alt="A">`, `<img src="/_astro/${name}#x" alt="A">`, `<p>${name}</p>`]) {
+    assert.deepEqual(await named(body), [], body);
+  }
+  // Como final de otro nombre, como principio de otro, o seguido de «.bak»: no la usa.
+  for (const body of [`<img src="/_astro/x${name}" alt="A">`, `<img src="/_astro/x_${name}" alt="A">`, `<img src="/_astro/x.${name}" alt="A">`, `<img src="/_astro/x-${name}" alt="A">`,
+    `<img src="/_astro/${name}x" alt="A">`, `<img src="/_astro/${name}_2" alt="A">`, `<img src="/_astro/${name}-2" alt="A">`, `<p>/_astro/${name}.bak</p>`]) {
+    assert.deepEqual(await named(body), ['R-FOTO-02'], body);
+  }
+  // Un nombre con letras fuera del alfabeto inglés también cuenta entero.
+  const accented = 'guante-ñandú.A1.png';
+  assert.deepEqual(failures(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/${accented}" alt="A">`) })), []);
+  assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/x-${accented}" alt="A">`) })), ['R-FOTO-02']);
+  // Varias páginas y hojas de estilo: basta con que una la nombre.
+  assert.deepEqual(failures(await scan({ [`_astro/${name}`]: 'imagen', 'a/index.html': page('<p>Nada</p>'), 'b/index.html': page('<p>Nada</p>'), '_astro/sitio.C3.css': `.f{background:url(./${name})}` })), []);
+});

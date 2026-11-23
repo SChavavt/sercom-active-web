@@ -1095,8 +1095,46 @@ function withoutStandards(text, standards) {
   const needles = [...new Set(standards.map(standard => oneLine(fold(standard))).filter(Boolean))].sort((a, b) => b.length - a.length);
   return needles.reduce((rest, needle) => rest.replace(whole(needle), ' '), text);
 }
-/** Dónde aparece entero cada código en un texto: [inicio, fin) de cada aparición. */
-const codeSpans = (text, codes) => codes.flatMap(code => [...text.matchAll(whole(code))].map(match => [match.index ?? 0, (match.index ?? 0) + match[0].length]));
+// R-FOTO-02: un nombre de archivo entero es un tramo de letras inglesas, cifras, «_», «.» y «-» que no sigue ni va
+// seguido de otro de esos signos: «suelta.A1.png» está en «/_astro/suelta.A1.png?v=1», no en «otra-suelta.A1.png» ni en
+// «suelta.A1.png.bak».
+const FILE_NAME_RUN = /[\w.-]+/g;
+// Solo se guardan los que terminan como un archivo de imagen: los únicos que se buscan.
+const IMAGE_NAME = /\.(?:jpe?g|png|webp|avif|gif|svg)$/i;
+// Lo mismo que `whole`, mirado en una posición dada sin compilar una expresión por código: el carácter de antes y el de
+// después (por punto de código, como la bandera «u») no son una letra o una cifra, ni un signo de `JOINER` pegado a una.
+const LETTER_OR_DIGIT = /^[\p{L}\p{N}]$/u;
+const JOINER_CHARACTER = new RegExp(`^${JOINER}$`);
+function characterBefore(text, index) {
+  if (index <= 0) return '';
+  const low = text.charCodeAt(index - 1);
+  const high = index >= 2 ? text.charCodeAt(index - 2) : 0;
+  return low >= 0xdc00 && low <= 0xdfff && high >= 0xd800 && high <= 0xdbff ? text.slice(index - 2, index) : text[index - 1];
+}
+const characterAfter = (text, index) => (index >= text.length ? '' : String.fromCodePoint(text.codePointAt(index)));
+function isWholeAt(text, from, length) {
+  const before = characterBefore(text, from);
+  if (LETTER_OR_DIGIT.test(before) || (JOINER_CHARACTER.test(before) && LETTER_OR_DIGIT.test(characterBefore(text, from - 1)))) return false;
+  const after = characterAfter(text, from + length);
+  return !(LETTER_OR_DIGIT.test(after) || (JOINER_CHARACTER.test(after) && LETTER_OR_DIGIT.test(characterAfter(text, from + length + 1))));
+}
+/**
+ * Si un número con forma de teléfono de un texto es, entero, parte de una aparición entera (como `whole`) de un código
+ * público. Solo pueden serlo los códigos que contienen el número tal como está escrito (`containing`, que guarda para
+ * cada número escrito los códigos que lo contienen y se calcula una vez por escaneo), y de cada uno solo se miran las
+ * posiciones donde, empezando ahí, cubriría el número: una página sin números con forma de teléfono no busca ningún
+ * código, y una con uno no recorre la página por cada código.
+ */
+function insidePublicCode(text, match, containing) {
+  const start = match.index ?? 0;
+  const end = start + match[0].length;
+  return containing(match[0]).some(code => {
+    for (let from = Math.max(0, end - code.length); from <= start; from += 1) {
+      if (text.startsWith(code, from) && isWholeAt(text, from, code.length)) return true;
+    }
+    return false;
+  });
+}
 
 /**
  * Las direcciones externas que publican los datos: el «Sitio del fabricante» de cada marca (`manufacturerLinks[].url`
@@ -1598,10 +1636,24 @@ export async function scanDist(directory, options = {}) {
   const catalogProducts = Array.isArray(data.catalog?.products) ? data.catalog.products : [];
   const ownStandards = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, standardTexts(product)]));
   const publicCodes = publicProductCodes(catalogProducts);
+  // Un número con forma de teléfono termina en cuatro cifras que no sigue una letra, una cifra ni «_»: si está dentro de
+  // un código, el código tiene esas cuatro cifras así. Los códigos se agrupan por esas terminaciones, y para cada número
+  // escrito solo se miran los de su grupo.
+  const codesByEnding = new Map();
+  for (const code of publicCodes) {
+    for (const [ending] of code.matchAll(/\d{4}(?!\w)/g)) codesByEnding.set(ending, new Set([...(codesByEnding.get(ending) ?? []), code]));
+  }
+  const codesWith = new Map();
+  const containing = written => {
+    if (!codesWith.has(written)) codesWith.set(written, [...(codesByEnding.get(written.slice(-4)) ?? [])].filter(code => code.includes(written)));
+    return codesWith.get(written);
+  };
   // Las direcciones externas que publican los datos: un atributo que es entero una de ellas no se lee como frase.
   const published = publishedAddresses(data.catalog, data.brands);
-  // R-FOTO-02: el texto de las páginas y de las hojas de estilo, donde se nombra cada imagen que se usa.
+  // R-FOTO-02: el texto de las páginas y de las hojas de estilo, donde se nombra cada imagen que se usa, y cada nombre
+  // de archivo entero que nombran (`FILE_NAME_RUN`), juntados en una pasada para buscar cada imagen una sola vez.
   const referencing = [];
+  const namedFiles = new Set();
 
   for (const file of files) {
     const path = name(file);
@@ -1617,7 +1669,10 @@ export async function scanDist(directory, options = {}) {
     const isText = TEXT_EXTENSIONS.has(extname(file).toLowerCase());
     const isHtml = /\.html?$/i.test(file);
     const raw = (await readFile(file)).toString('utf8');
-    if (/\.(?:html?|css)$/i.test(file)) referencing.push(raw);
+    if (/\.(?:html?|css)$/i.test(file)) {
+      referencing.push(raw);
+      for (const [run] of raw.matchAll(FILE_NAME_RUN)) if (IMAGE_NAME.test(run)) namedFiles.add(run);
+    }
 
     // R-RULE-03, producción: los textos del archivo de ejemplos no aparecen en ningún archivo, tampoco en binarios.
     if (!preview) {
@@ -1760,12 +1815,9 @@ export async function scanDist(directory, options = {}) {
     }
     // Un número con forma de teléfono que no es el confirmado, salvo cuando es, entero, una aparición de un código
     // público de las fichas: un código no es un teléfono.
-    const codes = codeSpans(shown, publicCodes);
     for (const match of phoneShapedNumbers(shown)) {
       const number = match[0].replace(/\D/g, '');
-      const start = match.index ?? 0;
-      const insideCode = codes.some(([from, to]) => from <= start && start + match[0].length <= to);
-      if (!knownNumbers.has(number) && !insideCode) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
+      if (!knownNumbers.has(number) && !insidePublicCode(shown, match, containing)) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
     }
 
     // R-RULE-28, R-A11Y-06 y R-A11Y-07.
@@ -1815,8 +1867,13 @@ export async function scanDist(directory, options = {}) {
   for (const file of files) {
     const path = name(file);
     if (!/^_astro\/[^/]+\.(?:jpe?g|png|webp|avif|gif|svg)$/i.test(path)) continue;
-    const used = new RegExp(`(?<![\\w.-])${escapeRegExp(path.slice('_astro/'.length))}(?![\\w.-])`);
-    if (!referencing.some(text => used.test(text))) add('FAIL', 'R-FOTO-02', file, 'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta');
+    const image = path.slice('_astro/'.length);
+    // Un nombre hecho solo de letras inglesas, cifras, «_», «.» y «-» se busca entre los nombres enteros que se juntaron;
+    // otro nombre («guante-ñandú.A1.png»), con la misma regla en el texto de cada página y hoja de estilo.
+    const used = /^[\w.-]+$/.test(image)
+      ? namedFiles.has(image)
+      : referencing.some(text => new RegExp(`(?<![\\w.-])${escapeRegExp(image)}(?![\\w.-])`).test(text));
+    if (!used) add('FAIL', 'R-FOTO-02', file, 'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta');
   }
 
   // R-RULE-14: las páginas generadas corresponden a registros que pueden mostrarse.
