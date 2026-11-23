@@ -611,10 +611,14 @@ const items = [
       /**
        * La frase «La cantidad volvió a …» de la región viva habla de un renglón (`restoredRow`). Deja de ser cierta cuando
        * ese renglón cambia o se va, y entonces se borra; lo que pase en los demás renglones no la toca. Sin argumento se
-       * borra siempre: la lista entera cambió.
+       * borra siempre: la lista entera cambió. Lo mismo vale para la frase que todavía espera a que el puntero suelte
+       * (`unsaid`): si su renglón cambia o se va antes, ya no se dice.
        */
       let restoredRow: Element | null = null;
+      /** La cantidad que volvió en un renglón que el puntero estaba por quitar: se dice al soltar si el renglón sigue ahí. */
+      let unsaid: { row: Element; sentence: string } | null = null;
       function quietRestored(row?: Element | null) {
+        if (unsaid && (row === undefined || row === unsaid.row)) unsaid = null;
         if (!restoredRow) return;
         if (row !== undefined && row !== restoredRow && restoredRow.isConnected) return;
         restoredRow = null;
@@ -718,9 +722,12 @@ const items = [
       /** Lo que describe a un control además de su error (una ayuda, si un día la lleva): el error se agrega y se quita solo. */
       const describedBy = (input: HTMLElement, errorId: string) =>
         (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(id => id && id !== errorId);
+      /** La clase de una línea de error que ya no se ve pero conserva su lugar (Field.astro). */
+      const UNSEEN = 'field__error--unseen';
       function showError(input: HTMLInputElement) {
         const error = document.getElementById(`${input.id}-error`);
-        if (!error || !error.hidden) return;
+        if (!error || (!error.hidden && !error.classList.contains(UNSEEN))) return;
+        error.classList.remove(UNSEEN);
         const text = error.querySelector('[data-field-error]');
         if (text) text.textContent = QUANTITY_ERROR;
         error.hidden = false;
@@ -729,17 +736,27 @@ const items = [
         input.closest('.field')?.classList.add('field--invalid');
         if (document.activeElement !== input) input.focus();
       }
-      function hideError(input: HTMLInputElement) {
+      /**
+       * Quita el error de un campo. Con `keepPlace`, la línea del error deja de verse y de describir al campo, pero
+       * conserva su lugar hasta `settle`: mientras el puntero está oprimiendo, nada se mueve debajo de él.
+       */
+      function hideError(input: HTMLInputElement, keepPlace = false) {
         const error = document.getElementById(`${input.id}-error`);
         if (!error || error.hidden) return;
-        error.hidden = true;
-        const text = error.querySelector('[data-field-error]');
-        if (text) text.textContent = '';
         input.removeAttribute('aria-invalid');
         const rest = describedBy(input, error.id);
         if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
         else input.removeAttribute('aria-describedby');
         input.closest('.field')?.classList.remove('field--invalid');
+        if (keepPlace) error.classList.add(UNSEEN);
+        else collapseError(error);
+      }
+      /** La línea del error deja de ocupar su lugar. */
+      function collapseError(error: HTMLElement) {
+        error.hidden = true;
+        error.classList.remove(UNSEEN);
+        const text = error.querySelector('[data-field-error]');
+        if (text) text.textContent = '';
       }
 
       const indexOf = (target: Element) => {
@@ -780,14 +797,43 @@ const items = [
         afterEdit();
       });
 
-      // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, hasta la siguiente tecla: dice si el foco sale de un campo
-      // porque el visitante está por activar un control con el puntero.
+      // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, desde que oprime hasta que suelta: dice si el foco sale de
+      // un campo porque el visitante está por activar un control con el puntero. Se sigue con `mousedown` y `mouseup`, que
+      // el navegador envía también con el dedo y con el lápiz: `mousedown` es el que saca el foco del campo.
       let pressed: Element | null = null;
-      document.addEventListener('pointerdown', event => {
+      document.addEventListener('mousedown', event => {
         pressed = event.target instanceof Element ? event.target : null;
       }, true);
-      document.addEventListener('keydown', () => {
+      /**
+       * El puntero ya soltó: las líneas de error que conservaban su lugar se quitan del todo, y la cantidad que volvió sin
+       * decirse se dice si su renglón sigue en la lista (el visitante oprimió «Quitar» y soltó fuera del botón).
+       */
+      function settle() {
+        for (const error of list!.querySelectorAll<HTMLElement>(`.${UNSEEN}`)) collapseError(error);
+        const waiting = unsaid;
+        unsaid = null;
+        if (!waiting?.row.isConnected) return;
+        restoredRow = waiting.row;
+        page.announce(waiting.sentence, 'quantity');
+      }
+      // El clic llega justo después de `mouseup`, en el mismo turno: `settle` va en el turno siguiente, con el clic ya
+      // atendido. Cuando el puntero suelta sin `mouseup` (se abrió un menú contextual, empezó un arrastre o la ventana
+      // perdió el foco), lo mismo.
+      const release = () => {
+        if (!pressed) return;
         pressed = null;
+        setTimeout(settle, 0);
+      };
+      for (const type of ['mouseup', 'dragend', 'contextmenu']) document.addEventListener(type, release, true);
+      window.addEventListener('blur', release);
+      // Con una tecla ya no hay ningún clic que cuidar, y todo queda en su lugar de una vez. Una tecla modificadora o una
+      // tecla sostenida no cuentan mientras el puntero oprime: con Ctrl + clic, el teclado sigue enviando la tecla
+      // sostenida entre oprimir y soltar.
+      const modifierKeys = ['Alt', 'AltGraph', 'Control', 'Meta', 'Shift'];
+      document.addEventListener('keydown', event => {
+        if (pressed && (event.repeat || modifierKeys.includes(event.key))) return;
+        pressed = null;
+        settle();
       }, true);
 
       // Al salir del campo con una cantidad vacía o no válida, vuelve la última válida, y se dice.
@@ -798,17 +844,26 @@ const items = [
         if (index < 0 || parseQuantity(input.value) !== null) return;
         const line = lines[index];
         const row = rows[index];
+        const element = input.closest('li');
         input.value = String(line.quantity);
-        hideError(input);
+        // Con el puntero oprimiendo, la línea del error conserva su lugar hasta que suelta. Si el renglón se encogiera
+        // ahora, todo lo que está debajo subiría entre oprimir y soltar, el clic caería en otro lado y el control que el
+        // visitante oprimió (otro renglón, «Vaciar cotización», un envío) no haría nada.
+        hideError(input, pressed !== null);
         input.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
+        const sentence = restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit));
         // Si el foco sale porque el puntero está oprimiendo «Quitar» o «Unirlos» de este mismo renglón, o «Vaciar
-        // cotización», el renglón está por irse y su cantidad no se anuncia: se oiría junto con «Quitaste …». Con el
-        // teclado sí se anuncia aunque el foco llegue a uno de esos botones (el renglón sigue ahí hasta que se active), y
-        // la frase se borra si después el renglón cambia o se va (`quietRestored`).
+        // cotización», el renglón está por irse y su cantidad no se anuncia: se oiría junto con «Quitaste …». Si al soltar
+        // el renglón sigue ahí, se dice entonces (`settle`). Con el teclado sí se anuncia aunque el foco llegue a uno de
+        // esos botones (el renglón sigue ahí hasta que se active), y la frase se borra si después el renglón cambia o se
+        // va (`quietRestored`).
         const leaving = pressed?.closest('[data-quote-remove], [data-quote-merge], [data-quote-clear]');
-        if (leaving && (leaving.matches('[data-quote-clear]') || input.closest('li')?.contains(leaving))) return;
-        restoredRow = input.closest('li');
-        page.announce(restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit)), 'quantity');
+        if (element && leaving && (leaving.matches('[data-quote-clear]') || element.contains(leaving))) {
+          unsaid = { row: element, sentence };
+          return;
+        }
+        restoredRow = element;
+        page.announce(sentence, 'quantity');
       });
 
       // Variante y unidad se guardan al cambiar; nunca se unen renglones (una lista cambia con cada flecha).
