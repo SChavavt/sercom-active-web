@@ -125,7 +125,8 @@ const items = [
           ><Icon name="trash" class="icon--18" /><span>Quitarlos de mi cotización</span></button>
         </StatusLine>
       </li>
-      {/* La línea de estado de la última acción que se puede deshacer: el script la pone en el lugar del renglón */}
+      {/* La línea de estado de la última acción que se puede deshacer: el script la pone en el lugar del renglón. Lleva
+          también la frase que va a la región viva cuando otra pestaña cambia la lista. */}
       <li class="cotizar__line" data-quote-status-row hidden>
         <StatusLine
           icons={['trash', 'check']}
@@ -134,6 +135,7 @@ const items = [
           data-quote-status
           data-unknown-removed="Quitaste los productos que no aparecen en esta página."
           data-emptied="Vaciaste tu cotización."
+          data-changed-elsewhere="Tu cotización cambió en otra pestaña."
         ><button class="text-btn" slot="action" type="button" data-quote-undo><Icon name="rotate-ccw" class="icon--18" /><span>Deshacer</span></button></StatusLine>
       </li>
     </ol>
@@ -303,6 +305,8 @@ const items = [
     const status = document.querySelector<HTMLElement>('[data-quote-status]');
     const heading = document.getElementById('lista-title');
     const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-draft-field]')];
+    /** El título de la sección de los campos: a donde va el foco cuando la sección de la lista se oculta entera. */
+    const fieldsHeading = fields[0]?.closest('section')?.querySelector<HTMLElement>('h2') ?? null;
 
     if (main && section && list && unknownRow && statusRow && status && heading) {
       const page = createMessagePage(main, { regions: '[data-cotizar]' });
@@ -320,6 +324,7 @@ const items = [
       // La sección se puede ocultar del todo solo cuando la página no tiene productos (está impresa oculta).
       const collapsible = section.hidden;
       heading.tabIndex = -1;
+      if (fieldsHeading) fieldsHeading.tabIndex = -1;
 
       let lines: QuoteLine[] = quoteStore.read();
       let rows: QuoteRow[] = [];
@@ -776,12 +781,33 @@ const items = [
       });
 
       // Otra pestaña cambió la lista, o el navegador restauró la página: se muestra lo guardado, sin escribir nada.
+      // El foco no se pierde: si lo que lo tenía se va con el cambio (su renglón cambió o ya no está, o era la línea de
+      // estado, que se oculta), pasa al mismo control del renglón que quedó en su lugar si es del mismo producto; si no,
+      // al título de la sección, y si la sección entera se oculta, al título de la sección de los campos. Un cambio de
+      // otra pestaña se dice en la región viva: llega sin que el visitante haya hecho nada en esta página.
+      const rowControls = [
+        '[data-row-link]', '[data-quote-remove]', '[data-row-variant]', '[data-stepper-minus]', '[data-stepper-input]',
+        '[data-stepper-plus]', '[data-row-unit]', '[data-quote-merge]',
+      ];
       quoteStore.subscribe((stored, { source }) => {
         if (source === 'write') return;
+        const active = document.activeElement;
+        const held = active instanceof HTMLElement && section.contains(active) ? active : null;
+        const heldAt = held ? indexOf(held) : -1;
+        const heldProduct = heldAt >= 0 ? lines[heldAt]?.productId : undefined;
+        const heldControl = held ? rowControls.find(selector => held.matches(selector)) : undefined;
+        const changed = JSON.stringify(stored.map(keyOf)) !== JSON.stringify(lines.map(keyOf));
         hideStatus();
         hideWriteFailed();
         lines = stored;
         render();
+        if (held && (!held.isConnected || held.closest('[hidden]'))) {
+          const twin = heldControl && heldProduct !== undefined && lines[heldAt]?.productId === heldProduct
+            ? drawn[heldAt]?.element.querySelector<HTMLElement>(heldControl) ?? null
+            : null;
+          (twin && !twin.closest('[hidden]') ? twin : section.hidden ? fieldsHeading : heading)?.focus();
+        }
+        if (changed && source === 'storage' && status.dataset.changedElsewhere) page.announce(status.dataset.changedElsewhere);
       });
 
       // ---- los campos ------------------------------------------------------------------------------------------------
