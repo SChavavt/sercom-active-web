@@ -861,6 +861,37 @@ export function rowLabelName(row) {
 }
 
 /**
+ * Para toda la lista, el nombre de cada renglón dentro de los nombres accesibles de sus controles:
+ *   - `row`: el de «Quitar», la cantidad con sus dos botones y «Unirlos» (`rowLabelName`);
+ *   - `unit`: el de la lista de unidades: el mismo, siempre sin la unidad, porque su valor ya la dice;
+ *   - `variant`: el de la lista de variantes: solo el producto, porque su valor ya dice la variante.
+ * Cuando dos renglones se llamarían igual y tienen unidades distintas (`unitKey`: el mismo producto y la misma variante
+ * en pares y en cajas), `row` y `variant` de cada uno añaden la unidad que el renglón muestra («Guante recubierto,
+ * Talla 8, caja»). Dos renglones iguales también en la unidad se siguen llamando igual: son el mismo renglón dos veces,
+ * y la página ofrece unirlos. Un renglón retirado lleva su nombre en las tres; uno que la página no ubica, tres cadenas
+ * vacías.
+ * @param {readonly QuoteRow[] | null | undefined} rows
+ * @returns {{ row: string, unit: string, variant: string }[]}
+ */
+export function rowControlNames(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const names = list.map(row => rowLabelName(row));
+  /** Las unidades distintas de los renglones 'ok' que llevan cada nombre. @type {Map<string, Set<string>>} */
+  const units = new Map();
+  list.forEach((row, i) => {
+    if (row?.status !== 'ok') return;
+    units.set(names[i], (units.get(names[i]) ?? new Set()).add(unitKey(row.unit)));
+  });
+  return list.map((row, i) => {
+    const name = names[i];
+    if (row?.status !== 'ok') return { row: name, unit: name, variant: name };
+    const product = oneLine(row.product.name);
+    const unit = (units.get(name)?.size ?? 0) > 1 ? oneLine(row.unit) : '';
+    return unit ? { row: `${name}, ${unit}`, unit: name, variant: `${product}, ${unit}` } : { row: name, unit: name, variant: product };
+  });
+}
+
+/**
  * El nombre accesible de un control a partir de un patrón impreso en la página: cada «{nombre}» del patrón cambiado por
  * el nombre en una línea. `nameLabel('Cantidad de {nombre}', 'Guante recubierto')` → «Cantidad de Guante recubierto».
  * @param {unknown} pattern

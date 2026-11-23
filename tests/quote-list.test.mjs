@@ -7,7 +7,7 @@ import {
   duplicateStates, formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
   listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
   QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage,
-  restoreLines, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
+  restoreLines, rowControlNames, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
   unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
@@ -752,6 +752,62 @@ test('rowLabelName: el producto y, si tiene varias variantes, la del renglón', 
   ]);
   assert.equal(rowLabelName(null), '');
   assert.equal(rowLabelName(undefined), '');
+});
+
+test('rowLabelName: el nombre va en una línea, y una variante sin etiqueta se dice «por definir»', () => {
+  // Renglones armados a mano: los datos de hoy no traen saltos de línea ni etiquetas vacías, pero el nombre de un
+  // control no puede depender de eso.
+  const product = {
+    id: 'p', name: '  Guante\n de  prueba ', brandName: '', code: '', url: '', isExample: false,
+    variants: [{ id: 'a', label: ' Talla\n\t8 ', code: '' }, { id: 'b', label: '   ', code: '' }],
+  };
+  const row = variant => ({ line: line('p', 1, 'par', variant.id), status: 'ok', product, variant, units: ['par'], unit: 'par' });
+  assert.equal(rowLabelName(row(product.variants[0])), 'Guante de prueba, Talla 8');
+  assert.equal(rowLabelName(row(product.variants[1])), 'Guante de prueba, talla o color por definir');
+  assert.equal(rowLabelName({ line: line('r'), status: 'retired', product: { ...product, name: 'Casco\n retirado ' } }), 'Casco retirado');
+});
+
+test('rowControlNames: dos renglones que solo difieren en la unidad la dicen; los demás se nombran igual que antes', () => {
+  const names = lines => rowControlNames(deepFreeze(reconcileList(lines, rareIndex).rows));
+  // El mismo guante y la misma talla en pares y en cajas: «Quitar», la cantidad y «Unirlos» dicen la unidad, y la lista
+  // de variantes también (su valor es el mismo en los dos renglones). La lista de unidades no: su valor ya la dice.
+  // El renglón de la otra talla no la necesita.
+  assert.deepEqual(names([line('guante-recubierto', 12, 'par', 'talla-8'), line('guante-recubierto', 1, 'caja', 'talla-8'), line('guante-recubierto', 1, 'par', 'talla-9')]), [
+    { row: 'Guante recubierto sintético, Talla 8, par', unit: 'Guante recubierto sintético, Talla 8', variant: 'Guante recubierto sintético, par' },
+    { row: 'Guante recubierto sintético, Talla 8, caja', unit: 'Guante recubierto sintético, Talla 8', variant: 'Guante recubierto sintético, caja' },
+    { row: 'Guante recubierto sintético, Talla 9', unit: 'Guante recubierto sintético, Talla 9', variant: 'Guante recubierto sintético' },
+  ]);
+  const rowNames = lines => names(lines).map(name => name.row);
+  // Sin variantes, con una sola y con ninguna elegida.
+  assert.deepEqual(rowNames([line('respirador', 2, 'caja'), line('respirador', 3, 'pieza')]), ['Respirador sintético, caja', 'Respirador sintético, pieza']);
+  assert.deepEqual(rowNames([line('cono', 1, 'pieza', 'unica'), line('cono', 1, 'caja', 'unica')]), ['Cono sintético, pieza', 'Cono sintético, caja']);
+  assert.deepEqual(rowNames([line('guante-recubierto', 1, 'par'), line('guante-recubierto', 2, 'caja')]), [
+    'Guante recubierto sintético, talla o color por definir, par', 'Guante recubierto sintético, talla o color por definir, caja',
+  ]);
+  // La unidad va como el renglón la muestra: la opción que se ofrece, o la guardada si no se ofrece.
+  assert.deepEqual(rowNames([line('guante-de-nitrilo', 3, 'tambo de 200 L', 'mediano'), line('guante-de-nitrilo', 2, 'Cajas', 'mediano')]), [
+    'Guante de nitrilo sintético, Mediano, tambo de 200 L', 'Guante de nitrilo sintético, Mediano, caja',
+  ]);
+  // Iguales también en la unidad, aunque esté escrita de otra forma: son el mismo renglón dos veces (la página ofrece
+  // unirlos) y se llaman igual, sin unidad.
+  assert.deepEqual(names([line('guante-recubierto', 12, 'par', 'talla-8'), line('guante-recubierto', 5, 'PARES', 'talla-8')]), [
+    { row: 'Guante recubierto sintético, Talla 8', unit: 'Guante recubierto sintético, Talla 8', variant: 'Guante recubierto sintético' },
+    { row: 'Guante recubierto sintético, Talla 8', unit: 'Guante recubierto sintético, Talla 8', variant: 'Guante recubierto sintético' },
+  ]);
+  // Dos iguales y un tercero en otra unidad: los tres dicen la suya.
+  assert.deepEqual(rowNames([line('guante-recubierto', 12, 'par', 'talla-8'), line('guante-recubierto', 5, 'Pares', 'talla-8'), line('guante-recubierto', 1, 'caja', 'talla-8')]), [
+    'Guante recubierto sintético, Talla 8, par', 'Guante recubierto sintético, Talla 8, par', 'Guante recubierto sintético, Talla 8, caja',
+  ]);
+  // La lista «rara»: sus tres renglones del mismo guante llevan la misma unidad, así que nadie la dice. El retirado
+  // lleva su nombre en las tres; el que la página no ubica, nada.
+  const rare = rowControlNames(rareRows);
+  assert.deepEqual(rare.map(name => name.row), rareRows.map(row => rowLabelName(row)));
+  assert.deepEqual(rare[2], { row: 'Bota sintética con casquillo, talla o color por definir', unit: 'Bota sintética con casquillo, talla o color por definir', variant: 'Bota sintética con casquillo' });
+  assert.deepEqual(rare[3], { row: '', unit: '', variant: '' });
+  assert.deepEqual(rare[4], { row: 'Producto retirado sintético', unit: 'Producto retirado sintético', variant: 'Producto retirado sintético' });
+  // Un retirado no cuenta para decidir si un renglón 'ok' dice su unidad, ni la dice él.
+  assert.deepEqual(rowNames([line('producto-retirado', 1, 'pieza', 'unica'), line('producto-retirado', 1, 'caja', 'unica')]), ['Producto retirado sintético', 'Producto retirado sintético']);
+  for (const nothing of [null, undefined, 'lista', {}]) assert.deepEqual(rowControlNames(nothing), []);
 });
 
 test('addStatusStands: tras el cambio de otra pestaña, en la ficha solo se queda el aviso que sigue siendo cierto', () => {

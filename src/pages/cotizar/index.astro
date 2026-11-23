@@ -284,9 +284,9 @@ const items = [
     import { composeListMessage, listItem } from '../../lib/contact-core.mjs';
     import { createMessagePage } from '../../lib/message-page.mjs';
     import {
-      canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel, parseQuantity,
-      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, rowLabelName,
-      storageNoteText, undoLines, unknownLinesMessage, updateLine, variantText,
+      canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel,
+      parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage,
+      rowControlNames, storageNoteText, undoLines, unknownLinesMessage, updateLine, variantText,
     } from '../../lib/quote-list.mjs';
     import { quoteStore } from '../../lib/quote-store.mjs';
     import type { QuoteDuplicate, QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, QuoteUndo } from '../../types/quote.ts';
@@ -297,6 +297,8 @@ const items = [
       kind: 'ok' | 'retired';
       element: HTMLLIElement;
       duplicate: QuoteDuplicate;
+      /** Los nombres que ya llevan sus controles (`refreshNames`), para no escribirlos de nuevo si no cambian. */
+      named: string;
     }
 
     const main = document.querySelector('main');
@@ -386,22 +388,31 @@ const items = [
       }
 
       /**
-       * Los nombres accesibles de los controles de un renglón: «Quitar», la cantidad con sus dos botones, la unidad y
-       * «Unirlos» dicen de qué producto y, si tiene varias, de qué variante (`rowLabelName`): con el mismo producto en dos
-       * tallas no se oye el mismo nombre en los dos renglones. Se escriben al dibujar el renglón y cuando cambia su
-       * variante. La lista de variantes dice solo el producto: su valor ya es la variante.
+       * Los nombres accesibles de los controles de cada renglón (`rowControlNames`, con pruebas): «Quitar», la cantidad
+       * con sus dos botones y «Unirlos» dicen de qué producto y, si tiene varias, de qué variante; con el mismo producto
+       * en dos tallas no se oye el mismo nombre en los dos renglones. Si dos renglones solo difieren en la unidad, también
+       * la dicen. La lista de variantes y la de unidades no repiten lo que ya dice su valor. Como el nombre de un renglón
+       * depende de los demás, se revisan todos después de cada cambio de la lista, y solo se toca lo que cambió.
        */
-      function nameControls(element: HTMLElement, row: Exclude<QuoteRow, { status: 'unknown' }>) {
-        const name = rowLabelName(row);
-        const set = (selector: string, pattern: string | undefined) =>
-          element.querySelector(selector)?.setAttribute('aria-label', nameLabel(pattern, name));
-        set('[data-quote-remove]', labels.labelRemove);
-        if (row.status !== 'ok') return;
-        set('[data-stepper-input]', labels.labelQuantity);
-        set('[data-stepper-minus]', labels.labelMinus);
-        set('[data-stepper-plus]', labels.labelPlus);
-        set('[data-row-unit]', labels.labelUnit);
-        set('[data-quote-merge]', labels.labelMerge);
+      function refreshNames() {
+        const names = rowControlNames(rows);
+        drawn.forEach((item, index) => {
+          const name = names[index];
+          if (!item || !name) return;
+          const named = JSON.stringify(name);
+          if (named === item.named) return;
+          item.named = named;
+          const set = (selector: string, pattern: string | undefined, text: string) =>
+            item.element.querySelector(selector)?.setAttribute('aria-label', nameLabel(pattern, text));
+          set('[data-quote-remove]', labels.labelRemove, name.row);
+          if (item.kind !== 'ok') return;
+          set('[data-row-variant]', labels.labelVariant, name.variant);
+          set('[data-stepper-input]', labels.labelQuantity, name.row);
+          set('[data-stepper-minus]', labels.labelMinus, name.row);
+          set('[data-stepper-plus]', labels.labelPlus, name.row);
+          set('[data-row-unit]', labels.labelUnit, name.unit);
+          set('[data-quote-merge]', labels.labelMerge, name.row);
+        });
       }
 
       /** Cambia el id de un control y lo que lo nombra: la etiqueta, la ayuda y el error. */
@@ -428,8 +439,7 @@ const items = [
         const element = template?.content.firstElementChild?.cloneNode(true);
         if (!(element instanceof HTMLLIElement)) return null;
         fillProduct(element, row.product);
-        nameControls(element, row);
-        if (row.status === 'retired') return { line: row.line, kind: 'retired', element, duplicate: 'none' };
+        if (row.status === 'retired') return { line: row.line, kind: 'retired', element, duplicate: 'none', named: '' };
 
         counter += 1;
         const id = `fila-${counter}`;
@@ -446,7 +456,6 @@ const items = [
             renameControl(variantField, select, `${id}-variante`);
             select.append(...product.variants.map(variant => option(variant.id, variantText(product, variant))));
             select.value = line.variantId;
-            select.setAttribute('aria-label', nameLabel(labels.labelVariant, product.name));
           }
         } else if (product.variants.length === 1 && variantOnly) {
           variantField?.remove();
@@ -470,7 +479,7 @@ const items = [
           unit.append(...row.units.map(text => option(text, text)));
           unit.value = row.unit;
         }
-        return { line, kind: 'ok', element, duplicate: 'none' };
+        return { line, kind: 'ok', element, duplicate: 'none', named: '' };
       }
 
       /** Pone los elementos de la lista en su orden, moviendo solo los que no están en su lugar. */
@@ -552,6 +561,7 @@ const items = [
         for (const items of pool.values()) for (const item of items) item.element.remove();
         arrange();
         refreshDuplicates();
+        refreshNames();
         refreshChrome();
         if (fresh.length > 0) list!.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
         refreshMessage();
@@ -564,6 +574,7 @@ const items = [
           if (item) item.line = lines[index];
         });
         refreshDuplicates();
+        refreshNames();
         refreshMessage();
       }
 
@@ -881,11 +892,8 @@ const items = [
         quietRestored(drawn[index]?.element ?? null);
         endMergeUndo(index);
         store(result.lines);
+        // Con otra variante u otra unidad, `afterEdit` vuelve a nombrar los controles de los renglones que lo necesitan.
         afterEdit();
-        // Con otra variante, los controles del renglón se nombran con ella.
-        const item = drawn[index];
-        const row = rows[index];
-        if (patch.variantId !== undefined && item && row && row.status !== 'unknown') nameControls(item.element, row);
       });
 
       document.addEventListener('click', event => {
