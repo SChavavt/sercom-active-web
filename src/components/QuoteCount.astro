@@ -9,6 +9,8 @@
 // (`position: absolute`, components.css y responsive.css): aparecer o cambiar de «3» a «99+» no mueve nada. Lleva
 // aria-hidden: lo que dice lo dice el nombre del enlace, que el script completa («Cotizar mi lista, 3 productos»).
 //
-// Uso (dentro del enlace, después del texto):  <a …><span>Cotizar mi lista<QuoteCount /></span></a>
+// Uso (dentro del enlace, después del texto y de un espacio):  <a …><span>Cotizar mi lista <QuoteCount /></span></a>
+// El espacio no se ve (queda al final del renglón) y separa las cifras del texto para quien lo lee sin estilos y
+// para las revisiones de «etiqueta en el nombre»: sin él el texto visible sería «Cotizar mi lista3».
 ---
 <span class="quote-count" aria-hidden="true" data-quote-count hidden></span>

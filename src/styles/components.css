@@ -203,7 +203,9 @@
    sólido). Siempre fuera del flujo, dentro de su enlace: aparecer, pasar de «3» a «99+» o volver a 0 no mueve nada.
    Sobre la esquina del icono donde el enlace lo muestra (el bloque desde 1360 px, la barra fija del celular): su
    referencia es el texto, que va justo después del icono y centrado con él; crece hacia la izquierda y hacia arriba,
-   sin tocar el texto. En la fila del menú, al final de la fila (responsive.css 6.10). Oculto con la lista vacía. */
+   sin tocar el texto. En la fila del menú, al final de la fila (responsive.css 6.10). Oculto con la lista vacía.
+   Su referencia (`position: relative`) se fija solo mientras el enlace lleva `aria-label`, que el script le pone a la
+   vez que muestra el número: con la lista vacía ningún elemento cambia de orden de pintado y la página es la de antes. */
 .quote-count {
   position: absolute;
   z-index: 1;
@@ -221,7 +223,7 @@
   text-align: center;
   white-space: nowrap;
 }
-.masthead__cta > span { position: relative; }
+.masthead__cta[aria-label] > span { position: relative; }
 .masthead__cta .quote-count { right: calc(100% + var(--s-3) - 6px); bottom: calc(50% + 3px); background: var(--white); color: var(--blue); }
 
 .masthead__btn { display: none; }                 /* botones de búsqueda y menú: solo tableta y celular */

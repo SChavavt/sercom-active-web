@@ -710,12 +710,13 @@
 }
 
 /* 6.10 Número de «Cotizar mi lista» (QuoteCount; su dibujo y su lugar en el bloque de computadora, components.css 4.2).
-   Siempre fuera del flujo: con la lista vacía (y sin JavaScript) no se ve y la cabecera es la de siempre. */
+   Siempre fuera del flujo: con la lista vacía (y sin JavaScript) no se ve y la cabecera es la de siempre. Cada
+   referencia (`position`) va con `[aria-label]`: solo existe mientras el número se ve (components.css 4.2). */
 /* Hasta 1359 px el bloque sólido no muestra su icono (6.1 y 6.2): el número va en la esquina de arriba a la derecha
    del bloque, que es su referencia, sobre el aire que deja el texto centrado. */
 @media (max-width: 1359px) {
-  .masthead__cta { position: relative; }
-  .masthead__cta > span { position: static; }
+  .masthead__cta[aria-label] { position: relative; }
+  .masthead__cta[aria-label] > span { position: static; }
   .masthead__cta .quote-count { top: var(--s-2); right: var(--s-2); bottom: auto; }
 }
 /* Fila «Cotizar mi lista» del menú de tableta y celular (sin icono): al final de la fila, centrado en su alto */
@@ -724,7 +725,7 @@
 }
 /* Barra fija del celular: sobre la esquina de arriba a la derecha del icono, como en el bloque de computadora */
 @media (max-width: 699px) {
-  .dock__link > span { position: relative; }
+  .dock__link[aria-label] > span { position: relative; }
   .dock__link .quote-count { right: 100%; bottom: calc(50% + 5px); }   /* hasta el borde del texto: el relleno del enlace es corto */
 }
 /* Letra agrandada (el interruptor de 6.9): «Cotizar mi lista» pasa a dos renglones y llena su celda; el aire que
@@ -732,14 +733,14 @@
    fija, el de la esquina de arriba a la izquierda del enlace, sobre el icono (la etiqueta llena el ancho y el icono queda
    en el relleno izquierdo). Con la letra normal, también con el espaciado de texto, no cambia nada. */
 @container lamina (width < calc((1rem - 16px) * 400)) {
-  .masthead__cta { position: relative; }
-  .masthead__cta > span { position: static; }
+  .masthead__cta[aria-label] { position: relative; }
+  .masthead__cta[aria-label] > span { position: static; }
   .masthead__cta .quote-count { top: auto; right: 0; bottom: 0; }
 }
 @media (max-width: 699px) {
   @container barra (width < calc((1rem - 16px) * 400)) {
-    .dock__link { position: relative; }
-    .dock__link > span { position: static; }
+    .dock__link[aria-label] { position: relative; }
+    .dock__link[aria-label] > span { position: static; }
     .dock__link .quote-count { top: 0; right: auto; bottom: auto; left: 0; }
   }
 }

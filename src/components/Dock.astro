@@ -12,6 +12,6 @@ import QuoteCount from './QuoteCount.astro';
 const quoteCurrent = Astro.url.pathname === routes.quoteList ? 'page' : undefined;
 ---
 <nav class="dock" aria-label="Acciones rápidas">
-  <a class="dock__link" href={routes.quoteList} aria-current={quoteCurrent}><Icon name="clipboard-list" /><span>Cotizar mi lista<QuoteCount /></span></a>
+  <a class="dock__link" href={routes.quoteList} aria-current={quoteCurrent}><Icon name="clipboard-list" /><span>Cotizar mi lista <QuoteCount /></span></a>
   <a class="dock__link dock__link--wa" href={contactLinks.general().whatsapp}><Icon name="whatsapp" /><span>WhatsApp</span></a>
 </nav>
