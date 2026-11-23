@@ -14,33 +14,26 @@
 //     Una página nunca lanza `input` ni `change` por su cuenta: si guarda en cada `input`, guardaría mientras dibuja.
 // El script nunca reescribe lo que el visitante escribe ni muestra un error: validar lo escrito es trabajo de la
 // página (el contenedor de error de Field).
-// Cantidad válida (`parseQuantity`, la misma regla que la lista de cotización): el texto, sin los espacios de los
-// lados, es de 1 a 5 cifras o un número con coma de miles («1,200» es 1200), entre 1 y 99999; y además dentro de
+// Cantidad válida: la decide `parseQuantity` de src/lib/quote-list.mjs, la única regla de cantidad del sitio (de 1 a
+// 5 cifras o un número con coma de miles, «1,200» es 1200; entre 1 y 99999), y además debe estar dentro de
 // `data-min`…`data-max` del Stepper.
 //
 // Uso:  <StepperScript />   (una vez, después de los Stepper o al final de la página)
 ---
 <script>
+  import { MAX_QUANTITY, parseQuantity } from '../lib/quote-list.mjs';
+
   const STEPPER = '[data-stepper]';
   const INPUT = '[data-stepper-input]';
   const MINUS = '[data-stepper-minus]';
   const PLUS = '[data-stepper-plus]';
-  const LIMIT = 99999;
-
-  /** Cantidad entera de 1 a 99999, o null. Acepta de 1 a 5 cifras o la coma de miles («1,200»), con espacios a los lados. */
-  function parseQuantity(value: string): number | null {
-    const text = value.trim();
-    if (!/^\d{1,5}$/.test(text) && !/^\d{1,2},\d{3}$/.test(text)) return null;
-    const quantity = Number(text.replace(',', ''));
-    return quantity >= 1 && quantity <= LIMIT ? quantity : null;
-  }
 
   /** Mínimo y máximo de un Stepper (atributos data-min y data-max). */
   function bounds(box: HTMLElement) {
     const min = Number.parseInt(box.dataset.min ?? '', 10);
     const max = Number.parseInt(box.dataset.max ?? '', 10);
     const low = Number.isInteger(min) && min >= 1 ? min : 1;
-    return { min: low, max: Number.isInteger(max) && max >= low ? max : LIMIT };
+    return { min: low, max: Number.isInteger(max) && max >= low ? max : MAX_QUANTITY };
   }
 
   /** La cantidad del campo si es válida y está dentro del Stepper; si no, null. */
