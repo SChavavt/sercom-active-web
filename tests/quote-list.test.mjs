@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import {
   addedMessage, addLine, addStatusStands, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf,
   duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
-  listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
+  listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, MAX_UNIT_LENGTH, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
   QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, REPEATED_PRESS, restoredMessage,
-  restoreLines, rowControlNames, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
+  restoreLines, rowControlNames, rowLabelName, serializeList, singularUnit, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
   unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
@@ -117,6 +117,17 @@ test('unitKey: la misma unidad en singular o plural, con o sin acentos y mayúsc
     assert.equal(unitKey(a), unitKey(b));
     for (const quantity of [1, 2, 12000]) assert.equal(quantityLabel(quantity, a), quantityLabel(quantity, b), `${quantity} ${a}`);
   }
+});
+
+test('singularUnit: la primera palabra en singular, con sus mayúsculas; MAX_UNIT_LENGTH es el largo que recorta cleanUnit', () => {
+  for (const [written, singular] of [
+    ['pares', 'par'], ['par', 'par'], ['Piezas', 'Pieza'], ['GALONES', 'GALÓN'], ['galones', 'galón'], ['Cajas con 100 piezas', 'Caja con 100 piezas'],
+    ['caja con 100 piezas', 'caja con 100 piezas'], ['  pares ', 'par'], ['tambos de 200 L', 'tambos de 200 L'], ['', ''], [null, ''],
+  ]) assert.equal(singularUnit(written), singular, JSON.stringify(written));
+  // Lo que da tiene la misma clave que lo escrito: es la misma unidad.
+  for (const written of ['pares', 'GALONES', 'Cajas con 100 piezas']) assert.equal(unitKey(singularUnit(written)), unitKey(written));
+  assert.equal(MAX_UNIT_LENGTH, 60);
+  assert.equal(cleanUnit('x'.repeat(MAX_UNIT_LENGTH + 1)).length, MAX_UNIT_LENGTH);
 });
 
 test('una unidad de venta escrita en plural no ofrece además su singular', () => {

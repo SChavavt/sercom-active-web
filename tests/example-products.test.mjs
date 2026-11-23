@@ -222,6 +222,16 @@ test('validateExampleProducts rechaza un ejemplo que pueda confundirse con una f
   }
   assert.match(mutated(example => { example.variants[0].code = '11-800-7'; }), /código que no empieza con el del ejemplo/);
   assert.match(mutated(example => { example.variants[1].id = example.variants[0].id; }), /variante incompleta, duplicada/);
+  // Dos ejemplos con el mismo nombre, o dos variantes de un ejemplo con la misma etiqueta (sin distinguir acentos,
+  // mayúsculas ni espacios), como en el catálogo: darían los mismos nombres a dos renglones de «Cotizar mi lista».
+  assert.equal(mutated((example, list) => { example.name = list[1].name.toUpperCase(); }), 'ejemplos[1].name: repite el nombre de ejemplos[0]; cada ejemplo necesita un nombre propio.');
+  assert.equal(mutated((_, list) => { list[5].name = 'ARNES de ejemplo de cuerpo completo'; list[6].name = 'Arnés de ejemplo de cuerpo completo'; }),
+    'ejemplos[6].name: repite el nombre de ejemplos[5]; cada ejemplo necesita un nombre propio.');
+  assert.equal(mutated(example => { example.variants[2].label = 'TALLA 7'; }), 'ejemplos[0].variants[2].label: repite la etiqueta de variants[0]; cada variante necesita una etiqueta propia.');
+  // En ejemplos distintos, la misma etiqueta sí puede repetirse (el archivo real ya lo hace: «Única», «Mica clara»).
+  assert.ok(listed.filter(example => example.variants.some(variant => variant.label === 'Única')).length > 1);
+  // A diferencia de una ficha real, cada variante de un ejemplo lleva su código.
+  assert.match(mutated(example => { delete example.variants[0].code; }), /variante incompleta, duplicada o con un código que no empieza con el del ejemplo/);
   assert.match(mutated(example => { example.saleUnit = ''; }), /falta unidad de venta o resumen/);
   // Campos de una ficha real o comerciales: un ejemplo no los admite.
   for (const key of ['approval', 'source', 'status', 'brandId', 'model', 'image', 'documents', 'precio']) {

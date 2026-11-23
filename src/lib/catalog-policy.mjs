@@ -1,3 +1,9 @@
+// Código solo de compilación: lo usan el validador (`npm run validate:catalog`) y `site-data-core.mjs`. Importa los
+// módulos para el navegador `text.mjs` y `quote-list.mjs` para comparar y limpiar el texto y las unidades como el sitio;
+// ninguno de ellos puede importar este.
+import { cleanQuery, normalizeText } from './text.mjs';
+import { MAX_UNIT_LENGTH, singularUnit, unitKey } from './quote-list.mjs';
+
 const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
@@ -12,6 +18,29 @@ const excluded = mentionsExcludedBrand;
 const forbidden = /^(price|prices|precio|precios|cost|costs|costo|costos|stock|inventory|inventario)$/;
 const productKeys = new Set(['id', 'brandId', 'model', 'name', 'categoryIds', 'status', 'description', 'characteristics', 'saleUnit', 'variants', 'image', 'source', 'approval', 'documents']);
 const categoryKeys = new Set(['id', 'name', 'shortName', 'summary', 'status']);
+// Claves de los objetos dentro de una ficha. Con `manufacturerCode` opcional, una clave mal escrita
+// (`manufacturerCodes`) diría en silencio «sin código»: por eso cada objeto acepta solo las suyas. `image` no se
+// revisa aquí.
+const variantKeys = new Set(['id', 'label', 'manufacturerCode']);
+const documentKeys = new Set(['label', 'url']);
+const sourceKeys = new Set(['url', 'checkedOn']);
+const approvalKeys = new Set(['by', 'on', 'supplyConfirmed']);
+const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
+const unknownKeys = (value, allowed, path, errors) => {
+  if (isRecord(value)) for (const key of Object.keys(value)) if (!allowed.has(key)) errors.push(`${path}.${key}: campo no definido.`);
+};
+/**
+ * Texto de una línea, como lo deja `cleanQuery` (text.mjs): recortado, con un solo espacio común entre palabras y sin
+ * saltos de línea, espacios de no separación ni caracteres invisibles. Lo que se pega de un PDF suele traerlos.
+ * Devuelve el problema, o `null` si el texto está limpio.
+ */
+const lineProblem = value => {
+  if (typeof value !== 'string') return 'debe ser un texto.';
+  const clean = cleanQuery(value);
+  if (!clean) return 'está vacío; escríbelo o quita el campo.';
+  if (clean !== value) return 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.';
+  return null;
+};
 // Los ejemplos de la vista previa viven en src/data/preview y nunca entran al catálogo: sus marcas quedan reservadas.
 const exampleCode = value => /^ej-\d/i.test(String(value ?? '').trim());
 const reservedForExamples = p => /^ejemplo(?:-|$)/.test(String(p.id ?? '')) || /\bde ejemplo\b/.test(normalize(p.name))
@@ -48,6 +77,8 @@ export function validateCatalog(catalog, registry) {
   }
   const ids = new Set();
   const models = new Set();
+  // Nombre ya visto (con `normalizeText`) → la ficha que lo usa primero.
+  const names = new Map();
   for (const [index, p] of catalog.products.entries()) {
     const path = `products[${index}]`;
     if (!p || typeof p !== 'object') { errors.push(`${path}: producto inválido.`); continue; }
@@ -65,13 +96,70 @@ export function validateCatalog(catalog, registry) {
     if (!['draft', 'in_review', 'approved', 'retired'].includes(p.status)) errors.push(`${path}: estado editorial inválido.`);
     if (!Array.isArray(p.categoryIds) || !p.categoryIds.length || p.categoryIds.some(id => !categories.has(id))) errors.push(`${path}: faltan categorías válidas.`);
     if (p.source && (!isHttps(p.source.url) || !validDate(p.source.checkedOn))) errors.push(`${path}: fuente o fecha inválida.`);
+    unknownKeys(p.source, sourceKeys, `${path}.source`, errors);
+    unknownKeys(p.approval, approvalKeys, `${path}.approval`, errors);
     if (p.documents && (!Array.isArray(p.documents) || p.documents.some(d => !d || !isText(d.label) || !isHttps(d.url)))) errors.push(`${path}: documento inválido.`);
+
+    // La forma del texto se revisa en cualquier estado: un borrador ya debe estar bien escrito. `covered`: otra regla ya
+    // dice que el campo falta o está vacío, y aquí solo se revisa que esté limpio.
+    const line = (field, value, covered, empty = 'está vacío; escríbelo o quítalo.') => {
+      if (value === undefined) return;
+      if (typeof value !== 'string' || !value.trim()) {
+        if (!covered) errors.push(`${path}.${field}: ${typeof value === 'string' ? empty : 'debe ser un texto.'}`);
+      } else if (cleanQuery(value) !== value) {
+        errors.push(`${path}.${field}: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.`);
+      }
+    };
+    const approved = p.status === 'approved';
+    line('name', p.name, true);
+    line('model', p.model, true);
+    line('description', p.description, approved);
+    line('saleUnit', p.saleUnit, approved);
+    if (p.characteristics !== undefined && !Array.isArray(p.characteristics)) {
+      if (!approved) errors.push(`${path}.characteristics: debe ser una lista de textos.`);
+    } else (p.characteristics ?? []).forEach((value, i) => line(`characteristics[${i}]`, value, approved));
+    if (Array.isArray(p.documents)) p.documents.forEach((d, i) => {
+      unknownKeys(d, documentKeys, `${path}.documents[${i}]`, errors);
+      if (isRecord(d)) line(`documents[${i}].label`, d.label, true);
+    });
+
+    // Nombres únicos en todo el catálogo, también entre borradores: «Cotizar mi lista» nombra los controles de cada
+    // renglón con el nombre del producto y la etiqueta de su variante (`rowControlNames` en quote-list.mjs), y dos
+    // productos con el mismo nombre darían a dos renglones los mismos nombres accesibles. Se compara como compara el
+    // sitio (`normalizeText`): «Guante Solvex» y «guante SOLVEX» son el mismo nombre.
+    const nameKey = isText(p.name) ? normalizeText(p.name) : '';
+    if (nameKey && names.has(nameKey)) errors.push(`${path}.name: repite el nombre de ${names.get(nameKey)}; cada producto necesita un nombre propio.`);
+    else if (nameKey) names.set(nameKey, path);
+
+    // Unidad de venta, en cualquier estado: corta, porque la lista de cotización la recorta a `MAX_UNIT_LENGTH`, y con
+    // su primera palabra en singular cuando es una unidad conocida (`unitKey`), porque la lista la escribe en plural
+    // según la cantidad («12 pares»).
+    if (isText(p.saleUnit)) {
+      const length = [...p.saleUnit].length;
+      if (length > MAX_UNIT_LENGTH) errors.push(`${path}.saleUnit: tiene ${length} caracteres y el máximo es ${MAX_UNIT_LENGTH}; escribe una unidad corta, como «par» o «caja con 100 piezas».`);
+      const [first, ...rest] = p.saleUnit.split(' ');
+      if (unitKey(first) !== normalizeText(first)) errors.push(`${path}.saleUnit: la primera palabra va en singular; escribe «${[singularUnit(first), ...rest].join(' ')}».`);
+    }
+
     if (p.variants) {
       const variantIds = new Set();
+      // Etiqueta ya vista (con `normalizeText`) → su posición: por la misma razón que los nombres, dos variantes de un
+      // producto no pueden llamarse igual.
+      const labels = new Map();
       if (!Array.isArray(p.variants)) errors.push(`${path}: variants debe ser una lista.`);
-      else for (const v of p.variants) {
-        if (!v || !isId(v.id) || variantIds.has(v.id) || !isText(v.label) || !isText(v.manufacturerCode)) errors.push(`${path}: variante incompleta o duplicada.`);
+      else for (const [i, v] of p.variants.entries()) {
+        if (!v || !isId(v.id) || variantIds.has(v.id) || !isText(v.label)) errors.push(`${path}: variante incompleta o duplicada.`);
         variantIds.add(v?.id);
+        if (!isRecord(v)) continue;
+        unknownKeys(v, variantKeys, `${path}.variants[${i}]`, errors);
+        line(`variants[${i}].label`, v.label, true);
+        // El código de la variante es opcional (muchos fabricantes publican las tallas sin un código para cada una);
+        // si la clave está, lleva un código: vacía no significa «sin código».
+        if (Object.hasOwn(v, 'manufacturerCode')) line(`variants[${i}].manufacturerCode`, v.manufacturerCode, false,
+          'está vacío; escribe el código o, si la variante no tiene código propio, quita la clave.');
+        const labelKey = isText(v.label) ? normalizeText(v.label) : '';
+        if (labelKey && labels.has(labelKey)) errors.push(`${path}.variants[${i}].label: repite la etiqueta de variants[${labels.get(labelKey)}]; cada variante necesita una etiqueta propia.`);
+        else if (labelKey) labels.set(labelKey, i);
       }
     }
     if (p.status !== 'approved') continue;
@@ -93,7 +181,7 @@ export function getPublishedProducts(catalog, registry) {
     id: p.id, brandId: p.brandId, model: p.model, name: p.name,
     categoryIds: [...p.categoryIds], description: p.description,
     characteristics: [...p.characteristics], saleUnit: p.saleUnit,
-    variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, manufacturerCode: v.manufacturerCode })),
+    variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, ...(v.manufacturerCode !== undefined && { manufacturerCode: v.manufacturerCode }) })),
     image: { url: p.image.url, alt: p.image.alt },
     documents: (p.documents ?? []).map(d => ({ label: d.label, url: d.url })),
   }));

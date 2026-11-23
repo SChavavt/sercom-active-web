@@ -18,7 +18,8 @@ export interface Product {
   description?: string;
   characteristics?: string[];
   saleUnit?: string;
-  variants?: { id: string; label: string; manufacturerCode: string }[];
+  /** `manufacturerCode` es opcional: muchas tallas no tienen un código propio. Si la clave está, no puede ir vacía. */
+  variants?: { id: string; label: string; manufacturerCode?: string }[];
   image?: { url: string; alt: string; sourceUrl: string; usageConfirmed: boolean };
   source?: { url: string; checkedOn: string };
   approval?: { by: string; on: string; supplyConfirmed: boolean };
@@ -34,7 +35,8 @@ export interface PublishedProduct {
   description: string;
   characteristics: string[];
   saleUnit: string;
-  variants: { id: string; label: string; manufacturerCode: string }[];
+  /** Sin `manufacturerCode` cuando la variante no tiene código propio. */
+  variants: { id: string; label: string; manufacturerCode?: string }[];
   image: { url: string; alt: string };
   documents: { label: string; url: string }[];
 }

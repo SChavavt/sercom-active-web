@@ -44,7 +44,7 @@ export interface PublicBrand {
 export interface PublicVariant {
   readonly id: string;
   readonly label: string;
-  /** Código del fabricante para la variante. */
+  /** Código del fabricante para la variante; cadena vacía si la variante no tiene código propio. */
   readonly code: string;
 }
 

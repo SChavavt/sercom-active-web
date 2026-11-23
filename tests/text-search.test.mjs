@@ -81,6 +81,14 @@ test('encuentra por el código de una variante', () => {
   assert.deepEqual(codes(exampleProducts, 'EJ-3001-AZ'), ['EJ-3001']);
 });
 
+test('una variante sin código propio no cambia el texto de búsqueda: el producto se encuentra por su nombre y su código', () => {
+  const product = { name: 'Guante sintético de prueba', brandName: 'Marca sintética', code: 'SP-37-175', categoryNames: ['Protección de manos'], variants: [] };
+  const withSizes = { ...product, variants: [{ code: '' }, { code: '' }, { code: 'SP-37-175-9' }] };
+  assert.equal(searchText({ ...product, variants: [{ code: '' }, { code: '' }] }), searchText(product));
+  assert.equal(matchesSearchText(searchText(withSizes), 'guante sp37175'), true);
+  assert.equal(matchesSearchText(searchText(withSizes), 'sp-37-175-9'), true);
+});
+
 test('encuentra por marca y por nombre de categoría', () => {
   assert.deepEqual(codes(synthetic, 'marca alfa'), ['37-175']);
   assert.deepEqual(codes(synthetic, 'BETA'), ['AL026CL/3C', 'S.100 A']);

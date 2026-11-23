@@ -161,7 +161,9 @@ export function crossCheckBrands(brands, registry) {
 /**
  * Valida los productos de ejemplo de la vista previa. Deben ser inconfundibles con fichas reales:
  * identificador «ejemplo-…», código «EJ-0000», nombre con «de ejemplo», una de las marcas de `EXAMPLE_BRAND_NAMES`
- * y ninguna mención de una marca real. Las variantes pueden faltar (`variants: []`), como en una ficha real.
+ * y ninguna mención de una marca real. Las variantes pueden faltar (`variants: []`), como en una ficha real; si las
+ * hay, cada una lleva su código (a diferencia de una ficha real, donde es opcional). Dos ejemplos no tienen el mismo
+ * nombre ni dos variantes de un ejemplo la misma etiqueta (comparados con `normalizeText`), como en el catálogo.
  * `retired: true` marca un ejemplo retirado; sus demás reglas no cambian.
  * @param {unknown} examples Contenido de `src/data/preview/example-products.json`.
  * @param {{ categoryIds: readonly string[], brands: readonly Pick<BrandRecord, 'id' | 'name'>[] }} context
@@ -173,6 +175,11 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
   const errors = [];
   const ids = new Set();
   const codes = new Set();
+  // Nombre ya visto (con `normalizeText`) → el ejemplo que lo usa primero. Como en el catálogo (`validateCatalog`):
+  // «Cotizar mi lista» nombra los controles de cada renglón con el nombre y la etiqueta de la variante, y dos ejemplos o
+  // dos variantes con el mismo nombre darían a dos renglones los mismos nombres accesibles.
+  /** @type {Map<string, string>} */
+  const names = new Map();
   examples.forEach((example, index) => {
     const path = `ejemplos[${index}]`;
     if (!isRecord(example)) {
@@ -189,6 +196,9 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     codes.add(example.code);
     if (!isText(example.name) || !hasWord(normalizeText(example.name), 'de ejemplo')) errors.push(`${path}: el nombre debe contener «de ejemplo».`);
+    const nameKey = isText(example.name) ? normalizeText(example.name) : '';
+    if (nameKey && names.has(nameKey)) errors.push(`${path}.name: repite el nombre de ${names.get(nameKey)}; cada ejemplo necesita un nombre propio.`);
+    else if (nameKey) names.set(nameKey, path);
     if (typeof example.brandName !== 'string' || !EXAMPLE_BRAND_NAMES.includes(example.brandName)) errors.push(`${path}: la marca debe ser ${BRAND_CHOICES}.`);
     if ('retired' in example && typeof example.retired !== 'boolean') errors.push(`${path}: retired debe ser true o false.`);
     if (!Array.isArray(example.categoryIds) || example.categoryIds.length === 0 || example.categoryIds.some(id => !categoryIds.includes(id))) {
@@ -201,14 +211,19 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     const variants = example.variants;
     const variantIds = new Set();
+    /** @type {Map<string, number>} */
+    const labels = new Map();
     if (!Array.isArray(variants)) errors.push(`${path}: variants debe ser una lista (puede estar vacía).`);
-    else for (const variant of variants) {
+    else for (const [position, variant] of variants.entries()) {
       const valid = isRecord(variant) && unknownKeys(variant, VARIANT_KEYS).length === 0 && isId(variant.id) && !variantIds.has(variant.id)
         && isText(variant.label) && typeof variant.code === 'string' && variant.code.startsWith(`${example.code}-`) && !codes.has(variant.code);
       if (!valid) errors.push(`${path}: variante incompleta, duplicada o con un código que no empieza con el del ejemplo.`);
       if (isRecord(variant)) {
         variantIds.add(variant.id);
         codes.add(variant.code);
+        const labelKey = isText(variant.label) ? normalizeText(variant.label) : '';
+        if (labelKey && labels.has(labelKey)) errors.push(`${path}.variants[${position}].label: repite la etiqueta de variants[${labels.get(labelKey)}]; cada variante necesita una etiqueta propia.`);
+        else if (labelKey) labels.set(labelKey, position);
       }
     }
     // Ningún campo puede nombrar una marca real ni la marca excluida.
@@ -321,7 +336,8 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         summary: product.description,
         characteristics: [...product.characteristics],
         saleUnit: product.saleUnit,
-        variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode })),
+        // Una variante sin código propio lleva `code: ''`: la ficha muestra solo su etiqueta y el mensaje no lleva código.
+        variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
         image: { url: product.image.url, alt: product.image.alt },
         documents: product.documents.map(document => ({ label: document.label, url: document.url })),
         isExample: false,

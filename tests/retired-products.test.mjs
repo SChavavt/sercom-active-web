@@ -61,7 +61,7 @@ test('una ficha retirada es pública solo si tiene una aprobación comercial com
 });
 
 test('getRetiredProducts entrega solo lo que identifica al producto y nunca los campos internos', () => {
-  const editorial = withProducts(record(), record({ id: 'test-002', model: 'TEST-002', approval: undefined }));
+  const editorial = withProducts(record(), record({ id: 'test-002', model: 'TEST-002', name: 'Producto sintético de prueba 2', approval: undefined }));
   const retired = getRetiredProducts(editorial, brandScope);
   assert.deepEqual(retired, [{ id: 'test-001', brandId: 'ansell', model: 'TEST-001/A', name: 'Producto sintético de prueba', categoryIds: ['manos'] }]);
   // La copia no comparte memoria con el catálogo.
@@ -93,7 +93,7 @@ test('la validación del catálogo no cambia: un retirado sin aprobación es un 
 
 test('un identificador nunca es a la vez un producto y un retirado, y las marcas de los ejemplos siguen reservadas', () => {
   const approved = record({ status: 'approved' });
-  assert.throws(() => build('production', [approved, record({ model: 'TEST-OTRO' })]), /id inválido o duplicado/);
+  assert.throws(() => build('production', [approved, record({ model: 'TEST-OTRO', name: 'Producto sintético de prueba 2' })]), /id inválido o duplicado/);
   for (const change of [{ id: 'ejemplo-producto-retirado' }, { model: 'EJ-1002' }, { name: 'Producto de ejemplo retirado' }, { variants: [{ id: 'u', label: 'Única', manufacturerCode: 'EJ-1002-U' }] }]) {
     assert.throws(() => build('production', [record(change)]), /reservado para los ejemplos de vista previa/, JSON.stringify(change));
   }
@@ -135,7 +135,7 @@ test('producción: el retirado con aprobación tiene registro propio y ningún l
 });
 
 test('con una ficha aprobada y una retirada, los conteos y listados solo cuentan la aprobada', () => {
-  const site = build('preview', [record({ status: 'approved', id: 'test-002', model: 'TEST-002', variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-002-9' }] }), record()]);
+  const site = build('preview', [record({ status: 'approved', id: 'test-002', model: 'TEST-002', name: 'Producto sintético de prueba 2', variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-002-9' }] }), record()]);
   assert.deepEqual(site.products.map(product => product.id), ['test-002', ...listedExamples.map(example => example.id)]);
   assert.deepEqual(site.retiredProducts.map(product => product.id), ['test-001']);
   assert.equal(site.getCategory('manos')?.productCount, 4);

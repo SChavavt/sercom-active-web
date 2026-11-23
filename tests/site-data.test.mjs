@@ -196,6 +196,15 @@ test('vista previa con una ficha aprobada: la ficha real va primero y los ejempl
   assert.deepEqual(site.featuredProducts(11).at(-1)?.code, 'EJ-1001');
 });
 
+test('una variante sin código propio llega a la forma pública con el código vacío', () => {
+  const site = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.variants = [{ id: 'chica', label: 'Chica' }, { id: 'mediana', label: 'Mediana', manufacturerCode: 'TEST-001/A-M' }, { id: 'grande', label: 'Grande' }];
+  }) });
+  assert.deepEqual(site.getProduct('test-001')?.variants, [
+    { id: 'chica', label: 'Chica', code: '' }, { id: 'mediana', label: 'Mediana', code: 'TEST-001/A-M' }, { id: 'grande', label: 'Grande', code: '' },
+  ]);
+});
+
 test('lo que no está aprobado no se publica, y un catálogo inválido detiene la compilación', () => {
   const build = (change, mode = 'production') => createSiteData({ mode, catalog: syntheticCatalog(change), brands, exampleProducts: examples });
   for (const status of ['draft', 'in_review', 'retired']) {

@@ -15,7 +15,8 @@
 //   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
 //   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
 //   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
-// La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización».
+// La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización». Cada variante
+// lleva su etiqueta y, si tiene código propio, el código.
 // Volver a los resultados: si la ficha se abrió desde el catálogo con una búsqueda o filtros (la dirección de la página
 // anterior es /catalogo/?…), el script de abajo hace que «Catálogo» de la fila de ruta lleve a esos mismos resultados.
 // No guarda nada; con cualquier otra página anterior el enlace queda como se imprimió.
@@ -75,6 +76,7 @@ const description = product ? product.summary : `Este producto ya no forma parte
 const variantCount = product?.variants.length ?? 0;
 const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4': (4 - (variantCount % 4)) % 4 };
 // Un código largo no cabe en una celda de tableta o celular sin partirse: entonces las variantes siguen en filas.
+// Una variante sin código propio (`code: ''`) muestra solo su etiqueta, sin elemento de código.
 const CHIP_CODE_MAX = 14;
 const variantRows = product?.variants.some(variant => variant.code.length > CHIP_CODE_MAX) ?? false;
 
@@ -178,7 +180,7 @@ const moreOdd = more.items.length % 2 === 1;
             {product.variants.map(variant => (
               <li class="producto__chip">
                 <span class="producto__chip-label">{variant.label}</span>
-                <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>
+                {variant.code && <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>}
               </li>
             ))}
             {!variantRows && <li class="producto__chip-fill" aria-hidden="true"></li>}
