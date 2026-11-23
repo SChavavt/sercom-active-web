@@ -151,7 +151,8 @@ function inspectImage(image, productPath, errors, line) {
 /**
  * Revisa las normas de una ficha (`standards`), en cualquier estado: una lista de 1 a `MAX_STANDARDS` objetos con
  * `text` y `sourceUrl` y ninguna otra clave. `text` es texto limpio de una línea, de `MAX_STANDARD_LENGTH` caracteres
- * como máximo, y no se repite en la ficha (comparado con `normalizeText`); `sourceUrl` es una dirección `https`.
+ * como máximo (contados en NFC), con varias palabras o un número, y no se repite en la ficha (comparado con
+ * `normalizeText`); `sourceUrl` es una dirección `https`.
  * @param {(field: string, value: unknown, covered: boolean, empty: string) => void} line revisa que un texto de la ficha esté limpio
  */
 function inspectStandards(standards, productPath, errors, line) {
@@ -176,8 +177,13 @@ function inspectStandards(standards, productPath, errors, line) {
     if (text === undefined) errors.push(`${entry}.text: falta; escribe la norma como la imprime el fabricante.`);
     else line(`standards[${i}].text`, text, false, 'está vacío; escribe la norma como la imprime el fabricante.');
     if (isText(text)) {
-      const length = [...text].length;
+      // Se cuenta como lo lee una persona: una letra acentuada es un carácter, escrita compuesta o descompuesta (NFC), y
+      // también un carácter fuera del plano básico.
+      const length = [...text.normalize('NFC')].length;
       if (length > MAX_STANDARD_LENGTH) errors.push(`${entry}.text: tiene ${length} caracteres y el máximo es ${MAX_STANDARD_LENGTH}; escribe solo la designación de la norma.`);
+      // Una designación lleva número o varias palabras: una sigla sola («ANSI») no dice qué norma es, y en la página de la
+      // ficha descontaría cualquier mención de esa sigla, también la de otra norma.
+      if (!/\s/.test(text.trim()) && !/\p{N}/u.test(text)) errors.push(`${entry}.text: «${text.trim()}» es una sola palabra y no lleva número; escribe la designación completa de la norma como la imprime el fabricante, por ejemplo «EN 388:2016 4131A».`);
       const key = normalizeText(text);
       if (seen.has(key)) errors.push(`${entry}.text: repite la norma de standards[${seen.get(key)}]; escribe cada norma una vez.`);
       else seen.set(key, i);

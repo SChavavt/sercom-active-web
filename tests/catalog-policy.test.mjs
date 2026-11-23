@@ -412,14 +412,14 @@ test('el texto de una norma va limpio, en una línea, con 80 caracteres como má
       [[norm('EN 388:2016  4131A')], [at(0, 'text', 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.')]],
       [[norm('EN 388:2016\n4131A')], [at(0, 'text', 'tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.')]],
       [[norm('EN 388:2016‍ 4131A')], [at(0, 'text', 'tiene un carácter invisible (U+200D) después de «EN 388:2016»; borra esa parte y escríbela de nuevo.')]],
-      [[norm('A'.repeat(81))], [at(0, 'text', 'tiene 81 caracteres y el máximo es 80; escribe solo la designación de la norma.')]],
+      [[norm('A'.repeat(81))], [at(0, 'text', 'tiene 81 caracteres y el máximo es 80; escribe solo la designación de la norma.'), at(0, 'text', '«AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA» es una sola palabra y no lleva número; escribe la designación completa de la norma como la imprime el fabricante, por ejemplo «EN 388:2016 4131A».')]],
       // Repetida, comparada como compara el sitio: sin acentos, sin mayúsculas.
       [[norm('EN 388:2016 4131A'), norm('Categoría III'), norm('CATEGORIA III')], [at(2, 'text', 'repite la norma de standards[1]; escribe cada norma una vez.')]],
     ];
     for (const [standards, messages] of cases) assert.deepEqual(errorsOf({ status, standards }), messages, `${status} ${JSON.stringify(standards)}`);
   }
   // 80 caracteres sí; se cuentan como se leen.
-  assert.deepEqual(errorsOf({ standards: [norm('Á'.repeat(80))] }), []);
+  assert.deepEqual(errorsOf({ standards: [norm(`${'Á'.repeat(76)} 100`)] }), []);
 });
 
 test('cada norma lleva la dirección https del fabricante donde consta', () => {
@@ -438,4 +438,27 @@ test('lo publicado de las normas es solo su texto, en el orden de los datos; sin
   assert.deepEqual(without.standards, []);
   assert.equal(JSON.stringify(withNorms).includes('sourceUrl'), false);
   assert.equal(JSON.stringify(withNorms).includes(NORM_SOURCE), false);
+});
+
+test('el largo de una norma se cuenta como lo lee una persona: una letra acentuada es un carácter, compuesta o descompuesta, y también uno fuera del plano básico', () => {
+  const at = message => [`products[0].standards[0].text: ${message}`];
+  const tooLong = 'tiene 81 caracteres y el máximo es 80; escribe solo la designación de la norma.';
+  // «EN 1» y el resto de la norma con la letra dada: 80 y 81 caracteres en total.
+  const designation = (letter, length) => `EN 1${letter.repeat(length - 4)}`;
+  for (const [form, letter] of [['compuesta', 'é'.normalize('NFC')], ['descompuesta', 'é'.normalize('NFD')], ['fuera del plano básico', '\u{1D400}']]) {
+    for (const status of STATUSES) {
+      assert.deepEqual(errorsOf({ status, standards: [norm(designation(letter, 80))] }), [], `${form} 80 ${status}`);
+      assert.deepEqual(errorsOf({ status, standards: [norm(designation(letter, 81))] }), at(tooLong), `${form} 81 ${status}`);
+    }
+  }
+});
+
+test('una norma es una designación: una sola palabra sin número se rechaza; varias palabras, o una con número, no', () => {
+  const message = text => [`products[0].standards[0].text: «${text}» es una sola palabra y no lleva número; escribe la designación completa de la norma como la imprime el fabricante, por ejemplo «EN 388:2016 4131A».`];
+  for (const status of STATUSES) {
+    for (const text of ['ANSI', 'NIOSH', 'CE', 'ANSI/ISEA', 'Ignífugo']) assert.deepEqual(errorsOf({ status, standards: [norm(text)] }), message(text), `${status} ${text}`);
+    // La segunda de dos normas también, con su posición.
+    assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A'), norm('ASTM')] }), ['products[0].standards[1].text: «ASTM» es una sola palabra y no lleva número; escribe la designación completa de la norma como la imprime el fabricante, por ejemplo «EN 388:2016 4131A».'], status);
+    for (const text of ['Aprobado por NIOSH', 'Norma sintética', 'Z87', 'EN388', 'Categoría III', 'Clase E']) assert.deepEqual(errorsOf({ status, standards: [norm(text)] }), [], `${status} ${text}`);
+  }
 });
