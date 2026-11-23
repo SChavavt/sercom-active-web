@@ -2,9 +2,15 @@
 // Enlaces de WhatsApp y de correo, y plantillas de mensaje, con los datos de `src/data/business.json`.
 // Para cambiar el contacto se edita ese archivo; aquí no hay nombres, números ni correos escritos.
 //
+// Exporta `contactDetails` (los datos que se muestran, sin dirección), `contactLinks` (los enlaces de cada borrador),
+// `messages` y `subjects` (textos y asuntos), `whatsappUrl`, `mailtoUrl`, `absoluteUrl` y `contactFromBusiness`.
+//
 // SOLO PARA COMPILACIÓN (frontmatter de archivos .astro) y pruebas. Un <script> de navegador no debe
-// importarlo: arrastraría `business.json` completo, con datos que no se publican. En el navegador se usan
-// `withPageLink` y `withRequestDescription` de `contact-core.mjs`, que trabajan sobre el `href` ya construido.
+// alcanzarlo, ni directamente ni a través de otro módulo: arrastraría `business.json` completo, con datos que no se
+// publican. Los scripts del navegador solo alcanzan los módulos sin datos de `BROWSER_MODULES`
+// (tests/build-mode.test.mjs); de `contact-core.mjs` usan lo que trabaja sobre un `href` ya construido (`withPageLink`,
+// `withFieldValues`, `withMessage`, `draftLinks`…) y lo que arma el texto de un mensaje (`composeListMessage`,
+// `listItem`). Ver docs/datos-y-modos.md, secciones 2 y 4.
 //
 // Abrir WhatsApp o el correo no envía nada: la página nunca debe mostrar una confirmación de recepción.
 import business from '../data/business.json' with { type: 'json' };

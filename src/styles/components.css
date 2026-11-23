@@ -684,8 +684,9 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
    con `field--framed`, una casilla con su propio filete dentro de una celda más ancha). Los controles nunca usan
    letra de menos de 16 px (iOS agrandaría la página al enfocarlos) y miden al menos 44 px de alto en todo ancho.
    Dibujan su propio filete azul de 1 px solo: `.field--framed`, `.stepper` (las casillas del selector de cantidad),
-   `.check-row__box` (el cuadro de la casilla) y un `.btn` apagado (`.btn[aria-disabled="true"]`, de cualquier
-   variante: caja blanca con filete azul claro). Fuera de eso, ningún control tiene borde propio. Sin colores de
+   `.check-row__box` (el cuadro de la casilla), `.btn--outline` (4.3: blanco con filete azul, la acción secundaria de
+   un bloque) y un `.btn` apagado (`.btn[aria-disabled="true"]`, de cualquier variante: caja blanca con filete azul
+   claro). Fuera de eso, ningún control tiene borde propio (docs/diseno.md, sección 3). Sin colores de
    estado: un error se marca con texto en tinta y peso, un icono y una barra de tinta. Componentes: Field, Select,
    Stepper (+ StepperScript), CheckRow y StatusLine; ActionRow y Button sin href imprimen <button>. */
 
