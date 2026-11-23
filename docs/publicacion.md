@@ -4,7 +4,7 @@ Qué se ejecuta antes de proponer un cambio, qué debe ejecutar un alojamiento, 
 
 ## 1. Repositorio y comprobaciones locales
 
-Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 2, en borrador; `main` todavía no lo tiene.
+Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 2, que espera revisión; `main` todavía no lo tiene.
 
 ```bash
 git clone https://github.com/SChavavt/sercom-active-web.git
@@ -83,7 +83,7 @@ Ningún punto se hace antes de que el propietario apruebe publicar.
 4. En Safari de un iPhone, la lista después de más de siete días en los que se use Safari sin visitar el sitio (la regla cuenta días de uso del navegador, no de calendario): si se borró, como se espera, que la página de privacidad y [`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador) ya lo digan (hoy la página de privacidad dice «si pasan varios días»).
 5. Firefox y Safari, en computadora y en teléfono, un lector de pantalla real y los colores forzados de un Windows real, en las páginas del paso 2.
 6. En un navegador real, volver con Atrás a una página guardada en la caché de ida y vuelta (la ficha después de agregar un producto y «Cotizar mi lista» después de cambiar la lista en otra pestaña), y en Safari escribir rápido en la búsqueda del catálogo para ver si la dirección de la página se queda atrás.
-7. En un teléfono real, en «Cotizar mi lista»: escribir una cantidad no válida en un renglón y, sin salir del campo, tocar un control de más abajo («Quitar» de otro renglón, «Vaciar cotización», un envío). El control debe responder al primer toque, y «+» de otro renglón, a cada toque seguido ([`diseno.md`](diseno.md#168-estados)). Y dos toques seguidos en «Quitar», «Unirlos», «Vaciar cotización» y «Deshacer»: el segundo no debe abrir otra página ni cambiar otro renglón ([`diseno.md`](diseno.md#164-cotizar-mi-lista)). Solo se probó en Chromium, con ratón y con el tacto emulado.
+7. En un teléfono real, en «Cotizar mi lista»: escribir una cantidad no válida en un renglón y, sin salir del campo, tocar un control de más abajo («Quitar» de otro renglón, «Vaciar cotización», un envío). El control debe responder al primer toque, y «+» de otro renglón, a cada toque seguido; después, un toque en otro control de ese renglón o del siguiente debe caer donde se ve ([`diseno.md`](diseno.md#168-estados)). Y dos toques seguidos en «Quitar», «Unirlos», «Vaciar cotización», «Deshacer» y «Quitarlo de mi cotización»: el segundo no debe abrir otra página ni cambiar otro renglón ([`diseno.md`](diseno.md#164-cotizar-mi-lista)). En una computadora, lo mismo con el ratón, con el doble clic del sistema en su ajuste más lento y con el botón de en medio. Solo se probó en Chromium, con ratón y con el tacto emulado.
 
 **La página de privacidad la revisa la empresa.** El texto de `/privacidad/` dice qué guarda el navegador y qué no sale de él, pero es un borrador y no es el aviso de privacidad de la empresa: la empresa lo revisa, y entrega su aviso, antes de publicar.
 
