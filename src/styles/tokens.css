@@ -21,7 +21,7 @@
   /* Grises neutros (solo texto) */
   --grey-700: #46464C;          /* texto secundario, 9.4:1 sobre blanco */
   --grey-600: #5A5B62;          /* texto terciario y marcadores de campo, 6.8:1 sobre blanco */
-  --grey-300: #C9CACE;          /* diagonales de la ruta de navegación (.crumbs__sep); no hay controles deshabilitados */
+  --grey-300: #C9CACE;          /* diagonales de la ruta de navegación (.crumbs__sep); los controles apagados no lo usan (components.css, 4.3) */
 
   /* Funciones */
   --rule: var(--blue);          /* el filete */
