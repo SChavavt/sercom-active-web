@@ -1914,3 +1914,51 @@ test('R-RULE-13 dice en --rules que pasan los enlaces del fabricante publicados 
   assert.match(doc, /salvo los enlaces del fabricante publicados en brands\.json/);
   assert.doesNotMatch(doc, /salvo los «Sitio del fabricante»/);
 });
+
+test('R-RULE-13: la página de donde viene la foto de una ficha aprobada pasa en la página de esa ficha, aunque el registro la tenga, y en ninguna otra', async () => {
+  // Una marca cuyo único recurso del registro es la página de un producto: la foto de su ficha viene de ahí.
+  const productPage = data.registry.sources.flatMap(source => source.resources.filter(resource => resource.type === 'product_page').map(resource => ({ brandId: source.entity_id, url: resource.url })))[0];
+  assert.ok(productPage, 'el registro tiene la página de un producto');
+  const published = new Set(data.brands.flatMap(brand => brand.manufacturerLinks.map(link => link.url)));
+  assert.ok(!published.has(productPage.url));
+  const otherUrl = data.registry.sources.flatMap(source => source.resources.map(resource => resource.url)).find(url => url !== productPage.url && !published.has(url));
+  const approval = { by: 'Revisor de prueba', on: '2026-11-23', supplyConfirmed: true };
+  const image = { file: 'foto-de-prueba.jpg', alt: 'Foto de prueba', sourceUrl: productPage.url, usageConfirmed: true };
+  const catalog = structuredClone(emptiedData.catalog);
+  catalog.categories[0].status = 'approved';
+  catalog.products.push(
+    { id: 'ficha-con-foto', brandId: productPage.brandId, status: 'approved', approval, image },
+    { id: 'ficha-sin-foto', brandId: productPage.brandId, status: 'approved', approval },
+    { id: 'ficha-retirada', brandId: productPage.brandId, status: 'retired', approval, image },
+  );
+  const options = { data: { ...emptiedData, catalog } };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">Marca<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  const pages = (overrides = {}) => ({
+    'productos/ficha-con-foto/index.html': page(`<h1>Ficha con foto</h1>${credit(productPage.url)}`),
+    'productos/ficha-sin-foto/index.html': page('<h1>Ficha sin foto</h1>'),
+    'productos/ficha-retirada/index.html': page('<h1>Ficha retirada</h1>'),
+    ...overrides,
+  });
+  // En la página de su ficha, el crédito de la foto pasa.
+  assert.deepEqual(failures(await scan(pages(), options)), []);
+  // En cualquier otra página, la misma dirección es un enlace del registro: falla.
+  for (const [path, title] of [['productos/ficha-sin-foto/index.html', 'Ficha sin foto'], ['productos/ficha-retirada/index.html', 'Ficha retirada'], ['catalogo/index.html', 'Catálogo'], [`marcas/${productPage.brandId}/index.html`, 'Marca']]) {
+    const result = await scan(pages({ [path]: page(`<h1>${title}</h1>${credit(productPage.url)}`) }), options);
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-13', path]], path);
+    assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+  }
+  // En la página de la ficha con foto, otra dirección del registro sigue fallando.
+  const other = await scan(pages({ 'productos/ficha-con-foto/index.html': page(`<h1>Ficha con foto</h1>${credit(productPage.url)}${credit(otherUrl)}`) }), options);
+  assert.deepEqual(failures(other).map(finding => [finding.id, finding.file]), [['R-RULE-13', 'productos/ficha-con-foto/index.html']]);
+  assert.ok(failures(other)[0].message.endsWith(otherUrl.slice(0, 90)));
+  // Si la ficha vuelve a borrador, su página ya no existe y la dirección no pasa en ninguna parte.
+  const draft = structuredClone(catalog);
+  draft.products[0].status = 'draft';
+  const asDraft = await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1>${credit(productPage.url)}`), 'productos/ficha-sin-foto/index.html': page('<h1>Ficha sin foto</h1>'), 'productos/ficha-retirada/index.html': page('<h1>Ficha retirada</h1>') }, { data: { ...emptiedData, catalog: draft } });
+  assert.deepEqual(failedIds(asDraft), ['R-RULE-13']);
+});
+
+test('R-RULE-13 dice en --rules que el crédito de la foto pasa solo en la página de su ficha aprobada', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /la página de donde viene la foto de una ficha aprobada \(image\.sourceUrl\), solo en la página de esa ficha/);
+});
