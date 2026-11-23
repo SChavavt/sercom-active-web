@@ -1,7 +1,7 @@
-// Búsqueda por palabras: plurales, los tres pares de sinónimos revisados y la línea de resultados con filtros.
+// Búsqueda por palabras: plurales, los tres grupos de sinónimos revisados y la línea de resultados con filtros.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterProducts, matchesQuery, matchesSearchText, resultSummary, resultSummaryParts, SEARCH_SYNONYMS, searchText, singularForms, tokenAlternatives } from '../src/lib/search.mjs';
+import { filterProducts, matchesQuery, matchesSearchText, resultSummary, resultSummaryParts, SEARCH_SYNONYMS, searchMatcher, searchText, singularForms, tokenAlternatives } from '../src/lib/search.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
 import { loadProjectData } from './helpers.mjs';
 
@@ -51,14 +51,16 @@ test('tokenAlternatives: la palabra, sus singulares y los sinónimos de esas for
   assert.deepEqual(tokenAlternatives('lente'), ['lente', 'gafa']);
   assert.deepEqual(tokenAlternatives('botas'), ['botas', 'bota', 'calzado']);
   assert.deepEqual(tokenAlternatives('calzado'), ['calzado', 'bota']);
-  assert.deepEqual(tokenAlternatives('orejeras'), ['orejeras', 'orejera', 'auditiva']);
-  assert.deepEqual(tokenAlternatives('auditiva'), ['auditiva', 'orejera']);
+  assert.deepEqual(tokenAlternatives('orejeras'), ['orejeras', 'orejera', 'auditiva', 'auditivo']);
+  assert.deepEqual(tokenAlternatives('auditiva'), ['auditiva', 'orejera', 'auditivo']);
+  assert.deepEqual(tokenAlternatives('auditivos'), ['auditivos', 'auditivo', 'orejera', 'auditiva']);
 });
 
-test('SEARCH_SYNONYMS son exactamente los tres pares revisados, congelados', () => {
-  assert.deepEqual(SEARCH_SYNONYMS, [['lente', 'gafa'], ['bota', 'calzado'], ['orejera', 'auditiva']]);
+test('SEARCH_SYNONYMS son exactamente los tres grupos revisados, congelados', () => {
+  // «Orejeras / protección auditiva» lleva el adjetivo en sus dos géneros: «auditiva» y «auditivo».
+  assert.deepEqual(SEARCH_SYNONYMS, [['lente', 'gafa'], ['bota', 'calzado'], ['orejera', 'auditiva', 'auditivo']]);
   assert.ok(Object.isFrozen(SEARCH_SYNONYMS) && SEARCH_SYNONYMS.every(group => Object.isFrozen(group)));
-  // Nada fuera de los tres pares es un sinónimo.
+  // Nada fuera de los tres grupos es un sinónimo.
   for (const word of ['zapato', 'goggle', 'careta', 'casco', 'cachucha', 'tapon', 'respirador', 'mascarilla', 'anteojo', 'tenis', 'protector']) {
     assert.deepEqual(tokenAlternatives(word), [word], word);
   }
@@ -86,17 +88,85 @@ test('un singular sigue encontrando el plural (la palabra se busca en cualquier 
   assert.equal(finds(product('Lentes sintéticos de prueba'), 'lente'), true);
 });
 
-test('las formas singulares y los sinónimos solo coinciden al principio de una palabra', () => {
-  // «arnes» da la raíz «arn» (regla 2): no debe encontrar «carnaza».
-  assert.equal(finds(product('Guante sintético de carnaza'), 'arnes'), false);
-  assert.deepEqual(filterProducts(previewProducts, 'arnes').map(item => item.code), ['EJ-6001']);
+test('una forma singular o un sinónimo de 5 letras o más coincide en cualquier parte, como la palabra escrita', () => {
+  // Lo que encuentra el singular lo encuentra el plural, también dentro de una palabra compuesta.
+  for (const [name, singular, plural] of [
+    ['Sobrelente sintético de prueba', 'lente', 'lentes'],
+    ['Sobreguante sintético de prueba', 'guante', 'guantes'],
+    ['Subcasco sintético de prueba', 'casco', 'cascos'],
+    ['Semicareta sintética de prueba', 'careta', 'caretas'],
+  ]) {
+    assert.equal(finds(product(name, ['Ropa']), singular), true, `${singular} → ${name}`);
+    assert.equal(finds(product(name, ['Ropa']), plural), true, `${plural} → ${name}`);
+  }
+  // Un sinónimo largo también: «botas» encuentra «Cubrecalzado» por «calzado»; «gafas», «Sobrelente» por «lente».
+  assert.equal(finds(product('Cubrecalzado sintético de prueba', ['Ropa']), 'botas'), true);
+  assert.equal(finds(product('Sobrelente sintético de prueba', ['Ropa']), 'gafas'), true);
+  // La raíz larga de la regla 2: «arneses» → «arnes», «tapones» → «tapon».
   assert.deepEqual(filterProducts(previewProducts, 'arneses').map(item => item.code), ['EJ-6001']);
-  // «pares» da «par»: encuentra «Par …», no «Separador …».
-  assert.equal(finds(product('Separador sintético de prueba', ['Ropa']), 'pares'), false);
-  assert.equal(finds(product('Par sintético de prueba', ['Ropa']), 'pares'), true);
+  assert.equal(finds(product('Portatapón sintético de prueba', ['Ropa']), 'tapones'), true);
+});
+
+test('una forma de 4 letras solo coincide al principio de una palabra', () => {
+  // «micas» da «mica»: encuentra «Mica …» y no un producto de «Protección química».
+  assert.equal(finds(product('Mica sintética de prueba', ['Ropa']), 'micas'), true);
+  assert.equal(finds(product('Traje sintético de prueba', ['Protección química']), 'micas'), false);
   // El sinónimo «gafa» de «lentes» no encuentra «Agafador»; «lente» sí encuentra «Lentes».
   assert.equal(finds(product('Agafador sintético de prueba', ['Ropa']), 'lentes'), false);
   assert.equal(finds(product('Lentes sintéticos de prueba', ['Ropa']), 'gafas'), true);
+  // «botas» da «bota»: encuentra «Bota …» y «Botas …», no «Sabotaje …».
+  assert.equal(finds(product('Bota sintética de prueba', ['Ropa']), 'botas'), true);
+  assert.equal(finds(product('Sabotaje sintético de prueba', ['Ropa']), 'botas'), false);
+  // «cables» da la raíz «cabl»: encuentra «Cable …».
+  assert.equal(finds(product('Cable sintético de prueba', ['Ropa']), 'cables'), true);
+});
+
+test('una forma de 3 letras solo coincide con la palabra completa, sola o seguida de «e»', () => {
+  // «arnes» da la raíz «arn» (regla 2): no debe encontrar «carnaza».
+  assert.equal(finds(product('Guante sintético de carnaza'), 'arnes'), false);
+  assert.deepEqual(filterProducts(previewProducts, 'arnes').map(item => item.code), ['EJ-6001']);
+  // «pares» da «par»: encuentra «Par …», no «Separador …» ni cada producto que dice «para».
+  assert.equal(finds(product('Par sintético de prueba', ['Ropa']), 'pares'), true);
+  assert.equal(finds(product('Guante sintético (par)', ['Ropa']), 'pares'), true);
+  assert.equal(finds(product('Separador sintético de prueba', ['Ropa']), 'pares'), false);
+  assert.equal(finds(product('Careta sintética para soldar', ['Ropa']), 'pares'), false);
+  assert.equal(finds(product('Parka sintética de prueba', ['Ropa']), 'pares'), false);
+  assert.deepEqual(filterProducts(previewProducts, 'pares'), []);
+  // «redes» da «red»: encuentra «Red …», no «Redondo …».
+  assert.equal(finds(product('Red sintética para cabello', ['Ropa']), 'redes'), true);
+  assert.equal(finds(product('Tope sintético redondo', ['Ropa']), 'redes'), false);
+  // «bases» da «bas»: el singular es «base» (la raíz seguida de «e»); no encuentra «Bastón …» ni «básico».
+  assert.equal(finds(product('Base sintética para cono', ['Ropa']), 'bases'), true);
+  assert.equal(finds(product('Bastón sintético de prueba', ['Ropa']), 'bases'), false);
+  assert.equal(finds(product('Arnés sintético básico', ['Ropa']), 'bases'), false);
+  // «pies» da «pie»: encuentra «… de pie», no «Pieza …» ni «… de piel».
+  assert.equal(finds(product('Protector sintético de pie', ['Ropa']), 'pies'), true);
+  assert.equal(finds(product('Pieza sintética de piel', ['Ropa']), 'pies'), false);
+  // «kits» da «kit»; «luces» da «luz».
+  assert.equal(finds(product('Kit sintético de prueba', ['Ropa']), 'kits'), true);
+  assert.equal(finds(product('Luz sintética de prueba', ['Ropa']), 'luces'), true);
+});
+
+test('un signo pegado a la palabra no apaga el plural ni los sinónimos', () => {
+  const guante = product('Guante sintético de prueba');
+  for (const query of ['guantes,', 'guantes.', '(guantes)', '¿guantes?', '«guantes»', 'guantes;']) assert.equal(finds(guante, query), true, query);
+  assert.equal(finds(product('Lente sintético de prueba', ['Ropa']), '¿gafas?'), true);
+  assert.deepEqual(filterProducts(previewProducts, 'guantes,').map(item => item.code), ['EJ-1001', 'EJ-1003', 'EJ-1004']);
+  // Un código sigue buscándose tal cual: «ej-1001s» no es un plural.
+  assert.deepEqual(filterProducts(previewProducts, 'ej-1001s'), []);
+});
+
+test('searchMatcher prepara la consulta una vez y da lo mismo que matchesSearchText', () => {
+  const texts = previewProducts.map(searchText);
+  for (const query of ['', '   ', 'guantes', 'lentes de seguridad', 'EJ-1001', 'ej1001', 'gafas', 'zzzz', 'guantes guantes guantes', '%%']) {
+    const matches = searchMatcher(query);
+    assert.deepEqual(texts.map(text => matches(text)), texts.map(text => matchesSearchText(text, query)), query);
+  }
+  assert.equal(searchMatcher('guante')(null), false);
+  assert.equal(searchMatcher('')(null), true);
+  // Una consulta enorme con la misma palabra repetida da lo mismo que la palabra sola.
+  const repeated = searchMatcher('guantes '.repeat(12500));
+  assert.deepEqual(texts.map(text => repeated(text)), texts.map(text => matchesSearchText(text, 'guantes')));
 });
 
 test('«gris» no tiene singular y no encuentra un producto que solo dice «grip»', () => {
@@ -104,7 +174,7 @@ test('«gris» no tiene singular y no encuentra un producto que solo dice «grip
   assert.equal(finds(product('Guante sintético gris'), 'gris'), true);
 });
 
-test('los tres pares funcionan en las dos direcciones', () => {
+test('los tres grupos funcionan en las dos direcciones', () => {
   const lente = product('Lente sintético de prueba', ['Protección de ojos y cara']);
   const gafa = product('Gafa sintética de prueba', ['Protección de ojos y cara']);
   const bota = product('Bota sintética de prueba', ['Ropa']);
@@ -116,6 +186,11 @@ test('los tres pares funcionan en las dos direcciones', () => {
   assert.equal(finds(product('Calzado sintético de prueba', ['Ropa']), 'botas'), true);
   assert.equal(finds(auditiva, 'orejeras'), true);
   assert.equal(finds(orejera, 'auditiva'), true);
+  // El adjetivo en masculino: «tapones auditivos» y «protector auditivo» son la misma protección.
+  assert.equal(finds(orejera, 'auditivo'), true);
+  assert.equal(finds(orejera, 'auditivos'), true);
+  assert.equal(finds(product('Tapón auditivo sintético de prueba', ['Ropa']), 'orejeras'), true);
+  assert.equal(finds(product('Tapón auditivo sintético de prueba', ['Ropa']), 'auditiva'), true);
   // Con los ejemplos de la vista previa.
   assert.deepEqual(filterProducts(previewProducts, 'gafas').map(item => item.code), ['EJ-2001']);
   assert.deepEqual(filterProducts(previewProducts, 'orejeras').map(item => item.code), ['EJ-5001']);

@@ -7,7 +7,8 @@
 //   - en el navegador: `matchesSearchText(card.dataset.search, input.value)` para mostrar u ocultar la tarjeta.
 //
 // Cada palabra de la consulta se busca tal como se escribió y, además, en sus formas singulares (`singularForms`) y en
-// los sinónimos revisados (`SEARCH_SYNONYMS`): «guantes» encuentra «Guante …» y «gafas» encuentra «Lente …».
+// los sinónimos revisados (`SEARCH_SYNONYMS`): «guantes» encuentra «Guante …» y «gafas» encuentra «Lente …». Cuánto
+// debe coincidir cada una de esas otras formas depende de su largo (`matchesForm`).
 /** @import { SearchableProduct } from '../types/site.ts' */
 import { cleanQuery, normalizeCode, normalizeText } from './text.mjs';
 
@@ -52,7 +53,8 @@ export function searchText(product) {
 export const SEARCH_SYNONYMS = Object.freeze([
   Object.freeze(['lente', 'gafa']),
   Object.freeze(['bota', 'calzado']),
-  Object.freeze(['orejera', 'auditiva']),
+  // «Orejeras / protección auditiva» en el plan: el adjetivo va en sus dos géneros («tapón auditivo», «protección auditiva»).
+  Object.freeze(['orejera', 'auditiva', 'auditivo']),
 ]);
 
 // Solo una palabra hecha únicamente de letras tiene plural: un código («37-175», «ej1001») se busca tal cual.
@@ -99,40 +101,74 @@ export function tokenAlternatives(token) {
   return [...result];
 }
 
+/** Una letra o una cifra: lo que forma una palabra. */
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
 /**
  * ¿`needle` aparece en `haystack` al principio de una palabra (al inicio o después de algo que no es letra ni cifra)?
+ * Con `whole`, además debe terminar ahí la palabra (al final o antes de algo que no es letra ni cifra).
  * @param {string} haystack
  * @param {string} needle
+ * @param {boolean} [whole]
  */
-function startsWord(haystack, needle) {
+function startsWord(haystack, needle, whole = false) {
   for (let from = haystack.indexOf(needle); from !== -1; from = haystack.indexOf(needle, from + 1)) {
-    if (from === 0 || !/[\p{L}\p{N}]/u.test(haystack[from - 1] ?? '')) return true;
+    if (from > 0 && WORD_CHARACTER.test(haystack[from - 1] ?? '')) continue;
+    if (!whole || !WORD_CHARACTER.test(haystack[from + needle.length] ?? '')) return true;
   }
   return false;
 }
 
 /**
- * La palabra tal como se escribió coincide en cualquier parte del texto («guant» encuentra «guante»), igual que su forma
- * de código sin separadores («37175» encuentra «37-175»). Sus formas singulares y sus sinónimos solo coinciden al
- * principio de una palabra: la raíz de una regla puede ser corta («arnes» da «arn») y, en medio de otra palabra
- * («carnaza»), encontraría productos que nadie buscó.
+ * ¿Una forma singular o un sinónimo de una palabra de la consulta coincide con el texto? Cuanto más corta es la forma,
+ * más exacta debe ser la coincidencia, porque una forma corta aparece por casualidad dentro de otras palabras:
+ *   - 5 letras o más: en cualquier parte del texto, igual que una palabra escrita («lentes» → «lente» encuentra
+ *     «Sobrelente», «guantes» → «guante» encuentra «Sobreguante»);
+ *   - 4 letras: al principio de una palabra («micas» → «mica» encuentra «Mica clara» y no «Protección química»;
+ *     «cables» → «cabl» encuentra «Cable»);
+ *   - 3 letras: la palabra completa, sola o seguida de «e» («pares» → «par» encuentra «Par …» y no «para» ni
+ *     «Separador»; «bases» → «bas» encuentra «Base …» y no «Bastón»; «arnes» → «arn» no encuentra «carnaza»).
  * @param {string} haystack Texto producido por `searchText`.
- * @param {string[]} tokens Resultado de `queryTokens`.
+ * @param {string} form Forma normalizada (`tokenAlternatives`).
  */
-function matchesTokens(haystack, tokens) {
-  return tokens.every(token => haystack.includes(token) || haystack.includes(normalizeCode(token))
-    || tokenAlternatives(token).slice(1).some(form => startsWord(haystack, form)));
+function matchesForm(haystack, form) {
+  const length = Array.from(form).length;
+  if (length >= 5) return haystack.includes(form);
+  if (length === 4) return startsWord(haystack, form);
+  return startsWord(haystack, form, true) || startsWord(haystack, `${form}e`, true);
+}
+
+/**
+ * Prepara una consulta UNA vez y devuelve la función que dice si un texto de búsqueda (resultado de `searchText`) la
+ * cumple: el texto debe tener todas las palabras de la consulta. Una palabra coincide tal como se escribió, en cualquier
+ * parte del texto («guant» encuentra «guante»), o en su forma de código sin separadores («37175» encuentra «37-175»), o
+ * en una de sus formas singulares o sus sinónimos (`tokenAlternatives` de la palabra sin signos: «guantes,» y
+ * «¿lentes?» se buscan como «guantes» y «lentes»), con la exactitud que pide `matchesForm`. Una consulta vacía coincide
+ * con todo. Para filtrar muchas tarjetas con la misma consulta, llama a esta función una vez y usa su resultado en
+ * cada tarjeta.
+ * @param {unknown} query
+ * @returns {(text: string | null | undefined) => boolean}
+ */
+export function searchMatcher(query) {
+  const words = [...new Set(queryTokens(query))].map(token => {
+    const compact = normalizeCode(token);
+    return { token, compact, forms: tokenAlternatives(compact).slice(1) };
+  });
+  return text => {
+    const haystack = String(text ?? '');
+    return words.every(({ token, compact, forms }) => haystack.includes(token) || haystack.includes(compact) || forms.some(form => matchesForm(haystack, form)));
+  };
 }
 
 /**
  * ¿El texto de búsqueda de un producto (resultado de `searchText`) contiene todas las palabras de la consulta (cada una
- * tal como se escribió o en una de sus formas, ver `matchesTokens`)? Una consulta vacía coincide con todo.
+ * tal como se escribió o en una de sus formas, ver `searchMatcher`)? Una consulta vacía coincide con todo.
  * @param {string | null | undefined} text
  * @param {unknown} query
  * @returns {boolean}
  */
 export function matchesSearchText(text, query) {
-  return matchesTokens(String(text ?? ''), queryTokens(query));
+  return searchMatcher(query)(text);
 }
 
 /**
@@ -155,9 +191,9 @@ export function matchesQuery(product, query) {
  * @returns {T[]}
  */
 export function filterProducts(products, query) {
-  const tokens = queryTokens(query);
-  if (tokens.length === 0) return [...products];
-  return products.filter(product => matchesTokens(searchText(product), tokens));
+  if (!isActiveQuery(query)) return [...products];
+  const matches = searchMatcher(query);
+  return products.filter(product => matches(searchText(product)));
 }
 
 /**
