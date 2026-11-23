@@ -200,7 +200,7 @@
 
 /* Número de productos de la lista junto a «Cotizar mi lista» (QuoteCount): una cajita recta con cifras tabulares, en
    el color inverso de su fondo (azul sólido con cifras blancas sobre blanco; blanca con cifras azules en el bloque
-   sólido). Siempre fuera del flujo, dentro de su enlace: aparecer, pasar de «3» a «99+» o volver a 0 no mueve nada.
+   sólido). Siempre fuera del flujo, dentro de su enlace: aparecer, pasar de «3» a «120» o volver a 0 no mueve nada.
    Sobre la esquina del icono donde el enlace lo muestra (el bloque desde 1360 px, la barra fija del celular): su
    referencia es el texto, que va justo después del icono y centrado con él; crece hacia la izquierda y hacia arriba,
    sin tocar el texto. En la fila del menú, al final de la fila (responsive.css 6.10). Oculto con la lista vacía.

@@ -647,14 +647,17 @@ export function listCountLabel(count) {
 }
 
 /**
- * El número junto a «Cotizar mi lista»: cadena vacía con 0, «7», «99» y «99+» desde 100.
+ * El número junto a «Cotizar mi lista»: cadena vacía con 0 y, si no, el número exacto («7», «120», «200»). La lista
+ * tiene a lo más `MAX_LINES` renglones, así que son tres cifras como mucho; por si ese máximo cambia, desde 1,000 es
+ * «999+». Es el mismo número que dice el nombre del enlace (`listCountLabel`: «Cotizar mi lista, 120 productos»): lo
+ * que se ve forma parte de lo que se oye y de lo que hay que decir para activarlo con la voz.
  * @param {number} count
  * @returns {string}
  */
 export function badgeText(count) {
   const total = Math.max(0, Math.trunc(Number(count)) || 0);
   if (total === 0) return '';
-  return total > 99 ? '99+' : String(total);
+  return total > 999 ? '999+' : String(total);
 }
 
 /**

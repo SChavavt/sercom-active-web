@@ -479,8 +479,11 @@ test('frases del mensaje y de las líneas de estado', () => {
   assert.equal(badgeText(-2), '');
   assert.equal(badgeText(7), '7');
   assert.equal(badgeText(99), '99');
-  assert.equal(badgeText(100), '99+');
-  assert.equal(badgeText(200), '99+');
+  // El número exacto hasta el máximo de la lista: el nombre del enlace dice el mismo («…, 120 productos»).
+  assert.equal(badgeText(100), '100');
+  assert.equal(badgeText(MAX_LINES), '200');
+  assert.equal(badgeText(999), '999');
+  assert.equal(badgeText(1000), '999+');
   assert.equal(nameLabel('Cantidad de {nombre}', 'Guante recubierto'), 'Cantidad de Guante recubierto');
   assert.equal(nameLabel('Quitar {nombre} ({nombre})', 'Casco $& $1'), 'Quitar Casco $& $1 (Casco $& $1)');
   assert.equal(nameLabel('Cantidad de {nombre}', '  Guante\n rojo '), 'Cantidad de Guante rojo');
