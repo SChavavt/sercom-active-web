@@ -4,13 +4,13 @@ Sitio de presentación y catálogo de Sercom Active, con atención comercial en 
 
 ## Estado
 
-**El paso 1 (diseño y navegación completa) está aprobado y el paso 2 (buscador, filtros y «Mi cotización») está construido y en revisión. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
+**Los pasos 1 (diseño y navegación completa) y 2 (buscador, filtros y «Mi cotización») están aprobados e integrados en `main`. El paso 3 (catálogo piloto) está en curso. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
 
 | Paso | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Diseño y navegación completa | Aprobado el 22 de noviembre de 2026 (solicitud de cambios n.º 1) |
-| **2** | **Buscador, filtros y «Mi cotización»** | **Construido; en revisión (solicitud de cambios n.º 2)** |
-| 3 | Catálogo piloto (30 a 50 productos reales) | Pendiente |
+| 2 | Buscador, filtros y «Mi cotización» | Aprobado el 23 de noviembre de 2026 (solicitud de cambios n.º 2) |
+| **3** | **Catálogo piloto (30 a 50 productos reales)** | **En curso: primero la preparación técnica; los productos esperan la selección y la aprobación del contacto comercial** |
 | 4 | Publicación y QR | Pendiente |
 
 - Todas las páginas existen con el diseño «Lámina técnica» que eligió el propietario: portada, catálogo, categorías, marcas, ficha de producto, «Cotizar mi lista», solicitud especial, contacto, privacidad y la página de error.

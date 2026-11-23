@@ -4,7 +4,7 @@ Qué se ejecuta antes de proponer un cambio, qué debe ejecutar un alojamiento, 
 
 ## 1. Repositorio y comprobaciones locales
 
-Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 2, que espera revisión; `main` todavía no lo tiene.
+Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en `main` desde el 23 de noviembre de 2026 (solicitud de cambios n.º 2).
 
 ```bash
 git clone https://github.com/SChavavt/sercom-active-web.git

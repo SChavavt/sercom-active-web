@@ -10,15 +10,15 @@ El propietario aprobó cuatro pasos el 18 de noviembre de 2026, con la indicaci�
 
 **Estado.** Aprobado el 22 de noviembre de 2026, al integrar en `main` la solicitud de cambios n.º 1.
 
-## Paso 2. Buscador, filtros y «Mi cotización» — construido, en revisión
+## Paso 2. Buscador, filtros y «Mi cotización» — aprobado
 
 **Entrega.** Filtros combinables en el catálogo y regreso a los resultados conservando su estado; «Agregar a mi cotización» en la ficha; la lista que se arma en el sitio, guardada solo en el navegador del cliente, con cantidades, unidades y variantes; resumen para copiar, envío por WhatsApp o correo y manejo de mensajes largos; la solicitud especial guiada. Los adjuntos siguen enviándose por WhatsApp o correo.
 
 **Se acepta cuando** la búsqueda encuentra por código, marca y sin acentos; los filtros se combinan; la lista funciona con teclado, vacía y con muchos productos, con cantidades y unidades; ninguna página dice «recibimos tu solicitud» al abrir otra aplicación. Registrar la recepción en un sistema exigiría un servidor y un canal real, que no forman parte de este paso.
 
-**Estado.** Construido en la solicitud de cambios n.º 2, que espera la revisión de quien dirige el proyecto: nada de este paso está aprobado, integrado ni publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
+**Estado.** Aprobado el 23 de noviembre de 2026, al integrar en `main` la solicitud de cambios n.º 2. Nada está publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
 
-## Paso 3. Catálogo piloto (30 a 50 productos reales) — pendiente
+## Paso 3. Catálogo piloto (30 a 50 productos reales) — en curso
 
 **Entrega.** Con el contacto comercial, las categorías y modelos prioritarios que Sercom Active puede suministrar; de 30 a 50 fichas con fuente, código exacto, unidad, variantes aplicables, imagen con uso confirmado, resumen y características verificadas, aprobadas una por una. Antes de cargarlas: ampliar el esquema de imagen (archivo local o dirección, con ancho y alto) y decidir cómo se revisa el texto de los fabricantes frente a las reglas del sitio. Al haber productos aprobados, los ejemplos dejan de ser necesarios.
 
@@ -51,7 +51,7 @@ Notas anteriores usan las «entregas» 0 a 5 de la versión anterior de este doc
 
 La lista al día, con quién responde y lo que bloquea cada punto, está en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio). En resumen:
 
-- La revisión del paso 2 y la aprobación de todos los textos del sitio por el contacto comercial, incluidos los nuevos del paso 2 y el aviso de privacidad, que la empresa revisa.
+- La aprobación de todos los textos del sitio por el contacto comercial, incluidos los del paso 2 y el aviso de privacidad, que la empresa revisa.
 - La prueba del número de WhatsApp en un teléfono real.
 - Qué categorías se aprueban y qué modelos prioritarios se pueden conseguir, con sus fuentes e imágenes de uso permitido.
 - «Derma Care» o «Safety Guardian» en la lista de marcas.
