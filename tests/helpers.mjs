@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
-import { isPublicRetired } from '../src/lib/catalog-policy.mjs';
 
 /** Carpeta del proyecto. */
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -33,6 +32,23 @@ export function emptiedCatalog(catalog) {
   return copy;
 }
 
+// Una fecha «AAAA-MM-DD» que existe en el calendario.
+const isCalendarDate = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const time = Date.parse(value);
+  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === value;
+};
+
+/**
+ * Un retirado que fue público: estado `retired` con la aprobación comercial completa (quién, una fecha que existe y el
+ * suministro confirmado). Está escrito aquí, aparte de `isPublicRetired` de `src/lib/catalog-policy.mjs`, a propósito:
+ * lo esperado de las pruebas sobre los datos reales no puede salir de la regla que esas pruebas revisan, o un error en
+ * la regla cambiaría a la vez lo esperado y lo obtenido y ninguna lo vería.
+ */
+const wasPublicRetired = product => product?.status === 'retired'
+  && typeof product.approval?.by === 'string' && product.approval.by.trim() !== ''
+  && isCalendarDate(product.approval.on) && product.approval.supplyConfirmed === true;
+
 /**
  * Lo que cada compilación debe mostrar del catálogo real, derivado de los mismos datos (nunca una cifra escrita a mano):
  * producción muestra exactamente las categorías y las fichas `approved`; los retirados que fueron públicos solo tienen
@@ -41,7 +57,7 @@ export function emptiedCatalog(catalog) {
 export function publicCatalog(catalog) {
   const approvedCategoryIds = catalog.categories.filter(category => category.status === 'approved').map(category => category.id);
   const approvedProducts = catalog.products.filter(product => product.status === 'approved');
-  const publicRetired = catalog.products.filter(isPublicRetired);
+  const publicRetired = catalog.products.filter(wasPublicRetired);
   return {
     approvedCategoryIds,
     approvedProducts,
