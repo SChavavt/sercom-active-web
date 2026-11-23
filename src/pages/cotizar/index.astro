@@ -285,8 +285,8 @@ const items = [
     import { createMessagePage } from '../../lib/message-page.mjs';
     import {
       canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel, parseQuantity,
-      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, storageNoteText,
-      undoLines, unknownLinesMessage, updateLine, variantText,
+      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, rowLabelName,
+      storageNoteText, undoLines, unknownLinesMessage, updateLine, variantText,
     } from '../../lib/quote-list.mjs';
     import { quoteStore } from '../../lib/quote-store.mjs';
     import type { QuoteDuplicate, QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, QuoteUndo } from '../../types/quote.ts';
@@ -372,7 +372,7 @@ const items = [
         element.replaceChildren(...parts);
       }
 
-      /** Las partes comunes de un renglón: enlace, marca y código, «Ejemplo» y «Quitar». */
+      /** Las partes comunes de un renglón: enlace, marca y código y «Ejemplo». */
       function fillProduct(element: HTMLElement, product: QuoteIndexProduct | QuoteIndexRetired) {
         const link = element.querySelector<HTMLAnchorElement>('[data-row-link]');
         if (link) {
@@ -382,7 +382,25 @@ const items = [
         writeMeta(element.querySelector('[data-row-meta]'), product);
         const tag = element.querySelector<HTMLElement>('[data-row-tag]');
         if (tag) tag.hidden = !product.isExample;
-        element.querySelector('[data-quote-remove]')?.setAttribute('aria-label', nameLabel(labels.labelRemove, product.name));
+      }
+
+      /**
+       * Los nombres accesibles de los controles de un renglón: «Quitar», la cantidad con sus dos botones, la unidad y
+       * «Unirlos» dicen de qué producto y, si tiene varias, de qué variante (`rowLabelName`): con el mismo producto en dos
+       * tallas no se oye el mismo nombre en los dos renglones. Se escriben al dibujar el renglón y cuando cambia su
+       * variante. La lista de variantes dice solo el producto: su valor ya es la variante.
+       */
+      function nameControls(element: HTMLElement, row: Exclude<QuoteRow, { status: 'unknown' }>) {
+        const name = rowLabelName(row);
+        const set = (selector: string, pattern: string | undefined) =>
+          element.querySelector(selector)?.setAttribute('aria-label', nameLabel(pattern, name));
+        set('[data-quote-remove]', labels.labelRemove);
+        if (row.status !== 'ok') return;
+        set('[data-stepper-input]', labels.labelQuantity);
+        set('[data-stepper-minus]', labels.labelMinus);
+        set('[data-stepper-plus]', labels.labelPlus);
+        set('[data-row-unit]', labels.labelUnit);
+        set('[data-quote-merge]', labels.labelMerge);
       }
 
       /** Cambia el id de un control y lo que lo nombra: la etiqueta, la ayuda y el error. */
@@ -409,12 +427,12 @@ const items = [
         const element = template?.content.firstElementChild?.cloneNode(true);
         if (!(element instanceof HTMLLIElement)) return null;
         fillProduct(element, row.product);
+        nameControls(element, row);
         if (row.status === 'retired') return { line: row.line, kind: 'retired', element, duplicate: 'none' };
 
         counter += 1;
         const id = `fila-${counter}`;
         const { product, line } = row;
-        const name = product.name;
         // Variante: una lista con más de una, el texto con una sola, una celda blanca sin ninguna.
         const variantField = element.querySelector<HTMLElement>('[data-row-variant-field]');
         const variantOnly = element.querySelector<HTMLElement>('[data-row-variant-only]');
@@ -427,7 +445,7 @@ const items = [
             renameControl(variantField, select, `${id}-variante`);
             select.append(...product.variants.map(variant => option(variant.id, variantText(product, variant))));
             select.value = line.variantId;
-            select.setAttribute('aria-label', nameLabel(labels.labelVariant, name));
+            select.setAttribute('aria-label', nameLabel(labels.labelVariant, product.name));
           }
         } else if (product.variants.length === 1 && variantOnly) {
           variantField?.remove();
@@ -438,26 +456,19 @@ const items = [
           variantField?.remove();
           variantOnly?.remove();
         }
-        // Cantidad: el valor y los nombres; aria-disabled de los botones lo pone `stepper:sync` ya en el documento.
+        // Cantidad: el valor; aria-disabled de los botones lo pone `stepper:sync` ya en el documento.
         const input = element.querySelector<HTMLInputElement>('[data-stepper-input]');
         if (input) {
           renameControl(element, input, `${id}-cantidad`);
           input.value = String(line.quantity);
-          input.setAttribute('aria-label', nameLabel(labels.labelQuantity, name));
         }
-        element.querySelector('[data-stepper-minus]')?.setAttribute('aria-label', nameLabel(labels.labelMinus, name));
-        element.querySelector('[data-stepper-plus]')?.setAttribute('aria-label', nameLabel(labels.labelPlus, name));
         // Unidad: las opciones del renglón, con la que corresponde a la guardada elegida.
         const unit = element.querySelector<HTMLSelectElement>('[data-row-unit]');
         if (unit) {
           renameControl(element, unit, `${id}-unidad`);
           unit.append(...row.units.map(text => option(text, text)));
           unit.value = row.unit;
-          unit.setAttribute('aria-label', nameLabel(labels.labelUnit, name));
         }
-        // «Unirlos» dice de qué producto, como los demás controles del renglón: con varias parejas iguales no se oye
-        // el mismo nombre una y otra vez.
-        element.querySelector('[data-quote-merge]')?.setAttribute('aria-label', nameLabel(labels.labelMerge, name));
         return { line, kind: 'ok', element, duplicate: 'none' };
       }
 
@@ -815,6 +826,10 @@ const items = [
         endMergeUndo(index);
         store(result.lines);
         afterEdit();
+        // Con otra variante, los controles del renglón se nombran con ella.
+        const item = drawn[index];
+        const row = rows[index];
+        if (patch.variantId !== undefined && item && row && row.status !== 'unknown') nameControls(item.element, row);
       });
 
       document.addEventListener('click', event => {

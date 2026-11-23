@@ -2,8 +2,9 @@
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
 // vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
 // funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`), qué
-// productos van en el mensaje (`listMessageItems`), qué llevan los enlaces directos de la ficha (`directLinkValues`) y
-// qué frase lleva la nota de lo que se guarda (`storageNoteText`).
+// productos van en el mensaje (`listMessageItems`), qué llevan los enlaces directos de la ficha (`directLinkValues`),
+// qué frase lleva la nota de lo que se guarda (`storageNoteText`) y cómo se nombra un renglón en los nombres de sus
+// controles (`rowLabelName`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
 // `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar; lo demás, en el navegador.
 //
@@ -827,6 +828,22 @@ export function badgeText(count) {
   const total = Math.max(0, Math.trunc(Number(count)) || 0);
   if (total === 0) return '';
   return total > 999 ? '999+' : String(total);
+}
+
+/**
+ * El nombre de un renglón dentro de los nombres accesibles de sus controles («Quitar …», «Cantidad de …», «Unirlos: …»):
+ * el del producto y, si el producto tiene más de una variante, la del renglón («Guante recubierto, Talla 8») o «talla o
+ * color por definir» si no se eligió ninguna. Con el mismo producto en dos tallas, los controles de cada renglón se
+ * nombran distinto, como se ven. Un renglón retirado lleva solo el nombre del producto; uno que la página no ubica,
+ * cadena vacía.
+ * @param {QuoteRow | null | undefined} row
+ * @returns {string}
+ */
+export function rowLabelName(row) {
+  if (!row || row.status === 'unknown') return '';
+  const name = oneLine(row.product.name);
+  if (row.status !== 'ok' || row.product.variants.length < 2) return name;
+  return `${name}, ${row.variant ? oneLine(row.variant.label) || VARIANT_PENDING : VARIANT_PENDING}`;
 }
 
 /**

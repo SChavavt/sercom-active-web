@@ -6,8 +6,8 @@ import {
   addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf, duplicateStates,
   formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems,
   MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel,
-  QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS,
-  storageNoteText, undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
+  QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, rowLabelName, serializeList,
+  STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -724,4 +724,31 @@ test('storageNoteText: la nota dice solo lo que el navegador guarda en ese momen
     assert.equal(storageNoteText(kept, full), withProducts, JSON.stringify(kept));
     assert.equal(storageNoteText(kept, bare), withoutProducts, JSON.stringify(kept));
   }
+});
+
+test('rowLabelName: el producto y, si tiene varias variantes, la del renglón', () => {
+  // Los renglones de la lista «rara», en su orden.
+  assert.deepEqual(rareRows.map(row => rowLabelName(row)), [
+    'Guante recubierto sintético, Talla 8',
+    'Guante recubierto sintético, Talla 8',
+    // Con varias variantes y ninguna elegida, lo dice.
+    'Bota sintética con casquillo, talla o color por definir',
+    // Un renglón que la página no ubica no tiene nombre.
+    '',
+    // Un producto retirado: solo su nombre.
+    'Producto retirado sintético',
+    '',
+    // Con una sola variante o sin variantes no hace falta decirla: todos sus renglones tienen la misma.
+    'Cono sintético',
+    'Guante de nitrilo sintético, Mediano',
+    'Respirador sintético',
+    'Guante recubierto sintético, Talla 8',
+  ]);
+  // El mismo producto en dos tallas: cada renglón se nombra distinto, y así se nombran sus controles.
+  const sizes = reconcileList([line('guante-recubierto', 1, 'par', 'talla-8'), line('guante-recubierto', 1, 'par', 'talla-9')], rareIndex).rows;
+  assert.deepEqual(sizes.map(row => nameLabel('Unirlos: {nombre}', rowLabelName(row))), [
+    'Unirlos: Guante recubierto sintético, Talla 8', 'Unirlos: Guante recubierto sintético, Talla 9',
+  ]);
+  assert.equal(rowLabelName(null), '');
+  assert.equal(rowLabelName(undefined), '');
 });
