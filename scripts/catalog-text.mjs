@@ -18,14 +18,19 @@
 //     `manufacturerCode`: un número largo es un código, no va en el texto;
 //   - una dirección de correo no va en ninguna ficha (R-RULE-24), ni un enlace o una nota del registro de investigación
 //     (R-RULE-13, la misma lista que usa el escáner); un documento o una foto por dirección que enlazan el registro
-//     tampoco, salvo un «Sitio del fabricante» de brands.json.
+//     tampoco, salvo un «Sitio del fabricante» de brands.json;
+//   - las direcciones que publica la ficha (cada documento, la foto por dirección y la página de donde viene la foto) no
+//     se revisan como frases: el escáner no las lee así cuando la página las escribe enteras en un atributo, porque son
+//     del fabricante. Sí se revisan con lo que el escáner todavía encuentra en ellas (`addressFindings`: la marca
+//     excluida, las marcas de los ejemplos, la dirección del negocio, un mapa, una confirmación, la paleta anterior, un
+//     campo de precio, un destino de contacto). El registro de investigación en ellas se revisa aparte, arriba.
 //
 // Límites: cada campo se revisa solo. El escáner lee una página como una sola línea, así que una regla también puede
 // encontrar algo entre dos campos que quedan juntos en la página; eso solo lo ve el escaneo de la página compilada,
 // cuando la ficha ya está aprobada. Y no hay excepciones por ficha: si un producto real no se puede escribir sin una
 // palabra que una regla rechaza (un modelo que ES esa palabra), el mensaje lo muestra y la excepción se diseña entonces,
 // con ese caso a la vista.
-import { emailAddresses, phoneShapedNumbers, registryFindings, registryLeaks, textFindings } from './scan-dist.mjs';
+import { addressFindings, emailAddresses, phoneShapedNumbers, registryFindings, registryLeaks, textFindings } from './scan-dist.mjs';
 
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 const list = value => (Array.isArray(value) ? value : []);
@@ -60,12 +65,29 @@ function textFields(product) {
 }
 
 /**
+ * Las direcciones que publica una ficha: [campo, dirección, qué hacer si el escaneo la rechazaría].
+ * @returns {[string, unknown, string][]}
+ */
+function addressFields(product) {
+  const fields = [];
+  list(product.documents).forEach((document, i) => {
+    if (isRecord(document)) fields.push([`documents[${i}].url`, document.url, 'enlaza otra página o documento del fabricante para este producto.']);
+  });
+  if (isRecord(product.image)) {
+    fields.push(['image.url', product.image.url, 'usa otra dirección de la foto o guarda la foto en src/assets/productos/.']);
+    fields.push(['image.sourceUrl', product.image.sourceUrl, 'escribe otra página del fabricante de donde viene la foto.']);
+  }
+  return fields.filter(([, value]) => typeof value === 'string');
+}
+
+/**
  * Revisa el texto de cada ficha del catálogo, en cualquier estado.
  * @param {unknown} catalog Contenido de src/data/catalog.json.
- * @param {{ registry: unknown, brands: unknown }} sources El registro de investigación y src/data/brands.json.
+ * @param {{ registry: unknown, brands: unknown, examples?: unknown }} sources El registro de investigación,
+ *   src/data/brands.json y el archivo de ejemplos (sus códigos no van en una dirección publicada).
  * @returns {string[]} Un mensaje por problema, con la ficha, el campo, la regla y qué hacer; lista vacía si no hay.
  */
-export function reviewCatalogText(catalog, { registry, brands }) {
+export function reviewCatalogText(catalog, { registry, brands, examples = [] }) {
   const products = isRecord(catalog) ? list(catalog.products) : [];
   const leaks = registryLeaks(registry, brands);
   const messages = [];
@@ -95,6 +117,14 @@ export function reviewCatalogText(catalog, { registry, brands }) {
       }
       for (const note of notes) {
         messages.push(`${at(field)}: R-RULE-13, copia una nota interna del registro de investigación: «${quote(note)}». Escríbelo con tus palabras.`);
+      }
+    }
+
+    // Las direcciones que se publican, con lo que el escaneo todavía encuentra en ellas. El registro de investigación
+    // (R-RULE-13) se revisa aparte, abajo, solo en los documentos y en la foto por dirección.
+    for (const [field, address, what] of addressFields(product)) {
+      for (const { id, title, found } of addressFindings(address, { examples, skip: ['R-RULE-13'] })) {
+        messages.push(`${at(field)}: ${id}, ${title}: «${quote(found)}». La dirección se publica tal como está escrita; ${what}`);
       }
     }
 

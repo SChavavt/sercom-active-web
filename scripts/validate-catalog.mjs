@@ -48,7 +48,7 @@ export async function validateProject(root) {
   ]);
   const errors = validateCatalog(catalog, registry);
   // El texto de cada ficha, en cualquier estado, frente a las reglas de redacción del escáner (catalog-text.mjs).
-  errors.push(...reviewCatalogText(catalog, { registry, brands }));
+  errors.push(...reviewCatalogText(catalog, { registry, brands, examples }));
   // Los archivos de las fotografías: solo los de fichas aprobadas, con su formato, medidas y peso (product-photos.mjs).
   // Es la revisión que impide que un archivo de más llegue a la salida: la compilación copia todo lo que hay en la
   // carpeta. El escáner lo vuelve a revisar sobre la salida (R-FOTO-02).

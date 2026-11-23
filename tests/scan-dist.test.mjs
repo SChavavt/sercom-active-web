@@ -1911,3 +1911,101 @@ test('R-RULE-04: las normas de la ficha en su propia página solo se descuentan 
   const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/lente-certificado/index.html': previewPage(body) }, { preview: true, data: withNorms });
   assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-06', 'productos/lente-certificado/index.html'], ['R-RULE-06', 'productos/lente-certificado/index.html']]);
 });
+
+// Las direcciones que publican los datos (el «Sitio del fabricante» de cada marca y, de cada ficha aprobada, sus
+// documentos, la foto por dirección y la página de donde viene la foto) no son frases del sitio: un atributo cuyo valor
+// es exactamente una de ellas no se lee en los ámbitos `words` y `prose`. Todo lo demás se lee como siempre.
+const WORDING_ADDRESSES = [
+  ['https://fabricante.example/distribuidores-autorizados/ficha-guante.pdf', 'R-RULE-07'],
+  ['https://fabricante.example/es/tienda-oficial/guante-100', 'R-RULE-07'],
+  ['https://fabricante.example/promociones/guante-100.pdf', 'R-RULE-01'],
+  ['https://fabricante.example/gratis/guante-100.pdf', 'R-RULE-02'],
+];
+/** Una ficha aprobada que publica `address` en el campo dado. */
+const publishing = (field, address) => {
+  const image = { url: 'https://fotos.fabricante.example/guante.jpg', width: 800, height: 800, alt: 'Guante', sourceUrl: 'https://fabricante.example/guante', usageConfirmed: true };
+  if (field === 'documents[].url') return { id: 'guante-enlaces', status: 'approved', documents: [{ label: 'Hoja de datos', url: address }], image };
+  if (field === 'image.url') return { id: 'guante-enlaces', status: 'approved', image: { ...image, url: address } };
+  return { id: 'guante-enlaces', status: 'approved', image: { ...image, sourceUrl: address } };
+};
+/** Cómo imprime la página cada campo: el documento y el origen de la foto como enlace, la foto como imagen. */
+const linking = (field, written) => (field === 'image.url'
+  ? `<img src="${written}" alt="Guante" width="800" height="800" referrerpolicy="no-referrer">`
+  : `<a href="${written}" target="_blank" rel="noopener noreferrer">${field === 'documents[].url' ? 'Hoja de datos' : 'Origen de la foto'}</a>`);
+const ADDRESS_FIELDS = ['documents[].url', 'image.url', 'image.sourceUrl'];
+
+test('una dirección que publican los datos no se lee como frase en el atributo que la lleva entera; sin publicarla, sí', async () => {
+  for (const field of ADDRESS_FIELDS) {
+    for (const [address, id] of WORDING_ADDRESSES) {
+      const files = { 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) };
+      assert.deepEqual((await scan(files, { data: catalogWith(publishing(field, address)) })).findings, [], `${field} ${address}`);
+      // En la vista previa también.
+      assert.deepEqual(failures(await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), 'pagina/index.html': previewPage(`<h1>Guante</h1>${linking(field, address)}`) }, { preview: true, data: catalogWith(publishing(field, address)) })), [], `vista previa ${field} ${address}`);
+      // La misma dirección sin estar en los datos, o en los de un borrador, se lee como hoy.
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith() })), [id], `sin publicar: ${field} ${address}`);
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith({ ...publishing(field, address), status: 'draft' }) })), [id], `borrador: ${field} ${address}`);
+    }
+  }
+  // El «Sitio del fabricante» de una marca también es una dirección publicada.
+  const brandAddress = 'https://fabricante.example/es/tienda-oficial/';
+  const brands = [{ ...data.brands[0], manufacturerLinks: [{ label: 'Sitio del fabricante', url: brandAddress }] }, ...data.brands.slice(1)];
+  const brandPage = { 'pagina/index.html': page(`<h1>Marca</h1><a href="${brandAddress}" rel="noopener">Sitio del fabricante</a>`) };
+  assert.deepEqual((await scan(brandPage, { data: { ...catalogWith(), brands } })).findings, []);
+  assert.deepEqual(failedIds(await scan(brandPage, { data: catalogWith() })), ['R-RULE-07']);
+});
+
+test('una dirección publicada se compara entera, con las entidades decodificadas y con su %XX decodificado de los dos lados', async () => {
+  const address = 'https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&idioma=es';
+  const data = catalogWith(publishing('documents[].url', address));
+  // Escrita como la escribe la compilación (con &amp;) o con sus caracteres codificados: es la misma dirección.
+  for (const written of ['https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&amp;idioma=es', 'https://fabricante.example/tienda-oficial/gu%C3%ADa.pdf?modelo=100&#38;idioma=es']) {
+    assert.deepEqual((await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })).findings, [], written);
+  }
+  // Lo que solo empieza como ella, la contiene o lleva algo más ya no es ella.
+  for (const written of [
+    'https://fabricante.example/tienda-oficial/', `${address}#ficha`, `${address}&amp;x=1`, ` ${address}`,
+    'https://fabricante.example/tienda-oficial/guía.pdf', `https://otro.example/?ir=${encodeURIComponent(address)}`,
+  ]) {
+    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })), ['R-RULE-07'], written);
+  }
+});
+
+test('una dirección publicada se sigue leyendo como texto visible, en un script, en un JSON, junto a otro texto en un atributo y en el borrador de un enlace', async () => {
+  const [address] = WORDING_ADDRESSES[1];
+  const data = catalogWith(publishing('documents[].url', address));
+  for (const files of [
+    { 'pagina/index.html': page(`<h1>Guante</h1><p>${address}</p>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${address}">${address}</a>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><script>const ficha = "${address}";</script>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><div data-ficha="Ficha: ${address}">Ficha</div>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${WHATSAPP}?text=${encodeURIComponent(`Hola, vi ${address}`)}">Cotizar</a>`) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), 'datos.json': JSON.stringify({ ficha: address }) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), '_astro/ficha.js': `const ficha="${address}";` },
+  ]) {
+    assert.deepEqual(failedIds(await scan(files, { data })), ['R-RULE-07'], JSON.stringify(files));
+  }
+  // Una dirección del propio sitio nunca es una dirección publicada por los datos.
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<h1>Guante</h1><a href="/catalogo/?q=tienda-oficial">Buscar</a>') }, { data })), ['R-RULE-07']);
+});
+
+test('una dirección publicada sigue revisándose con las reglas que leen el archivo tal cual o decodificado', async () => {
+  const [, shortName] = data.registry.scope.excluded_entities;
+  for (const [address, id] of [
+    [`https://fabricante.example/${shortName.toLowerCase()}/ficha.pdf`, 'R-RULE-08'],
+    ['https://fabricante.example/fichas/72090.pdf', 'R-RULE-11'],
+    ['https://fabricante.example/fichas/EJ-1001.pdf', 'R-RULE-03'],
+    ['https://fabricante.example/fichas/Solicitud%20enviada.pdf', 'R-RULE-10'],
+  ]) {
+    for (const field of ADDRESS_FIELDS) {
+      const result = await scan({ 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) }, { data: catalogWith(publishing(field, address)) });
+      assert.ok(failedIds(result).includes(id), `${field} ${address}: ${failedIds(result)}`);
+    }
+  }
+});
+
+test('--rules dice que una dirección publicada por los datos no se lee como frase, y que las reglas del archivo sí la leen', () => {
+  const words = RULES.filter(rule => rule.id === 'R-RULE-07').map(rule => rule.doc).join('\n');
+  assert.match(words, /direcci[oó]n que publican los datos/);
+  const prices = RULES.filter(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose').map(rule => rule.doc).join('\n');
+  assert.match(prices, /direcci[oó]n que publican los datos/);
+});
