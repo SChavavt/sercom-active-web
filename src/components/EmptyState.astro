@@ -1,10 +1,13 @@
 ---
-// Estado vacío (`.empty`): una celda de ancho completo con un pictograma de línea, dos frases y una sola
+// Estado vacío (`.empty`): una celda de ancho completo con un pictograma de línea, dos frases y una
 // acción. Para una búsqueda sin resultados o una categoría sin productos todavía (textos del brief, 6.3):
 //   «No encontramos productos con esa búsqueda.» / «Puedes pedirnos este producto y lo buscamos por ti.»
 //     → Solicitar este producto
 //   «Estamos cargando los productos de esta categoría.» / «Mientras tanto, dinos qué necesitas y te
 //     ayudamos a cotizarlo.» → botón de WhatsApp
+// Slot `extra` (opcional): una segunda acción, después de la principal (el catálogo pone ahí «Limpiar filtros»).
+// Con él, las dos acciones van juntas en `.empty__actions` (catalogo.css): una sobre otra en computadora, lado a
+// lado si caben en tableta y a todo lo ancho en el celular. Sin él, el marcado es el de siempre.
 import type { IconName } from '../lib/icons.ts';
 import Button from './Button.astro';
 import Icon from './Icon.astro';
@@ -24,6 +27,7 @@ interface Props {
 
 const { icon, title, text, action, headingLevel = 2, class: className } = Astro.props;
 const Heading = `h${headingLevel}` as 'h2' | 'h3';
+const hasExtra = Astro.slots.has('extra');
 ---
 <div class:list={['empty', className]}>
   <Icon name={icon} class="empty__icon icon--fine" />
@@ -31,5 +35,12 @@ const Heading = `h${headingLevel}` as 'h2' | 'h3';
     <Heading class="empty__title">{title}</Heading>
     <p class="empty__text">{text}</p>
   </div>
-  <Button class="empty__action" href={action.href} icon={action.icon} iconEnd={action.icon ? undefined : 'arrow-right'}>{action.label}</Button>
+  {hasExtra ? (
+    <div class="empty__actions">
+      <Button class="empty__action" href={action.href} icon={action.icon} iconEnd={action.icon ? undefined : 'arrow-right'}>{action.label}</Button>
+      <slot name="extra" />
+    </div>
+  ) : (
+    <Button class="empty__action" href={action.href} icon={action.icon} iconEnd={action.icon ? undefined : 'arrow-right'}>{action.label}</Button>
+  )}
 </div>

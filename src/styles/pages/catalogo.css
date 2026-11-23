@@ -1,7 +1,8 @@
 /* ==========================================================================
    Páginas de listado: /catalogo/, /categorias/{id}/ y /marcas/{id}/
    Una sola hoja para las tres, que comparten piezas (CatalogSearch, CatalogListing, CatalogNav,
-   CatalogGrid), para que no se separen. La importan las tres páginas.
+   CatalogGrid), para que no se separen. La importan las tres páginas. Los filtros combinables (CatalogFilters) y
+   el estado sin resultados con dos acciones son solo del catálogo.
    Misma lámina que la portada: celdas blancas sobre el azul, filetes por huecos de 1 px, esquinas rectas,
    solo variables de tokens.css y fonts.css. Puntos de corte: 1359, 1099, 699 (docs/diseno.md).
 
@@ -209,9 +210,37 @@
   .catalog-grid__fill[data-fill2="1"] { display: block; grid-column: span 1; }
 }
 
-/* 2.3 Estado sin resultados de la búsqueda, dentro del área de productos */
+/* 2.3 Estado sin resultados (búsqueda, filtros o los dos), dentro del área de productos */
 .catalog-body__empty { border-bottom: var(--line) solid var(--rule); margin-bottom: calc(-1 * var(--line)); }
 .catalog-body__empty[hidden] { display: none; }
+/* Con una segunda acción (EmptyState con el slot `extra`: «Limpiar filtros»): las dos juntas en la columna de la
+   acción, una sobre otra y del mismo ancho */
+.empty__actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-3); min-width: 0; }
+
+/* 2.4 Filtros combinables (CatalogFilters; solo con JavaScript, en el lugar de la barra lateral de enlaces).
+   Una columna de celdas blancas sobre el azul, como la barra lateral: «Limpiar filtros» (solo mientras hay algo
+   marcado; oculto no reserva lugar y los grupos empiezan más arriba) y un grupo por parámetro, con su título (botón de
+   pliegue de la base, components.css 4.18) y sus filas con casilla (CheckRow, mismas medidas que las filas de la
+   barra). El último bloque lleva el filete inferior del recurso descrito arriba. */
+.catalog-filters { min-width: 0; background: var(--surface); }
+.catalog-filters__cells {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--line);
+  background: var(--rule);
+  border-bottom: var(--line) solid var(--rule);       /* ver el recurso del filete inferior, arriba */
+  margin-bottom: calc(-1 * var(--line));
+}
+.catalog-filters__group { min-width: 0; background: var(--surface); }
+.catalog-filters__title { margin: 0; }
+/* «Limpiar filtros»: el botón de texto de la base ocupa su propia celda (toda la celda responde al clic) */
+.catalog-filters__clear {
+  display: flex;
+  width: 100%;
+  padding: var(--s-4) var(--pad);
+  background: var(--surface);
+}
+.catalog-filters__clear:focus-visible { outline-offset: -3px; }
 
 /* 3. Piezas propias de una página -------------------------------------------------------------------------- */
 
@@ -268,6 +297,17 @@
   .catalog-nav__fold[open] > .catalog-nav__summary .icon { transform: rotate(180deg); }
   .catalog-nav__link, .catalog-nav__toggle { min-height: 48px; font-size: 1rem; }
 
+  /* Filtros: los títulos de los grupos son filas a todo lo ancho (como los pliegues de la barra de enlaces), cada
+     lista se abre bajo su título y «Limpiar filtros» va en una fila después de ellos (en el documento va primero, como
+     en computadora: el orden del teclado es el mismo en todos los anchos). Hasta que el script prepara los pliegues
+     (cerrados por debajo de 1100 px), las listas no se muestran: no se ven abiertas un instante al cargar. */
+  .catalog-filters { background: transparent; }
+  .catalog-filters__clear { order: 1; align-items: center; min-height: 60px; padding-block: var(--s-2); }
+  .catalog-filters:not([data-filters-ready]) .catalog-filters__panel { display: none; }
+  .catalog-filters:not([data-filters-ready]) .disclosure .icon { transform: none; }
+  /* Estado sin resultados con dos acciones: bajo el texto, lado a lado si caben */
+  .empty__actions { grid-column: 2; flex-direction: row; flex-wrap: wrap; justify-self: start; }
+
   .catalog-related__head, .catalog-related__list { grid-column: span 12; }
   .catalog-related__head { padding-bottom: 0; }
   .catalog-related { row-gap: 0; }
@@ -281,5 +321,12 @@
   .catalog-search__field { grid-column: span 12; gap: var(--s-3); padding-right: var(--s-2); }
   .catalog-search__input { font-size: 1rem; }
   .catalog-search__submit { grid-column: span 12; min-height: 52px; }
+  .empty__actions { grid-column: 1; flex-direction: column; width: 100%; }
+}
+
+/* 5. Colores forzados: las celdas de los filtros recuperan su contorno (como las de la barra lateral, responsive.css
+   6.8) */
+@media (forced-colors: active) {
+  :where(.catalog-filters__cells) > :where(:not(.vh, script, style, template)) { outline: var(--line) solid CanvasText; }
 }
 

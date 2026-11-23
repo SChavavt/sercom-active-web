@@ -7,13 +7,31 @@
 // El texto de ayuda del campo («Producto, marca o código») es corto a propósito: cabe entero desde 320 px,
 // también con el texto espaciado. El nombre completo del campo va en su etiqueta.
 //
-// El script filtra en el navegador las tarjetas de la página (CatalogGrid) con matchesSearchText sobre su
-// `data-search`: al cargar con ?q=… (el campo del encabezado envía aquí), mientras se escribe y al enviar,
-// sin recargar. Mantiene la dirección al día con history.replaceState, muestra el estado sin resultados
-// (`[data-catalog-empty]`) y le pasa la búsqueda a «Solicitar este producto» (?q=…).
-// La consulta es texto no confiable: solo se escribe con textContent, value o como parámetro codificado.
+// El script de este componente es el único del catálogo que lleva el estado { query, filters } (la búsqueda y las
+// casillas de CatalogFilters) y el único que escribe la dirección. Se imprime una vez por página.
+//   - Al cargar: lee la dirección (parseCatalogState), deja solo las opciones que la página ofrece (restrictFilters
+//     sobre los grupos armados con las casillas [data-filter-option]), escribe la consulta en los campos, marca las
+//     casillas y aplica; si la dirección no era la canónica (ids desconocidos, otro orden), la reemplaza.
+//   - Aplicar: applyCatalogState sobre el `data-search` y el `data-facets` de cada tarjeta de CatalogGrid; oculta las
+//     tarjetas, recalcula la celda de relleno, muestra la retícula o el estado sin resultados (`[data-catalog-empty]`,
+//     con la versión de sus atributos data-empty-* que corresponde), escribe la línea de resultados (región viva;
+//     «4 productos con filtros»), el número de cada opción, el de marcadas en el título de cada grupo, los dos
+//     «Limpiar filtros» ([data-filter-clear]), «Limpiar búsqueda» (su href conserva los filtros), el enlace a la
+//     solicitud especial (?q=… solo con búsqueda) y la dirección: catalogHref con history.replaceState, sin entradas
+//     nuevas en el historial (Atrás sale del catálogo).
+//   - Eventos: cambio de una casilla, escribir y enviar la búsqueda, «Limpiar búsqueda», «Limpiar filtros» (el foco
+//     pasa al título del primer grupo, o al campo de búsqueda si se pulsó en el estado sin resultados), los títulos de
+//     los grupos ([data-filter-toggle]: abren y cierran su lista) y pageshow (vuelve a leer la dirección sin tocarla:
+//     página restaurada de la caché de Atrás y Adelante, o campos que el navegador restauró por su cuenta).
+//   - Pliegues: abiertos desde 1100 px y cerrados por debajo al cargar, y de nuevo al cruzar los 1100 px.
+//   - Búsqueda del encabezado (formulario GET a /catalogo/): repite la consulta de la página y lleva un campo oculto
+//     por opción marcada ([data-filter-hidden]), así su envío normal llega a /catalogo/?q=…&categoria=…. No se
+//     intercepta.
+// Todo lo que llega de la dirección es texto no confiable: solo pasa por parseCatalogState y se escribe con
+// textContent, value o catalogHref. Nunca como HTML.
 // Sin JavaScript el formulario envía a /catalogo/?q=… y la página lista todo con el conteo simple:
-// «Limpiar búsqueda» y el estado sin resultados están ocultos (atributo hidden) y solo el script los muestra.
+// «Limpiar búsqueda», «Limpiar filtros» y el estado sin resultados están ocultos (atributo hidden) y solo el script
+// los muestra; los filtros no se ven (js-only) y queda la barra lateral de enlaces.
 //
 // Uso:  <CatalogSearch total={products.length} />  seguido de <CatalogListing> con el estado vacío en su slot.
 import { SEARCH_PARAM, resultSummary } from '../lib/search.mjs';
@@ -43,28 +61,66 @@ const { total } = Astro.props;
 </div>
 
 <script>
-  import { routes } from '../lib/routes.mjs';
-  import { SEARCH_PARAM, displayQuery, isActiveQuery, matchesSearchText, resultSummaryParts } from '../lib/search.mjs';
+  import { FACET_PARAMS, applyCatalogState, catalogHref, emptyFilters, hasActiveFilters, parseCatalogState, restrictFilters, selectedLabel } from '../lib/catalog-filters.mjs';
+  import { SEARCH_PARAM, displayQuery, isActiveQuery, resultSummary, resultSummaryParts } from '../lib/search.mjs';
+
+  type CatalogFilters = ReturnType<typeof emptyFilters>;
+  type FacetGroup = NonNullable<Parameters<typeof applyCatalogState>[2]>[number];
 
   const form = document.querySelector<HTMLFormElement>('[data-catalog-search]');
-  const input = form?.querySelector<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`);
+  const input = form?.querySelector<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`) ?? null;
   const count = document.querySelector<HTMLElement>('[data-catalog-count]');
-  const clear = document.querySelector<HTMLAnchorElement>('[data-catalog-clear]');
+  const clearSearch = document.querySelector<HTMLAnchorElement>('[data-catalog-clear]');
   const grid = document.querySelector<HTMLElement>('[data-catalog-grid]');
   const fill = document.querySelector<HTMLElement>('[data-catalog-fill]');
   const empty = document.querySelector<HTMLElement>('[data-catalog-empty]');
-  const request = empty?.querySelector<HTMLAnchorElement>('a[href]');
+  const request = empty?.querySelector<HTMLAnchorElement>('a[href]') ?? null;
+  const requestLabel = request?.querySelector('span') ?? null;
   const requestBase = request?.getAttribute('href') ?? '';
-  // Campo de búsqueda del encabezado (mismo nombre): muestra la misma consulta que el de la página.
+  const emptyTitle = empty?.querySelector<HTMLElement>('.empty__title') ?? null;
+  const emptyText = empty?.querySelector<HTMLElement>('.empty__text') ?? null;
+  const filtersBlock = document.querySelector<HTMLElement>('[data-catalog-filters]');
+  const filterClears = [...document.querySelectorAll<HTMLButtonElement>('[data-filter-clear]')];
+  const toggles = [...document.querySelectorAll<HTMLButtonElement>('[data-filter-toggle]')];
+  const boxes = [...document.querySelectorAll<HTMLInputElement>('[data-filter-option]')];
+  // Campo de búsqueda del encabezado (mismo nombre): muestra la misma consulta que el de la página, y su formulario
+  // lleva los filtros marcados en campos ocultos.
   const headerInputs = [...document.querySelectorAll<HTMLInputElement>(`input[name="${SEARCH_PARAM}"]`)].filter(field => field !== input);
-  const items = [...document.querySelectorAll<HTMLElement>('[data-catalog-grid] [data-search]')];
+  const headerForms = [...new Set(headerInputs.map(field => field.form).filter((owner): owner is HTMLFormElement => owner !== null && owner !== form))];
+  const cards = [...document.querySelectorAll<HTMLElement>('[data-catalog-grid] [data-search]')];
+  const items = cards.map(card => ({ search: card.dataset.search ?? '', facets: card.dataset.facets ?? '' }));
+
+  /** Los grupos que ofrece la página, armados con sus casillas (el parámetro es su `name` y la opción su `value`). */
+  const groups: FacetGroup[] = FACET_PARAMS.map(param => ({
+    param,
+    label: '',
+    options: boxes.filter(box => box.name === param).map(box => ({ id: box.value, label: '', count: 0 })),
+  }));
+
+  /** Filtros marcados en las casillas, en el orden canónico. */
+  function checkedFilters(): CatalogFilters {
+    const chosen = emptyFilters();
+    for (const box of boxes) if (box.checked && (FACET_PARAMS as readonly string[]).includes(box.name)) chosen[box.name as keyof CatalogFilters].push(box.value);
+    return restrictFilters(chosen, groups);
+  }
+
+  /** Marca exactamente las casillas de `filters`. */
+  function setBoxes(filters: CatalogFilters) {
+    for (const box of boxes) box.checked = (filters[box.name as keyof CatalogFilters] ?? []).includes(box.value);
+  }
+
+  /** Escribe la consulta en el campo de la página y en los del encabezado. */
+  function setQuery(query: string) {
+    if (input) input.value = query;
+    for (const field of headerInputs) field.value = query;
+  }
 
   /**
    * Escribe la línea de resultados con nodos de texto, nunca como HTML. El término va en un <bdi>: su dirección
    * (árabe, hebreo) no reordena las palabras del sitio. Se lee igual que `resultSummary`.
    */
-  function writeSummary(line: HTMLElement, visible: number, query: string) {
-    const { lead, term, end } = resultSummaryParts(visible, query);
+  function writeSummary(line: HTMLElement, visible: number, query: string, filtered: boolean) {
+    const { lead, term, end } = resultSummaryParts(visible, query, { filtered });
     if (!term) {
       line.textContent = lead;
       return;
@@ -74,52 +130,161 @@ const { total } = Astro.props;
     line.replaceChildren(lead, isolated, end);
   }
 
-  /** Filtra las tarjetas y deja la página (conteo, celda de relleno, estado vacío, enlaces) de acuerdo. */
-  function apply(query: string, updateUrl: boolean) {
-    const active = isActiveQuery(query);
-    let visible = 0;
-    for (const item of items) {
-      const show = !active || matchesSearchText(item.dataset.search, query);
-      item.hidden = !show;
-      if (show) visible += 1;
+  /** Número de opciones marcadas en el título de cada grupo: « (2 seleccionadas)», la cifra a la vista. */
+  function writeSelected(filters: CatalogFilters) {
+    for (const toggle of toggles) {
+      const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+      const param = panel?.querySelector<HTMLInputElement>('[data-filter-option]')?.name as keyof CatalogFilters | undefined;
+      const label = selectedLabel(param ? filters[param]?.length ?? 0 : 0);
+      const wrapper = toggle.querySelector<HTMLElement>('[data-filter-selected]');
+      const number = toggle.querySelector<HTMLElement>('[data-filter-selected-count]');
+      const words = toggle.querySelector<HTMLElement>('[data-filter-selected-text]');
+      if (!wrapper || !number || !words) continue;
+      const space = label.indexOf(' ');
+      number.textContent = space === -1 ? label : label.slice(0, space);
+      words.textContent = space === -1 ? '' : label.slice(space);
+      wrapper.hidden = label === '';
     }
+  }
+
+  /** Muestra en los campos ocultos del formulario del encabezado los filtros marcados, uno por opción. */
+  function writeHeaderFilters(filters: CatalogFilters) {
+    for (const owner of headerForms) {
+      for (const old of owner.querySelectorAll('input[data-filter-hidden]')) old.remove();
+      for (const param of FACET_PARAMS) {
+        for (const id of filters[param]) {
+          const field = document.createElement('input');
+          field.type = 'hidden';
+          field.name = param;
+          field.value = id;
+          field.dataset.filterHidden = '';
+          owner.append(field);
+        }
+      }
+    }
+  }
+
+  /** Aplica un estado a la página y, con `updateUrl`, lo escribe en la dirección. */
+  function apply(query: string, filters: CatalogFilters, updateUrl: boolean) {
+    const active = isActiveQuery(query);
+    const filtered = hasActiveFilters(filters);
+    const result = applyCatalogState(items, { query, filters }, groups);
+    cards.forEach((card, index) => { card.hidden = !result.visible[index]; });
+    const visible = result.count;
     // Lugares vacíos de la última fila con 4, 3 y 2 tarjetas por fila (ver CatalogGrid).
     if (fill) for (const perRow of [4, 3, 2]) fill.dataset[`fill${perRow}`] = String((perRow - (visible % perRow)) % perRow);
     if (grid) grid.hidden = visible === 0;
-    if (empty) empty.hidden = visible > 0;
-    if (count) writeSummary(count, visible, query);
-    if (clear) clear.hidden = !active;
+    if (empty) {
+      empty.hidden = visible > 0;
+      const situation = active && filtered ? 'both' : filtered ? 'filters' : 'query';
+      if (emptyTitle) emptyTitle.textContent = empty.getAttribute(`data-empty-title-${situation}`) ?? emptyTitle.textContent;
+      if (emptyText) emptyText.textContent = empty.getAttribute(`data-empty-text-${situation}`) ?? emptyText.textContent;
+      if (requestLabel) requestLabel.textContent = empty.getAttribute(`data-empty-action-${situation}`) ?? requestLabel.textContent;
+    }
+    if (count) writeSummary(count, visible, query, filtered);
+    for (const box of boxes) {
+      const row = box.closest('label');
+      const n = result.optionCounts[box.name as keyof CatalogFilters]?.[box.value] ?? 0;
+      const value = row?.querySelector('[data-check-count-value]');
+      const text = row?.querySelector('[data-check-count-text]');
+      if (value) value.textContent = String(n);
+      if (text) text.textContent = resultSummary(n);
+    }
+    writeSelected(filters);
+    for (const button of filterClears) button.hidden = !filtered;
+    if (clearSearch) {
+      clearSearch.hidden = !active;
+      clearSearch.href = catalogHref({ query: '', filters });
+    }
     if (request) request.href = active ? `${requestBase}?${SEARCH_PARAM}=${encodeURIComponent(displayQuery(query))}` : requestBase;
-    if (updateUrl) history.replaceState(history.state, '', routes.search(active ? displayQuery(query) : ''));
+    writeHeaderFilters(filters);
+    if (updateUrl) history.replaceState(history.state, '', catalogHref({ query, filters }));
+  }
+
+  /** El estado de la página: lo escrito en el campo y lo marcado. */
+  const current = () => ({ query: input?.value ?? '', filters: checkedFilters() });
+  const applyCurrent = () => {
+    const { query, filters } = current();
+    apply(query, filters, true);
+  };
+
+  /** Lee la dirección y deja los campos y las casillas como dice. Devuelve el estado leído. */
+  function readAddress() {
+    const state = parseCatalogState(window.location.search);
+    const filters = restrictFilters(state.filters, groups);
+    // Tal como se muestra (displayQuery, ya aplicado por parseCatalogState), que es también lo que se busca: una
+    // secuencia % mal formada no llega al campo como «�», ni un carácter de control, de dirección o invisible; una
+    // consulta sin nada visible es como no tener búsqueda. Lo que el visitante escribió y se lee igual no se toca.
+    if (displayQuery(input?.value ?? '') !== state.query) setQuery(state.query);
+    else for (const field of headerInputs) field.value = input?.value ?? '';
+    setBoxes(filters);
+    return { query: state.query, filters };
+  }
+
+  /** Pliegues: abiertos desde 1100 px, cerrados por debajo. */
+  const wide = window.matchMedia('(min-width: 1100px)');
+  function setOpen(toggle: HTMLButtonElement, open: boolean) {
+    toggle.setAttribute('aria-expanded', String(open));
+    const panel = document.getElementById(toggle.getAttribute('aria-controls') ?? '');
+    if (panel) panel.hidden = !open;
+  }
+  function resetFolds() {
+    for (const toggle of toggles) setOpen(toggle, wide.matches);
+  }
+
+  // Al cargar
+  resetFolds();
+  if (filtersBlock) filtersBlock.dataset.filtersReady = '';
+  {
+    const { query, filters } = readAddress();
+    apply(query, filters, false);
+    const canonical = catalogHref({ query, filters });
+    if (`${window.location.pathname}${window.location.search}` !== canonical) history.replaceState(history.state, '', canonical);
+  }
+
+  wide.addEventListener('change', resetFolds);
+
+  for (const toggle of toggles) {
+    toggle.addEventListener('click', () => setOpen(toggle, toggle.getAttribute('aria-expanded') !== 'true'));
+  }
+
+  for (const box of boxes) box.addEventListener('change', applyCurrent);
+
+  for (const button of filterClears) {
+    button.addEventListener('click', () => {
+      const inEmpty = empty?.contains(button) ?? false;
+      setBoxes(emptyFilters());
+      applyCurrent();
+      // El botón desaparece: el foco va a un lugar que sigue a la vista.
+      if (inEmpty) input?.focus();
+      else (toggles[0] ?? input)?.focus();
+    });
   }
 
   if (form && input) {
-    // Tal como se muestra (displayQuery), que es también lo que se busca: una secuencia % mal formada no llega al
-    // campo como «�», ni un carácter de control (los dos pasan a ser un espacio), de dirección o invisible (se quitan
-    // sin dejar espacio); una consulta sin nada visible es como no tener búsqueda.
-    const initial = displayQuery(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
-    if (initial) {
-      input.value = initial;
-      for (const field of headerInputs) field.value = initial;
-      apply(initial, false);
-    }
-
     input.addEventListener('input', () => {
       for (const field of headerInputs) field.value = input.value;
-      apply(input.value, true);
+      applyCurrent();
     });
 
     form.addEventListener('submit', event => {
       event.preventDefault();
-      apply(input.value, true);
+      applyCurrent();
     });
 
-    clear?.addEventListener('click', event => {
+    clearSearch?.addEventListener('click', event => {
       event.preventDefault();
-      input.value = '';
-      for (const field of headerInputs) field.value = '';
-      apply('', true);
+      setQuery('');
+      applyCurrent();
       input.focus();
     });
   }
+
+  // Página restaurada de la caché de Atrás y Adelante, o campos que el navegador restauró: la dirección manda. En la
+  // carga normal (pageshow llega después de load) la página ya está así y no se vuelve a escribir la región viva.
+  window.addEventListener('pageshow', event => {
+    const before = catalogHref(current());
+    const { query, filters } = readAddress();
+    if (event.persisted || catalogHref({ query, filters }) !== before) apply(query, filters, false);
+  });
 </script>

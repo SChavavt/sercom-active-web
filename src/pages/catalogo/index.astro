@@ -1,8 +1,12 @@
 ---
 // Catálogo (/catalogo/). Lo que muestra se decide con los datos, nunca con el modo de compilación:
-//   - Con productos (hoy, la vista previa): fila de búsqueda (CatalogSearch), barra lateral de categorías y
-//     marcas y retícula de tarjetas (CatalogListing), con el estado «sin resultados» de la búsqueda, y la
-//     banda de solicitud especial.
+//   - Con productos (hoy, la vista previa): fila de búsqueda (CatalogSearch); con JavaScript, filtros combinables
+//     por categoría y por marca (CatalogFilters) y, sin él, la barra lateral de enlaces; retícula de tarjetas
+//     (CatalogListing), con el estado «sin resultados», y la banda de solicitud especial.
+//     El estado sin resultados se imprime oculto con el texto de la búsqueda sin resultados (lo que veía la página
+//     sin filtros); sus tres versiones (solo texto, solo filtros, texto y filtros) van en atributos data-empty-* del
+//     contenedor y el script de CatalogSearch escribe la que corresponde. Con filtros marcados ofrece también
+//     «Limpiar filtros» (un segundo [data-filter-clear]).
 //   - Sin productos (hoy, producción): sin búsqueda, barra ni retícula. Aviso de que el catálogo se está
 //     preparando con las dos acciones útiles, las categorías como navegación si las hubiera, «Marcas que
 //     manejamos» y la banda.
@@ -15,14 +19,21 @@ import CatalogListing from '../../components/CatalogListing.astro';
 import CatalogSearch from '../../components/CatalogSearch.astro';
 import CategoryRegister from '../../components/CategoryRegister.astro';
 import EmptyState from '../../components/EmptyState.astro';
+import Button from '../../components/Button.astro';
 import Note from '../../components/Note.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import SectionHead from '../../components/SectionHead.astro';
+import { buildFacetGroups } from '../../lib/catalog-filters.mjs';
 import { contactDetails } from '../../lib/contact.mjs';
 import { brands, categories, products, routes } from '../../lib/site-data.mjs';
 import '../../styles/pages/catalogo.css';
 
 const hasProducts = products.length > 0;
+const facetGroups = buildFacetGroups(products, { categories, brands });
+// Las tres versiones del estado sin resultados: título, texto y acción principal.
+const emptyQuery = { title: 'No encontramos productos con esa búsqueda.', text: 'Puedes pedirnos este producto y lo buscamos por ti.', action: 'Solicitar este producto' };
+const emptyFilters = { title: 'No hay productos con esos filtros.', text: 'Quita algún filtro o dinos qué necesitas y lo buscamos por ti.', action: 'Ayúdame a encontrarlo' };
+const emptyBoth = { title: 'No encontramos productos con esa búsqueda y esos filtros.', text: 'Quita algún filtro, o pídenos este producto y lo buscamos por ti.', action: 'Solicitar este producto' };
 const breadcrumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Catálogo' }];
 const lead = hasProducts
   ? 'Explora por categoría o por marca. Los productos se muestran sin precio: la cotización se prepara según lo que necesitas.'
@@ -33,15 +44,24 @@ const lead = hasProducts
     <Fragment>
       <PageHeader title="Catálogo" breadcrumbs={breadcrumbs} lead={lead} />
       <CatalogSearch total={products.length} />
-      <CatalogListing products={products} categories={categories} brands={brands}>
-        <div class="catalog-body__empty" data-catalog-empty hidden>
+      <CatalogListing products={products} categories={categories} brands={brands} facets={facetGroups}>
+        <div
+          class="catalog-body__empty"
+          data-catalog-empty
+          data-empty-title-query={emptyQuery.title} data-empty-text-query={emptyQuery.text} data-empty-action-query={emptyQuery.action}
+          data-empty-title-filters={emptyFilters.title} data-empty-text-filters={emptyFilters.text} data-empty-action-filters={emptyFilters.action}
+          data-empty-title-both={emptyBoth.title} data-empty-text-both={emptyBoth.text} data-empty-action-both={emptyBoth.action}
+          hidden
+        >
           <EmptyState
             icon="search"
-            title="No encontramos productos con esa búsqueda."
-            text="Puedes pedirnos este producto y lo buscamos por ti."
-            action={{ href: routes.specialRequest, label: 'Solicitar este producto' }}
+            title={emptyQuery.title}
+            text={emptyQuery.text}
+            action={{ href: routes.specialRequest, label: emptyQuery.action }}
             headingLevel={3}
-          />
+          >
+            <Button slot="extra" type="button" variant="outline" class="empty__action" icon="close" data-filter-clear hidden>Limpiar filtros</Button>
+          </EmptyState>
         </div>
       </CatalogListing>
     </Fragment>

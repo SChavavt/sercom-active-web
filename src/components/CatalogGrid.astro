@@ -6,18 +6,22 @@
 // faltan, para que nunca se vea el azul de la lámina. Cuántos faltan se calcula aquí para la lista completa
 // (lo que se ve sin JavaScript) y el script de la búsqueda lo recalcula al filtrar (atributos data-fill4,
 // data-fill3 y data-fill2).
-// Cada tarjeta lleva en `data-search` su texto de búsqueda (searchText de search.mjs).
+// Cada tarjeta lleva en `data-search` su texto de búsqueda (searchText de search.mjs) y, con `facets` (solo el
+// catálogo, que tiene filtros), en `data-facets` sus fichas de filtro (facetText de catalog-filters.mjs).
 //
 // Uso:  <CatalogGrid products={products} />   (con la lista vacía no imprime nada: la página muestra EmptyState)
 import type { PublicProduct } from '../types/site.ts';
+import { facetText } from '../lib/catalog-filters.mjs';
 import { searchText } from '../lib/search.mjs';
 import ProductCard from './ProductCard.astro';
 
 interface Props {
   products: readonly PublicProduct[];
+  /** Imprime `data-facets` en cada tarjeta (la página tiene filtros). */
+  facets?: boolean;
 }
 
-const { products } = Astro.props;
+const { products, facets = false } = Astro.props;
 /** Lugares vacíos de la última fila con `perRow` tarjetas por fila. */
 const missing = (perRow: number) => (perRow - (products.length % perRow)) % perRow;
 ---
@@ -25,7 +29,7 @@ const missing = (perRow: number) => (perRow - (products.length % perRow)) % perR
   <div class="catalog-grid" data-catalog-grid>
     <ul class="catalog-grid__list">
       {products.map(product => (
-        <li class="catalog-grid__item" data-search={searchText(product)}><ProductCard product={product} /></li>
+        <li class="catalog-grid__item" data-search={searchText(product)} data-facets={facets ? facetText(product) : undefined}><ProductCard product={product} /></li>
       ))}
       <li class="catalog-grid__fill" aria-hidden="true" data-catalog-fill data-fill4={missing(4)} data-fill3={missing(3)} data-fill2={missing(2)}></li>
     </ul>
