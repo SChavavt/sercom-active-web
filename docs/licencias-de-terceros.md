@@ -8,16 +8,25 @@ Material de terceros incluido en el repositorio y en el sitio compilado. El logo
 | Iconos de Lucide (68, 23 de ellos heredados de Feather) | `src/assets/icons/icons.json` | ISC (Feather: MIT) |
 | Iconos de Tabler Icons (7) | `src/assets/icons/icons.json` | MIT |
 | Icono de WhatsApp de Simple Icons (1) | `src/assets/icons/icons.json` | CC0 1.0 |
+| Fotografías de producto (hoy, ninguna) | `src/assets/productos/` o una dirección `https`, según la ficha | La de cada foto, con su uso confirmado y su origen en la ficha (sección «Fotografías de producto») |
 
 Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias no exigen un crédito visible en el sitio.
 
-Nada más de terceros llega al sitio compilado: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
+Nada más de terceros llega al sitio compilado, salvo las fotografías de producto cuando las haya: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
 
 ## Tipografía Archivo · SIL Open Font License 1.1
 
 Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). Sin nombre reservado.
 
 El texto completo de la licencia está en `src/assets/fonts/OFL-Archivo.txt` y debe quedarse junto a los archivos de la fuente. La OFL permite usar, incrustar y redistribuir la fuente con un sitio web; no permite venderla por sí sola, y una versión modificada no puede llevar el nombre original sin permiso. Los archivos se usan sin cambios.
+
+## Fotografías de producto
+
+Hoy ninguna ficha está aprobada y no hay ninguna fotografía en el repositorio ni en el sitio compilado. Cuando las haya, cada ficha aprobada lleva una foto de su producto, normalmente del fabricante, que no es de la empresa ni tiene una licencia común a todas:
+
+- Se usa solo con su uso confirmado: la ficha registra de dónde viene (`image.sourceUrl`, la página `https` de origen) y `image.usageConfirmed: true`, y el validador no aprueba una ficha sin las dos cosas. Que una foto esté en Internet no da derecho a usarla ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#3-flujo-para-agregar-un-producto-real), paso 4).
+- Una foto guardada como archivo está en `src/assets/productos/`, que solo guarda las de fichas aprobadas porque el repositorio es público; la compilación la copia a `dist/_astro/` convertida a WebP y en varios anchos. Una foto por dirección (`image.url`) no se copia: la página la pide a ese servidor.
+- Las condiciones de cada foto (crédito, plazo, dónde se puede usar) son las que dé su titular, y se cumplen ficha por ficha; este archivo no las lista una por una.
 
 ## Iconos
 
