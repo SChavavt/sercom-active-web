@@ -26,11 +26,20 @@ h1, h2, h3, p, ul, ol, dl, dt, dd { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
 img, svg { display: block; }
 a { color: inherit; }
-button, input { font: inherit; color: inherit; letter-spacing: inherit; }
+/* Los controles toman la letra de la página: nunca menos de 16 px (1rem) en un campo, o iOS agranda la página al
+   enfocarlo. Los campos y sus clases están en components.css (4.18). */
+button, input, select, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
 button { cursor: pointer; }
 strong, b { font-weight: var(--type-strong-weight); }
 summary { cursor: pointer; }
 summary::-webkit-details-marker { display: none; }
+
+/* Con y sin JavaScript. BaseLayout pone la clase `js` en <html> antes de la primera pintura (script en línea del
+   <head>): lo que solo funciona con un script lleva `js-only` y su alternativa estática `no-js-only`, sin parpadeo
+   al cargar. Un estado dentro de un bloque de script (una línea de estado, un error) se muestra y se oculta con el
+   atributo `hidden`, que gana a cualquier `display` de un componente. */
+html:not(.js) .js-only, html.js .no-js-only { display: none !important; }
+[hidden] { display: none !important; }
 
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 /* Las celdas se tocan: su anillo de foco se dibuja por dentro para que la vecina no lo tape */
