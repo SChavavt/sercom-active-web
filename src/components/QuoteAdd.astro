@@ -26,7 +26,8 @@
 //     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder. El mismo
 //     renglón enviado otra vez a menos de medio segundo (un doble clic, Enter sostenido) no se agrega de nuevo. En una
 //     página que el navegador restaura de su caché de ida y vuelta la línea de estado no se muestra: habla de una
-//     lista que pudo cambiar mientras tanto.
+//     lista que pudo cambiar mientras tanto. Tampoco después de que otra pestaña cambia o vacía la lista. Si el foco
+//     estaba en «Ver mi cotización», pasa al botón «Agregar a mi cotización».
 //   - Enlaces directos (`[data-quote-direct]`, «Cotizar este producto» y «Cotizar por correo»): cada línea de su
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
@@ -165,6 +166,17 @@ const chooseVariant = product.variants.length > 1;
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => { live.textContent = sentence; });
     };
+    /**
+     * La frase de la última vez deja de valer: no se muestra ni queda en la región viva. Si el foco estaba en su
+     * enlace («Ver mi cotización»), pasa al botón del formulario, que está justo antes.
+     */
+    const forget = () => {
+      const held = status.contains(document.activeElement);
+      status.hidden = true;
+      cancelAnimationFrame(frame);
+      live.textContent = '';
+      if (held) form.querySelector<HTMLElement>('[type="submit"]')?.focus();
+    };
 
     // Un doble clic en el botón (o Enter sostenido) envía el formulario varias veces seguidas. El mismo renglón enviado
     // otra vez a menos de REPEAT_MS del envío anterior no se agrega de nuevo: guardaría el doble de lo que muestra el
@@ -178,9 +190,7 @@ const chooseVariant = product.variants.length > 1;
       const quantity = parseQuantity(input.value);
       if (quantity === null) {
         // La frase anterior ya no vale; el error lo lee el lector de pantalla al llegar el foco al campo.
-        status.hidden = true;
-        cancelAnimationFrame(frame);
-        live.textContent = '';
+        forget();
         showError();
         input.focus();
         return;
@@ -241,12 +251,13 @@ const chooseVariant = product.variants.length > 1;
     window.addEventListener('pageshow', event => {
       // Página restaurada de la caché de ida y vuelta: la frase de la última vez («Agregado a tu cotización…») puede
       // hablar de una lista que el visitante cambió o vació mientras tanto. No se muestra ni queda en la región viva.
-      if (event.persisted) {
-        status.hidden = true;
-        cancelAnimationFrame(frame);
-        live.textContent = '';
-      }
+      if (event.persisted) forget();
       restored();
+    });
+    // Lo mismo cuando otra pestaña cambia o vacía la lista mientras esta página sigue abierta: «Con lo que ya tenías
+    // son 24 pares» ya no es verdad. Una escritura de esta página no borra la frase que acaba de decir.
+    quoteStore.subscribe((_stored, { source }) => {
+      if (source === 'storage') forget();
     });
   }
 </script>
