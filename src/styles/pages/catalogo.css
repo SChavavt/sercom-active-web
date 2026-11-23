@@ -242,6 +242,18 @@
 }
 .catalog-filters__clear:focus-visible { outline-offset: -3px; }
 
+/* Letra agrandada, desde 1100 px: en el área de 9 columnas, las acciones del estado sin resultados al lado del texto
+   lo dejaban en una columna angosta (el título en siete renglones a 200 %). Pasan debajo del texto, como en la
+   tableta. Con la letra normal la condición no se cumple (lamina: layout.css; responsive.css 6.9). */
+@media (min-width: 1100px) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .catalog-body__empty .empty { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-6); }
+    .catalog-body__empty .empty__action,
+    .catalog-body__empty .empty__actions { grid-column: 2; justify-self: start; }
+    .catalog-body__empty .empty__actions { flex-direction: row; flex-wrap: wrap; }
+  }
+}
+
 /* 3. Piezas propias de una página -------------------------------------------------------------------------- */
 
 /* 3.1 Marca: enlace «Sitio del fabricante» en la columna lateral del título (sobre la fila de WhatsApp si hay productos) */
@@ -328,5 +340,8 @@
    6.8) */
 @media (forced-colors: active) {
   :where(.catalog-filters__cells) > :where(:not(.vh, script, style, template)) { outline: var(--line) solid CanvasText; }
+  /* «Limpiar filtros» es una celda: su contorno va en el hueco, como el de las demás (no separado como el de un botón de
+     texto suelto); el anillo de foco sigue por dentro */
+  .catalog-filters__clear { outline-offset: 0; }
 }
 
