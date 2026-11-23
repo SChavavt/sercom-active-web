@@ -981,7 +981,7 @@ export const CHECKS = [
   ['R-PUB-03', `Con --launch se exige lo contrario de R-RULE-12: ningún grupo de robots.txt bloquea el sitio entero, ninguna página lleva noindex y ninguna lleva el aviso «${DEVELOPMENT_NOTICE}», tampoco oculto: al lanzar el aviso se quita de la página, no se esconde (${ALL_TEXT_DOC}).`],
   ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los «Sitio del fabricante» de brands.json. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
-  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. Los números con forma de teléfono del texto visible se listan (WARN).'],
+  ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. En el código de un script, «mailto:», «tel:» o «sms:» como clave de un objeto («{whatsapp:e,mailto:t}») o como propiedad leída en una condición («a?t.mailto:t.whatsapp») no es un destino; con una «@» detrás, o con siete cifras o más bajo «tel:» o «sms:», sí falla. Los números con forma de teléfono del texto visible se listan (WARN).'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
   ['R-RULE-29', 'Ningún color está a 4 o menos por canal del azul marino o del celeste anteriores (hexadecimal, rgb() o hsl()) en una hoja de estilo, un atributo style o de color (fill, stroke, color, bgcolor, bordercolor, text, link…), los valores to, from, by y values de <animate> y <set> (salvo cuando animan un enlace), un <meta> de color, o en un script o un JSON: el valor de una propiedad, clave o constante cuyo nombre dice color (color, fill, background, bg, fondo, primary, accent, brand, marca, navy, azul, palette, paleta, theme, tema…; la palabra cuenta en cualquier lugar del nombre: «textcolor», «MAINCOLOR», «navbg», «darktheme»; salvo «tema», que cuenta solo al principio del nombre o de una de sus partes, después de «_», «-» o «$» o en camelCase: «temaOscuro», «tema_claro», «miTema»; no dentro de otra palabra, como «sistema», ni en «temas», que son asuntos, ni en «temática», «temático» o «temario», que son otras palabras; pegado a otra palabra sí cuenta: «temaoscuro»), cada valor de un objeto o una lista guardados bajo un nombre de color o de paleta («colores={fondo:…}», «palette=[…]») o el segundo argumento de setProperty, sea cual sea el primero. Ninguna página declara <meta name="color-scheme"> con dark.'],
   ['R-RULE-28', 'Ningún formulario envía datos a un servidor (method="post" o action con dirección absoluta).'],
@@ -1053,6 +1053,31 @@ const LICENSE_COMMENT = /\/\*![\s\S]*?\*\//g;
 const isPrefix = rest => rest === '' || rest === '/' || /^\/?[$`{]/.test(rest);
 // Un número de teléfono escrito en un enlace: cifras, «+», espacios, puntos, guiones y paréntesis.
 const PHONE_SHAPE = /^\+?[\d\s().-]+$/;
+// En el código de un script, «mailto:», «tel:» o «sms:» también pueden ser código y no un destino. El compilador
+// escribe sin comillas ni espacios la CLAVE de un objeto que nombra el canal («{whatsapp:e,mailto:t}», «{mailto:1900}»,
+// «{whatsapp:[],mailto:[]}»: antes hay «{» o «,») y una PROPIEDAD leída en una condición
+// («e==="mailto"?t.mailto:t.whatsapp»: antes hay un punto). Un destino que funciona va al principio de una cadena o de
+// un atributo, nunca después de «{», «,» o «.». Y lo que sigue no puede tener forma de destino: un «mailto:» con una
+// «@» detrás, y un «tel:» o «sms:» seguido de siete cifras o más, fallan estén donde estén
+// («{mailto:"mailto:otro@x.com"}» falla por la cadena; «"a,mailto:otro@x.com"», por la arroba).
+const CODE_BEFORE = /(?:[{,]\s*|\.)$/;
+// Lo que puede ser un número de teléfono al principio de un valor: cifras, «+», espacios, puntos, guiones y paréntesis.
+const PHONE_LEAD = /^[+\d\s().-]*/;
+/**
+ * ¿El «mailto:», «tel:» o «sms:» de `match` es código de un script (la clave de un objeto o una propiedad leída) y no
+ * un destino?
+ * @param {string} source
+ * @param {RegExpMatchArray} match
+ * @param {string} rest Lo que sigue a los dos puntos.
+ * @param {{ phone?: boolean }} [options]
+ */
+function isChannelCode(source, match, rest, { phone = false } = {}) {
+  const index = match.index ?? 0;
+  if (!CODE_BEFORE.test(source.slice(Math.max(0, index - 40), index))) return false;
+  const value = decodePercent(rest);
+  if (phone) return (PHONE_LEAD.exec(value)?.[0] ?? '').replace(/\D/g, '').length < 7;
+  return !value.includes('@');
+}
 
 /**
  * R-RULE-24: destinos de WhatsApp, correo y teléfono escritos en cualquier parte de un archivo (enlaces, otros
@@ -1062,7 +1087,7 @@ const PHONE_SHAPE = /^\+?[\d\s().-]+$/;
  * sin sustituir («mailto:{correo}») fallan. Un «mailto:» o «tel:» sin nada detrás solo se acepta en el texto suelto,
  * donde puede ser una etiqueta («Tel: 221…») o un selector de CSS (`a[href^="mailto:"]`); en el valor de un atributo
  * (`attribute: true`) falla. Solo en el código de un script (`script: true`) un destino incompleto puede ser el
- * principio que el script completa.
+ * principio que el script completa, y un «mailto:» o «tel:» puede ser código y no un destino (`isChannelCode`).
  * @param {string} source Contenido con entidades y escapes de cadena decodificados.
  * @param {{ script?: boolean, attribute?: boolean, joinedPieces?: boolean, nestedOnly?: boolean }} [options]
  *   `joinedPieces`: el texto viene de `scriptText`, con las piezas de las cadenas unidas («"https://wa.me/"+"52155…"»);
@@ -1088,6 +1113,7 @@ function contactProblems(source, { digits, email, knownNumbers }, { script = fal
   for (const match of source.matchAll(MAILTO)) {
     const value = match[1];
     if (incomplete(value)) continue;
+    if (script && isChannelCode(source, match, value)) continue;
     const queryStart = value.indexOf('?');
     if (script && joinedPieces && queryStart === 0) continue;
     const addresses = decodePercent(queryStart === -1 ? value : value.slice(0, queryStart)).split(',').map(address => address.trim().toLowerCase());
@@ -1100,6 +1126,7 @@ function contactProblems(source, { digits, email, knownNumbers }, { script = fal
   for (const match of source.matchAll(PHONE_LINK)) {
     const value = match[2];
     if (incomplete(value)) continue;
+    if (script && isChannelCode(source, match, value, { phone: true })) continue;
     const written = decodePercent(value.split(/[?;]/)[0]).trim();
     const number = written.replace(/\D/g, '');
     if (!PHONE_SHAPE.test(written) || !knownNumbers.has(number)) problems.add(`teléfono distinto del confirmado, vacío o con letras: ${shorten(match[0])}`);

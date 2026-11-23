@@ -815,6 +815,50 @@ test('R-RULE-24: un enlace de correo o de teléfono vacío o sin sustituir, y de
   assert.deepEqual(failures(await scan({ '_astro/sitio.css': 'a[href^="mailto:"],a[href^="tel:"]{text-decoration:none}' })), []);
 });
 
+test('R-RULE-24: en un script, «mailto:» o «tel:» como clave de un objeto o como propiedad leída no es un destino; con forma de destino sí', async () => {
+  const EMAIL = data.business.email;
+  // Código como lo deja el compilador (sin comillas en las claves y sin espacios): objetos con una clave por canal,
+  // con cualquier valor, y propiedades leídas en una condición.
+  for (const content of [
+    'var L={whatsapp:1900,mailto:1900};function f(e,t){return{whatsapp:e,mailto:t}}var x=1;',
+    'const l=Object.freeze({whatsapp:1900,mailto:1900}),u=2;',
+    'function g(e){const{whatsapp:t,mailto:n}=e;return[t,n]}',
+    'const c={mailto:e.correo,tel:e.telefono,sms:t},d={tel:!0,sms:!1,mailto:-1};',
+    'const etiquetas={whatsapp:`Abrir WhatsApp`,mailto:`Abrir correo`,tel:"Llamar"};',
+    `const destinos={mailto:"mailto:${EMAIL}",tel:t};`,
+    'const cuenta={tel:3,sms:120000,mailto:0.5};',
+    'const g={whatsapp:[],mailto:[]};for(const a of l)g[k(a)].push(a);',
+    'const h={whatsapp:a(),mailto:b(1),tel:void 0,sms:e.length>0},i={mailto:{a:1},tel:[1,2]};',
+    'const t=c==="mailto"?l.mailto:l.whatsapp,u=c==="tel"?l.tel:l.sms;',
+    'const n=x?e?.mailto:e?.tel,m=x?e.sms:0;',
+    `const v=",mailto:${EMAIL}";`,
+  ]) {
+    assert.deepEqual(failures(await scan({ '_astro/pagina.js': content })), [], content);
+    assert.deepEqual(failures(await scan({ 'pagina/index.html': page(`<script type="module">${content}</script>`) })), [], content);
+  }
+  // Lo que tiene forma de destino sigue fallando esté donde esté: en la cadena que es el valor de la clave, pegado a
+  // una coma o a un punto dentro de una cadena (también codificado dentro de otra dirección), con un número con forma
+  // de teléfono, al principio de una cadena aunque no sea una dirección, y fuera del código de un script.
+  for (const content of [
+    'const destinos={mailto:"mailto:otro@example.com"};',
+    'const destinos={whatsapp:e,mailto:`mailto:otro@example.com`};',
+    'const lista="a,mailto:otro@example.com";',
+    'const texto="visita.mailto:otro@example.com";',
+    'const u="https://l.example.com/?a=1,mailto%3Aotro%40example.com";',
+    'const c={tel:5511223344};',
+    'const c={x:1,sms:5511223344,y:2};',
+    'const c={tel:"tel:+525511223344"};',
+    'const t="llama.tel:+52 55 1122 3344";',
+    'const t="a,tel:(55) 1122-3344";',
+    'location.href=a?"mailto:otro@example.com":b;',
+    'location.href="mailto:ventas";',
+  ]) assert.deepEqual(failedIds(await scan({ '_astro/pagina.js': content })), ['R-RULE-24'], content);
+  for (const [path, content] of [['datos.json', '{"a":"x,mailto:t}"}'], ['pagina/index.html', page('<p data-canales="{whatsapp:e,mailto:t}">x</p>')],
+    ['pagina/index.html', page('<a href="mailto:t">Correo</a>')]]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-24'], content);
+  }
+});
+
 test('R-RULE-01: un prefijo de moneda antes de «$» es un precio en el texto, en los atributos, en los scripts y en el CSS', async () => {
   // La base y la ronda 1 los detectaban; la excepción de «$» pegado a una letra solo vale para el código de un script.
   await assertEachFails('R-RULE-01', [
