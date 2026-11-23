@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
 // (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
-// de un producto retirado) y del aviso de arriba (que nada lo oculte), que se leen en el HTML y en las hojas de
-// estilo, sin navegador.
+// de un producto retirado), del aviso de arriba (que nada lo oculte) y de los controles (que cada uno tenga una
+// función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de un <template>), que se
+// leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -10,15 +11,16 @@
 //               de búsqueda (#buscador) con su botón Buscar
 //
 // Cada comprobación vive en CHECKS con su identificador (el del hallazgo de la revisión que la originó). Una
-// comprobación recibe cada página ya leída (árbol de elementos, ruta publicada) y cada hoja de estilo, y devuelve
-// mensajes; agregar otra es agregar una entrada a CHECKS.
+// comprobación recibe cada página ya leída (árbol de elementos, ruta publicada, el código de sus scripts) y cada hoja
+// de estilo, y devuelve mensajes; agregar otra es agregar una entrada a CHECKS.
 //
-// Qué no revisa: el resultado visual (anchos, solapes, foco, colores). Eso se revisa a mano en un navegador
-// (docs/diseno.md, sección 15): el repositorio no tiene pruebas con navegador.
+// Qué no revisa: el resultado visual (anchos, solapes, foco, colores) ni lo que hace un control al usarlo (solo que
+// un script de su página lo nombra). Eso se revisa a mano en un navegador (docs/diseno.md, sección 15): el
+// repositorio no tiene pruebas con navegador.
 //
 // Termina con código 1 si encuentra problemas y con 2 si la carpeta no existe o no tiene páginas HTML.
 import { readdir, readFile } from 'node:fs/promises';
-import { extname, join, relative, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { routes } from '../src/lib/routes.mjs';
 import { isLongProductName } from '../src/lib/product-title.mjs';
@@ -38,13 +40,14 @@ const decodeEntities = text => text
   .replace(/&amp;/g, '&');
 
 /**
- * @typedef {{ name: string, attributes: Map<string, string>, children: Element[], parent: Element | null, text: string[], content: (string | Element)[], order: number }} Element
+ * @typedef {{ name: string, attributes: Map<string, string>, children: Element[], parent: Element | null, text: string[], content: (string | Element)[], order: number, source?: string }} Element
  */
 
 /**
  * Árbol de elementos de un documento. Cada elemento lleva su orden en el documento (`order`), su texto directo
  * (`text`) y su contenido tal como se lee (`content`: el texto directo y los elementos hijos, en su orden).
- * El contenido de <script>, <style>, <textarea> y <title> no se interpreta. Las hojas <style> se devuelven aparte.
+ * El contenido de <script>, <style>, <textarea> y <title> no se interpreta. Las hojas <style> se devuelven aparte;
+ * el contenido de un <script> va tal cual en su `source` (no es texto del elemento ni de la página).
  * @param {string} source
  */
 export function parseHtml(source) {
@@ -103,7 +106,8 @@ export function parseHtml(source) {
       const close = lower.indexOf(`</${name}`, next);
       const content = html.slice(next, close === -1 ? html.length : close);
       if (name === 'style') styles.push(content);
-      else if (name !== 'script') addText(element, content);
+      else if (name === 'script') element.source = content;
+      else addText(element, content);
       const closeEnd = close === -1 ? html.length : html.indexOf('>', close) + 1;
       next = closeEnd || html.length;
     } else if (!VOID.has(name) && !selfClosing) {
@@ -454,7 +458,9 @@ export function classAttributeCouldMatch({ operator, value, insensitive }, { isW
 export const classAttributeIsRetired = attribute => classAttributeCouldMatch(attribute, { isWhole: isRetiredClass, names: RETIRED_HEADER_CLASSES });
 
 /**
- * @typedef {{ file: string, route: string, root: Element, elements: Element[] }} Page
+ * `code` es el código de la página: el de sus scripts en línea y el de los archivos de la carpeta que cargan (ver
+ * `pageCode`); vacío si no lleva ninguno.
+ * @typedef {{ file: string, route: string, root: Element, elements: Element[], code?: string }} Page
  * @typedef {{ file: string, css: string, selectors: string[] }} Sheet
  * @typedef {{ preview: boolean }} Options
  * @typedef {{ id: string, title: string, page?: (page: Page, options: Options) => string[], sheet?: (sheet: Sheet, options: Options) => string[] }} Check
@@ -756,6 +762,156 @@ function hiddenByAttributes(element) {
     if (hidesElement(declaration)) reasons.push(`style="${declaration.property}: ${declaration.value}"`);
   }
   return reasons;
+}
+
+// Controles y el código de la página (R-RULE-30a y R-RULE-30b) -----------------------------------------------
+
+// Un <script> es código cuando no lleva type, lo lleva vacío, es «module» o un tipo de JavaScript. Un bloque de datos
+// (application/json, application/ld+json, importmap…) no es código: lo que nombra no da función a nada.
+const CODE_TYPE = /^(?:|module|(?:text|application)\/(?:x-)?(?:java|ecma)script|text\/javascript1\.[0-5]|text\/(?:jscript|livescript))$/;
+/** ¿El <script> es código que el navegador ejecuta? */
+export const isCodeScript = script => CODE_TYPE.test((script.attributes.get('type') ?? '').trim().toLowerCase());
+// Lo que un archivo de código importa: «import{a}from"./x.js"», «import"./x.js"», «export{a}from"./x.js"» y
+// «import("./x.js")», con cualquiera de las tres comillas (la compilación escribe «`»).
+const STATIC_IMPORT = /\b(?:import|export)\s*(?:[\w$*{}\s,]*?\bfrom\s*)?(["'`])([^"'`\r\n]+)\1/g;
+const DYNAMIC_IMPORT = /\bimport\s*\(\s*(["'`])([^"'`\r\n]+)\1\s*[,)]/g;
+/** Las direcciones que importa un código, estáticas o dinámicas, en orden y sin repetir. */
+export function importsOf(code) {
+  const found = [...code.matchAll(STATIC_IMPORT), ...code.matchAll(DYNAMIC_IMPORT)].sort((a, b) => a.index - b.index).map(match => match[2]);
+  return [...new Set(found)];
+}
+
+/** Nombre de un atributo data-* en su forma `dataset`: «data-quote-add» → «quoteAdd». */
+export const datasetName = attribute => attribute.slice('data-'.length).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+const escapeRegExp = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * ¿El código nombra el atributo data-* `attribute`, como nombre entero? Como atributo («[data-quote-add]»,
+ * getAttribute('data-quote-add'); sin distinguir mayúsculas, como un selector), con algo que no sea letra, cifra, «_» ni
+ * «-» a cada lado: «data-quote-add» no es «data-quote-add-all». O en su forma `dataset` como palabra entera
+ * («quoteAdd», no «quoteAddAll»). Un nombre de una sola palabra («data-toggle» → «toggle») aparece en cualquier código
+ * («classList.toggle»), así que en su forma `dataset` solo cuenta leído de `dataset` («dataset.toggle»,
+ * «dataset['toggle']»).
+ */
+export function namesHook(code, attribute) {
+  if (new RegExp(`(?<![\\w-])${escapeRegExp(attribute)}(?![\\w-])`, 'i').test(code)) return true;
+  const key = escapeRegExp(datasetName(attribute));
+  if (!key) return false;
+  if (/[A-Z]/.test(datasetName(attribute))) return new RegExp(`(?<![\\w$])${key}(?![\\w$])`).test(code);
+  return new RegExp(`\\bdataset\\s*(?:\\?\\.|\\.)\\s*${key}(?![\\w$])|\\bdataset\\s*(?:\\?\\.)?\\[\\s*(["'\`])${key}\\1\\s*\\]`).test(code);
+}
+/** Los atributos data-* de un elemento: todos, y los que nombra el código. */
+function hooksOf(element, code) {
+  const all = [...element.attributes.keys()].filter(name => name.startsWith('data-') && name.length > 'data-'.length);
+  return { all, named: all.filter(name => namesHook(code, name)) };
+}
+
+const typeAttribute = element => (element.attributes.get('type') ?? '').trim().toLowerCase();
+const roles = element => (element.attributes.get('role') ?? '').trim().toLowerCase().split(/\s+/);
+/** ¿Es un control? <button>, <select>, <textarea>, <input> que no es hidden, y todo lo que lleva role="button". */
+export const isControl = element => (['button', 'select', 'textarea'].includes(element.name)
+  || (element.name === 'input' && typeAttribute(element) !== 'hidden') || roles(element).includes('button'));
+/** ¿Envía su formulario? Un <button> sin type o con type="submit" (o un type que no existe), un <input> submit o image. */
+const isSubmit = element => (element.name === 'button' ? !['button', 'reset'].includes(typeAttribute(element))
+  : element.name === 'input' && ['submit', 'image'].includes(typeAttribute(element)));
+/** ¿Borra su formulario? type="reset" vacía los campos del <form> sin script, con action o sin él. */
+const isReset = element => ['button', 'input'].includes(element.name) && typeAttribute(element) === 'reset';
+/** ¿Es un campo cuyo valor viaja con su formulario? <select>, <textarea> o un <input> que no es un botón. */
+const isField = element => element.name === 'select' || element.name === 'textarea'
+  || (element.name === 'input' && !['hidden', 'button', 'submit', 'reset', 'image'].includes(typeAttribute(element)));
+/**
+ * El formulario de un control: el que nombra su atributo form (si no es un <form>, ninguno) o el <form> que lo
+ * contiene. Un <template> es un límite: lo que va dentro se clona en otro lugar.
+ * @param {Element} control @param {Page} page
+ */
+function formOf(control, page) {
+  if (control.attributes.has('form')) {
+    const id = control.attributes.get('form');
+    return page.elements.find(element => element.name === 'form' && element.attributes.get('id') === id) ?? null;
+  }
+  for (let element = control.parent; element && element.name !== '#document' && element.name !== 'template'; element = element.parent) {
+    if (element.name === 'form') return element;
+  }
+  return null;
+}
+/** Un control como se reporta: etiqueta, type, name, role, clases y los primeros 60 caracteres de su texto. */
+function describeControl(control) {
+  const attributes = ['type', 'name', 'role', 'class'].filter(key => control.attributes.has(key)).map(key => ` ${key}="${control.attributes.get(key)}"`).join('');
+  const text = textOf(control).slice(0, 60);
+  return `<${control.name}${attributes}>${text ? ` «${text}»` : ''}`;
+}
+/**
+ * Por qué un control no tiene función en una página; `null` si la tiene (ver R-RULE-30a).
+ * @param {Element} control @param {Page} page
+ */
+export function missingFunction(control, page) {
+  const code = page.code ?? '';
+  const own = hooksOf(control, code);
+  if (own.named.length) return null;
+  const form = formOf(control, page);
+  const named = isField(control) && Boolean(control.attributes.get('name'));
+  const sends = isSubmit(control);
+  const formHooks = form ? hooksOf(form, code) : null;
+  if (form && isReset(control)) return null;
+  if (form && (named || sends) && (form.attributes.has('action') || formHooks?.named.length)) return null;
+  const reasons = [own.all.length
+    ? `ningún script de la página nombra ${own.all.map(name => `${name} (ni ${datasetName(name)})`).join(', ')}`
+    : 'no lleva un atributo data-* que un script de la página nombre'];
+  if (form) {
+    if (isField(control) && !named) reasons.push('está en un <form>, pero un campo sin name no viaja con él');
+    else if (!named && !sends) reasons.push(`está en un <form>, pero ${control.name === 'button' || control.name === 'input' ? `un botón type="${typeAttribute(control)}"` : 'este control'} no lo envía: el <form> solo da función a sus campos con name y a su botón de envío`);
+    else reasons.push(`su <form> no lleva action ni un atributo data-* que un script de la página nombre${formHooks?.all.length ? ` (lleva ${formHooks.all.join(', ')})` : ''}`);
+  } else if (named || sends) {
+    reasons.push(`no está en un <form> con action o con un atributo data-* que un script de la página nombre`);
+  }
+  return `${describeControl(control)} no tiene función: ${reasons.join('; ')}`;
+}
+
+/**
+ * El código de una página: el texto de sus <script> de código en línea y el de los archivos de la carpeta que cargan
+ * sus <script src>, más lo que esos archivos importan, estática o dinámicamente, desde la carpeta, a cualquier
+ * profundidad. Cada archivo se lee una vez (`load` guarda lo leído); una dirección fuera de la carpeta (otro servidor,
+ * «../» que sale de ella) o un archivo que no existe no aportan nada (los enlaces rotos los revisa check-links).
+ * @param {{ file: string, root: Element }} page `file` es la ruta del archivo de la página en el disco
+ * @param {string} directory @param {(path: string) => Promise<string | null>} load
+ */
+export async function pageCode({ file, root }, directory, load) {
+  const resolveFrom = (specifier, base) => {
+    const address = specifier.trim();
+    if (!/^(?:\.{1,2}\/|\/(?!\/))/.test(address)) return null;
+    let path = address.split(/[?#]/)[0];
+    try { path = decodeURIComponent(path); } catch { /* se usa tal cual */ }
+    const target = path.startsWith('/') ? join(directory, path) : join(dirname(base), path);
+    const inside = relative(directory, target);
+    return inside && !inside.startsWith('..') && !isAbsolute(inside) ? target : null;
+  };
+  const parts = [];
+  const queue = [];
+  for (const script of allElements(root).filter(element => element.name === 'script' && isCodeScript(element))) {
+    if (script.attributes.has('src')) {
+      const target = resolveFrom(script.attributes.get('src') ?? '', file);
+      if (target) queue.push(target);
+      continue;
+    }
+    parts.push(script.source ?? '');
+    for (const specifier of importsOf(script.source ?? '')) {
+      const target = resolveFrom(specifier, file);
+      if (target) queue.push(target);
+    }
+  }
+  const seen = new Set();
+  while (queue.length) {
+    const target = /** @type {string} */ (queue.shift());
+    if (seen.has(target)) continue;
+    seen.add(target);
+    const text = await load(target);
+    if (text === null) continue;
+    parts.push(text);
+    for (const specifier of importsOf(text)) {
+      const next = resolveFrom(specifier, target);
+      if (next) queue.push(next);
+    }
+  }
+  return parts.join('\n');
 }
 
 /** @type {Check[]} */
@@ -1276,6 +1432,66 @@ export const CHECKS = [
       return problems;
     },
   },
+  // R-RULE-30a · Ningún control que no haga nada.
+  // Los controles: cada <button>, <select>, <textarea>, <input> que no es hidden y cada elemento con role="button", en
+  // cualquier parte de la página, también dentro de un <template> (se clona y entra en la página). El código de la
+  // página es el de `pageCode`: sus scripts de código en línea y los archivos de la carpeta que cargan e importan; un
+  // bloque de datos (<script type="application/json">) no es código, y lo que nombra el código de OTRA página no cuenta.
+  // Un control tiene función cuando:
+  // - funciona solo: es un campo con name o un botón de envío (type="submit", o un <button> sin type) de un <form> con
+  //   action (las dos búsquedas: el navegador va a la dirección del formulario con sus campos), o un botón
+  //   type="reset" dentro de un <form> (vacía sus campos sin script; hoy el sitio no usa ninguno);
+  // - lleva un atributo data-* que el código nombra (`namesHook`: el atributo entero, o su forma dataset como palabra
+  //   entera; «data-quote-add» no cuenta como «data-quote-add-all»);
+  // - es un campo con name o un botón de envío de un <form> que lleva un atributo así (el script atiende el envío del
+  //   formulario y lee sus campos). El formulario es el que contiene al control o el que nombra su atributo form; un
+  //   <template> corta esa relación.
+  // Decisiones, tomadas de lo que las páginas llevan hoy:
+  // - <summary> no es un control aquí: abre y cierra su <details> sin script (Categorías, «Ver todas las marcas», las
+  //   preguntas de contacto). <label> tampoco: enfoca o marca su campo, y el campo se revisa.
+  // - Un control con disabled o aria-disabled="true" se revisa igual que los demás: si ningún script lo nombra, nada lo
+  //   habilita y se queda inútil (hoy solo «Disminuir» del selector de cantidad empieza con aria-disabled, y lleva su
+  //   gancho). Un control con hidden también: un script lo muestra.
+  // - Un manejador escrito en un atributo (onclick) no cuenta: el sitio no los usa; un control así lleva su gancho.
+  // - El código de un <script> que está dentro de un <template> cuenta como código de la página (el navegador lo
+  //   ejecuta al clonarla), pero R-RULE-30b ya hace fallar ese <script>, así que la compilación no pasa igual.
+  // Límites: prueba que un script de la página nombra el gancho del control, no que haga algo útil con él, ni que el
+  // control se muestre solo cuando funciona (que un control de JavaScript lleve js-only, por ejemplo). Basta con que el
+  // nombre aparezca en el código, también en un comentario o en una cadena que no es un selector. Un control cuya
+  // función viene solo de un oyente puesto en un antecesor sin gancho propio falla: es a propósito, se le da un
+  // gancho. Un archivo que el código arma en el navegador («import(variable)») no se sigue. El comportamiento (qué
+  // pasa al pulsar, el foco, lo que se anuncia) se sigue revisando en el navegador.
+  {
+    id: 'R-RULE-30a',
+    title: 'Cada control (<button>, <select>, <textarea>, <input> que no es hidden y role="button", también dentro de un <template>) tiene función: es un campo con name o un botón de envío de un <form> con action (o un botón type="reset" de un <form>), o lleva un atributo data-* que el código de su página nombra (sus scripts en línea y los archivos de la compilación que cargan e importan, sin los bloques de datos), o es un campo con name o un botón de envío de un <form> que lleva ese atributo. <summary> y <label> no son controles; disabled no exime. Prueba que un script nombra el gancho, no que haga algo útil con él ni que el control se muestre solo cuando funciona: el comportamiento se revisa en el navegador',
+    page(page) {
+      return page.elements.filter(isControl).map(control => missingFunction(control, page)).filter(message => message !== null);
+    },
+  },
+  // R-RULE-30b · Ningún <script> dentro de un <template>.
+  // Astro escribe el script de un componente donde el componente se dibuja por primera vez; dentro de un <template>
+  // escribe una copia más, y cada clon de la plantilla la ejecuta otra vez: en este proyecto eso hizo que un clic
+  // contara cuatro veces con tres renglones clonados. La regla del proyecto es que un componente que se usa dentro de un
+  // <template> no lleva script, y su script lo escribe una sola vez un componente aparte (…Script.astro) fuera de la
+  // plantilla. Para que la regla sea simple falla cualquier <script> dentro de un <template>, a cualquier profundidad y
+  // de cualquier tipo: también un bloque de datos (nada lo necesita ahí).
+  {
+    id: 'R-RULE-30b',
+    title: 'Ningún <script>, de ningún tipo (tampoco un bloque de datos), va dentro de un <template>: cada clon de la plantilla ejecutaría su copia otra vez',
+    page(page) {
+      const problems = [];
+      for (const script of page.elements.filter(element => element.name === 'script')) {
+        const template = closest(script.parent, element => element.name === 'template');
+        if (!template) continue;
+        const type = script.attributes.get('type');
+        const src = script.attributes.get('src');
+        const hooks = [...template.attributes.keys()].filter(name => name.startsWith('data-'));
+        const what = `<script${type !== undefined ? ` type="${type}"` : ''}${src !== undefined ? ` src="${src}"` : ''}>${src === undefined ? ` «${(script.source ?? '').trim().slice(0, 60)}»` : ''}`;
+        problems.push(`${what} está dentro de ${describe(template).slice(0, -1)}${hooks.length ? ` ${hooks.join(' ')}` : ''}>: cada clon de la plantilla lo ejecuta otra vez; el script va una sola vez fuera de la plantilla (un componente …Script.astro)`);
+      }
+      return problems;
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------------------------------
@@ -1307,11 +1523,18 @@ export async function checkMarkup(directory, options = {}) {
   const pages = [];
   /** @type {Sheet[]} */
   const sheets = [];
+  // Cada archivo de código se lee una sola vez, aunque lo carguen muchas páginas.
+  const sources = new Map();
+  const load = path => {
+    if (!sources.has(path)) sources.set(path, readFile(path, 'utf8').catch(() => null));
+    return sources.get(path);
+  };
   for (const file of files) {
     const extension = extname(file).toLowerCase();
     if (extension === '.html' || extension === '.htm') {
       const { root, styles } = parseHtml(await readFile(file, 'utf8'));
-      pages.push({ file: name(file), route: routeOf(name(file)), root, elements: allElements(root) });
+      const code = await pageCode({ file, root }, directory, load);
+      pages.push({ file: name(file), route: routeOf(name(file)), root, elements: allElements(root), code });
       styles.forEach((css, index) => sheets.push({ file: `${name(file)} <style> ${index + 1}`, css, selectors: cssSelectors(css) }));
     } else if (extension === '.css') {
       const css = await readFile(file, 'utf8');

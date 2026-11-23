@@ -50,8 +50,11 @@ function header({ search = true, categories = true, marks = {}, classes = {}, or
 const dock = (marks = {}) => `<nav class="dock" aria-label="Acciones rápidas"><a class="dock__link" href="/cotizar/"${marks['dock:/cotizar/'] ? ` aria-current="${marks['dock:/cotizar/']}"` : ''}><span>Cotizar mi lista</span></a><a class="dock__link dock__link--wa" href="https://wa.me/5212214002219"><span>WhatsApp</span></a></nav>`;
 // El pie por omisión no lleva enlaces: las pruebas del pie lo sustituyen con `withFooter`.
 const EMPTY_FOOTER = '<footer class="site-footer"><p class="label">Sercom Active</p></footer>';
+// El script de la cabecera, como lo escribe SiteHeader: nombra los ganchos de los botones Menú y Buscar, así que sus
+// botones tienen función (R-RULE-30a).
+const HEADER_SCRIPT = '<script type="module">const b=document.querySelectorAll(`[data-toggle="menu"],[data-toggle="search"]`);b.forEach(x=>x.addEventListener(`click`,()=>{}));</script>';
 const page = (options = {}, body = '<h1>Página</h1>') => `<!doctype html><html lang="es-MX"><head><meta charset="utf-8"><title>Prueba</title></head><body><a class="skip-link" href="#contenido">Saltar al contenido</a>`
-  + `<div class="sheet">${header(options)}<main id="contenido" tabindex="-1">${body}</main>${EMPTY_FOOTER}</div>${dock(options.marks)}</body></html>`;
+  + `<div class="sheet">${header(options)}<main id="contenido" tabindex="-1">${body}</main>${EMPTY_FOOTER}</div>${dock(options.marks)}${HEADER_SCRIPT}</body></html>`;
 const STYLE = '.masthead__nav{display:flex}.masthead__search{display:flex}.masthead__search-input{flex:1}.masthead__search-btn{width:44px}.masthead__nav-link{padding:0 12px}@media (max-width:1099px){.masthead__nav,.masthead__search{position:absolute;display:none}html:not(.js) .masthead__nav{display:flex}}';
 
 /** Revisa un sitio temporal (una portada correcta más `files`) con solo las comprobaciones indicadas. */

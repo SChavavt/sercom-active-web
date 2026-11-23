@@ -1613,17 +1613,25 @@ test('--rules nombra «representante» en R-RULE-07 y todo <iframe> en R-RULE-11
   assert.match(entry('R-RULE-11', 'mapa'), /Cualquier <iframe> falla mientras la atención presencial no esté confirmada, porque el escáner no distingue un mapa de otra inserción: un video del fabricante se da como enlace/);
 });
 
-test('--rules y check-links no prometen revisar los botones: un botón sin efecto solo se encuentra en el navegador', async () => {
-  // R-RULE-30: check-links revisa enlaces; los botones de la cabecera, check-markup; un botón sin efecto, solo el navegador.
+test('--rules y check-links dicen quién revisa los enlaces y quién los controles, y qué queda para el navegador', async () => {
+  // R-RULE-30: check-links revisa enlaces; los controles, check-markup (R-RULE-30a y R-RULE-30b); lo que hace un
+  // control al usarlo, solo el navegador.
   const links = CHECKS.filter(([id]) => id === 'R-RULE-30').map(([, doc]) => doc).join('\n');
   assert.doesNotMatch(links, /controles inertes/);
   assert.match(links, /vacíos, «#», javascript: o un <a> sin href/);
-  assert.match(links, /botones propios de la cabecera/);
-  assert.match(links, /Un botón que no hace nada no lo encuentra ninguna comprobación: solo la revisión de la página en el navegador/);
+  assert.match(links, /scripts\/check-markup\.mjs revisa los controles de cada página compilada/);
+  assert.match(links, /R-RULE-30a pide que cada <button>, <select>, <textarea>, <input> que no es hidden y cada role="button", también dentro de un <template>/);
+  assert.match(links, /una función nativa \(un campo con name o el botón de envío de un <form> con action\) o un atributo data-\* que el código de su página nombre/);
+  assert.match(links, /R-RULE-30b, que ningún <script> vaya dentro de un <template>/);
+  assert.match(links, /no prueban que el script haga algo útil con el control, ni que el control se vea solo cuando funciona: lo que pasa al usarlo, el foco y lo que se anuncia se siguen revisando en el navegador/);
+  // Ya no promete que un botón sin función solo lo encuentre el navegador: lo encuentra check-markup.
+  assert.doesNotMatch(links, /Un botón que no hace nada no lo encuentra ninguna comprobación/);
+  assert.doesNotMatch(links, /botones propios de la cabecera/);
   const header = (await readText('scripts/check-links.mjs')).split('\nimport ')[0];
   assert.doesNotMatch(header, /controles inertes/);
-  assert.match(header, /Solo revisa enlaces: un <button> u otro control que no hace nada no se detecta aquí/);
-  assert.match(header, /Un botón sin efecto solo se encuentra revisando la página en el navegador/);
+  assert.doesNotMatch(header, /botones propios de la cabecera/);
+  assert.match(header, /Solo revisa enlaces: un <button> u otro control sin función no se detecta aquí, lo revisa check-markup/);
+  assert.match(header, /Que un control haga algo útil al usarlo solo se comprueba en el navegador/);
 });
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {

@@ -20,8 +20,9 @@
 // Qué no revisa: los enlaces externos, de WhatsApp, de correo y de teléfono no se consultan (la revisión no
 // usa la red); hay que probarlos a mano antes de publicar. Tampoco ejecuta scripts: una dirección que un script
 // arma en el navegador, o que va en un atributo data-*, no se revisa.
-// Solo revisa enlaces: un <button> u otro control que no hace nada no se detecta aquí (check-markup revisa solo los
-// botones propios de la cabecera). Un botón sin efecto solo se encuentra revisando la página en el navegador.
+// Solo revisa enlaces: un <button> u otro control sin función no se detecta aquí, lo revisa check-markup (R-RULE-30a:
+// cada control tiene una función nativa o un atributo data-* que el código de su página nombra; R-RULE-30b: ningún
+// <script> dentro de un <template>). Que un control haga algo útil al usarlo solo se comprueba en el navegador.
 //
 // Termina con código 1 si encuentra problemas y con 2 si la carpeta no existe o no tiene páginas HTML.
 import { readdir, readFile } from 'node:fs/promises';
