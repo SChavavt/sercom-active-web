@@ -51,7 +51,7 @@ export async function validateProject(root) {
   errors.push(...reviewCatalogText(catalog, { registry, brands }));
   // Los archivos de las fotografías: solo los de fichas aprobadas, con su formato, medidas y peso (product-photos.mjs).
   // Es la revisión que impide que un archivo de más llegue a la salida: la compilación copia todo lo que hay en la
-  // carpeta.
+  // carpeta. El escáner lo vuelve a revisar sobre la salida (R-FOTO-02).
   errors.push(...await checkProductPhotos(catalog, join(root, PHOTO_FOLDER)));
   const sourceIds = new Set();
   for (const source of registry.sources) {

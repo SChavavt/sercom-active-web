@@ -991,6 +991,7 @@ export const CHECKS = [
   ['R-NAV-17', 'Cada página declara lang="es-MX" y lleva el enlace «Saltar al contenido» hacia un ancla de la misma página (que el ancla exista lo revisa check-links.mjs).'],
   ['R-PUB-04', 'La página 404 (404.html de la raíz) nunca declara <link rel="canonical">: el servidor la entrega en cualquier dirección desconocida y /404/ no es una página. Las demás páginas llevan su dirección canónica solo cuando se compila con SITE_URL.'],
   ['R-COPY-15', 'El <title> de la portada (index.html de la raíz) es la denominación provisional: el nombre de src/data/business.json, « · » y su titleLabel («Sercom Active · Atención en Puebla»). Las páginas interiores llevan «<Página> · Sercom Active» y la etiqueta «Atención comercial en Puebla» sigue en el encabezado, el pie y las descripciones.'],
+  ['R-FOTO-02', 'Cada imagen de _astro/ (.jpg, .jpeg, .png, .webp, .avif, .gif, .svg) está nombrada en alguna página o hoja de estilo de la misma compilación, por su nombre de archivo entero: la compilación copia a _astro/ todo lo que hay en src/assets/productos/, también un archivo que ninguna página dibuja (la foto de un borrador, un archivo suelto), y lo deja ahí con su nombre. De una foto que sí se dibuja, Astro deja solo los anchos que nombra el srcset. Un script no cuenta como uso. Los archivos de public/ (fuera de _astro/) no se revisan aquí. La primera revisión es la del validador, antes de compilar (scripts/product-photos.mjs); esta es la segunda, sobre la salida, en los dos modos.'],
   ['R-RULE-30', 'scripts/check-links.mjs revisa los enlaces: rotos, y los que no llevan a ninguna parte (vacíos, «#», javascript: o un <a> sin href). scripts/check-markup.mjs revisa los controles de cada página compilada: R-RULE-30a pide que cada <button>, <select>, <textarea>, <input> que no es hidden y cada role="button", también dentro de un <template>, tenga una función nativa (un campo con name o el botón de envío de un <form> con action) o un atributo data-* que el código de su página nombre; R-RULE-30b, que ningún <script> vaya dentro de un <template>, porque cada clon de la plantilla lo ejecutaría otra vez. Esas dos no prueban que el script haga algo útil con el control, ni que el control se vea solo cuando funciona: lo que pasa al usarlo, el foco y lo que se anuncia se siguen revisando en el navegador.'],
   ['R-A11Y-06', 'Los enlaces y botones tienen texto o aria-label (WARN).'],
   ['R-A11Y-07', 'Cada imagen tiene atributo alt.'],
@@ -1483,6 +1484,8 @@ export async function scanDist(directory, options = {}) {
   const catalogProducts = Array.isArray(data.catalog?.products) ? data.catalog.products : [];
   const ownStandards = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, standardTexts(product)]));
   const publicCodes = publicProductCodes(catalogProducts);
+  // R-FOTO-02: el texto de las páginas y de las hojas de estilo, donde se nombra cada imagen que se usa.
+  const referencing = [];
 
   for (const file of files) {
     const path = name(file);
@@ -1498,6 +1501,7 @@ export async function scanDist(directory, options = {}) {
     const isText = TEXT_EXTENSIONS.has(extname(file).toLowerCase());
     const isHtml = /\.html?$/i.test(file);
     const raw = (await readFile(file)).toString('utf8');
+    if (/\.(?:html?|css)$/i.test(file)) referencing.push(raw);
 
     // R-RULE-03, producción: los textos del archivo de ejemplos no aparecen en ningún archivo, tampoco en binarios.
     if (!preview) {
@@ -1688,6 +1692,15 @@ export async function scanDist(directory, options = {}) {
   // Con --launch, ningún grupo puede seguir bloqueando el sitio entero.
   const stillBlocked = [...agents].filter(([, rules]) => rules.some(([field, value]) => field === 'disallow' && (value === '/' || value === '/*'))).map(([agent]) => agent);
   if (launch && stillBlocked.length) add('FAIL', 'R-PUB-03', robots, `robots.txt sigue bloqueando el sitio en la versión de lanzamiento (${stillBlocked.map(agent => `«${agent}»`).join(', ')})`);
+
+  // R-FOTO-02: una imagen de _astro/ que ninguna página ni hoja de estilo nombra es una copia que la compilación hizo de
+  // un archivo de src/assets/productos/ que nadie dibuja.
+  for (const file of files) {
+    const path = name(file);
+    if (!/^_astro\/[^/]+\.(?:jpe?g|png|webp|avif|gif|svg)$/i.test(path)) continue;
+    const used = new RegExp(`(?<![\\w.-])${escapeRegExp(path.slice('_astro/'.length))}(?![\\w.-])`);
+    if (!referencing.some(text => used.test(text))) add('FAIL', 'R-FOTO-02', file, 'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta');
+  }
 
   // R-RULE-14: las páginas generadas corresponden a registros que pueden mostrarse.
   const categories = data.catalog?.categories ?? [];

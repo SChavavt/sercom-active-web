@@ -1821,3 +1821,62 @@ test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay n
     await Promise.all([clean, dirty, empty].map(removeTree));
   }
 });
+
+// R-FOTO-02: la compilación copia a _astro/ todo lo que hay en src/assets/productos/, también un archivo que ninguna
+// página dibuja (la foto de un borrador, uno suelto). Una imagen de _astro/ que ninguna página ni hoja de estilo nombra
+// es una copia de ese tipo y falla, en los dos modos.
+const pictureOf = name => `<picture><source srcset="/_astro/${name}_a1.webp 320w, /_astro/${name}_b2.webp 640w" type="image/webp" sizes="320px">`
+  + `<img src="/_astro/${name}_c3.jpg" srcset="/_astro/${name}_c3.jpg 320w" alt="Guante ficticio" width="1600" height="1200"></picture>`;
+const drawnFiles = name => Object.fromEntries(['_a1.webp', '_b2.webp', '_c3.jpg'].map(suffix => [`_astro/${name}${suffix}`, 'imagen']));
+
+test('R-FOTO-02: las imágenes de _astro/ que una página o una hoja de estilo nombra pasan, en los dos modos', async () => {
+  for (const preview of [false, true]) {
+    const notice = preview ? { notice: 'preview' } : {};
+    const result = await scan({
+      'pagina/index.html': page(`<h1>Guante ficticio</h1>${pictureOf('guante-ficticio.Ab12Cd')}<img src="/_astro/logo.B0A87QC4.svg" alt="Sercom Active">`, notice),
+      'index.html': page('<h1>Inicio</h1>', notice),
+      ...drawnFiles('guante-ficticio.Ab12Cd'),
+      '_astro/logo.B0A87QC4.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      '_astro/sitio.Xy12.css': '.fondo{background:url(/_astro/trama.Zz99.png)}.otro{background-image:url("./rayas.Qq11.webp")}',
+      '_astro/trama.Zz99.png': 'imagen', '_astro/rayas.Qq11.webp': 'imagen',
+      // Fuera de _astro/ están los archivos propios del sitio (public/): no se revisan aquí.
+      'favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'apple-touch-icon.png': 'imagen',
+    }, { preview });
+    assert.deepEqual(result.findings, [], `preview: ${preview}`);
+  }
+});
+
+test('R-FOTO-02: una imagen de _astro/ que nada nombra falla, en los dos modos, con un mensaje que dice qué hacer', async () => {
+  for (const preview of [false, true]) {
+    const notice = preview ? { notice: 'preview' } : {};
+    const result = await scan({
+      'pagina/index.html': page(`<h1>Guante ficticio</h1>${pictureOf('guante-ficticio.Ab12Cd')}`, notice),
+      'index.html': page('<h1>Inicio</h1>', notice),
+      ...drawnFiles('guante-ficticio.Ab12Cd'),
+      // Lo que deja Astro de la foto de un borrador y de un archivo suelto: el original, con su huella.
+      '_astro/guante-borrador.BoUPRLsZ.png': 'imagen', '_astro/foto-suelta.JlkVc0co.jpg': 'imagen',
+    }, { preview });
+    assert.deepEqual(failedIds(result), ['R-FOTO-02'], `preview: ${preview}`);
+    assert.deepEqual(failures(result).map(finding => [finding.file, finding.message]), ['_astro/foto-suelta.JlkVc0co.jpg', '_astro/guante-borrador.BoUPRLsZ.png'].map(file => [file,
+      'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta']), `preview: ${preview}`);
+  }
+});
+
+test('R-FOTO-02: cada formato de imagen cuenta; nombrarla en un script, o solo como parte de otro nombre, no la usa', async () => {
+  for (const name of ['suelta.A1.jpg', 'suelta.A1.jpeg', 'suelta.A1.png', 'suelta.A1.webp', 'suelta.A1.avif', 'suelta.A1.gif', 'suelta.A1.svg', 'SUELTA.A1.JPG']) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${name}`]: 'imagen' })), ['R-FOTO-02'], name);
+  }
+  // Un script no dibuja una foto de producto en este sitio: solo cuentan las páginas y las hojas de estilo.
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', '_astro/app.Zz.js': 'const f="/_astro/suelta.A1.png";' })), ['R-FOTO-02']);
+  // El nombre dentro de otro nombre más largo no cuenta.
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', 'pagina/index.html': page('<img src="/_astro/otra-suelta.A1.png" alt="Otra">'), '_astro/otra-suelta.A1.png': 'imagen' })), ['R-FOTO-02']);
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', 'pagina/index.html': page('<img src="/_astro/suelta.A1.png.webp" alt="Otra">'), '_astro/suelta.A1.png.webp': 'imagen' })), ['R-FOTO-02']);
+  // Una fuente u otro archivo que no es imagen no se revisa aquí.
+  assert.deepEqual(failures(await scan({ '_astro/letra.A1.woff2': 'fuente' })), []);
+});
+
+test('R-FOTO-02 está documentada en --rules', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-FOTO-02').map(([, text]) => text).join('\n');
+  assert.match(doc, /_astro\//);
+  assert.match(doc, /src\/assets\/productos\//);
+});
