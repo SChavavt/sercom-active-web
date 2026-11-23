@@ -437,7 +437,7 @@
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
-      "next_action": "No enlazar la portada ni el blog: el mapa del sitio y el blog llevan páginas ajenas (de casinos); solo páginas de producto y la de categorías. Abrir y revisar el PDF antes de publicarlo; pesa 49.7 MB.",
+      "next_action": "No enlazar la portada ni el blog: el mapa del sitio y el blog llevan páginas ajenas (de casinos); solo páginas de producto y la de categorías. El PDF pesa 49.7 MB: decir su tamaño junto al enlace.",
       "resources": [
         {
           "label": "Categorías y productos",
@@ -449,7 +449,7 @@
           "label": "Catálogo PDF",
           "url": "https://www.goldeneagle.com.mx/folder/catalogoGE.pdf",
           "type": "pdf",
-          "verification": "sin comprobar el contenido (2026-11-23): el servidor responde 200 como PDF, 49,748,485 bytes, modificado el 2026-05-27, pero ninguna página leída del sitio lo enlaza y no se ha abierto"
+          "verification": "accesible (2026-11-23); se bajó y se revisó con programas: 140 páginas, portada «GOLDEN EAGLE · CATÁLOGO DE PRODUCTOS» sin año impreso, creado el 2026-04-06 y modificado el 2026-05-27, 49,748,485 bytes, sin contenido activo y sin enlaces; ninguna página leída del sitio lo enlaza"
         },
         {
           "label": "Página de categorías de Golden Eagle",
