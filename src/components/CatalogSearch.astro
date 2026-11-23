@@ -14,8 +14,8 @@
 //     casillas y aplica; si la dirección no era la canónica (ids desconocidos, otro orden), la reemplaza.
 //   - Aplicar: applyCatalogState sobre el `data-search` y el `data-facets` de cada tarjeta de CatalogGrid; oculta las
 //     tarjetas, recalcula la celda de relleno, muestra la retícula o el estado sin resultados (`[data-catalog-empty]`,
-//     con la versión de sus atributos data-empty-* que corresponde), escribe la línea de resultados (región viva;
-//     «4 productos con filtros»), el número de cada opción, el de marcadas en el título de cada grupo, los dos
+//     con la versión de sus atributos data-empty-* que dice emptySituation), escribe la línea de resultados (región
+//     viva; «4 productos con filtros»), el número de cada opción, el de marcadas en el título de cada grupo, los dos
 //     «Limpiar filtros» ([data-filter-clear]), «Limpiar búsqueda» (su href conserva los filtros), el enlace a la
 //     solicitud especial (?q=… solo con búsqueda) y la dirección: catalogHref con history.replaceState, sin entradas
 //     nuevas en el historial (Atrás sale del catálogo).
@@ -67,7 +67,9 @@ const { total } = Astro.props;
 </div>
 
 <script>
-  import { FACET_PARAMS, applyCatalogState, catalogHref, emptyFilters, hasActiveFilters, parseCatalogState, restrictFilters, selectedLabel } from '../lib/catalog-filters.mjs';
+  import {
+    FACET_PARAMS, applyCatalogState, catalogHref, emptyFilters, emptySituation, hasActiveFilters, parseCatalogState, restrictFilters, selectedLabel,
+  } from '../lib/catalog-filters.mjs';
   import { SEARCH_PARAM, displayQuery, isActiveQuery, resultSummary, resultSummaryParts } from '../lib/search.mjs';
 
   type CatalogFilters = ReturnType<typeof emptyFilters>;
@@ -184,7 +186,7 @@ const { total } = Astro.props;
     if (grid) grid.hidden = visible === 0;
     if (empty) {
       empty.hidden = visible > 0;
-      const situation = active && filtered ? 'both' : filtered ? 'filters' : 'query';
+      const situation = emptySituation({ query, filters });
       if (emptyTitle) emptyTitle.textContent = empty.getAttribute(`data-empty-title-${situation}`) ?? emptyTitle.textContent;
       if (emptyText) emptyText.textContent = empty.getAttribute(`data-empty-text-${situation}`) ?? emptyText.textContent;
       if (requestLabel) requestLabel.textContent = empty.getAttribute(`data-empty-action-${situation}`) ?? requestLabel.textContent;

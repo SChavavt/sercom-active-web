@@ -13,7 +13,7 @@
 // Dentro de un grupo las opciones se suman (O); entre grupos, y con el texto, se restringen (Y).
 //
 // Ninguna función cambia sus argumentos.
-/** @import { CatalogFilters, CatalogItem, CatalogResult, CatalogState, FacetGroup, FacetOption, FacetParam, FacetProduct } from '../types/catalog-filters.ts' */
+/** @import { CatalogEmptySituation, CatalogFilters, CatalogItem, CatalogResult, CatalogState, FacetGroup, FacetOption, FacetParam, FacetProduct } from '../types/catalog-filters.ts' */
 import { routes } from './routes.mjs';
 import { displayQuery, isActiveQuery, searchMatcher, SEARCH_PARAM } from './search.mjs';
 import { normalizeText } from './text.mjs';
@@ -189,6 +189,19 @@ export function restrictFilters(filters, groups) {
  */
 export function hasActiveFilters(filters) {
   return FACET_PARAMS.some(param => Array.isArray(filters?.[param]) && filters[param].length > 0);
+}
+
+/**
+ * Qué versión del estado sin resultados muestra el catálogo (sus atributos `data-empty-*-{situación}`): `'both'` con
+ * una búsqueda activa (`isActiveQuery`) y opciones marcadas, `'filters'` solo con opciones marcadas y `'query'` en los
+ * demás casos (solo búsqueda, o ninguna de las dos: un catálogo sin productos).
+ * @param {{ query?: unknown, filters?: Partial<CatalogFilters> | null } | null | undefined} state
+ * @returns {CatalogEmptySituation}
+ */
+export function emptySituation(state) {
+  const filtered = hasActiveFilters(state?.filters);
+  if (filtered) return isActiveQuery(state?.query) ? 'both' : 'filters';
+  return 'query';
 }
 
 /**

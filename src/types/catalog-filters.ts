@@ -49,6 +49,12 @@ export interface CatalogItem {
   readonly facets: string;
 }
 
+/**
+ * Qué dice el estado sin resultados del catálogo (`emptySituation`): hay búsqueda y filtros (`'both'`), solo filtros
+ * (`'filters'`) o solo búsqueda (`'query'`, también cuando no hay ninguna de las dos).
+ */
+export type CatalogEmptySituation = 'both' | 'filters' | 'query';
+
 /** Resultado de `applyCatalogState`. */
 export interface CatalogResult {
   /** Por tarjeta, en el orden de `items`: ¿se muestra? */

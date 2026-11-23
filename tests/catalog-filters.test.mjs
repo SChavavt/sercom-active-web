@@ -3,8 +3,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  applyCatalogState, buildFacetGroups, catalogHref, emptyFilters, FACET_PARAMS, facetId, facetText, hasActiveFilters, parseCatalogState,
-  productFacets, restrictFilters, selectedLabel,
+  applyCatalogState, buildFacetGroups, catalogHref, emptyFilters, emptySituation, FACET_PARAMS, facetId, facetText, hasActiveFilters,
+  parseCatalogState, productFacets, restrictFilters, selectedLabel,
 } from '../src/lib/catalog-filters.mjs';
 import { routes } from '../src/lib/routes.mjs';
 import { displayQuery, MAX_QUERY_LENGTH, searchText } from '../src/lib/search.mjs';
@@ -308,4 +308,20 @@ test('ninguna función cambia sus argumentos', () => {
   assert.doesNotThrow(() => restrictFilters(frozenState.filters, frozenGroups));
   assert.doesNotThrow(() => catalogHref(frozenState));
   assert.doesNotThrow(() => buildFacetGroups(Object.freeze(products.map(product => Object.freeze({ ...product }))), { categories: Object.freeze(categories), brands: Object.freeze(brands) }));
+});
+
+test('emptySituation: la versión del estado sin resultados según la búsqueda y los filtros', () => {
+  assert.equal(emptySituation(state('guante', { categoria: ['manos'] })), 'both');
+  assert.equal(emptySituation(state('guante', { marca: ['marca-alfa'] })), 'both');
+  assert.equal(emptySituation(state('', { categoria: ['manos'], marca: ['marca-alfa'] })), 'filters');
+  // Un texto que no es una búsqueda («%%», espacios) cuenta como sin búsqueda.
+  assert.equal(emptySituation(state('%%', { marca: ['marca-alfa'] })), 'filters');
+  assert.equal(emptySituation(state('   ', { categoria: ['manos'] })), 'filters');
+  assert.equal(emptySituation(state('guante')), 'query');
+  // Sin búsqueda ni filtros (un catálogo sin productos): la versión de la búsqueda.
+  assert.equal(emptySituation(state('')), 'query');
+  assert.equal(emptySituation(null), 'query');
+  assert.equal(emptySituation({ query: 'guante', filters: null }), 'query');
+  // No cambia el estado.
+  assert.doesNotThrow(() => emptySituation(Object.freeze({ query: 'guante', filters: Object.freeze({ categoria: Object.freeze(['manos']), marca: Object.freeze([]) }) })));
 });
