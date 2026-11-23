@@ -747,6 +747,20 @@ export function addedMessage({ summary, total } = {}) {
 
 /** La lista llegó a `MAX_LINES` renglones. */
 export const LIST_FULL_MESSAGE = `Tu cotización ya tiene ${MAX_LINES} productos, el máximo. Quita alguno para agregar más.`;
+
+/**
+ * La frase que la ficha dejó en su línea de estado después de «Agregar a mi cotización», cuando OTRA pestaña cambia la
+ * lista: ¿sigue siendo cierta? «Agregado…» (`'added'`) deja de serlo: habla de lo que la lista tenía. La de la lista
+ * llena (`'full'`, `LIST_FULL_MESSAGE`) lo sigue siendo mientras la lista guardada siga llena. La de que el navegador no
+ * deja guardar (`'storage'`) no depende de lo que la lista tenga: vale hasta el siguiente intento.
+ * @param {'added' | 'full' | 'storage' | null | undefined} said Lo que dice la línea de estado (`null`: nada).
+ * @param {readonly unknown[] | null | undefined} stored La lista guardada después del cambio.
+ * @returns {boolean}
+ */
+export function addStatusStands(said, stored) {
+  if (said === 'full') return Array.isArray(stored) && stored.length >= MAX_LINES;
+  return said === 'storage';
+}
 /** La cantidad escrita no es válida (`parseQuantity`). */
 export const QUANTITY_ERROR = `Escribe una cantidad entera de 1 a ${formatQuantity(MAX_QUANTITY)}.`;
 

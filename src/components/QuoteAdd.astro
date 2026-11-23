@@ -26,8 +26,10 @@
 //     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder. El mismo
 //     renglón enviado otra vez a menos de medio segundo (un doble clic, Enter sostenido) no se agrega de nuevo. En una
 //     página que el navegador restaura de su caché de ida y vuelta la línea de estado no se muestra: habla de una
-//     lista que pudo cambiar mientras tanto. Tampoco después de que otra pestaña cambia o vacía la lista. Si el foco
-//     estaba en «Ver mi cotización», pasa al botón «Agregar a mi cotización».
+//     lista que pudo cambiar mientras tanto. Cuando otra pestaña cambia o vacía la lista se va la frase que ya no es
+//     cierta (`addStatusStands`): «Agregado…» siempre; la de la lista llena, solo si la lista dejó de estar llena; la
+//     de que el navegador no deja guardar se queda. Si el foco estaba en «Ver mi cotización», pasa al botón «Agregar a
+//     mi cotización».
 //   - Enlaces directos (`[data-quote-direct]`, «Cotizar este producto» y «Cotizar por correo»): cada línea de su
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
@@ -92,7 +94,8 @@ const chooseVariant = product.variants.length > 1;
 <script>
   import { MESSAGE_LABELS, withFieldValues } from '../lib/contact-core.mjs';
   import {
-    addedMessage, addLine, directLinkValues, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel, reconcileList,
+    addedMessage, addLine, addStatusStands, directLinkValues, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel,
+    reconcileList,
   } from '../lib/quote-list.mjs';
   import { quoteStore } from '../lib/quote-store.mjs';
 
@@ -156,10 +159,14 @@ const chooseVariant = product.variants.length > 1;
 
     // ---- línea de estado y región viva (StatusLine.astro) ----
     let frame = 0;
-    const say = (sentence: string, icon: 'check' | 'alert-circle', showLink: boolean) => {
+    /** Lo que dice la línea de estado: agregado (con «Ver mi cotización»), lista llena o el navegador no deja guardar. */
+    let said: 'added' | 'full' | 'storage' | null = null;
+    const say = (kind: 'added' | 'full' | 'storage', sentence: string) => {
+      said = kind;
       statusText.textContent = sentence;
+      const icon = kind === 'added' ? 'check' : 'alert-circle';
       for (const mark of status.querySelectorAll<HTMLElement>('[data-status-icon]')) mark.hidden = mark.dataset.statusIcon !== icon;
-      if (view) view.hidden = !showLink;
+      if (view) view.hidden = kind !== 'added';
       status.hidden = false;
       // La misma frase otra vez también se anuncia: se vacía la región y se escribe en el cuadro siguiente.
       live.textContent = '';
@@ -172,6 +179,7 @@ const chooseVariant = product.variants.length > 1;
      */
     const forget = () => {
       const held = status.contains(document.activeElement);
+      said = null;
       status.hidden = true;
       cancelAnimationFrame(frame);
       live.textContent = '';
@@ -204,19 +212,19 @@ const chooseVariant = product.variants.length > 1;
       if (repeated) return;
       const result = addLine(quoteStore.read(), line);
       if (result.status === 'full') {
-        say(messages.full, 'alert-circle', false);
+        say('full', messages.full);
         return;
       }
       // `write` recibe la lista (nunca el resultado de addLine) y dice si el navegador la guardó.
       if (result.status === 'invalid' || !quoteStore.write(result.lines)) {
-        say(messages.storage, 'alert-circle', false);
+        say('storage', messages.storage);
         return;
       }
       const summary = lineSummary(reconcileList([line], maps).rows[0]);
       const sentence = result.status === 'merged'
         ? addedMessage({ summary, total: quantityLabel(result.quantity, line.unit) })
         : addedMessage({ summary });
-      say(sentence, 'check', true);
+      say('added', sentence);
     });
 
     // El error se va en cuanto el campo tiene una cantidad válida (escrita o con los botones del selector).
@@ -254,10 +262,12 @@ const chooseVariant = product.variants.length > 1;
       if (event.persisted) forget();
       restored();
     });
-    // Lo mismo cuando otra pestaña cambia o vacía la lista mientras esta página sigue abierta: «Con lo que ya tenías
-    // son 24 pares» ya no es verdad. Una escritura de esta página no borra la frase que acaba de decir.
-    quoteStore.subscribe((_stored, { source }) => {
-      if (source === 'storage') forget();
+    // Cuando otra pestaña cambia o vacía la lista mientras esta página sigue abierta, «Con lo que ya tenías son 24
+    // pares» ya no es verdad y se va. Un aviso que sigue siendo cierto se queda: el de la lista llena mientras siga
+    // llena, y el de que el navegador no deja guardar (`addStatusStands`, con pruebas). Una escritura de esta página no
+    // borra la frase que acaba de decir.
+    quoteStore.subscribe((stored, { source }) => {
+      if (source === 'storage' && !addStatusStands(said, stored)) forget();
     });
   }
 </script>

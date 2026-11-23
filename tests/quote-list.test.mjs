@@ -3,11 +3,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  addedMessage, addLine, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf, duplicateStates,
-  formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems,
-  MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel,
-  QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, rowLabelName, serializeList,
-  STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
+  addedMessage, addLine, addStatusStands, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf,
+  duplicateStates, formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
+  listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
+  QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage,
+  restoreLines, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
+  unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -751,4 +752,22 @@ test('rowLabelName: el producto y, si tiene varias variantes, la del renglón', 
   ]);
   assert.equal(rowLabelName(null), '');
   assert.equal(rowLabelName(undefined), '');
+});
+
+test('addStatusStands: tras el cambio de otra pestaña, en la ficha solo se queda el aviso que sigue siendo cierto', () => {
+  const full = Array.from({ length: MAX_LINES }, (_, i) => line(`producto-${i}`));
+  // «Agregado…» habla de lo que la lista tenía: se va siempre.
+  assert.equal(addStatusStands('added', full), false);
+  assert.equal(addStatusStands('added', []), false);
+  // «Tu cotización ya tiene 200 productos» sigue siendo cierto mientras la lista siga llena.
+  assert.equal(addStatusStands('full', full), true);
+  assert.equal(addStatusStands('full', full.slice(1)), false);
+  assert.equal(addStatusStands('full', []), false);
+  assert.equal(addStatusStands('full', null), false);
+  // Que el navegador no deja guardar no depende de lo que la lista tenga.
+  assert.equal(addStatusStands('storage', []), true);
+  assert.equal(addStatusStands('storage', full), true);
+  // Sin frase no hay nada que conservar.
+  assert.equal(addStatusStands(null, full), false);
+  assert.equal(addStatusStands(undefined, full), false);
 });
