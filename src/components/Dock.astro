@@ -2,13 +2,16 @@
 // Barra fija del celular (`.dock`): «Cotizar mi lista» y WhatsApp siempre a mano, en dos celdas.
 // Solo se ve por debajo de 700 px; el cuerpo de la página reserva su alto para que no tape contenido.
 // En /cotizar/ su enlace «Cotizar mi lista» se marca como la página actual.
+// «Cotizar mi lista» lleva el número de productos de la lista guardada (QuoteCount, sobre la esquina de su icono); su
+// script lo imprime SiteHeader, una vez por página.
 import { contactLinks } from '../lib/contact.mjs';
 import { routes } from '../lib/site-data.mjs';
 import Icon from './Icon.astro';
+import QuoteCount from './QuoteCount.astro';
 
 const quoteCurrent = Astro.url.pathname === routes.quoteList ? 'page' : undefined;
 ---
 <nav class="dock" aria-label="Acciones rápidas">
-  <a class="dock__link" href={routes.quoteList} aria-current={quoteCurrent}><Icon name="clipboard-list" /><span>Cotizar mi lista</span></a>
+  <a class="dock__link" href={routes.quoteList} aria-current={quoteCurrent}><Icon name="clipboard-list" /><span>Cotizar mi lista<QuoteCount /></span></a>
   <a class="dock__link dock__link--wa" href={contactLinks.general().whatsapp}><Icon name="whatsapp" /><span>WhatsApp</span></a>
 </nav>

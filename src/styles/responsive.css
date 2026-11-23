@@ -708,3 +708,42 @@
   .field, .field--framed { padding-inline: var(--s-2); }
   .select__control { padding-right: calc(20px + var(--s-1)); }
 }
+
+/* 6.10 Número de «Cotizar mi lista» (QuoteCount; su dibujo y su lugar en el bloque de computadora, components.css 4.2).
+   Siempre fuera del flujo: con la lista vacía (y sin JavaScript) no se ve y la cabecera es la de siempre. */
+/* Hasta 1359 px el bloque sólido no muestra su icono (6.1 y 6.2): el número va en la esquina de arriba a la derecha
+   del bloque, que es su referencia, sobre el aire que deja el texto centrado. */
+@media (max-width: 1359px) {
+  .masthead__cta { position: relative; }
+  .masthead__cta > span { position: static; }
+  .masthead__cta .quote-count { top: var(--s-2); right: var(--s-2); bottom: auto; }
+}
+/* Fila «Cotizar mi lista» del menú de tableta y celular (sin icono): al final de la fila, centrado en su alto */
+@media (max-width: 1099px) {
+  .masthead__nav-link .quote-count { top: 50%; right: var(--pad); font-size: calc(0.1875rem + 9px); transform: translateY(-50%); }
+}
+/* Barra fija del celular: sobre la esquina de arriba a la derecha del icono, como en el bloque de computadora */
+@media (max-width: 699px) {
+  .dock__link > span { position: relative; }
+  .dock__link .quote-count { right: 100%; bottom: calc(50% + 5px); }   /* hasta el borde del texto: el relleno del enlace es corto */
+}
+/* Letra agrandada (el interruptor de 6.9): «Cotizar mi lista» pasa a dos renglones y llena su celda; el aire que
+   queda es el de la esquina de abajo a la derecha del bloque (el segundo renglón es el corto, centrado) y, en la barra
+   fija, el de la esquina de arriba a la izquierda del enlace, sobre el icono (la etiqueta llena el ancho y el icono queda
+   en el relleno izquierdo). Con la letra normal, también con el espaciado de texto, no cambia nada. */
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .masthead__cta { position: relative; }
+  .masthead__cta > span { position: static; }
+  .masthead__cta .quote-count { top: auto; right: 0; bottom: 0; }
+}
+@media (max-width: 699px) {
+  @container barra (width < calc((1rem - 16px) * 400)) {
+    .dock__link { position: relative; }
+    .dock__link > span { position: static; }
+    .dock__link .quote-count { top: 0; right: auto; bottom: auto; left: 0; }
+  }
+}
+/* Colores forzados: la caja pierde su fondo; queda su contorno del color del texto del sistema */
+@media (forced-colors: active) {
+  .quote-count { outline: var(--line) solid CanvasText; }
+}

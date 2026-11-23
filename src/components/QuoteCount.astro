@@ -1,0 +1,14 @@
+---
+// Número de productos de «Mi cotización» junto a «Cotizar mi lista» (`.quote-count`). SOLO MARCADO, sin <script>, a
+// propósito: va DENTRO de un enlace (el bloque de la cabecera, la fila del menú de tableta y celular y la barra fija
+// del celular), y su script es QuoteCountScript.astro, que SiteHeader imprime una sola vez por página, fuera de todo
+// enlace.
+//
+// Se imprime oculto y vacío. El script escribe el número (`badgeText`: «3», «99+») y lo muestra cuando la lista
+// guardada tiene renglones; con la lista vacía, y siempre sin JavaScript, no se ve ni ocupa lugar. Va fuera del flujo
+// (`position: absolute`, components.css y responsive.css): aparecer o cambiar de «3» a «99+» no mueve nada. Lleva
+// aria-hidden: lo que dice lo dice el nombre del enlace, que el script completa («Cotizar mi lista, 3 productos»).
+//
+// Uso (dentro del enlace, después del texto):  <a …><span>Cotizar mi lista<QuoteCount /></span></a>
+---
+<span class="quote-count" aria-hidden="true" data-quote-count hidden></span>
