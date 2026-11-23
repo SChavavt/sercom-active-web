@@ -582,6 +582,20 @@ test('duplicateStates: el singular y el plural son el mismo renglón; con la sum
   assert.deepEqual(duplicateStates(null), []);
 });
 
+test('duplicateStates: una unidad que la lista no ofrece, guardada con otras mayúsculas, es el mismo renglón', () => {
+  // «tambo de 200 L» no está entre las unidades del guante de nitrilo, así que cada renglón muestra la suya tal como
+  // se guardó. Lo que decide si dos renglones son iguales es la unidad guardada comparada con unitKey, no la opción
+  // que el renglón muestra elegida.
+  const rows = reconcileList([line('guante-de-nitrilo', 3, 'tambo de 200 L', 'mediano'), line('guante-de-nitrilo', 2, 'Tambo de 200 L', 'mediano')], rareIndex).rows;
+  assert.deepEqual(rows.map(row => row.unit), ['tambo de 200 L', 'Tambo de 200 L']);
+  assert.deepEqual(duplicateStates(rows), ['none', 'merge']);
+  assert.equal(duplicateOf(rows, 1), 0);
+  assert.equal(canMerge(rows, 1), true);
+  // Con otra medida ya es otra unidad, y con otra variante es otro renglón.
+  const other = reconcileList([line('guante-de-nitrilo', 3, 'tambo de 200 L', 'mediano'), line('guante-de-nitrilo', 2, 'tambo de 100 L', 'mediano'), line('guante-de-nitrilo', 2, 'Tambo de 200 L', 'grande')], rareIndex).rows;
+  assert.deepEqual(duplicateStates(other), ['none', 'none', 'none']);
+});
+
 test('duplicateStates da lo mismo que duplicateOf y canMerge en una lista de 200 renglones con muchos repetidos', () => {
   // Una lista generada siempre igual (un generador con semilla fija): pocos productos, variantes y unidades, así que se
   // repiten mucho; también renglones retirados y desconocidos, y cantidades cerca del máximo.
