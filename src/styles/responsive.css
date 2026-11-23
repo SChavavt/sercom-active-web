@@ -422,7 +422,7 @@
   /* celdas: todo hijo de una retícula de la lámina (contenedores con huecos de 1 px sobre el azul del filete) */
   :where(.sheet, .site-header, .masthead, .catpanel__list, .sheet > main, .section, .grid12, .site-footer, .dock,
     .page-head__side, .hero__side, .plate, .register, .brands, .products, .data, .steps, .faq, .item-register,
-    .catalog-nav__groups, .catalog-nav__folds, .catalog-grid__list, .catalog-search__form,
+    .catalog-nav__groups, .catalog-nav__folds, .catalog-grid__list, .catalog-search__form, .catalog-sources,
     .producto__body, .producto__part, .producto__list, .producto__norms, .producto__chips, .producto__docs, .producto__actions,
     .atencion__col, .atencion__side, .privacidad, .nf__main) > :where(:not(.vh, script, style, template)) {
     outline: var(--line) solid CanvasText;

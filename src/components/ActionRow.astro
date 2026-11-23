@@ -2,7 +2,10 @@
 // Fila de acción (`.action`): ocupa toda una fila de la lámina, con el texto a la izquierda y una flecha (u otro
 // icono) a la derecha. `primary` la pinta de azul sólido (la decisión principal del bloque).
 // Va dentro de una columna de celdas (por ejemplo la columna lateral de PageHeader o de la portada).
-//   - Con `href` es un enlace <a>, con los atributos que reciba (como siempre).
+//   - Con `href` es un enlace <a>, con los atributos que reciba (como siempre). Con `external` abre otra pestaña como
+//     `MoreLink external` (`target="_blank"`, `rel="noopener noreferrer"` y «(se abre en otra pestaña)» para lectores de
+//     pantalla, al final del texto): el catálogo del fabricante en la página de una marca, con el icono
+//     `external-link`.
 //   - Con `type` y sin `href` es un <button> con el mismo dibujo: `type="button"` si lo atiende un script de la
 //     página, `type="submit"` si envía su formulario. Úsalo solo en esos dos casos: el botón lleva su propio gancho
 //     `data-*` (que el script de la página nombra) y recibe todos los demás atributos (`data-*`, `aria-*`, `id`,
@@ -16,6 +19,7 @@
 //   <ActionRow href={routes.catalog}>Explorar catálogo</ActionRow>
 //   <ActionRow type="submit" icon="clipboard-plus">Agregar a mi cotización</ActionRow>
 //   <ActionRow type="button" icon="copy" data-copy-request>Copiar solicitud</ActionRow>
+//   <ActionRow href={link.url} external icon="external-link">{link.label}</ActionRow>
 import type { HTMLAttributes } from 'astro/types';
 import type { IconName } from '../lib/icons.ts';
 import Icon from './Icon.astro';
@@ -29,20 +33,24 @@ interface Shared extends Omit<HTMLAttributes<'a'>, 'type' | 'href'> {
 interface AsLink extends Shared {
   href: string;
   type?: never;
+  /** Enlace a otro sitio: se abre en otra pestaña y lo dice a los lectores de pantalla. */
+  external?: boolean;
 }
 /** Un botón: sin `href` y con `type` escrito. */
 interface AsButton extends Shared {
   href?: never;
   /** `button` (lo atiende un script de la página) o `submit` (envía su formulario). */
   type: 'button' | 'submit';
+  external?: never;
 }
 type Props = AsLink | AsButton;
 
-const { href, primary = false, icon = 'arrow-right', type = 'button', class: className, ...attrs } = Astro.props;
+const { href, primary = false, icon = 'arrow-right', type = 'button', external = false, class: className, ...attrs } = Astro.props;
 const classes = ['action', 'cell-link', { 'action--primary': primary }, className];
+const target = external ? { target: '_blank', rel: 'noopener noreferrer' } : {};
 ---
 {href !== undefined ? (
-  <a class:list={classes} href={href} {...(attrs as HTMLAttributes<'a'>)}><span><slot /></span><Icon name={icon} class="icon--24" /></a>
+  <a class:list={classes} href={href} {...target} {...(attrs as HTMLAttributes<'a'>)}><span><slot />{external && <span class="vh"> (se abre en otra pestaña)</span>}</span><Icon name={icon} class="icon--24" /></a>
 ) : (
   <button class:list={classes} type={type} {...(attrs as HTMLAttributes<'button'>)}><span><slot /></span><Icon name={icon} class="icon--24" /></button>
 )}

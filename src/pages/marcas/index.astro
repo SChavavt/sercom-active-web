@@ -1,24 +1,60 @@
 ---
 // Marcas (/marcas/): «Marcas que manejamos». Bloque de título con la ruta; las celdas de marca de la portada en
 // tamaño grande (cuatro por fila, 96 px), una por marca en el orden de los datos, como texto y nunca como
-// logotipo, con su número de productos cuando tiene alguno; la nota de disponibilidad y la banda de
-// solicitud especial de la portada. Hoy es igual en producción y en vista previa: diecinueve marcas y
-// ningún producto con marca real. Textos: brief de la página de marcas.
+// logotipo, con su número de productos cuando tiene alguno, y la nota de disponibilidad. Después, «Catálogos de los
+// fabricantes» (`#catalogos`): una fila por marca que tiene un catálogo del fabricante (en PDF o en línea), en el
+// orden de los datos, con su nombre (lleva a su página) en 4 columnas y sus catálogos en 8 (abren otra pestaña; el
+// PDF con su edición y su tamaño al lado), y otra vez la nota. Sin ninguna marca con catálogo la sección no se
+// imprime. Al final, la banda de solicitud especial de la portada (sin el enlace a los catálogos: están justo
+// arriba). Cada enlace de catálogo se entiende solo: su nombre accesible lleva la marca («Catálogo del fabricante
+// (PDF), JYRSA (se abre en otra pestaña)»); se ve solo la etiqueta. Textos: brief de la página de marcas.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Band from '../../components/Band.astro';
 import BrandCells from '../../components/BrandCells.astro';
+import MoreLink from '../../components/MoreLink.astro';
 import Note from '../../components/Note.astro';
 import PageHeader from '../../components/PageHeader.astro';
+import SectionHead from '../../components/SectionHead.astro';
 import { contactDetails } from '../../lib/contact.mjs';
 import { brands, routes } from '../../lib/site-data.mjs';
+import '../../styles/pages/catalogo.css';
 
 const description = `Marcas que manejamos en ${contactDetails.businessName}. ${contactDetails.locationLabel}.`;
+const catalogBrands = brands.filter(brand => brand.hasCatalog);
 ---
 <BaseLayout title="Marcas que manejamos" description={description}>
   <PageHeader title="Marcas que manejamos" breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Marcas' }]} />
 
   <BrandCells brands={brands} size="lg" counts />
   <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
+
+  {catalogBrands.length > 0 && (
+    <section class="section" id="catalogos" aria-labelledby="catalogos-title">
+      <SectionHead
+        title="Catálogos de los fabricantes"
+        id="catalogos-title"
+        aside="El catálogo que publica cada fabricante, en su propio sitio. Si te interesa un modelo, dinos su código y te ayudamos a cotizarlo."
+      />
+      <ul class="catalog-sources">
+        {catalogBrands.map(brand => (
+          <li class="catalog-sources__row grid12">
+            <div class="catalog-sources__brand cell span-4 span-sm-12">
+              <a class="catalog-sources__name" href={brand.url}>{brand.name}</a>
+            </div>
+            <div class="catalog-sources__links cell span-8 span-sm-12">
+              {brand.manufacturerLinks.filter(link => link.kind !== 'site').map(link => (
+                <p class="catalog-sources__link">
+                  <MoreLink href={link.url} external>{link.label}<span class="vh">, {brand.name}</span></MoreLink>
+                  {link.detail && <span class="catalog-sources__detail t-small">{link.detail}</span>}
+                </p>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Note>Disponibilidad por marca y modelo sujeta a confirmación al cotizar.</Note>
+    </section>
+  )}
 
   <section class="section" aria-labelledby="especial-title">
     <Band
