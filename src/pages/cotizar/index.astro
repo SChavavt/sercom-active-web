@@ -247,7 +247,12 @@ const items = [
     </div>
     <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
     <Note icon="file-text">Si tienes tu lista en Excel, PDF o foto, adjúntala en la conversación de WhatsApp o en el correo.</Note>
-    <Note icon="shield-check"><span data-storage-note data-blocked="En este navegador no se guarda nada de lo que escribes aquí.">{hasProducts
+    <Note icon="shield-check"><span
+      data-storage-note
+      data-blocked="En este navegador no se guarda nada de lo que escribes aquí."
+      data-session-only={hasProducts ? 'Lo que escribes aquí se guarda solo en esta pestaña y se borra al cerrarla.' : undefined}
+      data-list-only={hasProducts ? 'Los productos que agregas se guardan en este navegador. Lo que escribes en los campos no se guarda.' : undefined}
+    >{hasProducts
       ? 'Los productos que agregas se guardan en este navegador. Lo que escribes en los campos se borra al cerrar esta pestaña.'
       : 'Lo que escribes aquí se guarda solo en esta pestaña y se borra al cerrarla.'}</span> <a class="mensaje__privacy" href={routes.privacy}>Privacidad</a></Note>
     <p class="vh" role="status" data-live></p>
@@ -866,17 +871,29 @@ const items = [
       });
 
       // ---- los campos ------------------------------------------------------------------------------------------------
-      const showBlockedNote = () => {
-        if (storageNote?.dataset.blocked && storageNote.textContent !== storageNote.dataset.blocked) storageNote.textContent = storageNote.dataset.blocked;
+      // La nota de lo que se guarda dice lo que pasa en ESTE navegador. La lista (localStorage) y lo escrito en los campos
+      // (sessionStorage) pueden faltar por separado, así que cada frase habla solo de lo que sí ocurre: la impresa cuando
+      // se guardan las dos cosas; `data-session-only` cuando solo se guardan los campos; `data-list-only` cuando solo se
+      // guarda la lista, y `data-blocked` cuando no se guarda nada. Una página sin productos imprime solo la última: su
+      // frase de siempre ya habla solo de los campos.
+      let draftKept = quoteStore.draftAvailable();
+      const refreshStorageNote = () => {
+        if (!storageNote) return;
+        const { sessionOnly, listOnly, blocked: nothing } = storageNote.dataset;
+        const text = draftKept ? (available ? undefined : sessionOnly) : ((available ? listOnly : undefined) ?? nothing);
+        if (text && storageNote.textContent !== text) storageNote.textContent = text;
       };
-      if (!available) showBlockedNote();
+      refreshStorageNote();
       const saved = quoteStore.readDraft();
       for (const element of fields) {
         const name = element.dataset.draftField;
         if (name === 'note' || name === 'delivery' || name === 'date') element.value = saved[name];
         element.addEventListener('input', () => {
           const kept = quoteStore.writeDraft({ note: field('note'), delivery: field('delivery'), date: field('date') });
-          if (!kept) showBlockedNote();
+          if (!kept && draftKept) {
+            draftKept = false;
+            refreshStorageNote();
+          }
           refreshMessage();
         });
       }

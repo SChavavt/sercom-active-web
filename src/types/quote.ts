@@ -123,6 +123,8 @@ export interface QuoteStore {
   write(lines: readonly QuoteLine[]): boolean;
   /** Escucha los cambios; devuelve la función que cancela esa suscripción (cada llamada es una suscripción propia). */
   subscribe(listener: QuoteListener): () => void;
+  /** ¿Se puede leer el almacén del borrador (el de la pestaña) sin una excepción? No escribe nada. */
+  draftAvailable(): boolean;
   readDraft(): QuoteDraft;
   writeDraft(fields: Partial<QuoteDraft>): boolean;
   clearDraft(): boolean;

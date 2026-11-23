@@ -98,11 +98,30 @@ test('available() nunca escribe: no hay clave de prueba', () => {
   assert.equal(createQuoteStore({ local: null, session: null, target: null }).available(), false);
 });
 
+test('draftAvailable() habla solo del almacén de la pestaña y tampoco escribe', () => {
+  const session = fakeStorage();
+  const local = fakeStorage();
+  const store = createQuoteStore({ local, session, target: new EventTarget() });
+  assert.equal(store.draftAvailable(), true);
+  assert.deepEqual(session.calls, [['getItem', QUOTE_DRAFT_KEY]]);
+  assert.equal(session.data.size, 0);
+  assert.deepEqual(local.calls, []);
+  // Los dos almacenes pueden faltar por separado: la lista bloqueada con el borrador disponible, y al revés.
+  const onlyDraft = createQuoteStore({ local: blocked(), session: fakeStorage(), target: new EventTarget() });
+  assert.deepEqual([onlyDraft.available(), onlyDraft.draftAvailable()], [false, true]);
+  assert.equal(onlyDraft.writeDraft({ note: 'Guantes' }), true);
+  const onlyList = createQuoteStore({ local: fakeStorage(), session: blocked(), target: new EventTarget() });
+  assert.deepEqual([onlyList.available(), onlyList.draftAvailable()], [true, false]);
+  assert.equal(onlyList.writeDraft({ note: 'Guantes' }), false);
+  assert.equal(createQuoteStore({ local: null, session: null, target: null }).draftAvailable(), false);
+});
+
 test('un almacenamiento bloqueado no rompe nada', () => {
   const store = createQuoteStore({ local: blocked(), session: blocked(), target: new EventTarget() });
   let calls = 0;
   store.subscribe(() => { calls += 1; });
   assert.equal(store.available(), false);
+  assert.equal(store.draftAvailable(), false);
   assert.deepEqual(store.read(), []);
   assert.equal(store.write([line('guante')]), false);
   assert.equal(store.write([]), false);

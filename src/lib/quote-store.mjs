@@ -7,7 +7,7 @@
 //   - `localStorage`, clave `cotizacion:v1`: solo `{ v: 1, lines: [{ productId, variantId, quantity, unit }] }`;
 //   - `sessionStorage`, clave `cotizacion:borrador:v1`: lo que el visitante escribe en «Cotizar mi lista» (lista
 //     escrita, lugar de entrega y fecha). Pertenece a la pestaña.
-// Nada más: ninguna clave de prueba, ninguna cookie. `available()` no escribe nada.
+// Nada más: ninguna clave de prueba, ninguna cookie. `available()` y `draftAvailable()` no escriben nada.
 //
 // Una página nunca reescribe la lista por su cuenta (al cargar, con un evento «storage» o con «pageshow»): solo escribe
 // cuando el visitante hace algo en ella. Los avisos a quien escucha dicen de dónde viene el cambio (`source`): 'write'
@@ -177,6 +177,16 @@ export function createQuoteStore({ local, session, target } = {}) {
           listening = null;
         }
       };
+    },
+    draftAvailable() {
+      try {
+        const area = sessionArea();
+        if (!area) return false;
+        area.getItem(QUOTE_DRAFT_KEY);
+        return true;
+      } catch {
+        return false;
+      }
     },
     readDraft() {
       /** @type {QuoteDraft} */
