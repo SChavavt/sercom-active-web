@@ -40,7 +40,7 @@
 // los muestra; los filtros no se ven (js-only) y queda la barra lateral de enlaces.
 //
 // Uso:  <CatalogSearch total={products.length} />  seguido de <CatalogListing> con el estado vacío en su slot.
-import { SEARCH_PARAM, resultSummary } from '../lib/search.mjs';
+import { MAX_QUERY_LENGTH, SEARCH_PARAM, resultSummary } from '../lib/search.mjs';
 import { routes } from '../lib/site-data.mjs';
 import Icon from './Icon.astro';
 
@@ -56,7 +56,7 @@ const { total } = Astro.props;
     <div class="catalog-search__field">
       <Icon name="search" class="icon--24" />
       <label class="vh" for="catalogo-q">Buscar por producto, marca o código</label>
-      <input class="catalog-search__input" id="catalogo-q" name={SEARCH_PARAM} type="search" placeholder="Producto, marca o código" autocomplete="off" enterkeyhint="search" />
+      <input class="catalog-search__input" id="catalogo-q" name={SEARCH_PARAM} type="search" placeholder="Producto, marca o código" maxlength={MAX_QUERY_LENGTH} autocomplete="off" enterkeyhint="search" />
     </div>
     <button class="catalog-search__submit" type="submit">Buscar</button>
   </form>

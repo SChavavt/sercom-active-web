@@ -7,7 +7,7 @@ import {
   productFacets, restrictFilters, selectedLabel,
 } from '../src/lib/catalog-filters.mjs';
 import { routes } from '../src/lib/routes.mjs';
-import { displayQuery, searchText } from '../src/lib/search.mjs';
+import { displayQuery, MAX_QUERY_LENGTH, searchText } from '../src/lib/search.mjs';
 
 const categories = [
   { id: 'manos', name: 'Protección de manos' },
@@ -171,6 +171,17 @@ test('catalogHref: orden canónico, y sin filtros la misma dirección que la bú
   assert.equal(catalogHref({}), routes.catalog);
   // Un id sin forma de id o repetido no se escribe.
   assert.equal(catalogHref(state('', { categoria: ['manos', 'Manos', 'manos', '<x>'] })), '/catalogo/?categoria=manos');
+});
+
+test('una búsqueda larga llega recortada a la dirección, y la dirección recortada se lee igual', () => {
+  const pasted = `${'guante de nitrilo '.repeat(600)}fin`;
+  const state = parseCatalogState(`?q=${encodeURIComponent(pasted)}&marca=acme`);
+  assert.equal(Array.from(state.query).length <= MAX_QUERY_LENGTH, true);
+  assert.equal(state.query, displayQuery(pasted));
+  const href = catalogHref({ query: pasted, filters: state.filters });
+  assert.equal(href, catalogHref(state));
+  assert.ok(href.length < 400, `${href.length} caracteres`);
+  assert.deepEqual(parseCatalogState(href.slice(href.indexOf('?'))), state);
 });
 
 test('catalogHref y parseCatalogState van y vuelven sin cambiar el estado', () => {

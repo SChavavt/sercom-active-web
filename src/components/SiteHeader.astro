@@ -14,7 +14,7 @@
 // de este encabezado. Oculto con la lista vacía y sin JavaScript: la cabecera es la de siempre.
 import logo from '../assets/brand/logo.svg';
 import { contactDetails, contactLinks } from '../lib/contact.mjs';
-import { SEARCH_PARAM } from '../lib/search.mjs';
+import { MAX_QUERY_LENGTH, SEARCH_PARAM } from '../lib/search.mjs';
 import { categories, products, routes } from '../lib/site-data.mjs';
 import Icon from './Icon.astro';
 import QuoteCount from './QuoteCount.astro';
@@ -98,7 +98,7 @@ const searchHint = 'Buscar en el catálogo';
       <form class="masthead__search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
         <label class="vh" for="q">{searchHint}</label>
         <span class="masthead__search-field">
-          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} autocomplete="off" enterkeyhint="search" />
+          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} maxlength={MAX_QUERY_LENGTH} autocomplete="off" enterkeyhint="search" />
           <span class="masthead__search-hint" aria-hidden="true"><span>{searchHint}</span></span>
         </span>
         <button class="masthead__search-btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>

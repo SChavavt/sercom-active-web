@@ -15,18 +15,38 @@ import { cleanQuery, normalizeCode, normalizeText } from './text.mjs';
 /** Nombre del parámetro de la URL que lleva la consulta: `/catalogo/?q=...`. */
 export const SEARCH_PARAM = 'q';
 
+/**
+ * Largo máximo de una búsqueda, en caracteres completos (puntos de código). Lo que pasa de ahí no se busca, no se
+ * muestra y no llega a la dirección de la página ni al enlace de la solicitud especial: un texto pegado por error no
+ * deja una dirección que ningún servidor acepta. Los campos de búsqueda llevan el mismo límite (`maxlength`).
+ */
+export const MAX_QUERY_LENGTH = 200;
+
+/**
+ * La consulta limpia (`cleanQuery`) recortada a `MAX_QUERY_LENGTH`, sin espacio al final: la que se muestra y la que se
+ * busca.
+ * @param {unknown} query
+ * @returns {string}
+ */
+function boundedQuery(query) {
+  const text = cleanQuery(query);
+  if (text.length <= MAX_QUERY_LENGTH) return text;
+  return Array.from(text).slice(0, MAX_QUERY_LENGTH).join('').trim();
+}
+
 // Una letra o una cifra que se ve: no cuenta una de las que se ignoran por omisión (\p{DI}), que no dibujan nada. Los
 // rellenos del hangul (U+115F, U+1160, U+3164, U+FFA0), que lo son, ya los quita `cleanQuery` sin dejar espacio.
 const SEARCHABLE = /(?!\p{DI})[\p{L}\p{N}]/u;
 
 /**
- * Palabras de la consulta limpia (`cleanQuery`, la misma que se muestra), ya normalizadas: el catálogo filtra sobre
- * exactamente lo que muestra la línea de resultados. Se descartan las palabras sin ninguna letra ni cifra visible.
+ * Palabras de la consulta limpia y recortada (la misma que se muestra, `displayQuery`), ya normalizadas: el catálogo
+ * filtra sobre exactamente lo que muestra la línea de resultados. Se descartan las palabras sin ninguna letra ni cifra
+ * visible.
  * @param {unknown} query
  * @returns {string[]}
  */
 export function queryTokens(query) {
-  return normalizeText(cleanQuery(query)).split(' ').filter(token => SEARCHABLE.test(normalizeCode(token)));
+  return normalizeText(boundedQuery(query)).split(' ').filter(token => SEARCHABLE.test(normalizeCode(token)));
 }
 
 /**
@@ -204,16 +224,16 @@ export function filterProducts(products, query) {
  * «gu<U+200B>ante» y «cas<U+115F>co» se muestran y se buscan «guante» y «casco».
  * Cambia por un espacio el carácter de reemplazo (U+FFFD), que es como llega una secuencia % mal formada de la URL
  * (`?q=%E0%A4%A` → «�%A» → «%A»), los controles y las mitades sueltas de un par sustituto (`encodeURIComponent` no
- * las acepta). Una consulta sin nada visible queda vacía.
+ * las acepta). Una consulta sin nada visible queda vacía. Hasta `MAX_QUERY_LENGTH` caracteres completos.
  * @param {unknown} query
  * @returns {string}
  */
 export function displayQuery(query) {
-  return cleanQuery(query);
+  return boundedQuery(query);
 }
 
 /**
- * ¿La consulta filtra algo? Solo cuando su texto limpio (`cleanQuery`) tiene al menos una palabra con letras o números.
+ * ¿La consulta filtra algo? Solo cuando su texto limpio (`displayQuery`) tiene al menos una palabra con letras o números.
  * @param {unknown} query
  * @returns {boolean}
  */
