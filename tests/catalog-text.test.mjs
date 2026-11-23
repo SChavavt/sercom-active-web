@@ -301,3 +301,12 @@ test('las direcciones de brands.json y del registro no dan mensaje de la revisi�
     }
   }
 });
+
+test('la revisión del texto reconoce las mismas familias de normas que el escaneo, y no una sigla dentro de un modelo', () => {
+  const at = field => `products[0].${field} (guante-ficticio)`;
+  const where = 'Una norma va solo en standards, con la página o el documento del fabricante donde consta; aquí escríbelo de otra forma o quítalo.';
+  assert.deepEqual(review({ description: 'Cumple NFPA 9999.' }), [`${at('description')}: R-RULE-04, norma o valor técnico: «NFPA». ${where}`]);
+  assert.deepEqual(review({ characteristics: ['Dato ficticio A', 'Con marcado CE', 'Dato ficticio C'] }), [`${at('characteristics[1]')}: R-RULE-04, norma o valor técnico: «marcado CE». ${where}`]);
+  assert.deepEqual(review({ description: 'Cumple NOM 999.' }), [`${at('description')}: R-RULE-04, norma mexicana o nivel de protección: «NOM 999». ${where}`]);
+  for (const description of ['Lente CE-200.', 'Serie UL-100.', 'Respirador N95.', 'Guante clase 0.']) assert.deepEqual(review({ description }), [], description);
+});

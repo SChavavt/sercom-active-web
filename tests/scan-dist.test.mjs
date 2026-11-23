@@ -2009,3 +2009,44 @@ test('--rules dice que una dirección publicada por los datos no se lee como fra
   const prices = RULES.filter(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose').map(rule => rule.doc).join('\n');
   assert.match(prices, /direcci[oó]n que publican los datos/);
 });
+
+// Las familias de normas que imprimen los fabricantes, con designaciones sintéticas: cada una da el aviso escrita
+// como la imprimen. Una sigla suelta dentro de un modelo, o un nombre de filtro o de clase, no es una norma.
+const NORM_FAMILIES = [
+  ['NFPA', 'Cumple NFPA 9999'], ['ISEA', 'Según ISEA 999'], ['CSA', 'Cumple CSA Z99.9'], ['CAN/CSA', 'Cumple CAN/CSA Z99.9-99'],
+  ['NMX', 'Cumple NMX-S-999-SCFI-2099'], ['AS/NZS', 'Cumple AS/NZS 9999:2099'], ['IEC', 'Cumple IEC 69999'], ['UL', 'Cumple UL 9999'],
+  ['NRF', 'Cumple NRF-999-PEMEX-2099'], ['CFR (FDA)', 'Cumple FDA 99 CFR 999.9999'], ['CFR', 'Aprobado según 99 CFR parte 99'], ['CFR pegado', 'Aprobado según 99CFR99'],
+  ['LAPEM', 'Aprobado por LAPEM K9999-999/2099'], ['SNR', 'SNR 99 dB'], ['NOM con espacio', 'Cumple NOM 999'], ['NOM sin guion', 'Cumple NOM999'],
+  ['marcado CE', 'Con marcado CE'], ['CE con norma', 'CE EN999'], ['CE con categoría', 'CE categoría III'], ['CE con categoría abreviada', 'CE Cat. II'],
+];
+const HONEST_NOT_NORMS = [
+  'Lente CE-200', 'Serie UL-100', 'Modelo IEC-200', 'Casco CSA-200', 'Kit NRF-100', 'Tela de Nomex', 'Línea CE', 'Azul UL', 'Modelo AS-100',
+  'Respirador N95', 'Mascarilla KN95', 'Filtro FFP2', 'Guante clase 0', 'Casco tipo I', 'Talla CE', 'Con 99 piezas', 'Marca registrada',
+];
+
+test('R-RULE-04: cada familia de normas da el aviso escrita como la imprime el fabricante; una sigla dentro de un modelo no', async () => {
+  for (const [family, phrase] of NORM_FAMILIES) {
+    const result = await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) });
+    assert.deepEqual([failedIds(result), warnedIds(result)], [[], ['R-RULE-04']], `${family}: ${phrase}`);
+  }
+  for (const phrase of HONEST_NOT_NORMS) {
+    assert.deepEqual((await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) })).findings, [], phrase);
+  }
+});
+
+test('R-RULE-04: una norma de una familia nueva en las normas de la ficha no da aviso en su propia página, y en otra página sí', async () => {
+  const norms = ['NFPA 9999', 'CAN/CSA Z99.9-99', 'FDA 99 CFR 999.9999', 'NOM 999', 'CE categoría III'];
+  const withNorms = catalogWith({ id: 'guante-familias', status: 'approved', standards: standardsOf(...norms) });
+  const own = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`) }, { data: withNorms });
+  assert.deepEqual(own.findings, []);
+  for (const norm of norms) {
+    const other = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`), 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${norm}</p>`) }, { data: withNorms });
+    assert.deepEqual(other.findings.map(finding => [finding.level, finding.id, finding.file]), [['WARN', 'R-RULE-04', 'catalogo/index.html']], norm);
+  }
+});
+
+test('--rules nombra las familias de normas que reconoce R-RULE-04 y dice que una familia que no nombra no da aviso', () => {
+  const doc = RULES.filter(rule => rule.id === 'R-RULE-04').map(rule => rule.doc).join('\n');
+  for (const family of ['ANSI', 'ISEA', 'NFPA', 'CSA', 'NMX', 'AS/NZS', 'IEC', 'UL', 'NRF', 'CFR', 'LAPEM', 'SNR', 'NOM', 'CE']) assert.match(doc, new RegExp(`«[^»]*${family.replace('/', '\\/')}`), family);
+  assert.match(doc, /no da aviso/);
+});
