@@ -109,6 +109,7 @@ const items = [
       data-label-remove="Quitar {nombre}"
       data-label-minus="Disminuir cantidad de {nombre}"
       data-label-plus="Aumentar cantidad de {nombre}"
+      data-label-merge="Unirlos: {nombre}"
     >
       {/* Los productos que la página no puede ubicar: un solo renglón después de los productos */}
       <li class="cotizar__line" data-quote-unknown hidden>
@@ -388,9 +389,8 @@ const items = [
         return element;
       }
 
-      /** Un renglón nuevo desde su <template>; todavía fuera del documento. */
-      function build(row: QuoteRow): Drawn | null {
-        if (row.status === 'unknown') return null;
+      /** Un renglón nuevo desde su <template>; todavía fuera del documento. Los que la página no ubica no se dibujan. */
+      function build(row: Exclude<QuoteRow, { status: 'unknown' }>): Drawn | null {
         const template = row.status === 'ok' ? rowTemplate : retiredTemplate;
         const element = template?.content.firstElementChild?.cloneNode(true);
         if (!(element instanceof HTMLLIElement)) return null;
@@ -441,6 +441,9 @@ const items = [
           unit.value = row.unit;
           unit.setAttribute('aria-label', nameLabel(labels.labelUnit, name));
         }
+        // «Unirlos» dice de qué producto, como los demás controles del renglón: con varias parejas iguales no se oye
+        // el mismo nombre una y otra vez.
+        element.querySelector('[data-quote-merge]')?.setAttribute('aria-label', nameLabel(labels.labelMerge, name));
         return { line, kind: 'ok', element, duplicate: 'none' };
       }
 
