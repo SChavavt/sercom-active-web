@@ -285,8 +285,8 @@ const items = [
     import { createMessagePage } from '../../lib/message-page.mjs';
     import {
       canMerge, duplicateOf, duplicateStates, indexMaps, listMessageItems, mergedMessage, mergeLines, nameLabel, parseQuantity,
-      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, undoLines,
-      unknownLinesMessage, updateLine, variantText,
+      parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage, storageNoteText,
+      undoLines, unknownLinesMessage, updateLine, variantText,
     } from '../../lib/quote-list.mjs';
     import { quoteStore } from '../../lib/quote-store.mjs';
     import type { QuoteDuplicate, QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, QuoteUndo } from '../../types/quote.ts';
@@ -323,6 +323,12 @@ const items = [
       const storageNote = document.querySelector<HTMLElement>('[data-storage-note]');
       const labels = list.dataset;
       const available = quoteStore.available();
+      // Lo que este navegador guarda ahora, para la nota de abajo (`refreshStorageNote`): la lista y lo escrito en los
+      // campos, cada uno mientras el último intento de guardarlo haya funcionado. Al cargar, si se pueden leer.
+      let listKept = available;
+      let draftKept = quoteStore.draftAvailable();
+      /** La frase impresa de la nota: la de cuando se guardan las dos cosas. */
+      const printedNote = storageNote?.textContent ?? '';
       // La sección se puede ocultar del todo solo cuando la página no tiene productos (está impresa oculta).
       const collapsible = section.hidden;
       heading.tabIndex = -1;
@@ -550,12 +556,14 @@ const items = [
       }
 
       /**
-       * Guarda la lista; si el navegador no deja, la página sigue con la de la memoria y lo dice. Cuando vuelve a
-       * guardar, el aviso se va, también de la región viva.
+       * Guarda la lista; si el navegador no deja, la página sigue con la de la memoria y lo dice, y la nota de lo que
+       * se guarda deja de decir que la lista se guarda. Cuando vuelve a guardar, el aviso se va, también de la región
+       * viva, y la nota vuelve a decirlo.
        */
       function store(next: QuoteLine[]) {
         lines = next;
         const saved = quoteStore.write(next);
+        setListKept(saved);
         if (writeFailed && writeFailed.hidden !== saved) {
           writeFailed.hidden = saved;
           if (!saved) page.announce(writeFailed.querySelector('[data-status-text]')?.textContent ?? '', 'write');
@@ -840,6 +848,7 @@ const items = [
         const changed = JSON.stringify(stored.map(keyOf)) !== JSON.stringify(lines.map(keyOf));
         hideStatus();
         hideWriteFailed();
+        setListKept(available);
         if (changed) quietRestored();
         lines = stored;
         render();
@@ -856,15 +865,21 @@ const items = [
       // La nota de lo que se guarda dice lo que pasa en ESTE navegador. La lista (localStorage) y lo escrito en los campos
       // (sessionStorage) pueden faltar por separado, así que cada frase habla solo de lo que sí ocurre: la impresa cuando
       // se guardan las dos cosas; `data-session-only` cuando solo se guardan los campos; `data-list-only` cuando solo se
-      // guarda la lista, y `data-blocked` cuando no se guarda nada. Una página sin productos imprime solo la última: su
-      // frase de siempre ya habla solo de los campos.
-      let draftKept = quoteStore.draftAvailable();
-      const refreshStorageNote = () => {
+      // guarda la lista, y `data-blocked` cuando no se guarda nada (`storageNoteText`). Una página sin productos imprime
+      // solo la última: su frase de siempre ya habla solo de los campos. La nota sigue al último intento de guardar: si el
+      // navegador rechaza un cambio de la lista o de los campos, deja de decir que eso se guarda, y lo vuelve a decir
+      // cuando un cambio posterior sí se guarda o cuando la página vuelve a mostrar la lista guardada.
+      function refreshStorageNote() {
         if (!storageNote) return;
         const { sessionOnly, listOnly, blocked: nothing } = storageNote.dataset;
-        const text = draftKept ? (available ? undefined : sessionOnly) : ((available ? listOnly : undefined) ?? nothing);
-        if (text && storageNote.textContent !== text) storageNote.textContent = text;
-      };
+        const text = storageNoteText({ listKept, draftKept }, { printed: printedNote, sessionOnly, listOnly, blocked: nothing ?? '' });
+        if (storageNote.textContent !== text) storageNote.textContent = text;
+      }
+      function setListKept(kept: boolean) {
+        if (listKept === kept) return;
+        listKept = kept;
+        refreshStorageNote();
+      }
       refreshStorageNote();
       const saved = quoteStore.readDraft();
       for (const element of fields) {
@@ -872,8 +887,8 @@ const items = [
         if (name === 'note' || name === 'delivery' || name === 'date') element.value = saved[name];
         element.addEventListener('input', () => {
           const kept = quoteStore.writeDraft({ note: field('note'), delivery: field('delivery'), date: field('date') });
-          if (!kept && draftKept) {
-            draftKept = false;
+          if (kept !== draftKept) {
+            draftKept = kept;
             refreshStorageNote();
           }
           refreshMessage();

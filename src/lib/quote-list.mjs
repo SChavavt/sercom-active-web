@@ -2,7 +2,8 @@
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
 // vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
 // funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`), qué
-// productos van en el mensaje (`listMessageItems`) y qué llevan los enlaces directos de la ficha (`directLinkValues`).
+// productos van en el mensaje (`listMessageItems`), qué llevan los enlaces directos de la ficha (`directLinkValues`) y
+// qué frase lleva la nota de lo que se guarda (`storageNoteText`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
 // `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar; lo demás, en el navegador.
 //
@@ -787,6 +788,21 @@ export function unknownLinesMessage(count) {
   if (total === 0) return '';
   if (total === 1) return '1 producto de tu cotización no aparece en esta página y no se incluye en tu mensaje. Vuelve a cargar la página; si sigue igual, ya no está en el catálogo.';
   return `${formatQuantity(total)} productos de tu cotización no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.`;
+}
+
+/**
+ * La frase de la nota de lo que se guarda en «Cotizar mi lista», según lo que este navegador guarda AHORA: la lista
+ * (`listKept`) y lo escrito en los campos (`draftKept`). `printed` es la frase impresa, la de cuando se guardan las dos
+ * cosas; `sessionOnly`, la de cuando solo se guardan los campos; `listOnly`, la de cuando solo se guarda la lista, y
+ * `blocked`, la de cuando no se guarda nada. Una página sin productos solo trae `printed` y `blocked`: su frase impresa
+ * habla solo de los campos, así que vale mientras los campos se guarden, con la lista o sin ella.
+ * @param {{ listKept: boolean, draftKept: boolean }} kept
+ * @param {{ printed: string, sessionOnly?: string | undefined, listOnly?: string | undefined, blocked: string }} sentences
+ * @returns {string}
+ */
+export function storageNoteText({ listKept, draftKept }, { printed, sessionOnly, listOnly, blocked }) {
+  if (draftKept) return (listKept ? printed : sessionOnly) ?? printed;
+  return (listKept ? listOnly : undefined) ?? blocked;
 }
 
 /**

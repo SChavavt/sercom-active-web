@@ -7,7 +7,7 @@ import {
   formatQuantity, indexMaps, isNewerList, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE, listCountLabel, listMessageItems,
   MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel,
   QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, restoredMessage, restoreLines, serializeList, STANDARD_UNITS,
-  undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
+  storageNoteText, undoLines, unitKey, unitOptions, unknownLinesMessage, updateLine, variantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -706,4 +706,22 @@ test('directLinkValues: solo los campos tocados, vacíos con «por definir» o u
   assert.deepEqual(state({ variant: true, quantity: true }, null, ''), { variant: '', quantity: '' });
   // Un producto sin variantes: la línea de la variante (si se tocara) queda vacía.
   assert.deepEqual(state({ variant: true, quantity: true }, null, '2', 'caja', respirador), { variant: '', quantity: '2 cajas' });
+});
+
+test('storageNoteText: la nota dice solo lo que el navegador guarda en ese momento', () => {
+  // Una página con productos trae las cuatro frases; una sin productos, la impresa (que habla solo de los campos) y la
+  // de cuando no se guarda nada.
+  const full = { printed: 'la lista y los campos', sessionOnly: 'solo los campos', listOnly: 'solo la lista', blocked: 'nada' };
+  const bare = { printed: 'los campos', sessionOnly: undefined, listOnly: undefined, blocked: 'nada' };
+  const cases = [
+    [{ listKept: true, draftKept: true }, 'la lista y los campos', 'los campos'],
+    // El navegador rechazó el último cambio de la lista: la nota ya no dice que la lista se guarda.
+    [{ listKept: false, draftKept: true }, 'solo los campos', 'los campos'],
+    [{ listKept: true, draftKept: false }, 'solo la lista', 'nada'],
+    [{ listKept: false, draftKept: false }, 'nada', 'nada'],
+  ];
+  for (const [kept, withProducts, withoutProducts] of cases) {
+    assert.equal(storageNoteText(kept, full), withProducts, JSON.stringify(kept));
+    assert.equal(storageNoteText(kept, bare), withoutProducts, JSON.stringify(kept));
+  }
 });
