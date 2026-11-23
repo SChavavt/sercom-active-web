@@ -83,7 +83,7 @@ test('una norma va en standards: ahí no se aplica R-RULE-04 y sí todas las dem
   // La misma norma en otro campo se informa diciendo dónde va.
   const misplaced = review({ description: 'Guante ficticio con nivel ANSI/ISEA 105-2016 A4.' });
   assert.equal(misplaced.length, 1);
-  assert.match(misplaced[0], /^products\[0\]\.description \(guante-ficticio\): R-RULE-04, norma o valor técnico: «ANSI»\. Una norma va solo en standards/);
+  assert.match(misplaced[0], /^products\[0\]\.description \(guante-ficticio\): R-RULE-04, norma o valor técnico: «ANSI\/ISEA»\. Una norma va solo en standards/);
 });
 
 test('se revisan todos los campos de texto de la ficha, también el alternativo de la foto, y solo cuando la ficha tiene foto', () => {
@@ -189,4 +189,25 @@ test('un número con forma de teléfono se informa en cada campo de texto, tambi
   // Los diez tipos de campo que se revisan, uno por uno.
   assert.equal(fields.length, 10);
   for (const [field, change, reported] of fields) assert.deepEqual(review(change), reported ? [message(field)] : [], field);
+});
+
+test('el texto encontrado se cita entero: hasta el final de la palabra o de la designación que corta', () => {
+  const at = 'products[0].description (guante-ficticio)';
+  const where = 'Una norma va solo en standards, con la página o el documento del fabricante donde consta; aquí escríbelo de otra forma o quítalo.';
+  const cases = [
+    ['Cumple con la NOM-113-STPS-2009 vigente.', `${at}: R-RULE-04, norma mexicana o nivel de protección: «NOM-113-STPS-2009». ${where}`],
+    ['Lente EJ-200 de policarbonato', `${at}: R-RULE-03, marca de producto de ejemplo en producción: «EJ-200». Escríbelo de otra forma.`],
+    ['Lente EJ-200.', `${at}: R-RULE-03, marca de producto de ejemplo en producción: «EJ-200». Escríbelo de otra forma.`],
+    // También hacia atrás, y con la palabra escrita en forma descompuesta: se cita como está escrita.
+    ['Guante semi-garantizado', `${at}: R-RULE-06, experiencia o liderazgo sin evidencia: «semi-garantizado». Escríbelo de otra forma.`],
+    ['Guante no-autorizado', `${at}: R-RULE-07, «oficial», «autorizado», distribuidor, sucursal o representante: «no-autorizado». Escríbelo de otra forma.`],
+    ['Casco para co-líder de cuadrilla'.normalize('NFD'), `${at}: R-RULE-06, experiencia o liderazgo sin evidencia: «${'co-líder'.normalize('NFD')}». Escríbelo de otra forma.`],
+    // Lo que no corta ninguna palabra queda como se encontró.
+    ['Guante con nivel de corte A4', `${at}: R-RULE-04, norma mexicana o nivel de protección: «nivel de corte». ${where}`],
+    ['Cumple EN 388, ANSI Z87.1 y más.', `${at}: R-RULE-04, norma o valor técnico: «EN 388». ${where}`],
+  ];
+  for (const [description, message] of cases) assert.deepEqual(review({ description }).slice(0, 1), [message], description);
+  // Una designación muy larga se corta como cualquier cita, a 80 caracteres.
+  const long = `NOM-${'1'.repeat(90)}`;
+  assert.deepEqual(review({ description: `Cumple ${long}` }), [`${at}: R-RULE-04, norma mexicana o nivel de protección: «${long.slice(0, 80)}…». ${where}`]);
 });

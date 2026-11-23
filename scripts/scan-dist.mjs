@@ -1125,6 +1125,36 @@ function foldedWithOrigin(value) {
   return { folded, start, end };
 }
 
+// Lo que forma una palabra al citar un hallazgo: letras, cifras y marcas (el acento de una letra descompuesta). Un signo
+// que une partes de una designación (`JOINER`) también, cuando va entre dos de ellas: «NOM-113-STPS-2009», «EJ-200».
+const WORD_PIECE = /^[\p{L}\p{N}\p{M}]$/u;
+const JOINER_PIECE = /^[-.:/_+]$/;
+/**
+ * Extiende [from, to) de un texto hasta los límites de las palabras que corta: un hallazgo como «NOM-1» se cita
+ * «NOM-113-STPS-2009». Un borde que no corta una palabra (el hallazgo termina en un espacio o en un signo) no se mueve.
+ */
+function wholeWordsAround(text, from, to) {
+  const before = index => (index > 0 ? String.fromCodePoint(text.codePointAt(index - (index > 1 && /[\udc00-\udfff]/.test(text[index - 1]) ? 2 : 1))) : '');
+  const at = index => (index < text.length ? String.fromCodePoint(text.codePointAt(index)) : '');
+  const isWord = piece => WORD_PIECE.test(piece);
+  // Cada paso toma una pieza de palabra, o un signo de unión con la pieza que lo sigue, mientras el borde sea palabra.
+  let start = from;
+  while (isWord(at(start))) {
+    const piece = before(start);
+    if (isWord(piece)) start -= piece.length;
+    else if (JOINER_PIECE.test(piece) && isWord(before(start - 1))) start -= 1 + before(start - 1).length;
+    else break;
+  }
+  let stop = to;
+  while (isWord(before(stop))) {
+    const piece = at(stop);
+    if (isWord(piece)) stop += piece.length;
+    else if (JOINER_PIECE.test(piece) && isWord(at(stop + 1))) stop += 1 + at(stop + 1).length;
+    else break;
+  }
+  return text.slice(start, stop);
+}
+
 /**
  * Aplica a un texto suelto, como el campo de una ficha, las reglas de patrón con que se revisa una página de
  * producción (las comunes, las que valen mientras la atención presencial no está confirmada y las de producción), cada
@@ -1133,7 +1163,8 @@ function foldedWithOrigin(value) {
  * reglas que no se aplican (las normas de `standards` no pasan por R-RULE-04). Cada regla y texto encontrado, una vez.
  * @param {unknown} value
  * @param {{ skip?: string[] }} [options]
- * @returns {{ id: string, level: 'FAIL' | 'WARN', title: string, found: string }[]} `found`: lo encontrado, como está escrito
+ * @returns {{ id: string, level: 'FAIL' | 'WARN', title: string, found: string }[]} `found`: lo encontrado, como está
+ *   escrito y entero: extendido hasta los límites de las palabras que corta («NOM-1» se cita «NOM-113-STPS-2009»)
  */
 export function textFindings(value, { skip = [] } = {}) {
   if (typeof value !== 'string') return [];
@@ -1152,7 +1183,9 @@ export function textFindings(value, { skip = [] } = {}) {
       if (seen.has(key)) continue;
       seen.add(key);
       const index = match.index ?? 0;
-      const found = haystack === folded ? value.slice(start[index], end[index + match[0].length - 1]) : match[0];
+      const found = haystack === folded
+        ? wholeWordsAround(value, start[index], end[index + match[0].length - 1])
+        : wholeWordsAround(haystack, index, index + match[0].length);
       findings.push({ id, level: typeof level === 'function' ? level({ preview: false }) : level, title, found: oneLine(found) });
     }
   }
