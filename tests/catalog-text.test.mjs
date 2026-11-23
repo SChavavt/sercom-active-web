@@ -157,3 +157,36 @@ test('npm run validate:catalog corre la revisión del texto sobre el catálogo',
   // Con los datos del repositorio, ningún mensaje.
   assert.deepEqual(reviewCatalogText(data.catalog, sources), []);
 });
+
+test('lo reservado a los ejemplos se informa por R-RULE-03 en la descripción y en una característica, en cualquier estado', () => {
+  const at = field => `products[0].${field} (guante-ficticio)`;
+  for (const status of STATUSES) {
+    for (const [field, change] of [['description', text => ({ description: text })], ['characteristics[1]', text => ({ characteristics: ['Dato ficticio A', text, 'Dato ficticio C'] })]]) {
+      assert.deepEqual(review({ status, ...change('Guante de ejemplo') }), [`${at(field)}: R-RULE-03, marca de producto de ejemplo en producción: «de ejemplo». Escríbelo de otra forma.`], `${status} ${field}`);
+      const code = review({ status, ...change('Lente EJ-200') });
+      assert.equal(code.length, 1, `${status} ${field}`);
+      assert.match(code[0], new RegExp(`^${at(field).replace(/[[\]().]/g, '\\$&')}: R-RULE-03, marca de producto de ejemplo en producción: «EJ-2`), `${status} ${field}`);
+    }
+  }
+});
+
+test('un número con forma de teléfono se informa en cada campo de texto, también en el de una norma, y no en model ni en manufacturerCode', () => {
+  const number = '70001234567';
+  const message = field => `products[0].${field} (guante-ficticio): R-RULE-24, número con forma de teléfono: «${number}». Un número así va en model o en el manufacturerCode de su variante, no en el texto; escríbelo de otra forma.`;
+  const image = alt => ({ url: 'https://example.invalid/foto.jpg', width: 800, height: 600, alt, sourceUrl: SOURCE, usageConfirmed: true });
+  const fields = [
+    ['name', { name: `Guante ${number}` }, true],
+    ['model', { model: number }, false],
+    ['description', { description: `Guante con ${number} impreso.` }, true],
+    ['saleUnit', { saleUnit: `par ${number}` }, true],
+    ['characteristics[0]', { characteristics: [`Lote ${number}`] }, true],
+    ['variants[0].label', { variants: [{ id: 'talla-8', label: `Talla ${number}` }] }, true],
+    ['variants[0].manufacturerCode', { variants: [{ id: 'talla-8', label: 'Talla 8', manufacturerCode: number }] }, false],
+    ['standards[0].text', { standards: [{ text: `Norma sintética ${number}`, sourceUrl: SOURCE }] }, true],
+    ['documents[0].label', { documents: [{ label: `Hoja ${number}`, url: SOURCE }] }, true],
+    ['image.alt', { image: image(`Guante ${number}`) }, true],
+  ];
+  // Los diez tipos de campo que se revisan, uno por uno.
+  assert.equal(fields.length, 10);
+  for (const [field, change, reported] of fields) assert.deepEqual(review(change), reported ? [message(field)] : [], field);
+});
