@@ -5,11 +5,17 @@
 /** `production`: solo lo aprobado. `preview`: además categorías en borrador y productos de ejemplo. */
 export type SiteMode = 'production' | 'preview';
 
-/** Enlace al sitio del fabricante de una marca. */
+/** Clase de un enlace de marca: el catálogo en PDF, el catálogo en línea o el sitio del fabricante. */
+export type ManufacturerLinkKind = 'pdf' | 'online' | 'site';
+
+/** Enlace de una marca al sitio de su fabricante: su catálogo en PDF, su catálogo en línea o su sitio. */
 export interface ManufacturerLink {
-  /** Siempre «Sitio del fabricante». */
+  /** Una de `MANUFACTURER_LINK_LABELS` (`site-data-core.mjs`), la que corresponde a `kind`. */
   readonly label: string;
   readonly url: string;
+  readonly kind: ManufacturerLinkKind;
+  /** Solo en el PDF: la edición y el tamaño que se conocen («2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
+  readonly detail: string | null;
 }
 
 export interface PublicCategory {
@@ -33,8 +39,10 @@ export interface PublicBrand {
   readonly name: string;
   /** `supplier`: proveedor (hoy Espomega); no tiene productos propios. */
   readonly kind: 'brand' | 'supplier';
-  /** Cero o un enlace. */
+  /** De cero a tres enlaces, en este orden: catálogo en PDF, catálogo en línea y sitio del fabricante. */
   readonly manufacturerLinks: readonly ManufacturerLink[];
+  /** `true` si la marca tiene un catálogo del fabricante (en PDF o en línea): sale en «Catálogos de los fabricantes». */
+  readonly hasCatalog: boolean;
   /** Productos públicos de la marca en el modo actual (los ejemplos no cuentan: no tienen marca real). */
   readonly productCount: number;
   /** `/marcas/{id}/` */
@@ -167,7 +175,8 @@ export interface BrandRecord {
   id: string;
   name: string;
   kind: 'brand' | 'supplier';
-  manufacturerLinks: { label: string; url: string }[];
+  /** De cero a tres; solo el PDF lleva `edition` y `megabytes` (los valida `validateBrands`). */
+  manufacturerLinks: { label: string; url: string; edition?: string; megabytes?: number }[];
 }
 
 /** Registro de `src/data/preview/example-products.json`. No es una ficha del catálogo. */
@@ -204,6 +213,8 @@ export interface SiteRoutes {
   category(id: string): string;
   brand(id: string): string;
   product(id: string): string;
+  /** `/marcas/#catalogos`: la sección «Catálogos de los fabricantes» de la lista de marcas. */
+  readonly brandCatalogs: string;
   /** `/catalogo/?q=...`; sin consulta devuelve `/catalogo/`. */
   search(query?: string | null): string;
 }

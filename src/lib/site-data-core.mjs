@@ -8,7 +8,7 @@
  */
 import { getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
-import { normalizeText } from './text.mjs';
+import { cleanQuery, normalizeText } from './text.mjs';
 
 export { routes };
 
@@ -30,8 +30,52 @@ export const EXAMPLE_BRAND_NAME = 'Marca de ejemplo';
  * con casi cualquier texto.
  */
 export const EXAMPLE_BRAND_NAMES = Object.freeze([EXAMPLE_BRAND_NAME, 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
-/** Única etiqueta permitida para el enlace de una marca. */
-export const MANUFACTURER_LINK_LABEL = 'Sitio del fabricante';
+/**
+ * Las tres etiquetas de los enlaces de una marca (`manufacturerLinks`), una por clase de enlace y en el orden en que se
+ * escriben y se muestran: el catálogo general del fabricante en PDF, la página donde se consulta o se descargan sus
+ * catálogos, y su sitio. Cada una va una vez por marca como máximo. Las páginas nunca escriben una etiqueta: imprimen
+ * la del dato.
+ */
+export const MANUFACTURER_LINK_LABELS = Object.freeze({
+  pdf: 'Catálogo del fabricante (PDF)',
+  online: 'Catálogo en línea del fabricante',
+  site: 'Sitio del fabricante',
+});
+/** @typedef {'pdf' | 'online' | 'site'} LinkKind */
+/** Las clases de enlace en su orden: `pdf`, `online`, `site`. */
+const LINK_KINDS = /** @type {LinkKind[]} */ (['pdf', 'online', 'site']);
+/** La clase de enlace de cada etiqueta. */
+const KIND_OF_LABEL = /** @type {Map<string, LinkKind>} */ (new Map(LINK_KINDS.map(kind => [MANUFACTURER_LINK_LABELS[kind], kind])));
+/**
+ * Los tipos de recurso del registro que admite cada etiqueta. «Sitio del fabricante» admite cualquiera que no esté
+ * bloqueado (`null`). Una política de uso, una documentación de exportación o la página de un solo producto nunca son
+ * un catálogo.
+ */
+const LINK_RESOURCE_TYPES = {
+  pdf: { types: ['pdf', 'pdf_viewer'], purpose: 'un PDF (tipo pdf o pdf_viewer)' },
+  online: { types: ['web', 'landing', 'catalog_platform'], purpose: 'la página donde se consulta o se descarga el catálogo (tipo web, landing o catalog_platform)' },
+  site: null,
+};
+/** Largo máximo de la edición de un catálogo en PDF («2026 v2»). */
+export const MAX_EDITION_LENGTH = 24;
+/** Tamaño máximo, en megabytes, que se escribe para un catálogo en PDF. */
+export const MAX_MEGABYTES = 999;
+/** Las etiquetas en su orden, para los mensajes: «A», «B» y «C». */
+const LABEL_LIST = `«${MANUFACTURER_LINK_LABELS.pdf}», «${MANUFACTURER_LINK_LABELS.online}» y «${MANUFACTURER_LINK_LABELS.site}»`;
+/** Un texto limpio de una línea: como lo deja `cleanQuery` y sin caracteres que no se ven. */
+/** @param {unknown} value @returns {value is string} */
+const isCleanLine = value => typeof value === 'string' && value.trim() !== '' && cleanQuery(value) === value && !/\p{DI}/u.test(value);
+
+/**
+ * Lo que la página imprime junto a un catálogo en PDF: la edición y el tamaño que se conocen, unidos con « · »
+ * («2026 v2 · 49 MB», «2026 v2», «49 MB»); `null` sin ninguno de los dos o en otro enlace.
+ * @param {{ edition?: string, megabytes?: number }} link
+ * @returns {string | null}
+ */
+export function manufacturerLinkDetail(link) {
+  const parts = [link.edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(part => part !== undefined);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 /** @param {unknown} value @returns {value is string} */
 const isText = value => typeof value === 'string' && value.trim().length > 0;
@@ -56,7 +100,7 @@ const hasWord = (/** @type {string} */ haystack, /** @type {string} */ needle) =
 };
 
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks'];
-const LINK_KEYS = ['label', 'url'];
+const LINK_KEYS = ['label', 'url', 'edition', 'megabytes'];
 // `retired: true` marca el ejemplo de producto retirado: tiene su página, pero no entra en ningún listado.
 const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants', 'retired'];
 const VARIANT_KEYS = ['id', 'label', 'code'];
@@ -87,23 +131,65 @@ export function validateBrands(brands) {
     if (!isText(brand.name)) errors.push(`${path}: falta nombre.`);
     if (brand.kind !== 'brand' && brand.kind !== 'supplier') errors.push(`${path}: kind debe ser "brand" o "supplier".`);
     if (mentionsExcludedBrand(String(brand.id).replaceAll('-', ' ')) || mentionsExcludedBrand(brand.name)) errors.push(`${path}: marca excluida.`);
-    const links = brand.manufacturerLinks;
-    if (!Array.isArray(links) || links.length > 1) {
-      errors.push(`${path}: manufacturerLinks debe ser una lista con un enlace como máximo.`);
-      return;
-    }
-    for (const link of links) {
-      if (!isRecord(link) || unknownKeys(link, LINK_KEYS).length || link.label !== MANUFACTURER_LINK_LABEL || !isHttps(link.url)) {
-        errors.push(`${path}: el enlace debe tener solo la etiqueta «${MANUFACTURER_LINK_LABEL}» y una URL https.`);
-      }
-    }
+    errors.push(...linkErrors(brand.manufacturerLinks, isId(brand.id) ? `${path} (${brand.id})` : path));
   });
   return errors;
 }
 
 /**
+ * Revisa los enlaces de una marca (`manufacturerLinks`): una lista de 0 a 3 enlaces, cada uno con `label` y `url`; la
+ * etiqueta es una de `MANUFACTURER_LINK_LABELS`, cada una una vez y en su orden; la dirección es `https` escrita
+ * completa y no se repite; solo el PDF puede llevar `edition` (texto de una línea, de 1 a `MAX_EDITION_LENGTH`
+ * caracteres) y `megabytes` (entero de 1 a `MAX_MEGABYTES`). Que cada dirección sea un recurso verificado de la
+ * marca en el registro, con un tipo que su etiqueta admite, lo revisa `crossCheckBrands`.
+ * @param {unknown} links
+ * @param {string} path la marca, para los mensajes
+ * @returns {string[]}
+ */
+function linkErrors(links, path) {
+  if (!Array.isArray(links)) return [`${path}: manufacturerLinks debe ser una lista de enlaces; escribe [] si la marca no tiene ninguno.`];
+  /** @type {string[]} */
+  const errors = [];
+  if (links.length > LINK_KINDS.length) {
+    return [`${path}: manufacturerLinks admite como máximo tres enlaces, uno por etiqueta: ${LABEL_LIST}, en ese orden.`];
+  }
+  /** @type {LinkKind[]} */
+  const kinds = [];
+  const urls = new Set();
+  links.forEach((link, i) => {
+    const where = `${path}.manufacturerLinks[${i}]`;
+    if (!isRecord(link)) {
+      errors.push(`${where}: debe ser un objeto con label y url.`);
+      return;
+    }
+    for (const key of unknownKeys(link, LINK_KEYS)) errors.push(`${where}.${key}: campo no definido.`);
+    const kind = typeof link.label === 'string' ? KIND_OF_LABEL.get(link.label) : undefined;
+    const { edition, megabytes } = link;
+    if (!kind) errors.push(`${where}.label: ${typeof link.label === 'string' ? `«${link.label}» no es una etiqueta de enlace` : 'falta la etiqueta'}; usa una de estas tres: ${LABEL_LIST.replace(/ y «/, ' o «')}.`);
+    else if (kinds.includes(kind)) errors.push(`${where}.label: la etiqueta «${link.label}» ya está en otro enlace de la marca; cada etiqueta va una vez.`);
+    else kinds.push(kind);
+    if (!isHttps(link.url)) errors.push(`${where}.url: debe ser una URL https escrita completa, como https://www.fabricante.com/catalogo/.`);
+    else if (urls.has(link.url)) errors.push(`${where}.url: la dirección ${link.url} ya está en otro enlace de la marca; cada dirección va una vez.`);
+    else urls.add(link.url);
+    for (const [key, what] of /** @type {const} */ ([['edition', 'la edición'], ['megabytes', 'el tamaño en megabytes']])) {
+      if (Object.hasOwn(link, key) && kind && kind !== 'pdf') errors.push(`${where}.${key}: solo el enlace «${MANUFACTURER_LINK_LABELS.pdf}» lleva ${what}; quítalo de este.`);
+    }
+    if (Object.hasOwn(link, 'edition') && (!isCleanLine(edition) || [...edition].length > MAX_EDITION_LENGTH)) {
+      errors.push(`${where}.edition: debe ser un texto de una línea, de 1 a ${MAX_EDITION_LENGTH} caracteres, como lo imprime el fabricante («2026», «2026 v2»).`);
+    }
+    if (Object.hasOwn(link, 'megabytes') && (typeof megabytes !== 'number' || !Number.isInteger(megabytes) || megabytes < 1 || megabytes > MAX_MEGABYTES)) {
+      errors.push(`${where}.megabytes: debe ser un número entero de 1 a ${MAX_MEGABYTES}: lo que pesa el archivo en megabytes (de un millón de bytes), redondeado.`);
+    }
+  });
+  const ordered = [...kinds].sort((a, b) => LINK_KINDS.indexOf(a) - LINK_KINDS.indexOf(b));
+  if (ordered.join() !== kinds.join()) errors.push(`${path}: los enlaces van en este orden: ${LABEL_LIST}; ordénalos así.`);
+  return errors;
+}
+
+/**
  * Compara la lista pública de marcas con el registro de investigación: mismos identificadores,
- * nombres y tipos, y cada enlace debe ser un recurso de esa entidad verificado como accesible.
+ * nombres y tipos, y cada enlace debe ser un recurso de esa entidad verificado como accesible, de un tipo que no está
+ * bloqueado y que su etiqueta admite (`LINK_RESOURCE_TYPES`).
  * Solo la usan el validador (`npm run validate:catalog`) y las pruebas; el sitio nunca importa el registro.
  * @param {unknown} brands Contenido de `src/data/brands.json`.
  * @param {unknown} registry Contenido de `research/Sercom_Active_Fuentes_Catalogos.json`.
@@ -132,9 +218,12 @@ export function crossCheckBrands(brands, registry) {
     for (const link of brand.manufacturerLinks) {
       const resources = Array.isArray(source.resources) ? source.resources : [];
       const resource = resources.find((/** @type {any} */ candidate) => candidate.url === link.url);
+      const admitted = LINK_RESOURCE_TYPES[/** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label))];
       if (!resource) errors.push(`${brand.id}: el enlace ${link.url} no es un recurso de esa entidad en el registro.`);
       else if (!String(resource.verification ?? '').startsWith('accesible') || BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
         errors.push(`${brand.id}: el enlace ${link.url} no está verificado como accesible (${resource.type}: ${resource.verification}).`);
+      } else if (admitted && !admitted.types.includes(resource.type)) {
+        errors.push(`${brand.id}: el enlace ${link.url} lleva la etiqueta «${link.label}», pero en el registro es de tipo «${resource.type}»; esa etiqueta es solo para ${admitted.purpose}. Cambia la etiqueta o enlaza otro recurso de la marca.`);
       }
     }
   }
@@ -409,7 +498,13 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
     id: brand.id,
     name: brand.name,
     kind: brand.kind,
-    manufacturerLinks: brand.manufacturerLinks.map(link => ({ label: link.label, url: link.url })),
+    // De cada enlace, lo que imprime la página: la etiqueta, la dirección, su clase y, en el PDF, la edición y el
+    // tamaño ya escritos en una línea (`detail`).
+    manufacturerLinks: brand.manufacturerLinks.map(link => {
+      const kind = /** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label));
+      return { label: link.label, url: link.url, kind, detail: kind === 'pdf' ? manufacturerLinkDetail(link) : null };
+    }),
+    hasCatalog: brand.manufacturerLinks.some(link => KIND_OF_LABEL.get(link.label) !== 'site'),
     productCount: productsByBrand(brand.id).length,
     url: routes.brand(brand.id),
   }));

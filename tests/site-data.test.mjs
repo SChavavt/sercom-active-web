@@ -19,7 +19,7 @@ const exampleIds = examples.filter(example => example.retired !== true).map(exam
 const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 
 const CATEGORY_KEYS = ['id', 'name', 'shortName', 'summary', 'isDraft', 'productCount', 'url'];
-const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'productCount', 'url'];
+const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'hasCatalog', 'productCount', 'url'];
 const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'standards', 'image', 'documents', 'isExample'];
 // Nombres de campos internos que nunca deben verse en los datos públicos.
 const INTERNAL_KEYS = ['approval', 'source', 'status', 'sourceUrl', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
@@ -150,7 +150,7 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
   for (const category of site.categories) assert.deepEqual(Object.keys(category), CATEGORY_KEYS);
   for (const brand of site.brands) {
     assert.deepEqual(Object.keys(brand), BRAND_KEYS);
-    for (const link of brand.manufacturerLinks) assert.deepEqual(Object.keys(link), ['label', 'url']);
+    for (const link of brand.manufacturerLinks) assert.deepEqual(Object.keys(link), ['label', 'url', 'kind', 'detail']);
   }
   for (const product of site.products) {
     assert.deepEqual(Object.keys(product), PRODUCT_KEYS);
@@ -164,10 +164,15 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
   });
   assert.deepEqual(site.getBrand('ansell'), {
     id: 'ansell', name: 'Ansell', kind: 'brand',
-    manufacturerLinks: [{ label: 'Sitio del fabricante', url: 'https://www.ansell.com/mx/es/industrial' }],
-    productCount: 0, url: '/marcas/ansell/',
+    manufacturerLinks: [
+      { label: 'Catálogo del fabricante (PDF)', url: 'https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0', kind: 'pdf', detail: '2023' },
+      { label: 'Sitio del fabricante', url: 'https://www.ansell.com/mx/es/industrial', kind: 'site', detail: null },
+    ],
+    hasCatalog: true, productCount: 0, url: '/marcas/ansell/',
   });
-  assert.deepEqual(site.getBrand('espomega'), { id: 'espomega', name: 'Espomega', kind: 'supplier', manufacturerLinks: [], productCount: 0, url: '/marcas/espomega/' });
+  assert.deepEqual(site.getBrand('espomega'), { id: 'espomega', name: 'Espomega', kind: 'supplier', manufacturerLinks: [], hasCatalog: false, productCount: 0, url: '/marcas/espomega/' });
+  // Una marca con solo su sitio no tiene catálogo.
+  assert.equal(site.getBrand('alto').hasCatalog, false);
   assert.deepEqual(site.getProduct('ejemplo-guante-recubierto'), {
     id: 'ejemplo-guante-recubierto', url: '/productos/ejemplo-guante-recubierto/', name: 'Guante de ejemplo recubierto',
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1001', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
@@ -180,6 +185,35 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
     ],
     standards: [], image: null, documents: [], isExample: true,
   });
+});
+
+test('cada enlace de marca llega con su clase y, en el PDF, la edición y el tamaño en una línea', () => {
+  const PDF = 'Catálogo del fabricante (PDF)';
+  const ONLINE = 'Catálogo en línea del fabricante';
+  const SITE = 'Sitio del fabricante';
+  // Marcas ficticias de prueba sobre la lista real: los mismos ids, con otros enlaces.
+  const linksOf = links => {
+    const list = structuredClone(brands);
+    list[0].manufacturerLinks = links;
+    return createSiteData({ mode: 'production', catalog: emptied, brands: list }).brands[0];
+  };
+  const pdf = details => linksOf([{ label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', ...details }]).manufacturerLinks[0];
+  assert.deepEqual(pdf({ edition: '2026 v2', megabytes: 49 }), { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', kind: 'pdf', detail: '2026 v2 · 49 MB' });
+  assert.equal(pdf({ edition: '2026 v2' }).detail, '2026 v2');
+  assert.equal(pdf({ megabytes: 49 }).detail, '49 MB');
+  assert.equal(pdf({}).detail, null);
+  const all = linksOf([
+    { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', edition: '2026' },
+    { label: ONLINE, url: 'https://fabricante.invalid/catalogos/' },
+    { label: SITE, url: 'https://fabricante.invalid/' },
+  ]);
+  assert.deepEqual(all.manufacturerLinks.map(link => [link.kind, link.detail]), [['pdf', '2026'], ['online', null], ['site', null]]);
+  assert.equal(all.hasCatalog, true);
+  assert.equal(linksOf([{ label: ONLINE, url: 'https://fabricante.invalid/catalogos/' }]).hasCatalog, true);
+  assert.equal(linksOf([{ label: SITE, url: 'https://fabricante.invalid/' }]).hasCatalog, false);
+  assert.equal(linksOf([]).hasCatalog, false);
+  // La edición y el tamaño no llegan a las páginas como campos: solo en `detail`.
+  assert.ok(!allKeys(all).includes('edition') && !allKeys(all).includes('megabytes'));
 });
 
 test('búsquedas por id, por categoría y por marca, y selección de destacados', () => {
@@ -354,6 +388,7 @@ test('rutas del sitio: todas con diagonal final y la consulta codificada', () =>
   assert.equal(routes.category('manos'), '/categorias/manos/');
   assert.equal(routes.brand('mcr-safety'), '/marcas/mcr-safety/');
   assert.equal(routes.product('ejemplo-orejera'), '/productos/ejemplo-orejera/');
+  assert.equal(routes.brandCatalogs, '/marcas/#catalogos');
   assert.equal(routes.search('guante 37-175 señalización'), '/catalogo/?q=guante%2037-175%20se%C3%B1alizaci%C3%B3n');
   assert.equal(routes.search('  '), '/catalogo/');
   assert.equal(routes.search(), '/catalogo/');

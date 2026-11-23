@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCatalog, getPublishedProducts, getRetiredProducts } from '../src/lib/catalog-policy.mjs';
-import { crossCheckBrands, validateExampleProducts } from '../src/lib/site-data-core.mjs';
+import { crossCheckBrands, MANUFACTURER_LINK_LABELS, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { reviewCatalogText } from './catalog-text.mjs';
 import { checkProductPhotos, PHOTO_FOLDER } from './product-photos.mjs';
 
@@ -34,6 +34,20 @@ export function photoSummary(catalog) {
   const lines = [`Fotos de producto: ${plural(photoFiles, 'archivo', 'archivos')} en ${PHOTO_FOLDER}/ y ${photoUrls} por dirección, todas de fichas aprobadas${missing}.`];
   if (withoutPhoto.length) lines.push(`Sin foto (se muestran con el pictograma de su categoría): ${withoutPhoto.join(', ')}.`);
   return lines;
+}
+
+/**
+ * La línea del resumen sobre los enlaces de las marcas, ya validadas: cuántas tienen algún enlace del fabricante,
+ * cuántas un catálogo (en PDF o en línea) y, de esas, cuántas en PDF.
+ * @returns {string}
+ */
+export function brandSummary(brands) {
+  const labels = brand => brand.manufacturerLinks.map(link => link.label);
+  const catalogLabels = [MANUFACTURER_LINK_LABELS.pdf, MANUFACTURER_LINK_LABELS.online];
+  const withLink = brands.filter(brand => brand.manufacturerLinks.length).length;
+  const withCatalog = brands.filter(brand => labels(brand).some(label => catalogLabels.includes(label))).length;
+  const withPdf = brands.filter(brand => labels(brand).includes(MANUFACTURER_LINK_LABELS.pdf)).length;
+  return `Marcas públicas: ${brands.length} / ${withLink} con algún enlace del fabricante / ${withCatalog} con catálogo del fabricante (${withPdf} en PDF).`;
 }
 
 /**
@@ -73,7 +87,7 @@ export async function validateProject(root) {
     `Registro: ${registry.sources.length} entidades / ${registry.sources.reduce((n, s) => n + s.resources.length, 0)} referencias.`,
     `Catálogo: ${catalog.products.length} productos / ${getPublishedProducts(catalog, registry).length} aprobados / ${getRetiredProducts(catalog, registry).length} retirados con página informativa.`,
     ...photoSummary(catalog),
-    `Marcas públicas: ${brands.length} / ${brands.filter(brand => brand.manufacturerLinks.length).length} con enlace al sitio del fabricante.`,
+    brandSummary(brands),
     `Ejemplos de vista previa: ${examples.length} (${retiredExamples} ${retiredExamples === 1 ? 'retirado' : 'retirados'}); no forman parte del catálogo y solo se muestran con CATALOG_PREVIEW.`,
     'Validación estructural correcta; no acredita disponibilidad ni vuelve a consultar las fuentes.',
   ] };

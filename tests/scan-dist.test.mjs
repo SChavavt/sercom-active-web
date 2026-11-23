@@ -583,9 +583,9 @@ test('R-RULE-13: metadatos internos y registro de investigación', async () => {
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<a href="${privateResource.url.replaceAll('&', '&amp;')}">Catálogo</a>`) })), ['R-RULE-13']);
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<p>${data.registry.sources[0].next_action}</p>`) })), ['R-RULE-13']);
   assert.ok(failedIds(await scan({ '_astro/marcas.js': `var enlaces=["${privateResource.url}"];` })).includes('R-RULE-13'));
-  // Los catorce enlaces publicados no son una fuga.
+  // Los veintitrés enlaces publicados no son una fuga.
   const links = data.brands.flatMap(brand => brand.manufacturerLinks.map(link => `<a href="${link.url}">${link.label}</a>`)).join(' ');
-  assert.equal(published.size, 14);
+  assert.equal(published.size, 23);
   assert.deepEqual(failures(await scan({ 'marcas/index.html': page(links) })), []);
   // Documentos sueltos: se listan para revisión.
   assert.deepEqual(warnedIds(await scan({ 'docs/plan.pdf': Buffer.from('%PDF-1.7') })), ['R-RULE-13']);

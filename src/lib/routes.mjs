@@ -18,6 +18,7 @@ export const routes = Object.freeze(/** @type {SiteRoutes} */ ({
   category: id => `/categorias/${id}/`,
   brand: id => `/marcas/${id}/`,
   product: id => `/productos/${id}/`,
+  brandCatalogs: '/marcas/#catalogos',
   search: query => {
     const text = String(query ?? '').trim();
     return text ? `/catalogo/?${SEARCH_PARAM}=${encodeURIComponent(text)}` : '/catalogo/';

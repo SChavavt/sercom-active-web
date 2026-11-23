@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { photoSummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
+import { brandSummary, photoSummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
 import { emptiedCatalog, loadProjectData, makeTree, png, readText, removeTree } from './helpers.mjs';
 
 // El validador (`npm run validate:catalog`) corrido sobre una carpeta temporal con los datos del repositorio y un
@@ -97,4 +97,16 @@ test('el validador revisa la carpeta de fotos: un archivo suelto o la foto de un
 test('una foto aprobada sin el uso confirmado detiene la validación con el mensaje que dice qué hacer', async () => {
   const { errors } = await validate(catalogOf(product(1), product(2, { image: { ...urlImage, usageConfirmed: false } })));
   assert.deepEqual(errors, ['products[1].image.usageConfirmed: el uso de la foto no está confirmado. Confírmalo y escribe true, o quita image de la ficha: un producto aprobado se publica sin foto, con el pictograma de su categoría.']);
+});
+
+test('el resumen de las marcas dice cuántas tienen algún enlace, cuántas un catálogo y cuántas en PDF', async () => {
+  const PDF = 'Catálogo del fabricante (PDF)';
+  const ONLINE = 'Catálogo en línea del fabricante';
+  const SITE = 'Sitio del fabricante';
+  const brand = (...labels) => ({ manufacturerLinks: labels.map(label => ({ label, url: 'https://example.invalid/' })) });
+  assert.equal(brandSummary([brand(), brand(SITE), brand(ONLINE), brand(PDF, SITE), brand(PDF, ONLINE, SITE)]),
+    'Marcas públicas: 5 / 4 con algún enlace del fabricante / 3 con catálogo del fabricante (2 en PDF).');
+  // Con los datos del repositorio, la línea contada a mano desde la tabla de enlaces acordada.
+  const { lines } = await validate(catalogOf());
+  assert.ok(lines.includes('Marcas públicas: 19 / 16 con algún enlace del fabricante / 14 con catálogo del fabricante (6 en PDF).'), lines.join('\n'));
 });
