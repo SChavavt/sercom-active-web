@@ -43,7 +43,7 @@ Se necesita Node.js 24 y npm. Las versiones están fijadas en `package-lock.json
 | `npm run verify` | Genera las dos versiones y revisa en ambas las reglas del sitio, los enlaces y el marcado. |
 | `npm run scan:dist`, `npm run check:links`, `npm run check:markup` | Cada revisión por separado sobre `dist/`. |
 
-Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verify`. Desde el 23 de noviembre de 2026 la batería completa y la verificación completa corren en GitHub, en la comprobación «Verificar catálogo y sitio» de cada solicitud de cambios; en la computadora se corren `npm run check` y los archivos de prueba de lo que cambió ([`AGENTS.md`](AGENTS.md)).
+Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verify`. Desde el 23 de noviembre de 2026 la batería completa y la verificación completa corren en GitHub, en el flujo «Verificar catálogo y sitio» (comprobación «verify») de cada solicitud de cambios; en la computadora se corren `npm run check` y los archivos de prueba de lo que cambió ([`AGENTS.md`](AGENTS.md)).
 
 ## Las dos versiones del sitio
 

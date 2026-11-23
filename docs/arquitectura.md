@@ -31,7 +31,7 @@ Las cuotas y precios no son una promesa permanente: se verifican otra vez al pub
 | Marcas que se manejan | `src/data/brands.json` | Edición junto con el registro de investigación |
 | Fuentes de marcas y proveedores | `research/Sercom_Active_Fuentes_Catalogos.json` | Registro interno, fuera de la salida web |
 | Productos de ejemplo | `src/data/preview/example-products.json` | Solo en la vista previa de diseño |
-| Lista del cliente («Mi cotización») | En su navegador: `localStorage` (clave `cotizacion:v1`) para la lista y `sessionStorage` (`cotizacion:borrador:v1`) para lo que escribe en «Cotizar mi lista» | La cambia solo el visitante; sin servidor, cuenta, cookies ni sincronización entre dispositivos. Solo identificadores, cantidades y unidades. Formato y reglas en [`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador). |
+| Lista del cliente («Mi cotización») | En su navegador: `localStorage` (clave `cotizacion:v1`) para la lista y `sessionStorage` (`cotizacion:borrador:v1`) para lo que escribe en «Cotizar mi lista» | La cambia solo el visitante; sin servidor, cuenta, cookies ni sincronización entre dispositivos. La lista guarda solo identificadores, cantidades y unidades; el borrador de la pestaña guarda el texto que el visitante escribe en los tres campos (su lista escrita, el lugar de entrega y la fecha). Formato y reglas en [`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador). |
 | Mensaje de cotización | WhatsApp o correo del cliente | El cliente revisa y envía; el sitio no acredita recepción |
 | Historial de cambios del catálogo | Git | Commit y revisión |
 
@@ -42,7 +42,7 @@ Las páginas reciben una proyección pública de los datos (`src/lib/site-data.m
 | Parte | Dónde | Qué hace |
 | --- | --- | --- |
 | Datos | `src/data/` | JSON versionados (sección 3). |
-| Tipos | `src/types/` | `catalog.ts` (archivo editorial), `site.ts` (forma pública), `contact.ts`. |
+| Tipos | `src/types/` | `catalog.ts` (archivo editorial), `site.ts` (forma pública), `contact.ts`, `catalog-filters.ts` (filtros y estado del catálogo) y `quote.ts` (la lista de cotización, sus renglones y «Deshacer»). |
 | Capa de datos | `src/lib/` | `catalog-policy.mjs` (validación y proyección de aprobados y retirados), `site-data-core.mjs` y `site-data.mjs` (datos públicos por modo, solo al compilar), `contact-core.mjs` y `contact.mjs` (enlaces y borradores de contacto), `routes.mjs`, `search.mjs`, `text.mjs`, `catalog-filters.mjs` (filtros del catálogo), `quote-list.mjs` (reglas de la lista de cotización), `quote-store.mjs` (su almacén en el navegador), `message-page.mjs` (las páginas que arman un mensaje), `grid-fill.mjs`, `product-title.mjs`, `build-mode.mjs`, `icons.ts`, `ayuda.ts`. |
 | Plantilla y componentes | `src/layouts/BaseLayout.astro`, `src/components/` | Plantilla común, encabezado, pie, barra fija, avisos y componentes compartidos. |
 | Páginas | `src/pages/` | Portada, catálogo, categorías, marcas, producto (ficha o retirado), cotizar, solicitud especial, contacto, privacidad y 404. Las rutas con parámetro salen de los datos. |
