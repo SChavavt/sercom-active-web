@@ -5,21 +5,36 @@
 // especial. Junto a la acción de correo, en 8 columnas, la nota «Los botones abren tu aplicación…» (la única
 // vez que aparece en la página). En computadora la nota va a la izquierda y la acción a la derecha; hasta
 // 1099 px la acción va primero, justo bajo la banda, y la nota después (la acción va antes en el marcado y
-// atencion.css las coloca en computadora). Después, la misma estructura que /cotizar/: registro numerado
-// junto al borrador y datos de contacto. El sitio no envía nada: abre un borrador en la aplicación del cliente.
+// atencion.css las coloca en computadora). Después, «Qué nos ayuda a encontrarlo» junto al borrador y los datos de
+// contacto. El sitio no envía nada ni recibe nada: abre un borrador en la aplicación del cliente.
 //
-// Búsqueda que llega del catálogo: /solicitud-especial/?q=<búsqueda> (SEARCH_PARAM). Con JavaScript, el
-// script de abajo escribe la búsqueda en la línea «Descripción o uso» de los dos enlaces y del borrador, y
-// muestra la nota «Agregamos tu búsqueda “…” al borrador.» en la misma celda, encima de la otra nota. La
-// búsqueda es texto no confiable: solo se escribe con textContent o dentro del enlace codificado. Sin
-// JavaScript o sin parámetro, la página es la misma de siempre. Textos: brief de páginas «atencion», sección 2.
+// Sin JavaScript la página es la de siempre: el registro numerado (`no-js-only`) junto al borrador «Así empieza tu
+// mensaje». Con JavaScript (`js-only`), en lugar del registro, cinco campos (descripción, marca o modelo, cantidad y
+// unidad, lugar de entrega, fecha) y debajo las tres acciones del mensaje (MessageActions: WhatsApp, correo, «Copiar
+// solicitud»); el borrador de al lado, «Así queda tu mensaje», sigue lo que se escribe. El mensaje es la plantilla con
+// esas líneas llenas (`withFieldValues` sobre el enlace de WhatsApp impreso; un salto de línea de la descripción pasa a
+// ser un espacio) y va en todos los enlaces de las regiones marcadas `data-solicitud` (el botón de la banda, la acción
+// de correo, las acciones bajo los campos y los datos de contacto), con la regla del mensaje largo de
+// src/lib/message-page.mjs: si no cabe en un enlace, ninguno lleva el texto, las etiquetas cambian (también la del botón
+// de la banda, que se busca como `.band__action a` dentro de su región, con sus dos etiquetas en data-*) y se pide
+// copiar primero. Los demás enlaces de WhatsApp y de correo de la página siguen la misma regla. Nada de lo que se
+// escribe aquí se guarda.
+//
+// Búsqueda que llega del catálogo: /solicitud-especial/?q=<búsqueda> (SEARCH_PARAM). Con JavaScript, el script llena
+// «Descripción o uso» con la búsqueda (`requestDescription`) y muestra la nota «Agregamos tu búsqueda “…” al
+// borrador.» en la celda de las notas; la nota se oculta en cuanto el campo ya no empieza con ese texto. La búsqueda
+// es texto no confiable: solo se escribe con textContent, value o dentro del enlace codificado. Sin JavaScript la
+// página es la misma de siempre, también con el parámetro. Textos: brief de páginas «atencion», sección 2, y brief del
+// paso 2 de la solicitud especial.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ActionRow from '../../components/ActionRow.astro';
 import Band from '../../components/Band.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import ContactData from '../../components/ContactData.astro';
 import DraftMessage from '../../components/DraftMessage.astro';
+import Field from '../../components/Field.astro';
 import ItemRegister from '../../components/ItemRegister.astro';
+import MessageActions from '../../components/MessageActions.astro';
 import Monogram from '../../components/Monogram.astro';
 import Note from '../../components/Note.astro';
 import SectionHead from '../../components/SectionHead.astro';
@@ -45,7 +60,12 @@ const items = [
     <Breadcrumbs items={[{ label: 'Inicio', href: routes.home }, { label: 'Solicitud especial' }]} />
   </div>
 
-  <section class="solicitud__head section" aria-labelledby="titulo" data-solicitud>
+  <section
+    class="solicitud__head section"
+    aria-labelledby="titulo"
+    data-solicitud
+    data-band-long-label="Abrir WhatsApp para pegar mi solicitud"
+  >
     <Band
       headingLevel={1}
       id="titulo"
@@ -54,7 +74,7 @@ const items = [
       action={{ href: request.whatsapp, label: 'Enviar mi solicitud por WhatsApp' }}
     />
     <div class="grid12">
-      <ActionRow class="solicitud__mail span-4 span-md-12" href={request.mailto} icon="mail">Enviar mi solicitud por correo</ActionRow>
+      <ActionRow class="solicitud__mail span-4 span-md-12" href={request.mailto} icon="mail" data-long-label="Abrir mi correo para pegar mi solicitud">Enviar mi solicitud por correo</ActionRow>
       <div class="solicitud__notes cell span-8 span-md-12">
         <div data-search-note hidden>
           <Note icon="search">Agregamos tu búsqueda “<bdi data-search-term></bdi>” al borrador.</Note>
@@ -67,10 +87,40 @@ const items = [
   <section class="section" aria-labelledby="ayuda-title">
     <SectionHead title="Qué nos ayuda a encontrarlo" id="ayuda-title" />
     <div class="grid12">
-      <div class="atencion__col span-8 span-md-12">
+      <div class="atencion__col span-8 span-md-12 no-js-only">
         <ItemRegister items={items} />
       </div>
-      <DraftMessage text={request.text} id="borrador-title" class="span-4 span-md-12" />
+      <div class="atencion__col solicitud__fields span-8 span-md-12 js-only">
+        <Field label="Descripción o uso" for="solicitud-descripcion" hint="Qué es y para qué lo usas.">
+          <textarea class="control control--area" id="solicitud-descripcion" name="descripcion" maxlength="600" autocomplete="off" aria-describedby="solicitud-descripcion-ayuda" data-request-field="description"></textarea>
+        </Field>
+        <Field label="Marca o modelo (si lo tienes)" for="solicitud-modelo">
+          <input class="control" type="text" id="solicitud-modelo" name="modelo" maxlength="100" autocomplete="off" data-request-field="model" />
+        </Field>
+        <Field label="Cantidad y unidad" for="solicitud-cantidad" hint="Por ejemplo: 20 piezas">
+          <input class="control" type="text" id="solicitud-cantidad" name="cantidad" maxlength="100" autocomplete="off" aria-describedby="solicitud-cantidad-ayuda" data-request-field="quantity" />
+        </Field>
+        <Field label="Lugar de entrega" for="solicitud-entrega" hint="Ciudad o código postal.">
+          <input class="control" type="text" id="solicitud-entrega" name="entrega" maxlength="100" autocomplete="off" aria-describedby="solicitud-entrega-ayuda" data-request-field="delivery" />
+        </Field>
+        <Field label="Fecha requerida" for="solicitud-fecha" hint="Para cuándo lo necesitas.">
+          <input class="control" type="text" id="solicitud-fecha" name="fecha" maxlength="100" autocomplete="off" aria-describedby="solicitud-fecha-ayuda" data-request-field="date" />
+        </Field>
+        <Note icon="image">Si tienes una foto o un archivo, adjúntalo en la conversación de WhatsApp o en el correo.</Note>
+        <p class="vh" role="status" data-live></p>
+        <MessageActions
+          data-solicitud
+          whatsappHref={request.whatsapp}
+          mailHref={request.mailto}
+          whatsappLabel="Enviar mi solicitud por WhatsApp"
+          mailLabel="Enviar mi solicitud por correo"
+          longWhatsapp="Abrir WhatsApp para pegar mi solicitud"
+          longMail="Abrir mi correo para pegar mi solicitud"
+          notice="Tu solicitud es larga y no cabe en un enlace. Primero cópiala; después abre WhatsApp o tu correo y pégala."
+        />
+      </div>
+      <DraftMessage text={request.text} id="borrador-title" class="span-4 span-md-12 no-js-only" />
+      <DraftMessage text={request.text} id="mensaje-title" title="Así queda tu mensaje" class="span-4 span-md-12 js-only" data-message-draft />
     </div>
   </section>
 
@@ -90,39 +140,62 @@ const items = [
   </section>
 
   <script>
-    // Búsqueda que llega del catálogo (?q=). Texto no confiable: solo textContent y enlaces codificados.
-    import { requestDescription, withRequestDescription } from '../../lib/contact-core.mjs';
+    // Los cinco campos arman el mensaje; lo demás (borrador, enlaces, mensaje largo, «Copiar solicitud») lo hace
+    // message-page.mjs. Lo que escribe el visitante y la búsqueda (?q=) son texto no confiable: solo textContent, value
+    // y enlaces codificados. Nada se guarda.
+    import { MESSAGE_LABELS, messageOf, requestDescription, withFieldValues } from '../../lib/contact-core.mjs';
+    import { createMessagePage } from '../../lib/message-page.mjs';
     import { SEARCH_PARAM } from '../../lib/search.mjs';
 
-    // requestDescription limpia la búsqueda como el catálogo (cleanQuery): los caracteres de dirección, los invisibles
-    // y el guion suave se quitan sin dejar espacio; el carácter de reemplazo de una secuencia % mal formada y los
-    // controles pasan a ser un espacio. Si no queda nada visible, la página es la de siempre.
-    const query = new URLSearchParams(window.location.search).get(SEARCH_PARAM);
-    const description = requestDescription(query);
-    if (description) {
-      const links = document.querySelectorAll<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"], [data-solicitud] a[href^="mailto:"]');
-      for (const link of links) link.setAttribute('href', withRequestDescription(link.getAttribute('href'), description));
+    const main = document.querySelector('main');
+    const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-request-field]')];
+    const sendWhatsapp = document.querySelector<HTMLAnchorElement>('[data-solicitud] a[data-message-send="whatsapp"]');
 
-      // El borrador visible es el mismo texto que abrirá WhatsApp.
-      const whatsapp = document.querySelector<HTMLAnchorElement>('[data-solicitud] a[href^="https://wa.me/"]');
-      const draft = document.querySelector<HTMLElement>('[data-draft-text]');
-      const text = whatsapp ? new URL(whatsapp.href).searchParams.get('text') : null;
-      if (draft && text) {
-        // Un renglón por línea, como lo imprime DraftMessage; el salto entre renglones se conserva en el texto.
-        draft.replaceChildren(...text.split('\n').flatMap((line, index) => {
-          const span = document.createElement('span');
-          span.className = 'draft__line';
-          span.textContent = line;
-          return index > 0 ? [document.createTextNode('\n'), span] : [span];
-        }));
-      }
+    if (main && sendWhatsapp) {
+      // El botón de la banda no lleva gancho propio (Band.astro no pasa atributos): se busca dentro de su región y
+      // recibe su etiqueta del mensaje largo, que la región guarda en data-band-long-label.
+      const band = document.querySelector<HTMLElement>('[data-band-long-label]');
+      const bandButton = band?.querySelector<HTMLAnchorElement>('.band__action a');
+      if (band && bandButton && band.dataset.bandLongLabel) bandButton.dataset.longLabel = band.dataset.bandLongLabel;
 
+      // La plantilla es el enlace impreso antes de cualquier cambio.
+      const template = sendWhatsapp.getAttribute('href') ?? '';
+      const page = createMessagePage(main, { regions: '[data-solicitud]' });
+      const labels: Record<string, string> = {
+        description: MESSAGE_LABELS.description,
+        model: MESSAGE_LABELS.model,
+        quantity: MESSAGE_LABELS.quantity,
+        delivery: MESSAGE_LABELS.delivery,
+        date: MESSAGE_LABELS.date,
+      };
+      const message = () => {
+        const values: Record<string, string> = {};
+        for (const field of fields) {
+          const label = labels[field.dataset.requestField ?? ''];
+          if (label) values[label] = field.value;
+        }
+        return messageOf(withFieldValues(template, values));
+      };
+
+      // La búsqueda que llega del catálogo llena «Descripción o uso»; la nota lo dice mientras sea cierto.
+      const description = fields.find(field => field.dataset.requestField === 'description');
+      const searched = requestDescription(new URLSearchParams(window.location.search).get(SEARCH_PARAM));
       const note = document.querySelector<HTMLElement>('[data-search-note]');
       const term = document.querySelector<HTMLElement>('[data-search-term]');
-      if (note && term) {
-        term.textContent = description;
-        note.hidden = false;
+      if (searched && description && !description.value) description.value = searched;
+      if (term) term.textContent = searched;
+      const refreshNote = () => {
+        if (note) note.hidden = !searched || !description || !description.value.startsWith(searched);
+      };
+
+      for (const field of fields) {
+        field.addEventListener('input', () => {
+          refreshNote();
+          page.update(message());
+        });
       }
+      refreshNote();
+      page.update(message());
     }
   </script>
 </BaseLayout>

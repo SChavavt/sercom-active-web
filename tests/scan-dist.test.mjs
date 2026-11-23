@@ -815,6 +815,50 @@ test('R-RULE-24: un enlace de correo o de teléfono vacío o sin sustituir, y de
   assert.deepEqual(failures(await scan({ '_astro/sitio.css': 'a[href^="mailto:"],a[href^="tel:"]{text-decoration:none}' })), []);
 });
 
+test('R-RULE-24: en un script, «mailto:» o «tel:» como clave de un objeto o como propiedad leída no es un destino; con forma de destino sí', async () => {
+  const EMAIL = data.business.email;
+  // Código como lo deja el compilador (sin comillas en las claves y sin espacios): objetos con una clave por canal,
+  // con cualquier valor, y propiedades leídas en una condición.
+  for (const content of [
+    'var L={whatsapp:1900,mailto:1900};function f(e,t){return{whatsapp:e,mailto:t}}var x=1;',
+    'const l=Object.freeze({whatsapp:1900,mailto:1900}),u=2;',
+    'function g(e){const{whatsapp:t,mailto:n}=e;return[t,n]}',
+    'const c={mailto:e.correo,tel:e.telefono,sms:t},d={tel:!0,sms:!1,mailto:-1};',
+    'const etiquetas={whatsapp:`Abrir WhatsApp`,mailto:`Abrir correo`,tel:"Llamar"};',
+    `const destinos={mailto:"mailto:${EMAIL}",tel:t};`,
+    'const cuenta={tel:3,sms:120000,mailto:0.5};',
+    'const g={whatsapp:[],mailto:[]};for(const a of l)g[k(a)].push(a);',
+    'const h={whatsapp:a(),mailto:b(1),tel:void 0,sms:e.length>0},i={mailto:{a:1},tel:[1,2]};',
+    'const t=c==="mailto"?l.mailto:l.whatsapp,u=c==="tel"?l.tel:l.sms;',
+    'const n=x?e?.mailto:e?.tel,m=x?e.sms:0;',
+    `const v=",mailto:${EMAIL}";`,
+  ]) {
+    assert.deepEqual(failures(await scan({ '_astro/pagina.js': content })), [], content);
+    assert.deepEqual(failures(await scan({ 'pagina/index.html': page(`<script type="module">${content}</script>`) })), [], content);
+  }
+  // Lo que tiene forma de destino sigue fallando esté donde esté: en la cadena que es el valor de la clave, pegado a
+  // una coma o a un punto dentro de una cadena (también codificado dentro de otra dirección), con un número con forma
+  // de teléfono, al principio de una cadena aunque no sea una dirección, y fuera del código de un script.
+  for (const content of [
+    'const destinos={mailto:"mailto:otro@example.com"};',
+    'const destinos={whatsapp:e,mailto:`mailto:otro@example.com`};',
+    'const lista="a,mailto:otro@example.com";',
+    'const texto="visita.mailto:otro@example.com";',
+    'const u="https://l.example.com/?a=1,mailto%3Aotro%40example.com";',
+    'const c={tel:5511223344};',
+    'const c={x:1,sms:5511223344,y:2};',
+    'const c={tel:"tel:+525511223344"};',
+    'const t="llama.tel:+52 55 1122 3344";',
+    'const t="a,tel:(55) 1122-3344";',
+    'location.href=a?"mailto:otro@example.com":b;',
+    'location.href="mailto:ventas";',
+  ]) assert.deepEqual(failedIds(await scan({ '_astro/pagina.js': content })), ['R-RULE-24'], content);
+  for (const [path, content] of [['datos.json', '{"a":"x,mailto:t}"}'], ['pagina/index.html', page('<p data-canales="{whatsapp:e,mailto:t}">x</p>')],
+    ['pagina/index.html', page('<a href="mailto:t">Correo</a>')]]) {
+    assert.deepEqual(failedIds(await scan({ [path]: content })), ['R-RULE-24'], content);
+  }
+});
+
 test('R-RULE-01: un prefijo de moneda antes de «$» es un precio en el texto, en los atributos, en los scripts y en el CSS', async () => {
   // La base y la ronda 1 los detectaban; la excepción de «$» pegado a una letra solo vale para el código de un script.
   await assertEachFails('R-RULE-01', [
@@ -1569,17 +1613,25 @@ test('--rules nombra «representante» en R-RULE-07 y todo <iframe> en R-RULE-11
   assert.match(entry('R-RULE-11', 'mapa'), /Cualquier <iframe> falla mientras la atención presencial no esté confirmada, porque el escáner no distingue un mapa de otra inserción: un video del fabricante se da como enlace/);
 });
 
-test('--rules y check-links no prometen revisar los botones: un botón sin efecto solo se encuentra en el navegador', async () => {
-  // R-RULE-30: check-links revisa enlaces; los botones de la cabecera, check-markup; un botón sin efecto, solo el navegador.
+test('--rules y check-links dicen quién revisa los enlaces y quién los controles, y qué queda para el navegador', async () => {
+  // R-RULE-30: check-links revisa enlaces; los controles, check-markup (R-RULE-30a y R-RULE-30b); lo que hace un
+  // control al usarlo, solo el navegador.
   const links = CHECKS.filter(([id]) => id === 'R-RULE-30').map(([, doc]) => doc).join('\n');
   assert.doesNotMatch(links, /controles inertes/);
   assert.match(links, /vacíos, «#», javascript: o un <a> sin href/);
-  assert.match(links, /botones propios de la cabecera/);
-  assert.match(links, /Un botón que no hace nada no lo encuentra ninguna comprobación: solo la revisión de la página en el navegador/);
+  assert.match(links, /scripts\/check-markup\.mjs revisa los controles de cada página compilada/);
+  assert.match(links, /R-RULE-30a pide que cada <button>, <select>, <textarea>, <input> que no es hidden y cada role="button", también dentro de un <template>/);
+  assert.match(links, /una función nativa \(un campo con name o el botón de envío de un <form> con action\) o un atributo data-\* que el código de su página nombre/);
+  assert.match(links, /R-RULE-30b, que ningún <script> vaya dentro de un <template>/);
+  assert.match(links, /no prueban que el script haga algo útil con el control, ni que el control se vea solo cuando funciona: lo que pasa al usarlo, el foco y lo que se anuncia se siguen revisando en el navegador/);
+  // Ya no promete que un botón sin función solo lo encuentre el navegador: lo encuentra check-markup.
+  assert.doesNotMatch(links, /Un botón que no hace nada no lo encuentra ninguna comprobación/);
+  assert.doesNotMatch(links, /botones propios de la cabecera/);
   const header = (await readText('scripts/check-links.mjs')).split('\nimport ')[0];
   assert.doesNotMatch(header, /controles inertes/);
-  assert.match(header, /Solo revisa enlaces: un <button> u otro control que no hace nada no se detecta aquí/);
-  assert.match(header, /Un botón sin efecto solo se encuentra revisando la página en el navegador/);
+  assert.doesNotMatch(header, /botones propios de la cabecera/);
+  assert.match(header, /Solo revisa enlaces: un <button> u otro control sin función no se detecta aquí, lo revisa check-markup/);
+  assert.match(header, /Que un control haga algo útil al usarlo solo se comprueba en el navegador/);
 });
 
 test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay nada que revisar', async () => {

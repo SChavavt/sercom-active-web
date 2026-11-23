@@ -4,16 +4,17 @@ Sitio de presentación y catálogo de Sercom Active, con atención comercial en 
 
 ## Estado
 
-**El paso 1 (diseño y navegación completa) está construido y espera la revisión del propietario. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
+**El paso 1 (diseño y navegación completa) está aprobado y el paso 2 (buscador, filtros y «Mi cotización») está construido y en revisión. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
 
 | Paso | Contenido | Estado |
 | --- | --- | --- |
-| **1** | **Diseño y navegación completa** | **Construido; en revisión del propietario** |
-| 2 | Buscador, filtros y «Mi cotización» | Pendiente |
+| 1 | Diseño y navegación completa | Aprobado el 22 de noviembre de 2026 (solicitud de cambios n.º 1) |
+| **2** | **Buscador, filtros y «Mi cotización»** | **Construido; en revisión (solicitud de cambios n.º 2)** |
 | 3 | Catálogo piloto (30 a 50 productos reales) | Pendiente |
 | 4 | Publicación y QR | Pendiente |
 
 - Todas las páginas existen con el diseño «Lámina técnica» que eligió el propietario: portada, catálogo, categorías, marcas, ficha de producto, «Cotizar mi lista», solicitud especial, contacto, privacidad y la página de error.
+- Con el paso 2, el catálogo se filtra por categoría y por marca, combinadas entre sí y con la búsqueda, que encuentra también plurales y algunos sinónimos; desde la ficha se regresa a los mismos resultados. Cada ficha tiene «Agregar a mi cotización», con talla o color, cantidad y unidad. La lista se guarda solo en el navegador del visitante (no hay servidor, cuenta ni cookies) y en «Cotizar mi lista» se cambia, se completa y se convierte en un mensaje que el visitante envía por WhatsApp o por correo, o copia con «Copiar solicitud»; si el mensaje es demasiado largo para un enlace, la página pide copiarlo y pegarlo. La solicitud especial arma su mensaje con cinco campos. Sin JavaScript, cada página sigue funcionando como en el paso 1.
 - Todavía no hay productos reales aprobados; llegan en el paso 3. Mientras tanto, la versión que se publicaría no muestra productos, y una versión de revisión aparte muestra productos de ejemplo marcados como «Ejemplo», que no son artículos reales.
 - Lo que el negocio debe confirmar, lo verificado y lo pendiente: [`docs/ESTADO.md`](docs/ESTADO.md). El plan de los cuatro pasos: [`docs/plan-de-trabajo.md`](docs/plan-de-trabajo.md).
 
@@ -42,7 +43,7 @@ Se necesita Node.js 24 y npm. Las versiones están fijadas en `package-lock.json
 | `npm run verify` | Genera las dos versiones y revisa en ambas las reglas del sitio, los enlaces y el marcado. |
 | `npm run scan:dist`, `npm run check:links`, `npm run check:markup` | Cada revisión por separado sobre `dist/`. |
 
-Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verify`.
+Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verify`. Desde el 23 de noviembre de 2026 la batería completa y la verificación completa corren en GitHub, en el flujo «Verificar catálogo y sitio» (comprobación «verify») de cada solicitud de cambios; en la computadora se corren `npm run check` y los archivos de prueba de lo que cambió ([`AGENTS.md`](AGENTS.md)).
 
 ## Las dos versiones del sitio
 
@@ -68,7 +69,7 @@ Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. 
 | `src/data/brands.json` | «Marcas que manejamos» |
 | `src/data/preview/example-products.json` | Productos de ejemplo, solo para la vista previa |
 | `src/pages/`, `src/components/`, `src/styles/` | Páginas, componentes y estilos |
-| `src/lib/` | Validación, datos públicos, contacto, búsqueda |
+| `src/lib/` | Validación, datos públicos, contacto, búsqueda, filtros, la lista de cotización y su almacén en el navegador |
 | `scripts/` | Validador, modo de vista previa y revisiones del sitio generado |
 | `tests/` | Pruebas automáticas |
 | `.github/workflows/quality.yml` | Comprobaciones en GitHub al proponer cambios, sin publicar nada ni tareas programadas |

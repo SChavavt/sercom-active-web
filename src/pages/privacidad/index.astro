@@ -1,18 +1,24 @@
 ---
 // Privacidad (/privacidad/). Aviso breve con lo que es cierto del sitio tal como está construido: no pide
-// datos, no usa cookies ni almacenamiento del navegador, no envía formularios y los botones de contacto
-// solo abren un borrador en la aplicación del cliente. NO es el aviso de privacidad de la empresa: ese
-// texto lo debe entregar la empresa antes de publicar. Revisar esta página si se agrega la lista de
-// cotización del paso 2 (guarda datos en el navegador) o cualquier medición.
-// Textos: brief de páginas «atencion», sección 4. Se ve igual en los dos modos.
+// datos ni usa cookies; los campos de «Cotizar mi lista» y «Solicitud especial» solo arman el borrador del mensaje y el
+// sitio no recibe lo que se escribe en ellos; los botones de contacto solo abren un borrador en la aplicación del
+// cliente. El navegador guarda dos cosas (src/lib/quote-store.mjs): la lista de cotización en este navegador
+// (localStorage) y lo que se escribe en «Cotizar mi lista» solo en la pestaña (sessionStorage); lo de la solicitud
+// especial no se guarda. NO es el aviso de privacidad de la empresa: ese texto lo debe entregar la empresa antes de
+// publicar. Revisar esta página si cambia lo que se guarda o se agrega cualquier medición.
+// La fila «Lo que agregas a tu cotización» solo se imprime cuando la compilación tiene productos
+// (`products.length`): sin productos no hay cómo agregar uno ni botón «Vaciar cotización», y la fila describiría algo
+// que no está.
+// Textos: brief de páginas «atencion», sección 4, y brief del paso 2.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import EmailAddress from '../../components/EmailAddress.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import { contactDetails, mailtoUrl } from '../../lib/contact.mjs';
-import { routes } from '../../lib/site-data.mjs';
+import { products, routes } from '../../lib/site-data.mjs';
 import '../../styles/pages/atencion.css';
 
 const { businessName } = contactDetails;
+const hasProducts = products.length > 0;
 ---
 <BaseLayout title="Privacidad" description="Qué datos pide este sitio y qué pasa con lo que nos envías por WhatsApp o por correo.">
   <PageHeader
@@ -23,11 +29,21 @@ const { businessName } = contactDetails;
   <dl class="privacidad">
     <div class="privacidad__row grid12">
       <dt class="privacidad__key cell span-4">Qué datos pide este sitio</dt>
-      <dd class="privacidad__value cell span-8"><p>Ninguno. No hay formularios de registro, cuentas de usuario ni cookies de seguimiento.</p></dd>
+      <dd class="privacidad__value cell span-8"><p>Ninguno para usarlo. No hay formularios de registro, cuentas de usuario ni cookies de seguimiento. Los campos de “Cotizar mi lista” y “Solicitud especial” solo arman el borrador de tu mensaje: el sitio no recibe lo que escribes en ellos.</p></dd>
+    </div>
+    {hasProducts && (
+      <div class="privacidad__row grid12">
+        <dt class="privacidad__key cell span-4">Lo que agregas a tu cotización</dt>
+        <dd class="privacidad__value cell span-8"><p>Los productos, variantes, cantidades y unidades que agregas a tu cotización se guardan solo en este navegador, en este equipo. Se quedan ahí hasta que vacíes tu cotización o borres los datos del sitio; algunos navegadores, como Safari, los borran si pasan varios días sin que visites el sitio. No salen de tu navegador hasta que tú abres WhatsApp o tu correo, o copias tu solicitud.</p></dd>
+      </div>
+    )}
+    <div class="privacidad__row grid12">
+      <dt class="privacidad__key cell span-4">Lo que escribes en el sitio</dt>
+      <dd class="privacidad__value cell span-8"><p>Lo que escribes en “Cotizar mi lista” (tu lista escrita, el lugar de entrega y la fecha) se guarda solo en esta pestaña de tu navegador y se borra al cerrarla; si tu navegador vuelve a abrir la pestaña, puede recuperarlo. Lo que escribes en “Solicitud especial” no se guarda. Lo que buscas en el catálogo queda en la dirección de la página y en el historial de tu navegador, como en cualquier sitio.</p></dd>
     </div>
     <div class="privacidad__row grid12">
       <dt class="privacidad__key cell span-4">Cuando nos escribes</dt>
-      <dd class="privacidad__value cell span-8"><p>Los botones de WhatsApp y de correo abren tu propia aplicación con un borrador que puedes editar. El sitio no envía el mensaje por ti ni guarda una copia.</p></dd>
+      <dd class="privacidad__value cell span-8"><p>Los botones de WhatsApp y de correo abren tu propia aplicación con un borrador que puedes editar. El sitio no envía el mensaje por ti ni recibe una copia.</p></dd>
     </div>
     <div class="privacidad__row grid12">
       <dt class="privacidad__key cell span-4">Lo que nos compartes</dt>

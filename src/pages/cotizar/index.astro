@@ -1,24 +1,62 @@
 ---
-// Cotizar mi lista (/cotizar/). Página honesta del paso 1: qué enviar, el borrador que abrirán los botones
-// y las dos acciones (WhatsApp y correo con la plantilla de lista). El sitio no envía nada ni guarda la
-// lista: abre un borrador en la aplicación del cliente. La lista en el sitio llega en el paso 2.
-// Misma estructura que /solicitud-especial/: título con acciones, registro numerado junto al borrador,
-// notas y datos de contacto. No depende del catálogo: se ve igual en los dos modos.
-// Textos: brief de páginas «atencion», sección 1.
+// Cotizar mi lista (/cotizar/). El sitio no envía nada ni recibe nada: ayuda al visitante a armar UN mensaje, se lo
+// muestra y abre su WhatsApp o su correo con él, o le deja copiarlo. Después de abrir una aplicación la página no
+// cambia ni dice nada: no puede saber si el mensaje se envió.
+//
+// Sin JavaScript la página es la de siempre (lo marcado con `no-js-only`): título con las dos acciones de la plantilla
+// de lista, «Qué enviar» (registro numerado y el borrador «Así empieza tu mensaje»), las dos notas y «Atención con …».
+// Con JavaScript (lo marcado con `js-only`), de arriba abajo:
+//   - título con UNA fila de acción, un enlace dentro de la página: «Revisar y enviar mi lista» hacia «Revisa y envía»
+//     cuando el catálogo tiene productos; «Escribir mi lista» hacia la sección de los campos cuando no tiene;
+//   - «Mi cotización»: la lista guardada en este navegador (src/lib/quote-store.mjs), con un renglón por producto
+//     construido desde un <template> (solo textContent, value y propiedades). Con productos al compilar se imprime
+//     entera, con el índice público de los productos (`data-quote-index`, buildQuoteIndex); sin productos solo el
+//     título, el renglón de los productos que la página no puede ubicar, la línea de estado y el aviso de que el
+//     navegador no guardó un cambio, dentro de una sección oculta hasta que haya un renglón guardado que informar (y
+//     sin el script del selector de cantidad: no hay ninguno). Lo que se imprime en cada caso lo comprueba R-QUOTE-12
+//     de scripts/check-markup.mjs en las dos compilaciones;
+//   - «Completa tu solicitud» (con productos) o «Escribe tu lista» (sin productos): tres campos que se guardan solo en
+//     esta pestaña (sessionStorage, por quote-store.mjs);
+//   - «Revisa y envía»: las acciones (MessageActions) y el borrador «Así queda tu mensaje», siempre al día, más las
+//     notas y el enlace «Privacidad»;
+//   - «Atención con …», como siempre; sus dos enlaces de contacto llevan el mensaje de la página (región `data-cotizar`).
+// El script de abajo atiende la lista y los campos; lo compartido con la solicitud especial (borrador, enlaces, mensaje
+// largo, «Copiar solicitud», región viva) está en src/lib/message-page.mjs, y lo que decide sin tocar la página (qué
+// productos van en el mensaje, qué renglones repiten a otro, qué deja «Deshacer») en src/lib/quote-list.mjs, con
+// pruebas. Ganchos: data-quote-* (la lista), data-draft-field (los campos), data-storage-note, data-cotizar (región de
+// los enlaces de mensaje).
+// Con un catálogo sin productos, una lista vacía y nada escrito, cada enlace de WhatsApp y de correo de la página lleva
+// exactamente lo de siempre (`composeListMessage({ opening })` es `messages.list()`).
+// Textos: brief de páginas «atencion», sección 1, y brief del paso 2 de «Cotizar mi lista».
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ActionRow from '../../components/ActionRow.astro';
 import ContactData from '../../components/ContactData.astro';
 import DraftMessage from '../../components/DraftMessage.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import Field from '../../components/Field.astro';
+import Icon from '../../components/Icon.astro';
 import ItemRegister from '../../components/ItemRegister.astro';
+import MessageActions from '../../components/MessageActions.astro';
 import Monogram from '../../components/Monogram.astro';
 import Note from '../../components/Note.astro';
 import PageHeader from '../../components/PageHeader.astro';
 import SectionHead from '../../components/SectionHead.astro';
+import Select from '../../components/Select.astro';
+import StatusLine from '../../components/StatusLine.astro';
+import Stepper from '../../components/Stepper.astro';
+import StepperScript from '../../components/StepperScript.astro';
+import Tag from '../../components/Tag.astro';
 import { contactDetails, contactLinks } from '../../lib/contact.mjs';
-import { routes } from '../../lib/site-data.mjs';
+import { buildQuoteIndex, DRAFT_LIMITS, jsonForScript, MAX_QUANTITY } from '../../lib/quote-list.mjs';
+import { EXAMPLE_TAG, isPreview, products, retiredProducts, routes } from '../../lib/site-data.mjs';
 import '../../styles/pages/atencion.css';
 
 const list = contactLinks.list();
+const hasProducts = products.length > 0;
+const index = buildQuoteIndex(products, retiredProducts);
+const hasIndex = index.products.length > 0 || index.retired.length > 0;
+const fieldsTitle = hasProducts ? 'Completa tu solicitud' : 'Escribe tu lista';
+const fieldsId = hasProducts ? 'completa-title' : 'escribe-title';
 
 const items = [
   { label: 'Marca', text: 'La marca del producto, si la conoces.' },
@@ -39,11 +77,14 @@ const items = [
     breadcrumbs={[{ label: 'Inicio', href: routes.home }, { label: 'Cotizar mi lista' }]}
     lead="¿Ya tienes marcas, códigos o cantidades? Envíanos tu lista y preparamos la cotización."
   >
-    <ActionRow href={list.whatsapp} primary icon="whatsapp">Enviar mi lista por WhatsApp</ActionRow>
-    <ActionRow href={list.mailto} icon="mail">Enviar mi lista por correo</ActionRow>
+    <ActionRow class="no-js-only" href={list.whatsapp} primary icon="whatsapp">Enviar mi lista por WhatsApp</ActionRow>
+    <ActionRow class="no-js-only" href={list.mailto} icon="mail">Enviar mi lista por correo</ActionRow>
+    {hasProducts
+      ? <ActionRow class="js-only" href="#revisa-title" primary>Revisar y enviar mi lista</ActionRow>
+      : <ActionRow class="js-only" href={`#${fieldsId}`} primary>Escribir mi lista</ActionRow>}
   </PageHeader>
 
-  <section class="section" aria-labelledby="enviar-title">
+  <section class="section no-js-only" aria-labelledby="enviar-title">
     <SectionHead title="Qué enviar" id="enviar-title" />
     <div class="grid12">
       <div class="atencion__col span-8 span-md-12">
@@ -56,7 +97,171 @@ const items = [
     <Note icon="file-text">Si tienes tu lista en Excel, PDF o foto, adjúntala en la conversación de WhatsApp o en el correo.</Note>
   </section>
 
-  <section class="section" aria-labelledby="atencion-title">
+  {/* Mi cotización. Sin productos al compilar, la sección queda oculta hasta que haya un renglón guardado que informar
+      (una lista guardada por otra compilación no debe quedar invisible mientras el número junto a «Cotizar mi lista»
+      la cuenta). */}
+  <section class="section js-only" aria-labelledby="lista-title" data-quote-section hidden={!hasProducts}>
+    <SectionHead title="Mi cotización" id="lista-title" />
+    {hasIndex && <script type="application/json" data-quote-index set:html={jsonForScript(index)}></script>}
+    <ol
+      class="cotizar__rows"
+      aria-labelledby="lista-title"
+      data-quote-rows
+      data-label-variant="Variante de {nombre}"
+      data-label-quantity="Cantidad de {nombre}"
+      data-label-unit="Unidad de {nombre}"
+      data-label-remove="Quitar {nombre}"
+      data-label-minus="Disminuir cantidad de {nombre}"
+      data-label-plus="Aumentar cantidad de {nombre}"
+      data-label-merge="Unirlos: {nombre}"
+    >
+      {/* Los productos que la página no puede ubicar: un solo renglón después de los productos */}
+      <li class="cotizar__line" data-quote-unknown hidden>
+        <StatusLine icon="alert-circle" hidden={false}>
+          <button
+            class="text-btn"
+            slot="action"
+            type="button"
+            data-quote-remove-unknown
+            data-one="Quitarlo de mi cotización"
+            data-many="Quitarlos de mi cotización"
+          ><Icon name="trash" class="icon--18" /><span>Quitarlos de mi cotización</span></button>
+        </StatusLine>
+      </li>
+      {/* La línea de estado de la última acción que se puede deshacer: el script la pone en el lugar del renglón. Lleva
+          también la frase que va a la región viva cuando otra pestaña cambia la lista. */}
+      <li class="cotizar__line" data-quote-status-row hidden>
+        <StatusLine
+          icons={['trash', 'check']}
+          hidden={false}
+          tabindex="-1"
+          data-quote-status
+          data-unknown-removed="Quitaste los productos que no aparecen en esta página."
+          data-emptied="Vaciaste tu cotización."
+          data-changed-elsewhere="Tu cotización cambió en otra pestaña."
+        ><button class="text-btn" slot="action" type="button" data-quote-undo><Icon name="rotate-ccw" class="icon--18" /><span>Deshacer</span></button></StatusLine>
+      </li>
+    </ol>
+    {hasProducts && (
+      <Fragment>
+        <div data-quote-empty hidden>
+          <EmptyState
+            icon="clipboard-list"
+            title="Aún no agregas productos del catálogo."
+            text="Agrégalos desde su ficha o escribe abajo lo que necesitas."
+            action={{ href: routes.catalog, label: 'Explorar catálogo' }}
+            headingLevel={3}
+          />
+        </div>
+        <StatusLine icon="info" data-quote-blocked>Tu navegador no permite guardar tu cotización en este equipo. Escribe abajo los productos que necesitas.</StatusLine>
+      </Fragment>
+    )}
+    {/* También sin productos al compilar: ahí la página todavía puede escribir (quitar los productos que no ubica) y,
+        si el navegador no guarda ese cambio, tiene que decirlo. */}
+    <StatusLine icon="alert-circle" data-quote-write-failed>Tu navegador no permitió guardar el cambio. Copia o manda tu solicitud antes de salir de esta página.</StatusLine>
+    {hasProducts && (
+      <Fragment>
+        <div class="grid12" data-quote-tools hidden>
+          <ActionRow class="span-6 span-sm-12" href={routes.catalog}>Seguir agregando productos</ActionRow>
+          <ActionRow class="span-6 span-sm-12" type="button" icon="trash" data-quote-clear>Vaciar cotización</ActionRow>
+        </div>
+
+        {/* Un renglón de un producto del índice. Sin ningún script dentro (cada clon lo correría otra vez): el del selector de
+            cantidad es StepperScript, una vez al final de la página. Los ids y los nombres los pone el script. */}
+        <template data-quote-row-template>
+          <li class="cotizar__row grid12">
+            <div class="cotizar__cell cotizar__product">
+              {isPreview && <span class="cotizar__tag" data-row-tag><Tag>{EXAMPLE_TAG}</Tag></span>}
+              <a class="cotizar__name" href={routes.catalog} data-row-link>Producto</a>
+              <p class="cotizar__meta" data-row-meta></p>
+              <button class="text-btn cotizar__remove" type="button" data-quote-remove><Icon name="trash" class="icon--18" /><span>Quitar</span></button>
+            </div>
+            <Field label="Variante" for="fila-variante" class="cotizar__cell" data-row-variant-field>
+              <Select id="fila-variante" name="variante" data-row-variant>
+                <option value="">Talla o color por definir</option>
+              </Select>
+            </Field>
+            <div class="field cotizar__cell" data-row-variant-only>
+              <p class="field__label label">Variante</p>
+              <p class="cotizar__value" data-row-variant-text></p>
+            </div>
+            <div class="cotizar__cell cotizar__blank" aria-hidden="true" data-row-variant-none></div>
+            <Field label="Cantidad" for="fila-cantidad" error class="cotizar__cell">
+              <Stepper id="fila-cantidad" name="cantidad" max={MAX_QUANTITY} />
+            </Field>
+            <Field label="Unidad" for="fila-unidad" class="cotizar__cell">
+              <Select id="fila-unidad" name="unidad" data-row-unit></Select>
+            </Field>
+            <StatusLine icon="copy" class="cotizar__dup" data-row-dup>Este renglón es igual a otro de tu cotización.<button class="text-btn" slot="action" type="button" data-quote-merge><Icon name="layers" class="icon--18" /><span>Unirlos</span></button></StatusLine>
+          </li>
+        </template>
+      </Fragment>
+    )}
+    {hasIndex && (
+      <template data-quote-retired-template>
+        <li class="cotizar__row grid12">
+          <div class="cotizar__cell cotizar__product">
+            {isPreview && <span class="cotizar__tag" data-row-tag><Tag>{EXAMPLE_TAG}</Tag></span>}
+            <a class="cotizar__name" href={routes.catalog} data-row-link>Producto</a>
+            <p class="cotizar__meta" data-row-meta></p>
+            <button class="text-btn cotizar__remove" type="button" data-quote-remove><Icon name="trash" class="icon--18" /><span>Quitar</span></button>
+          </div>
+          <div class="cotizar__retired"><p>Producto retirado: no se incluye en tu mensaje.</p></div>
+        </li>
+      </template>
+    )}
+  </section>
+
+  <section class="section js-only" aria-labelledby={fieldsId}>
+    <SectionHead title={fieldsTitle} id={fieldsId} />
+    <div class="grid12">
+      <Field
+        label={hasProducts ? 'Otros productos o tu lista escrita' : 'Tu lista escrita'}
+        for="lista-nota"
+        hint="Un producto por renglón: marca y código o descripción, cantidad y unidad, talla o color."
+        class="span-12"
+      >
+        <textarea class="control control--area" id="lista-nota" name="nota" maxlength={DRAFT_LIMITS.note} autocomplete="off" aria-describedby="lista-nota-ayuda" data-draft-field="note"></textarea>
+      </Field>
+      <Field label="Lugar de entrega" for="lista-entrega" hint="Ciudad o código postal." class="span-6 span-sm-12">
+        <input class="control" type="text" id="lista-entrega" name="entrega" maxlength={DRAFT_LIMITS.delivery} autocomplete="off" aria-describedby="lista-entrega-ayuda" data-draft-field="delivery" />
+      </Field>
+      <Field label="Fecha requerida" for="lista-fecha" hint="Para cuándo lo necesitas." class="span-6 span-sm-12">
+        <input class="control" type="text" id="lista-fecha" name="fecha" maxlength={DRAFT_LIMITS.date} autocomplete="off" aria-describedby="lista-fecha-ayuda" data-draft-field="date" />
+      </Field>
+    </div>
+  </section>
+
+  <section class="section js-only" aria-labelledby="revisa-title">
+    <SectionHead title="Revisa y envía" id="revisa-title" />
+    <div class="mensaje grid12">
+      <MessageActions
+        class="mensaje__side span-4 span-md-12"
+        data-cotizar
+        whatsappHref={list.whatsapp}
+        mailHref={list.mailto}
+        whatsappLabel="Enviar mi lista por WhatsApp"
+        mailLabel="Enviar mi lista por correo"
+        longWhatsapp="Abrir WhatsApp para pegar mi lista"
+        longMail="Abrir mi correo para pegar mi lista"
+        notice="Tu lista es larga y no cabe en un enlace. Primero copia tu solicitud; después abre WhatsApp o tu correo y pégala."
+      />
+      <DraftMessage text={list.text} id="mensaje-title" title="Así queda tu mensaje" class="mensaje__draft span-8 span-md-12" data-message-draft />
+    </div>
+    <Note>Los botones abren tu aplicación con un borrador que puedes editar antes de enviarlo.</Note>
+    <Note icon="file-text">Si tienes tu lista en Excel, PDF o foto, adjúntala en la conversación de WhatsApp o en el correo.</Note>
+    <Note icon="shield-check"><span
+      data-storage-note
+      data-blocked="En este navegador no se guarda nada de lo que escribes aquí."
+      data-session-only={hasProducts ? 'Tu cotización no se guarda en este navegador. Lo que escribes en los campos se borra al cerrar esta pestaña.' : undefined}
+      data-list-only={hasProducts ? 'Los productos que agregas se guardan en este navegador. Lo que escribes en los campos no se guarda.' : undefined}
+    >{hasProducts
+      ? 'Los productos que agregas se guardan en este navegador. Lo que escribes en los campos se borra al cerrar esta pestaña.'
+      : 'Lo que escribes aquí se guarda solo en esta pestaña y se borra al cerrarla.'}</span> <a class="mensaje__privacy" href={routes.privacy}>Privacidad</a></Note>
+    <p class="vh" role="status" data-live></p>
+  </section>
+
+  <section class="section" aria-labelledby="atencion-title" data-cotizar>
     <SectionHead title={`Atención con ${contactDetails.contactName}`} id="atencion-title" eyebrow="Atención personal">
       <Monogram slot="side" />
     </SectionHead>
@@ -70,4 +275,812 @@ const items = [
       <ContactData class="contact__data span-7" whatsappHref={list.whatsapp} mailHref={list.mailto} />
     </div>
   </section>
+
+  {/* El selector de cantidad solo existe en los renglones (la plantilla de arriba): sin productos al compilar no hay
+      ninguno y su script no se carga. */}
+  {hasProducts && <StepperScript />}
+
+  <script>
+    import { composeListMessage, listItem } from '../../lib/contact-core.mjs';
+    import { createMessagePage } from '../../lib/message-page.mjs';
+    import {
+      canMerge, duplicateOf, duplicateStates, indexMaps, isRepeatedPress, listMessageItems, mergedMessage, mergeLines, nameLabel,
+      parseQuantity, parseQuoteIndex, QUANTITY_ERROR, quantityLabel, reconcileList, removedMessage, removeLines, restoredMessage,
+      rowControlNames, storageNoteText, undoLines, unknownLinesMessage, updateLine, variantText,
+    } from '../../lib/quote-list.mjs';
+    import { quoteStore } from '../../lib/quote-store.mjs';
+    import type { QuoteDuplicate, QuoteIndexProduct, QuoteIndexRetired, QuoteLine, QuoteRow, QuoteUndo } from '../../types/quote.ts';
+
+    /** Un renglón dibujado: el renglón guardado que muestra, su elemento y su estado de repetido. */
+    interface Drawn {
+      line: QuoteLine;
+      kind: 'ok' | 'retired';
+      element: HTMLLIElement;
+      duplicate: QuoteDuplicate;
+      /** Los nombres que ya llevan sus controles (`refreshNames`), para no escribirlos de nuevo si no cambian. */
+      named: string;
+    }
+
+    const main = document.querySelector('main');
+    const section = document.querySelector<HTMLElement>('[data-quote-section]');
+    const list = document.querySelector<HTMLOListElement>('[data-quote-rows]');
+    const unknownRow = document.querySelector<HTMLLIElement>('[data-quote-unknown]');
+    const statusRow = document.querySelector<HTMLLIElement>('[data-quote-status-row]');
+    const status = document.querySelector<HTMLElement>('[data-quote-status]');
+    const heading = document.getElementById('lista-title');
+    const fields = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('[data-draft-field]')];
+    /** El título de la sección de los campos: a donde va el foco cuando la sección de la lista se oculta entera. */
+    const fieldsHeading = fields[0]?.closest('section')?.querySelector<HTMLElement>('h2') ?? null;
+
+    if (main && section && list && unknownRow && statusRow && status && heading) {
+      const page = createMessagePage(main, { regions: '[data-cotizar]' });
+      const opening = page.template.split('\n')[0] ?? '';
+      const maps = indexMaps(parseQuoteIndex(document.querySelector('[data-quote-index]')?.textContent ?? null));
+      const rowTemplate = document.querySelector<HTMLTemplateElement>('[data-quote-row-template]');
+      const retiredTemplate = document.querySelector<HTMLTemplateElement>('[data-quote-retired-template]');
+      const empty = document.querySelector<HTMLElement>('[data-quote-empty]');
+      const blocked = document.querySelector<HTMLElement>('[data-quote-blocked]');
+      const writeFailed = document.querySelector<HTMLElement>('[data-quote-write-failed]');
+      const tools = document.querySelector<HTMLElement>('[data-quote-tools]');
+      const storageNote = document.querySelector<HTMLElement>('[data-storage-note]');
+      const longNotice = main.querySelector<HTMLElement>('[data-long-notice]');
+      const labels = list.dataset;
+      const available = quoteStore.available();
+      // Lo que este navegador guarda ahora, para la nota de abajo (`refreshStorageNote`): la lista y lo escrito en los
+      // campos, cada uno mientras el último intento de guardarlo haya funcionado. Al cargar, si se pueden leer.
+      let listKept = available;
+      let draftKept = quoteStore.draftAvailable();
+      /** La frase impresa de la nota: la de cuando se guardan las dos cosas. */
+      const printedNote = storageNote?.textContent ?? '';
+      // La sección se puede ocultar del todo solo cuando la página no tiene productos (está impresa oculta).
+      const collapsible = section.hidden;
+      heading.tabIndex = -1;
+      if (fieldsHeading) fieldsHeading.tabIndex = -1;
+
+      let lines: QuoteLine[] = quoteStore.read();
+      let rows: QuoteRow[] = [];
+      let drawn: (Drawn | null)[] = [];
+      /** La última acción que se puede deshacer (vive en memoria). */
+      let undo: QuoteUndo | null = null;
+      /** Dónde va la línea de estado: antes del renglón en esta posición (o al final, antes del de los desconocidos). */
+      let statusAt = 0;
+      let counter = 0;
+
+      const keyOf = (line: QuoteLine) => JSON.stringify([line.productId, line.variantId, line.quantity, line.unit]);
+
+      // ---- el mensaje ------------------------------------------------------------------------------------------
+      const field = (name: string) => fields.find(element => element.dataset.draftField === name)?.value ?? '';
+      // Qué productos van y cómo se escriben lo decide `listMessageItems` (quote-list.mjs, con pruebas).
+      const message = () => composeListMessage({
+        opening,
+        items: listMessageItems(rows).map(item => listItem(item)),
+        note: field('note'),
+        delivery: field('delivery'),
+        date: field('date'),
+      });
+      const refreshMessage = () => page.update(message());
+
+      // ---- los renglones -----------------------------------------------------------------------------------------
+      /** Marca y código del producto: «Marca · CÓDIGO», con el código en la letra de los códigos. */
+      function writeMeta(element: Element | null, product: QuoteIndexProduct | QuoteIndexRetired) {
+        if (!element) return;
+        const parts: Node[] = [];
+        if (product.brandName) parts.push(document.createTextNode(product.code ? `${product.brandName} · ` : product.brandName));
+        if (product.code) {
+          const code = document.createElement('span');
+          code.className = 't-code';
+          code.textContent = product.code;
+          parts.push(code);
+        }
+        element.replaceChildren(...parts);
+      }
+
+      /** Las partes comunes de un renglón: enlace, marca y código y «Ejemplo». */
+      function fillProduct(element: HTMLElement, product: QuoteIndexProduct | QuoteIndexRetired) {
+        const link = element.querySelector<HTMLAnchorElement>('[data-row-link]');
+        if (link) {
+          link.href = product.url || link.href;
+          link.textContent = product.name;
+        }
+        writeMeta(element.querySelector('[data-row-meta]'), product);
+        const tag = element.querySelector<HTMLElement>('[data-row-tag]');
+        if (tag) tag.hidden = !product.isExample;
+      }
+
+      /**
+       * Los nombres accesibles de los controles de cada renglón (`rowControlNames`, con pruebas): «Quitar», la cantidad
+       * con sus dos botones y «Unirlos» dicen de qué producto y, si tiene varias, de qué variante; con el mismo producto
+       * en dos tallas no se oye el mismo nombre en los dos renglones. Si dos renglones solo difieren en la unidad, también
+       * la dicen. La lista de variantes y la de unidades no repiten lo que ya dice su valor. Como el nombre de un renglón
+       * depende de los demás, se revisan todos después de cada cambio de la lista, y solo se toca lo que cambió.
+       */
+      function refreshNames() {
+        const names = rowControlNames(rows);
+        drawn.forEach((item, index) => {
+          const name = names[index];
+          if (!item || !name) return;
+          const named = JSON.stringify(name);
+          if (named === item.named) return;
+          item.named = named;
+          const set = (selector: string, pattern: string | undefined, text: string) =>
+            item.element.querySelector(selector)?.setAttribute('aria-label', nameLabel(pattern, text));
+          set('[data-quote-remove]', labels.labelRemove, name.row);
+          if (item.kind !== 'ok') return;
+          set('[data-row-variant]', labels.labelVariant, name.variant);
+          set('[data-stepper-input]', labels.labelQuantity, name.row);
+          set('[data-stepper-minus]', labels.labelMinus, name.row);
+          set('[data-stepper-plus]', labels.labelPlus, name.row);
+          set('[data-row-unit]', labels.labelUnit, name.unit);
+          set('[data-quote-merge]', labels.labelMerge, name.row);
+        });
+      }
+
+      /** Cambia el id de un control y lo que lo nombra: la etiqueta, la ayuda y el error. */
+      function renameControl(element: HTMLElement, control: HTMLElement | null, id: string) {
+        if (!control) return;
+        const old = control.id;
+        const label = element.querySelector<HTMLLabelElement>(`label[for="${old}"]`);
+        if (label) label.htmlFor = id;
+        const error = element.querySelector<HTMLElement>(`[id="${old}-error"]`);
+        if (error) error.id = `${id}-error`;
+        control.id = id;
+      }
+
+      function option(value: string, text: string) {
+        const element = document.createElement('option');
+        element.value = value;
+        element.textContent = text;
+        return element;
+      }
+
+      /** Un renglón nuevo desde su <template>; todavía fuera del documento. Los que la página no ubica no se dibujan. */
+      function build(row: Exclude<QuoteRow, { status: 'unknown' }>): Drawn | null {
+        const template = row.status === 'ok' ? rowTemplate : retiredTemplate;
+        const element = template?.content.firstElementChild?.cloneNode(true);
+        if (!(element instanceof HTMLLIElement)) return null;
+        fillProduct(element, row.product);
+        if (row.status === 'retired') return { line: row.line, kind: 'retired', element, duplicate: 'none', named: '' };
+
+        counter += 1;
+        const id = `fila-${counter}`;
+        const { product, line } = row;
+        // Variante: una lista con más de una, el texto con una sola, una celda blanca sin ninguna.
+        const variantField = element.querySelector<HTMLElement>('[data-row-variant-field]');
+        const variantOnly = element.querySelector<HTMLElement>('[data-row-variant-only]');
+        const variantNone = element.querySelector<HTMLElement>('[data-row-variant-none]');
+        if (product.variants.length > 1 && variantField) {
+          variantOnly?.remove();
+          variantNone?.remove();
+          const select = variantField.querySelector<HTMLSelectElement>('[data-row-variant]');
+          if (select) {
+            renameControl(variantField, select, `${id}-variante`);
+            select.append(...product.variants.map(variant => option(variant.id, variantText(product, variant))));
+            select.value = line.variantId;
+          }
+        } else if (product.variants.length === 1 && variantOnly) {
+          variantField?.remove();
+          variantNone?.remove();
+          const text = variantOnly.querySelector('[data-row-variant-text]');
+          if (text) text.textContent = variantText(product, row.variant);
+        } else {
+          variantField?.remove();
+          variantOnly?.remove();
+        }
+        // Cantidad: el valor; aria-disabled de los botones lo pone `stepper:sync` ya en el documento.
+        const input = element.querySelector<HTMLInputElement>('[data-stepper-input]');
+        if (input) {
+          renameControl(element, input, `${id}-cantidad`);
+          input.value = String(line.quantity);
+        }
+        // Unidad: las opciones del renglón, con la que corresponde a la guardada elegida.
+        const unit = element.querySelector<HTMLSelectElement>('[data-row-unit]');
+        if (unit) {
+          renameControl(element, unit, `${id}-unidad`);
+          unit.append(...row.units.map(text => option(text, text)));
+          unit.value = row.unit;
+        }
+        return { line, kind: 'ok', element, duplicate: 'none', named: '' };
+      }
+
+      /** Pone los elementos de la lista en su orden, moviendo solo los que no están en su lugar. */
+      function arrange() {
+        const elements = drawn.flatMap(item => (item ? [item.element] : []));
+        const at = Math.min(Math.max(0, drawnIndexToElementIndex(statusAt)), elements.length);
+        const wanted = [...elements.slice(0, at), statusRow!, ...elements.slice(at), unknownRow!];
+        let cursor = list!.firstElementChild;
+        for (const element of wanted) {
+          if (element === cursor) cursor = cursor.nextElementSibling;
+          else list!.insertBefore(element, cursor);
+        }
+      }
+      /** De una posición de la lista guardada a una posición entre los renglones dibujados (sin los desconocidos). */
+      function drawnIndexToElementIndex(position: number) {
+        return drawn.slice(0, position).filter(Boolean).length;
+      }
+
+      /**
+       * Qué renglones repiten a uno anterior y si se pueden unir (`duplicateStates`, una pasada con la misma regla que
+       * `duplicateOf`). Solo toca lo que cambió.
+       */
+      function refreshDuplicates() {
+        const states = duplicateStates(rows);
+        drawn.forEach((item, index) => {
+          if (!item || item.kind !== 'ok') return;
+          const state = states[index];
+          if (state === item.duplicate) return;
+          item.duplicate = state;
+          const notice = item.element.querySelector<HTMLElement>('[data-row-dup]');
+          if (notice) notice.hidden = state === 'none';
+          const merge = item.element.querySelector<HTMLElement>('[data-quote-merge]');
+          if (merge) merge.hidden = state !== 'merge';
+        });
+      }
+
+      /** Lo que rodea a la lista: renglón de desconocidos, estado vacío, aviso de almacenamiento, acciones de abajo. */
+      function refreshChrome() {
+        const unknown = rows.filter(row => row.status === 'unknown').length;
+        unknownRow!.hidden = unknown === 0;
+        if (unknown > 0) {
+          const text = unknownRow!.querySelector('[data-status-text]');
+          if (text) text.textContent = unknownLinesMessage(unknown);
+          const button = unknownRow!.querySelector<HTMLElement>('[data-quote-remove-unknown]');
+          const label = button?.querySelector('span');
+          if (button && label) label.textContent = (unknown === 1 ? button.dataset.one : button.dataset.many) ?? '';
+        }
+        if (empty) empty.hidden = !available || lines.length > 0;
+        if (blocked) blocked.hidden = available;
+        if (tools) tools.hidden = lines.length === 0;
+        if (collapsible) section!.hidden = lines.length === 0 && statusRow!.hidden && (writeFailed?.hidden ?? true);
+      }
+
+      /**
+       * Dibuja la lista `lines`: conserva el elemento de cada renglón que no cambió (con su foco y lo que se está
+       * escribiendo) y construye los demás. Las filas se insertan juntas y después, ya en el documento, un solo
+       * `stepper:sync` pone al día los botones de cantidad.
+       */
+      function render() {
+        rows = reconcileList(lines, maps).rows;
+        const pool = new Map<string, Drawn[]>();
+        for (const item of drawn) {
+          if (!item) continue;
+          const key = `${item.kind}:${keyOf(item.line)}`;
+          pool.set(key, [...(pool.get(key) ?? []), item]);
+        }
+        const fresh: Drawn[] = [];
+        drawn = rows.map(row => {
+          if (row.status === 'unknown') return null;
+          const kept = pool.get(`${row.status}:${keyOf(row.line)}`)?.shift();
+          if (kept) {
+            kept.line = row.line;
+            return kept;
+          }
+          const item = build(row);
+          if (item) fresh.push(item);
+          return item;
+        });
+        for (const items of pool.values()) for (const item of items) item.element.remove();
+        arrange();
+        refreshDuplicates();
+        refreshNames();
+        refreshChrome();
+        if (fresh.length > 0) list!.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
+        refreshMessage();
+      }
+
+      /** Después de un cambio que no cambia la estructura (variante, unidad, cantidad). */
+      function afterEdit() {
+        rows = reconcileList(lines, maps).rows;
+        drawn.forEach((item, index) => {
+          if (item) item.line = lines[index];
+        });
+        refreshDuplicates();
+        refreshNames();
+        refreshMessage();
+      }
+
+      /**
+       * Guarda la lista; si el navegador no deja, la página sigue con la de la memoria y lo dice, y la nota de lo que
+       * se guarda deja de decir que la lista se guarda. Cuando vuelve a guardar, el aviso se va, también de la región
+       * viva, y la nota vuelve a decirlo.
+       */
+      function store(next: QuoteLine[]) {
+        lines = next;
+        const saved = quoteStore.write(next);
+        setListKept(saved);
+        if (writeFailed && writeFailed.hidden !== saved) {
+          writeFailed.hidden = saved;
+          if (!saved) page.announce(writeFailed.querySelector('[data-status-text]')?.textContent ?? '', 'write');
+          else page.quiet('write');
+        }
+      }
+      /** El aviso de que no se guardó deja de valer cuando la página vuelve a mostrar lo guardado. */
+      function hideWriteFailed() {
+        if (!writeFailed || writeFailed.hidden) return;
+        writeFailed.hidden = true;
+        page.quiet('write');
+      }
+
+      // ---- la línea de estado y deshacer ------------------------------------------------------------------------
+      function showStatus(text: string, icon: 'trash' | 'check', position: number) {
+        const sentence = status!.querySelector('[data-status-text]');
+        if (sentence) sentence.textContent = text;
+        for (const element of status!.querySelectorAll<HTMLElement>('[data-status-icon]')) element.hidden = element.dataset.statusIcon !== icon;
+        statusRow!.hidden = false;
+        statusAt = position;
+      }
+      function hideStatus() {
+        statusRow!.hidden = true;
+        undo = null;
+      }
+      /** El foco a la línea de estado, cuando ya está en su lugar. Su frase no va además a la región viva. */
+      const focusStatus = () => status!.focus();
+
+      function drawnAt(index: number) {
+        return drawn[Math.min(Math.max(0, index), drawn.length - 1)] ?? null;
+      }
+
+      /**
+       * La frase «La cantidad volvió a …» de la región viva habla de un renglón (`restoredRow`). Deja de ser cierta cuando
+       * ese renglón cambia o se va, y entonces se borra; lo que pase en los demás renglones no la toca. Sin argumento se
+       * borra siempre: la lista entera cambió. Lo mismo vale para la frase que todavía espera a que el puntero suelte
+       * (`unsaid`): si su renglón cambia o se va antes, ya no se dice.
+       */
+      let restoredRow: Element | null = null;
+      /** La cantidad que volvió en un renglón que el puntero estaba por quitar: se dice al soltar si el renglón sigue ahí. */
+      let unsaid: { row: Element; sentence: string } | null = null;
+      function quietRestored(row?: Element | null) {
+        if (unsaid && (row === undefined || row === unsaid.row)) unsaid = null;
+        if (!restoredRow) return;
+        if (row !== undefined && row !== restoredRow && restoredRow.isConnected) return;
+        restoredRow = null;
+        page.quiet('quantity');
+      }
+
+      function removeRow(index: number) {
+        const row = rows[index];
+        if (!row || row.status === 'unknown') return;
+        const result = removeLines(lines, [index]);
+        quietRestored(drawn[index]?.element ?? null);
+        drawn[index]?.element.remove();
+        drawn.splice(index, 1);
+        store(result.lines);
+        undo = { kind: 'remove', removed: result.removed };
+        showStatus(removedMessage(row.product.name), 'trash', index);
+        render();
+        focusStatus();
+      }
+
+      function mergeRow(index: number) {
+        const keep = duplicateOf(rows, index);
+        if (keep < 0 || !canMerge(rows, index)) return;
+        const result = mergeLines(lines, keep, index);
+        if (!result.ok) return;
+        // Un renglón se va y el otro cambia de cantidad.
+        quietRestored(drawn[index]?.element ?? null);
+        quietRestored(drawn[keep]?.element ?? null);
+        const kept = result.lines[result.index];
+        const keptRow = rows[keep];
+        const keptUnit = keptRow?.status === 'ok' ? keptRow.unit : kept.unit;
+        // El renglón que se conserva cambia de cantidad en su lugar; el otro se va.
+        const keptDrawn = drawn[keep];
+        if (keptDrawn) setQuantity(keptDrawn, kept);
+        drawn[index]?.element.remove();
+        drawn.splice(index, 1);
+        store(result.lines);
+        undo = { kind: 'merge', index: result.index, previous: result.previous, removed: result.removed };
+        showStatus(mergedMessage(quantityLabel(kept.quantity, keptUnit)), 'check', index);
+        render();
+        focusStatus();
+      }
+
+      function removeUnknown() {
+        const indexes = rows.flatMap((row, index) => (row.status === 'unknown' ? [index] : []));
+        if (indexes.length === 0) return;
+        const result = removeLines(lines, indexes);
+        drawn = drawn.filter((_, index) => !indexes.includes(index));
+        store(result.lines);
+        undo = { kind: 'unknown', removed: result.removed };
+        showStatus(status!.dataset.unknownRemoved ?? '', 'trash', result.lines.length);
+        render();
+        focusStatus();
+      }
+
+      function emptyList() {
+        if (lines.length === 0) return;
+        const previous = lines;
+        quietRestored();
+        for (const item of drawn) item?.element.remove();
+        drawn = [];
+        store([]);
+        undo = { kind: 'empty', previous };
+        showStatus(status!.dataset.emptied ?? '', 'trash', 0);
+        render();
+        focusStatus();
+      }
+
+      /** La cantidad del renglón dibujado pasa a la de `line`, escrita desde el código (sin `input` ni `change`). */
+      function setQuantity(item: Drawn, line: QuoteLine) {
+        item.line = line;
+        const input = item.element.querySelector<HTMLInputElement>('[data-stepper-input]');
+        if (!input) return;
+        input.value = String(line.quantity);
+        hideError(input);
+        if (input.isConnected) input.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
+      }
+
+      function undoLast() {
+        const last = undo;
+        if (!last) return;
+        hideStatus();
+        // Qué lista queda, qué renglón recibe el foco y la cantidad del que se conservó: `undoLines` (con pruebas).
+        const { lines: next, focus, kept } = undoLines(lines, last);
+        if (last.kind === 'merge') {
+          const keptDrawn = drawn[last.index];
+          quietRestored(keptDrawn?.element ?? null);
+          if (keptDrawn && kept) setQuantity(keptDrawn, kept);
+        }
+        store(next);
+        render();
+        const item = focus >= 0 ? drawnAt(focus) : null;
+        // Después de quitar, «Quitar» del renglón que volvió; después de unir, su «Unirlos» (si ya no se puede unir,
+        // su «Quitar»); después de vaciar o de quitar los desconocidos, el título de la sección.
+        const merge = last.kind === 'merge' ? item?.element.querySelector<HTMLElement>('[data-quote-merge]') : null;
+        const target = merge && !merge.hidden ? merge : item?.element.querySelector<HTMLElement>('[data-quote-remove]');
+        (target ?? heading)!.focus();
+      }
+
+      // ---- la cantidad ---------------------------------------------------------------------------------------------
+      /** Lo que describe a un control además de su error (una ayuda, si un día la lleva): el error se agrega y se quita solo. */
+      const describedBy = (input: HTMLElement, errorId: string) =>
+        (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(id => id && id !== errorId);
+      /** La clase de una línea de error que ya no se ve pero conserva su lugar (Field.astro). */
+      const UNSEEN = 'field__error--unseen';
+      function showError(input: HTMLInputElement) {
+        const error = document.getElementById(`${input.id}-error`);
+        if (!error || (!error.hidden && !error.classList.contains(UNSEEN))) return;
+        error.classList.remove(UNSEEN);
+        const text = error.querySelector('[data-field-error]');
+        if (text) text.textContent = QUANTITY_ERROR;
+        error.hidden = false;
+        input.setAttribute('aria-invalid', 'true');
+        input.setAttribute('aria-describedby', [...describedBy(input, error.id), error.id].join(' '));
+        input.closest('.field')?.classList.add('field--invalid');
+        if (document.activeElement !== input) input.focus();
+      }
+      /** Alguna línea de error conserva su lugar sin verse (`hideError` con `keepPlace`), hasta que se quite del todo. */
+      let kept = false;
+      /**
+       * Quita el error de un campo. Con `keepPlace`, la línea del error deja de verse y de describir al campo, pero
+       * conserva su lugar mientras quitarla movería lo que el puntero tiene debajo: mientras oprime, y después mientras
+       * siga a la altura de la línea o más abajo (`collapseBelow`).
+       */
+      function hideError(input: HTMLInputElement, keepPlace = false) {
+        const error = document.getElementById(`${input.id}-error`);
+        if (!error || error.hidden) return;
+        input.removeAttribute('aria-invalid');
+        const rest = describedBy(input, error.id);
+        if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
+        else input.removeAttribute('aria-describedby');
+        input.closest('.field')?.classList.remove('field--invalid');
+        if (!keepPlace) return collapseError(error);
+        error.classList.add(UNSEEN);
+        kept = true;
+      }
+      /** La línea del error deja de ocupar su lugar. */
+      function collapseError(error: HTMLElement) {
+        error.hidden = true;
+        error.classList.remove(UNSEEN);
+        const text = error.querySelector('[data-field-error]');
+        if (text) text.textContent = '';
+      }
+
+      const indexOf = (target: Element) => {
+        const element = target.closest('li');
+        return drawn.findIndex(item => item?.element === element);
+      };
+
+      /**
+       * El visitante cambió el renglón que quedó de «Unirlos»: su línea de estado dice una cantidad que ya no es la del
+       * renglón, y «Deshacer» le devolvería la cantidad de antes de unir, borrando lo que acaba de escribir. La línea se
+       * va y la unión ya no se deshace (como con cualquier acción siguiente).
+       */
+      function endMergeUndo(index: number) {
+        if (undo?.kind === 'merge' && undo.index === index) hideStatus();
+      }
+
+      list.addEventListener('input', event => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || !input.matches('[data-stepper-input]')) return;
+        const index = indexOf(input);
+        if (index < 0) return;
+        quietRestored(drawn[index]?.element ?? null);
+        if (input.value.trim() === '') {
+          hideError(input);
+          return;
+        }
+        const quantity = parseQuantity(input.value);
+        if (quantity === null) {
+          showError(input);
+          return;
+        }
+        hideError(input);
+        if (quantity === lines[index].quantity) return;
+        const result = updateLine(lines, index, { quantity });
+        if (!result.ok) return;
+        endMergeUndo(index);
+        store(result.lines);
+        afterEdit();
+      });
+
+      // ---- el puntero -------------------------------------------------------------------------------------------------
+      // Quitar, unir, vaciar y deshacer cambian la lista de lugar: bajo el puntero queda otra cosa (el enlace de otro
+      // producto, «Deshacer», la cantidad de otro renglón). El segundo clic de un doble clic no es para eso: durante
+      // medio segundo, un clic repetido en ese mismo punto (`isRepeatedPress`, con pruebas) no activa nada ni mueve el
+      // foco, con ningún botón del ratón. Un clic en otro lugar, o después de esa pausa, cuenta como siempre; con el
+      // teclado no hay nada que cuidar. Se decide al oprimir, y el clic sigue a su presión: si el puntero oprimió dentro
+      // del medio segundo y soltó después, ese clic tampoco cuenta. Quien tiene el doble clic más lento en su sistema da
+      // el segundo clic después del medio segundo, pero el navegador lo cuenta como parte del mismo clic múltiple
+      // (`detail` mayor que 1): mientras todos los clics desde el que movió la lista hayan sido repetidos, uno así tampoco
+      // cuenta, hasta un segundo después de aquel.
+      let moved: { time: number; x: number; y: number } | null = null;
+      /** Todos los clics desde `moved` fueron repetidos: el siguiente todavía puede ser parte del mismo clic múltiple. */
+      let chained = false;
+      /** Lo que se decidió de la presión en curso (`null`: no hay ninguna): su clic corre la misma suerte. */
+      let strayPress: boolean | null = null;
+      const stray = (event: MouseEvent) => {
+        if (event.detail === 0) return;
+        const press = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+        let repeated: boolean;
+        if (event.type === 'mousedown') {
+          repeated = isRepeatedPress(moved, press, chained && event.detail > 1);
+          chained = chained && repeated;
+          strayPress = repeated;
+        } else {
+          repeated = strayPress ?? isRepeatedPress(moved, press);
+          strayPress = null;
+        }
+        if (!repeated) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      };
+      // `auxclick` es el clic de los demás botones: el de en medio abriría en otra pestaña el enlace que quedó debajo.
+      document.addEventListener('mousedown', stray, true);
+      document.addEventListener('click', stray, true);
+      document.addEventListener('auxclick', stray, true);
+
+      // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, desde que oprime hasta que suelta: dice si el foco sale de
+      // un campo porque el visitante está por activar un control con el puntero. Se sigue con `mousedown` y `mouseup`, que
+      // el navegador envía también con el dedo y con el lápiz: `mousedown` es el que saca el foco del campo.
+      let pressed: Element | null = null;
+      document.addEventListener('mousedown', event => {
+        pressed = event.target instanceof Element ? event.target : null;
+      }, true);
+      /** Las líneas de error que conservaban su lugar se quitan del todo. */
+      function collapseUnseen() {
+        if (!kept) return;
+        kept = false;
+        for (const error of list!.querySelectorAll<HTMLElement>(`.${UNSEEN}`)) collapseError(error);
+      }
+      /**
+       * Se quitan las líneas que conservan su lugar y están más abajo que el puntero (`y`, su altura en la ventana).
+       * Cuando una línea se va, sube lo que está debajo de ella y nada de lo que está arriba: con el puntero arriba de la
+       * línea, lo que tiene debajo no se mueve. Las líneas que están a su altura o más arriba se quedan, porque quitarlas
+       * le cambiaría al visitante lo que está por oprimir (el control de al lado, el renglón siguiente).
+       */
+      function collapseBelow(y: number) {
+        if (!kept) return;
+        kept = false;
+        for (const error of list!.querySelectorAll<HTMLElement>(`.${UNSEEN}`)) {
+          if (error.getBoundingClientRect().top > y) collapseError(error);
+          else kept = true;
+        }
+      }
+      /**
+       * La cantidad que volvió sin decirse se dice si su renglón sigue en la lista (el visitante oprimió «Quitar» y soltó
+       * fuera del botón).
+       */
+      function sayUnsaid() {
+        const waiting = unsaid;
+        unsaid = null;
+        if (!waiting?.row.isConnected) return;
+        restoredRow = waiting.row;
+        page.announce(waiting.sentence, 'quantity');
+      }
+      // El puntero soltó. El clic llega justo después de `mouseup`, en el mismo turno: lo demás va en el turno siguiente,
+      // con el clic ya atendido. Las líneas de error que quedaron más abajo que el puntero se quitan ahí mismo; las demás
+      // conservan su lugar, y así ni otro clic en el mismo control ni el clic en el control de al lado caen en otro lado.
+      // Después de un arrastre no se sabe dónde quedó el puntero (`dragend` no siempre lo dice): se quitan todas.
+      const release = (event: MouseEvent) => {
+        if (!pressed) return;
+        pressed = null;
+        const y = event.type === 'dragend' ? null : event.clientY;
+        setTimeout(() => {
+          sayUnsaid();
+          if (y === null) collapseUnseen();
+          else collapseBelow(y);
+        }, 0);
+      };
+      for (const type of ['mouseup', 'dragend', 'contextmenu'] as const) document.addEventListener(type, release, true);
+      // El puntero se movió: las líneas que quedaron más abajo que él ya se pueden quitar. Solo el ratón y el lápiz avisan
+      // dónde están sin tocar; con el dedo, las líneas que quedan se quitan con el siguiente toque más arriba que ellas, al
+      // desplazar la página o al usar el teclado. Un puntero que se mueve sin ningún botón oprimido ya soltó, aunque
+      // `mouseup` no haya llegado (se lo quedó la lista de un `<select>` al abrirse, por ejemplo).
+      document.addEventListener('pointermove', event => {
+        if (event.pointerType === 'touch' || (!pressed && !kept)) return;
+        if (pressed) {
+          if (event.buttons !== 0) return;
+          pressed = null;
+          sayUnsaid();
+        }
+        collapseBelow(event.clientY);
+      }, { capture: true, passive: true });
+      // Al desplazarse la página, lo que estaba bajo el puntero ya no lo está.
+      document.addEventListener('scroll', () => {
+        if (kept && !pressed) collapseUnseen();
+      }, { capture: true, passive: true });
+      window.addEventListener('blur', () => {
+        pressed = null;
+        collapseUnseen();
+        sayUnsaid();
+      });
+      // Con una tecla ya no hay ningún clic que cuidar, y todo queda en su lugar de una vez. Las teclas modificadoras y las
+      // de bloqueo no cuentan, ni una tecla sostenida mientras el puntero oprime: con Ctrl + clic, el teclado sigue
+      // enviando la tecla sostenida entre oprimir y soltar.
+      const idleKeys = [
+        'Alt', 'AltGraph', 'CapsLock', 'Control', 'Fn', 'FnLock', 'Hyper', 'Meta', 'NumLock', 'OS', 'ScrollLock', 'Shift', 'Super',
+        'Symbol', 'SymbolLock',
+      ];
+      document.addEventListener('keydown', event => {
+        if (idleKeys.includes(event.key) || (pressed && event.repeat)) return;
+        pressed = null;
+        collapseUnseen();
+        sayUnsaid();
+      }, true);
+
+      // Al salir del campo con una cantidad vacía o no válida, vuelve la última válida, y se dice.
+      list.addEventListener('focusout', event => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || !input.matches('[data-stepper-input]') || !input.isConnected) return;
+        const index = indexOf(input);
+        if (index < 0 || parseQuantity(input.value) !== null) return;
+        const line = lines[index];
+        const row = rows[index];
+        const element = input.closest('li');
+        input.value = String(line.quantity);
+        // Con el puntero oprimiendo, la línea del error conserva su lugar. Si el renglón se encogiera ahora, todo lo que
+        // está debajo subiría entre oprimir y soltar, el clic caería en otro lado y el control que el visitante oprimió
+        // (otro renglón, «Vaciar cotización», un envío) no haría nada; si se encogiera al soltar o al mover el puntero,
+        // ahí caería su siguiente clic. Se quita cuando el puntero queda más arriba que ella (`collapseBelow`).
+        hideError(input, pressed !== null);
+        input.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
+        const sentence = restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit));
+        // Si el foco sale porque el puntero está oprimiendo «Quitar» o «Unirlos» de este mismo renglón, o «Vaciar
+        // cotización», el renglón está por irse y su cantidad no se anuncia: se oiría junto con «Quitaste …». Si al soltar
+        // el renglón sigue ahí, se dice entonces (`sayUnsaid`). Con el teclado sí se anuncia aunque el foco llegue a uno de
+        // esos botones (el renglón sigue ahí hasta que se active), y la frase se borra si después el renglón cambia o se
+        // va (`quietRestored`).
+        const leaving = pressed?.closest('[data-quote-remove], [data-quote-merge], [data-quote-clear]');
+        if (element && leaving && (leaving.matches('[data-quote-clear]') || element.contains(leaving))) {
+          unsaid = { row: element, sentence };
+          return;
+        }
+        restoredRow = element;
+        page.announce(sentence, 'quantity');
+      });
+
+      // Variante y unidad se guardan al cambiar; nunca se unen renglones (una lista cambia con cada flecha).
+      list.addEventListener('change', event => {
+        const select = event.target;
+        if (!(select instanceof HTMLSelectElement)) return;
+        const index = indexOf(select);
+        if (index < 0) return;
+        let patch: Partial<QuoteLine> | null = null;
+        if (select.matches('[data-row-variant]')) patch = { variantId: select.value };
+        else if (select.matches('[data-row-unit]')) patch = { unit: select.value };
+        if (!patch) return;
+        const result = updateLine(lines, index, patch);
+        if (!result.ok) return;
+        quietRestored(drawn[index]?.element ?? null);
+        endMergeUndo(index);
+        store(result.lines);
+        // Con otra variante u otra unidad, `afterEdit` vuelve a nombrar los controles de los renglones que lo necesitan.
+        afterEdit();
+      });
+
+      document.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        const remove = target.closest('[data-quote-remove]');
+        const merge = target.closest('[data-quote-merge]');
+        if (remove && list.contains(remove)) removeRow(indexOf(remove));
+        else if (merge && list.contains(merge)) mergeRow(indexOf(merge));
+        else if (target.closest('[data-quote-remove-unknown]')) removeUnknown();
+        else if (target.closest('[data-quote-clear]')) emptyList();
+        else if (target.closest('[data-quote-undo]')) undoLast();
+        else return;
+        // La lista cambió de lugar bajo el puntero: un clic repetido aquí mismo no activa nada (`stray`).
+        if (event.detail > 0) {
+          moved = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+          chained = true;
+        }
+      });
+
+      // Otra pestaña cambió la lista, o el navegador restauró la página: se muestra lo guardado, sin escribir nada.
+      // El foco no se pierde: si lo que lo tenía se va con el cambio (su renglón cambió o ya no está, o era la línea de
+      // estado, que se oculta), pasa al mismo control del renglón que quedó en su lugar si es del mismo producto; si no,
+      // al título de la sección, y si la sección entera se oculta, al título de la sección de los campos. Un cambio de
+      // otra pestaña se dice en la región viva: llega sin que el visitante haya hecho nada en esta página. Si además deja
+      // el mensaje sin caber en un enlace, se dice junto con el aviso de la lista larga.
+      const rowControls = [
+        '[data-row-link]', '[data-quote-remove]', '[data-row-variant]', '[data-stepper-minus]', '[data-stepper-input]',
+        '[data-stepper-plus]', '[data-row-unit]', '[data-quote-merge]',
+      ];
+      quoteStore.subscribe((stored, { source }) => {
+        if (source === 'write') return;
+        const active = document.activeElement;
+        const held = active instanceof HTMLElement && section.contains(active) ? active : null;
+        const heldAt = held ? indexOf(held) : -1;
+        const heldProduct = heldAt >= 0 ? lines[heldAt]?.productId : undefined;
+        const heldControl = held ? rowControls.find(selector => held.matches(selector)) : undefined;
+        const changed = JSON.stringify(stored.map(keyOf)) !== JSON.stringify(lines.map(keyOf));
+        const wasLong = longNotice ? !longNotice.hidden : false;
+        hideStatus();
+        hideWriteFailed();
+        setListKept(available);
+        if (changed) quietRestored();
+        lines = stored;
+        render();
+        if (held && (!held.isConnected || held.closest('[hidden]'))) {
+          const twin = heldControl && heldProduct !== undefined && lines[heldAt]?.productId === heldProduct
+            ? drawn[heldAt]?.element.querySelector<HTMLElement>(heldControl) ?? null
+            : null;
+          (twin && !twin.closest('[hidden]') ? twin : section.hidden ? fieldsHeading : heading)?.focus();
+        }
+        if (changed && source === 'storage' && status.dataset.changedElsewhere) {
+          // Si con el cambio el mensaje dejó de caber en un enlace, `render` acaba de pedir que se diga el aviso de la
+          // lista larga, y una segunda frase lo borraría antes de que se lea. Se dicen juntas, como frase del estado
+          // largo: se borra cuando el mensaje vuelve a caber.
+          const notice = !wasLong && longNotice && !longNotice.hidden ? longNotice.querySelector('[data-status-text]')?.textContent ?? '' : '';
+          if (notice) page.announce(`${status.dataset.changedElsewhere} ${notice}`, 'long');
+          else page.announce(status.dataset.changedElsewhere);
+        }
+      });
+
+      // ---- los campos ------------------------------------------------------------------------------------------------
+      // La nota de lo que se guarda dice lo que pasa en ESTE navegador. La lista (localStorage) y lo escrito en los campos
+      // (sessionStorage) pueden faltar por separado, así que cada frase habla solo de lo que sí ocurre: la impresa cuando
+      // se guardan las dos cosas; `data-session-only` cuando solo se guardan los campos; `data-list-only` cuando solo se
+      // guarda la lista, y `data-blocked` cuando no se guarda nada (`storageNoteText`). Una página sin productos imprime
+      // solo la última: su frase de siempre ya habla solo de los campos. La nota sigue al último intento de guardar: si el
+      // navegador rechaza un cambio de la lista o de los campos, deja de decir que eso se guarda, y lo vuelve a decir
+      // cuando un cambio posterior sí se guarda o cuando la página vuelve a mostrar la lista guardada.
+      function refreshStorageNote() {
+        if (!storageNote) return;
+        const { sessionOnly, listOnly, blocked: nothing } = storageNote.dataset;
+        const text = storageNoteText({ listKept, draftKept }, { printed: printedNote, sessionOnly, listOnly, blocked: nothing ?? '' });
+        if (storageNote.textContent !== text) storageNote.textContent = text;
+      }
+      function setListKept(kept: boolean) {
+        if (listKept === kept) return;
+        listKept = kept;
+        refreshStorageNote();
+      }
+      refreshStorageNote();
+      const saved = quoteStore.readDraft();
+      for (const element of fields) {
+        const name = element.dataset.draftField;
+        if (name === 'note' || name === 'delivery' || name === 'date') element.value = saved[name];
+        element.addEventListener('input', () => {
+          const kept = quoteStore.writeDraft({ note: field('note'), delivery: field('delivery'), date: field('date') });
+          if (kept !== draftKept) {
+            draftKept = kept;
+            refreshStorageNote();
+          }
+          refreshMessage();
+        });
+      }
+
+      render();
+    }
+  </script>
 </BaseLayout>

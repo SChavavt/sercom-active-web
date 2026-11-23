@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { displayQuery, isActiveQuery, resultSummary, resultSummaryParts } from '../src/lib/search.mjs';
+import { displayQuery, isActiveQuery, matchesSearchText, MAX_QUERY_LENGTH, queryTokens, resultSummary, resultSummaryParts } from '../src/lib/search.mjs';
 import { cleanQuery } from '../src/lib/text.mjs';
 
 test('resultSummary sin búsqueda: conteo de productos con el plural correcto', () => {
@@ -42,7 +42,30 @@ test('isActiveQuery y displayQuery', () => {
   assert.equal(isActiveQuery(undefined), false);
   assert.equal(displayQuery('  a \t b\n'), 'a b');
   assert.equal(displayQuery(undefined), '');
-  assert.equal(displayQuery('x'.repeat(500)).length, 500);
+});
+
+test('una búsqueda se recorta a MAX_QUERY_LENGTH caracteres completos, y lo que se muestra es lo que se busca', () => {
+  assert.equal(MAX_QUERY_LENGTH, 200);
+  assert.equal(displayQuery('x'.repeat(200)), 'x'.repeat(200));
+  assert.equal(displayQuery('x'.repeat(500)), 'x'.repeat(200));
+  // Caracteres completos (puntos de código): un emoji de dos unidades no se parte, y 150 de ellos caben enteros.
+  const hats = displayQuery('👷'.repeat(250));
+  assert.equal(Array.from(hats).length, 200);
+  assert.ok(hats.endsWith('👷'));
+  assert.doesNotThrow(() => encodeURIComponent(hats));
+  assert.equal(displayQuery('👷'.repeat(150)), '👷'.repeat(150));
+  // El corte no deja un espacio al final, y volver a leer lo recortado no lo cambia (la dirección canónica es estable).
+  assert.equal(displayQuery(`${'x'.repeat(199)} guante`), 'x'.repeat(199));
+  const long = `${'guante '.repeat(40)}casco`;
+  assert.equal(displayQuery(long).length, 200);
+  assert.equal(displayQuery(displayQuery(long)), displayQuery(long));
+  // Lo que pasa del límite no se busca: «casco» quedó fuera y no filtra.
+  assert.deepEqual(queryTokens(long), queryTokens(displayQuery(long)));
+  assert.equal(queryTokens(long).includes('casco'), false);
+  assert.equal(matchesSearchText('guante de nitrilo', long), true);
+  assert.equal(matchesSearchText('guante de nitrilo', `casco ${long}`), false);
+  assert.equal(resultSummary(1, long), `1 resultado para “${displayQuery(long)}”`);
+  assert.equal(isActiveQuery(`${' '.repeat(300)}guante`), true);
 });
 
 test('displayQuery quita el carácter de reemplazo de una secuencia % mal formada (?q=%E0%A4%A)', () => {

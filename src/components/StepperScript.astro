@@ -1,0 +1,120 @@
+---
+// Script de los selectores de cantidad (Stepper.astro). SOLO SCRIPT, sin marcado: una página que tiene Stepper lo
+// imprime UNA vez, fuera de todo <template> y de todo enlace (dentro de un <template> Astro lo imprimiría otra vez y
+// cada clon lo ejecutaría de nuevo). Mismo patrón que PageLinkScript.astro.
+//
+// Un solo escuchador por tipo de evento, en `document`: un Stepper clonado después funciona sin registrarlo.
+//   - Clic en `[data-stepper-minus]` o `[data-stepper-plus]`: con un número dentro de `data-min`…`data-max` resta o
+//     suma 1 sin salir de ese rango y escribe el resultado solo con cifras («1,200» + 1 → «1201»). Con un número fuera
+//     del rango («0», «120000» con un máximo de 99999) escribe el límite más cercano: el visitante ve hasta dónde
+//     llega. Con cualquier otra cosa (vacío, letras, «1.5») escribe el mínimo. Después lanza desde el campo los eventos
+//     `input` y `change` (con burbujeo): la página reacciona a los botones igual que a lo que se escribe. En el límite
+//     el botón no hace nada. Lo decide el valor del campo, no el atributo aria-disabled que tenga el botón: una fila
+//     clonada con el atributo de otro valor funciona igual. Con el campo `disabled` o `readonly`, ningún botón hace
+//     nada y los dos se ven apagados.
+//   - Evento `input` de un `[data-stepper-input]`, y evento `stepper:sync` (CustomEvent con burbujeo que una página
+//     lanza después de escribir `input.value` desde su código: al dibujar una lista, al deshacer): pone
+//     aria-disabled="true" en «Disminuir» en el mínimo y en «Aumentar» en el máximo, y lo quita fuera de ellos.
+//     `stepper:sync` se lanza desde el campo o desde cualquier elemento que contenga varios (la lista entera: se ponen
+//     al día todos los suyos), y SIEMPRE cuando ya están en el documento: un evento lanzado desde un fragmento o desde
+//     una fila sin insertar no llega a `document`.
+//     Una página nunca lanza `input` ni `change` por su cuenta: si guarda en cada `input`, guardaría mientras dibuja.
+// El script nunca reescribe lo que el visitante escribe ni muestra un error: validar lo escrito es trabajo de la
+// página (el contenedor de error de Field).
+// Cantidad válida: la decide `parseQuantity` de src/lib/quote-list.mjs, la única regla de cantidad del sitio (de 1 a
+// 5 cifras o un número con coma de miles, «1,200» es 1200; entre 1 y 99999), y además debe estar dentro de
+// `data-min`…`data-max` del Stepper. Los dos límites se leen siempre dentro de 1…99999 y con el máximo nunca menor
+// que el mínimo (con `data-max` menor que `data-min`, el máximo es el mínimo).
+//
+// Uso:  <StepperScript />   (una vez, después de los Stepper o al final de la página)
+//       lista.append(filas); lista.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
+---
+<script>
+  import { MAX_QUANTITY, parseQuantity } from '../lib/quote-list.mjs';
+
+  const STEPPER = '[data-stepper]';
+  const INPUT = '[data-stepper-input]';
+  const MINUS = '[data-stepper-minus]';
+  const PLUS = '[data-stepper-plus]';
+
+  /** Mínimo y máximo de un Stepper (data-min y data-max): dentro de 1…MAX_QUANTITY y con el máximo ≥ el mínimo. */
+  function bounds(box: HTMLElement) {
+    const limit = (value: string | undefined, fallback: number) => {
+      const number = Number.parseInt(value ?? '', 10);
+      return Number.isInteger(number) && number >= 1 ? Math.min(number, MAX_QUANTITY) : fallback;
+    };
+    const min = limit(box.dataset.min, 1);
+    return { min, max: Math.max(min, limit(box.dataset.max, MAX_QUANTITY)) };
+  }
+
+  /** La cantidad del campo si es válida y está dentro del Stepper; si no, null. */
+  function current(box: HTMLElement, input: HTMLInputElement) {
+    const { min, max } = bounds(box);
+    const quantity = parseQuantity(input.value);
+    return quantity !== null && quantity >= min && quantity <= max ? quantity : null;
+  }
+
+  /**
+   * El número que está escrito, aunque quede fuera del rango o tenga más cifras de las que acepta `parseQuantity`
+   * («0», «120000», «120,000»); null si lo escrito no es un número entero.
+   */
+  function writtenNumber(value: string) {
+    const text = value.trim();
+    if (/^[0-9]{1,15}$/.test(text)) return Number(text);
+    if (/^[1-9][0-9]{0,2}(?:,[0-9]{3}){1,4}$/.test(text)) return Number(text.replaceAll(',', ''));
+    return null;
+  }
+
+  function setDisabled(button: Element | null, disabled: boolean) {
+    if (!button) return;
+    if (disabled) button.setAttribute('aria-disabled', 'true');
+    else button.removeAttribute('aria-disabled');
+  }
+
+  /** aria-disabled de los dos botones según el valor del campo (los dos apagados si el campo no se puede cambiar). */
+  function sync(input: HTMLInputElement) {
+    const box = input.closest<HTMLElement>(STEPPER);
+    if (!box) return;
+    const { min, max } = bounds(box);
+    const quantity = current(box, input);
+    const locked = input.disabled || input.readOnly;
+    setDisabled(box.querySelector(MINUS), locked || (quantity !== null && quantity <= min));
+    setDisabled(box.querySelector(PLUS), locked || (quantity !== null && quantity >= max));
+  }
+
+  document.addEventListener('click', event => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>(`${MINUS}, ${PLUS}`) : null;
+    if (!button) return;
+    const box = button.closest<HTMLElement>(STEPPER);
+    const input = box?.querySelector<HTMLInputElement>(INPUT);
+    if (!box || !input) return;
+    if (!input.disabled && !input.readOnly) {
+      const { min, max } = bounds(box);
+      const number = writtenNumber(input.value);
+      const step = button.matches(PLUS) ? 1 : -1;
+      // Dentro del rango, un paso; fuera de él, el límite más cercano; sin un número, el mínimo.
+      const next = number === null ? min : number < min ? min : number > max ? max : Math.min(max, Math.max(min, number + step));
+      if (next !== number) {
+        input.value = String(next);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    // Siempre al final: el estado de los botones no depende de que el evento `input` llegue hasta `document`.
+    sync(input);
+  });
+
+  for (const type of ['input', 'stepper:sync']) {
+    document.addEventListener(type, event => {
+      const { target } = event;
+      if (target instanceof HTMLInputElement && target.matches(INPUT)) sync(target);
+      else if (type === 'stepper:sync' && (target instanceof Element || target instanceof Document)) {
+        for (const input of target.querySelectorAll<HTMLInputElement>(INPUT)) sync(input);
+      }
+    });
+  }
+
+  // Estado inicial de los que ya están en la página (el marcado ya lo trae; esto cubre un valor que el navegador
+  // haya restaurado al volver a la página).
+  for (const input of document.querySelectorAll<HTMLInputElement>(INPUT)) sync(input);
+</script>

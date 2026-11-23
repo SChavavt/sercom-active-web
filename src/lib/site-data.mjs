@@ -1,9 +1,16 @@
 // @ts-check
 // Datos públicos del sitio: el único módulo de datos que usan las páginas y los componentes.
 //
-// SOLO PARA COMPILACIÓN (frontmatter de archivos .astro). Un <script> de navegador no debe importarlo:
-// arrastraría los archivos de datos completos al JavaScript público. Para el navegador existen
-// `routes.mjs`, `search.mjs`, `text.mjs` y `contact-core.mjs`.
+// Exporta `mode`, `isPreview`, `categories`, `brands`, `products`, `retiredProducts`, `paths`, `getCategory`,
+// `getBrand`, `getProduct`, `getRetiredProduct`, `productsByCategory`, `productsByBrand`, `featuredProducts`, `routes`,
+// `PREVIEW_NOTICE`, `DEVELOPMENT_NOTICE` y `EXAMPLE_TAG`.
+//
+// SOLO PARA COMPILACIÓN (frontmatter de archivos .astro). Un <script> de navegador no debe alcanzarlo, ni
+// directamente ni a través de otro módulo: arrastraría los archivos de datos completos al JavaScript público. Los
+// scripts del navegador solo alcanzan los módulos sin datos de `BROWSER_MODULES` (tests/build-mode.test.mjs): hoy
+// `text.mjs`, `search.mjs`, `routes.mjs`, `contact-core.mjs`, `catalog-filters.mjs`, `quote-list.mjs`,
+// `quote-store.mjs` y `message-page.mjs`. Lo que una página necesita en el navegador viaja en el HTML (`data-*` o un
+// bloque `<script type="application/json">`, como el índice público de «Cotizar mi lista»).
 //
 // Modos (ver docs/datos-y-modos.md):
 //   - producción: categorías aprobadas y fichas aprobadas, nada más;

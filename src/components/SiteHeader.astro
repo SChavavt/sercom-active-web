@@ -9,11 +9,16 @@
 // en «Categorías», una ficha en «Catálogo»); la marca se ve a todos los anchos (ver components.css y responsive.css).
 // El script es mejora progresiva: sin JavaScript la navegación y la búsqueda quedan visibles y
 // «Categorías» funciona como <details> nativo.
+// «Cotizar mi lista» lleva el número de productos de la lista guardada (QuoteCount) en el bloque sólido y en la fila
+// del menú de tableta y celular (y Dock, en la barra fija); su script (QuoteCountScript) se imprime una vez, al final
+// de este encabezado. Oculto con la lista vacía y sin JavaScript: la cabecera es la de siempre.
 import logo from '../assets/brand/logo.svg';
 import { contactDetails, contactLinks } from '../lib/contact.mjs';
-import { SEARCH_PARAM } from '../lib/search.mjs';
+import { MAX_QUERY_LENGTH, SEARCH_PARAM } from '../lib/search.mjs';
 import { categories, products, routes } from '../lib/site-data.mjs';
 import Icon from './Icon.astro';
+import QuoteCount from './QuoteCount.astro';
+import QuoteCountScript from './QuoteCountScript.astro';
 import { categoryIcon } from '../lib/icons.ts';
 
 const path = Astro.url.pathname;
@@ -84,7 +89,7 @@ const searchHint = 'Buscar en el catálogo';
           </li>
         )}
         <li><a class="masthead__nav-link" href={routes.brands} aria-current={current(routes.brands)}>Marcas</a></li>
-        <li class="masthead__nav-item--quote"><a class="masthead__nav-link" href={routes.quoteList} aria-current={current(routes.quoteList)}>Cotizar mi lista</a></li>
+        <li class="masthead__nav-item--quote"><a class="masthead__nav-link" href={routes.quoteList} aria-current={current(routes.quoteList)}>Cotizar mi lista <QuoteCount /></a></li>
         <li><a class="masthead__nav-link" href={routes.contact} aria-current={current(routes.contact)}>Contacto</a></li>
       </ul>
     </nav>
@@ -93,7 +98,7 @@ const searchHint = 'Buscar en el catálogo';
       <form class="masthead__search span-3" id="buscador" role="search" aria-label="Buscar en el catálogo" action={routes.catalog} method="get">
         <label class="vh" for="q">{searchHint}</label>
         <span class="masthead__search-field">
-          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} autocomplete="off" enterkeyhint="search" />
+          <input class="masthead__search-input" id="q" name={SEARCH_PARAM} type="search" placeholder={searchHint} maxlength={MAX_QUERY_LENGTH} autocomplete="off" enterkeyhint="search" />
           <span class="masthead__search-hint" aria-hidden="true"><span>{searchHint}</span></span>
         </span>
         <button class="masthead__search-btn" type="submit" aria-label="Buscar"><Icon name="search" /></button>
@@ -101,9 +106,12 @@ const searchHint = 'Buscar en el catálogo';
     )}
 
     <a class="masthead__wa" href={whatsapp}><Icon name="whatsapp" class="icon--24" /><span class="label">WhatsApp</span></a>
-    <a class="masthead__cta span-2" href={routes.quoteList} aria-current={current(routes.quoteList)}><Icon name="clipboard-list" /><span>Cotizar mi lista</span></a>
+    <a class="masthead__cta span-2" href={routes.quoteList} aria-current={current(routes.quoteList)}><Icon name="clipboard-list" /><span>Cotizar mi lista <QuoteCount /></span></a>
   </div>
 </header>
+
+{/* Una vez por página, fuera de los enlaces: el número de «Cotizar mi lista» aquí, en el menú y en la barra fija. */}
+<QuoteCountScript />
 
 <script>
   // Mejora progresiva del encabezado (tableta y celular: menú y búsqueda; computadora: panel Categorías).

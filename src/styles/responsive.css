@@ -364,6 +364,10 @@
   .empty { grid-template-columns: auto minmax(0, 1fr); row-gap: var(--s-6); padding: var(--s-8) var(--pad); }
   .empty__action { grid-column: 2; justify-self: start; }
   .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-md); }
+  /* formularios (components.css 4.18): objetivos táctiles de 44 px y las filas con casilla como las de la barra
+     lateral del catálogo en estos anchos */
+  .check-row { min-height: 48px; font-size: 1rem; }
+  .text-btn { min-height: 44px; }
 }
 @media (max-width: 699px) {
   .page-head__main { padding: var(--s-7) var(--pad) var(--s-5); }
@@ -447,6 +451,27 @@
 
   /* logotipos: el azul y la tinta del dibujo se leen sobre su placa blanca, sea cual sea el fondo del sistema */
   .masthead__logo img, .footer__logo img { forced-color-adjust: none; background: var(--white); outline: var(--s-2) solid var(--white); }
+
+  /* formularios (components.css 4.18). Los controles ya reciben su contorno arriba; el selector de cantidad pierde
+     los filetes de su fondo azul y quedan los contornos de sus tres casillas. Las filas con casilla muestran la
+     casilla nativa del sistema (marcada, foco) en lugar del cuadro dibujado. La barra de error y lo apagado toman
+     colores del sistema. Un control sin borde propio no tiene relleno a los lados: aquí lo recibe, para que el texto
+     no toque su contorno, y el contorno de un botón de texto se separa de sus letras. */
+  .control { padding-inline: var(--s-2); }
+  .select__control { padding-right: calc(20px + var(--s-3) + var(--s-2)); }
+  .select__icon { right: var(--s-2); }
+  .text-btn { outline-offset: var(--s-1); }
+  :where(.field-group) > * { outline: var(--line) solid CanvasText; }
+  .check-row__input { opacity: 1; }
+  .check-row__box { visibility: hidden; }
+  .field--invalid::before { forced-color-adjust: none; background: CanvasText; }
+  .stepper__btn[aria-disabled="true"], .action[aria-disabled="true"], .btn[aria-disabled="true"], .text-btn[aria-disabled="true"] { color: GrayText; }
+  .action[aria-disabled="true"] .icon, .stepper__btn[aria-disabled="true"] .icon { color: GrayText; }
+}
+@supports selector(:has(*)) {
+  @media (forced-colors: active) {
+    .field:has([aria-invalid="true"])::before { forced-color-adjust: none; background: CanvasText; }
+  }
 }
 @media (forced-colors: active) and (max-width: 1099px) {
   :where(.masthead__nav-list) > * { outline: var(--line) solid CanvasText; }       /* filas del menú plegado */
@@ -620,9 +645,22 @@
 }
 /* La categoría de una tarjeta de producto («Vial y señalización», en mayúsculas espaciadas) se parte con guion y, en
    último caso, donde no quepa, en lugar de salirse de la tarjeta (en el celular y en las cuatro columnas de
-   computadora). Solo con la letra agrandada (el interruptor de arriba). */
+   computadora). Solo con la letra agrandada (el interruptor de arriba).
+   El nombre tampoco se sale: con la letra al 200 %, «desechable» ensanchaba la página en las dos columnas del
+   celular a 360 px y «Respirador» pisaba la tarjeta vecina en las cuatro columnas de computadora de 1360 a 1439 px.
+   Una palabra que no cabe en su renglón pasa al siguiente por donde quepa. Donde el navegador deja fijar un mínimo
+   de letras se parte con guion, y solo las palabras de ocho letras o más (con tres al menos a cada lado del guion):
+   las más cortas caben casi siempre en la columna más angosta que se revisa (163 px para un nombre a 36 px, en esas
+   cuatro columnas), y sin ese mínimo el título equilibrado (`text-wrap: balance`) partía «ejem-plo» y «me-dia»
+   aunque cupieran enteras. Un navegador sin ese mínimo no pone guiones en el nombre. */
 @container lamina (width < calc((1rem - 16px) * 400)) {
   .product__cat { hyphens: auto; overflow-wrap: break-word; }
+  .product__name { overflow-wrap: break-word; }
+}
+@supports (hyphenate-limit-chars: 8 3 3) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .product__name { hyphens: auto; hyphenate-limit-chars: 8 3 3; }
+  }
 }
 /* Acciones de la tarjeta de producto: con la letra agrandada «Cotizar» baja a menudo a una segunda fila
    (components.css, «Las dos acciones van en una fila»). Su etiqueta empieza entonces donde la de «Ver ficha», en el
@@ -658,4 +696,55 @@
   @container lamina (width < calc((1rem - 27px) * 100000)) {
     .data__row { grid-template-columns: minmax(0, 1fr); row-gap: 2px; }
   }
+}
+
+/* Campos de formulario (components.css 4.18): la opción más larga de las listas de hoy, «Talla o color por definir»,
+   mide 9.84rem; con el relleno del celular (2 × 20 px) y la flecha (32 px) no cabe en la lámina con la letra al 200 %
+   de 360 a 388 px. Chromium pasa el texto de la lista a otro renglón (components.css 4.18); un navegador que no lo
+   hace lo cortaría con «…»: ahí el campo toma 8 px de relleno lateral y la flecha se acerca al texto, y la opción
+   cabe en un renglón. Con la letra normal (y a 150 % desde 320 px) la condición no se cumple. Las páginas apilan sus campos antes de
+   que una columna quede tan angosta (en computadora y tableta este umbral nunca se cumple). */
+@container lamina (width < calc(9.9rem + 72px)) {
+  .field, .field--framed { padding-inline: var(--s-2); }
+  .select__control { padding-right: calc(20px + var(--s-1)); }
+}
+
+/* 6.10 Número de «Cotizar mi lista» (QuoteCount; su dibujo y su lugar en el bloque de computadora, components.css 4.2).
+   Siempre fuera del flujo: con la lista vacía (y sin JavaScript) no se ve y la cabecera es la de siempre. Cada
+   referencia (`position`) va con `[aria-label]`: solo existe mientras el número se ve (components.css 4.2). */
+/* Hasta 1359 px el bloque sólido no muestra su icono (6.1 y 6.2): el número va en la esquina de arriba a la derecha
+   del bloque, que es su referencia, sobre el aire que deja el texto centrado. */
+@media (max-width: 1359px) {
+  .masthead__cta[aria-label] { position: relative; }
+  .masthead__cta[aria-label] > span { position: static; }
+  .masthead__cta .quote-count { top: var(--s-2); right: var(--s-2); bottom: auto; }
+}
+/* Fila «Cotizar mi lista» del menú de tableta y celular (sin icono): al final de la fila, centrado en su alto */
+@media (max-width: 1099px) {
+  .masthead__nav-link .quote-count { top: 50%; right: var(--pad); font-size: calc(0.1875rem + 9px); transform: translateY(-50%); }
+}
+/* Barra fija del celular: sobre la esquina de arriba a la derecha del icono, como en el bloque de computadora */
+@media (max-width: 699px) {
+  .dock__link[aria-label] > span { position: relative; }
+  .dock__link .quote-count { right: 100%; bottom: calc(50% + 5px); }   /* hasta el borde del texto: el relleno del enlace es corto */
+}
+/* Letra agrandada (el interruptor de 6.9): «Cotizar mi lista» pasa a dos renglones y llena su celda; el aire que
+   queda es el de la esquina de abajo a la derecha del bloque (el segundo renglón es el corto, centrado) y, en la barra
+   fija, el de la esquina de arriba a la izquierda del enlace, sobre el icono (la etiqueta llena el ancho y el icono queda
+   en el relleno izquierdo). Con la letra normal, también con el espaciado de texto, no cambia nada. */
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .masthead__cta[aria-label] { position: relative; }
+  .masthead__cta[aria-label] > span { position: static; }
+  .masthead__cta .quote-count { top: auto; right: 0; bottom: 0; }
+}
+@media (max-width: 699px) {
+  @container barra (width < calc((1rem - 16px) * 400)) {
+    .dock__link[aria-label] { position: relative; }
+    .dock__link[aria-label] > span { position: static; }
+    .dock__link .quote-count { top: 0; right: auto; bottom: auto; left: 0; }
+  }
+}
+/* Colores forzados: la caja pierde su fondo; queda su contorno del color del texto del sistema */
+@media (forced-colors: active) {
+  .quote-count { outline: var(--line) solid CanvasText; }
 }

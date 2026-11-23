@@ -138,8 +138,8 @@ test('con una ficha aprobada y una retirada, los conteos y listados solo cuentan
   const site = build('preview', [record({ status: 'approved', id: 'test-002', model: 'TEST-002', variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-002-9' }] }), record()]);
   assert.deepEqual(site.products.map(product => product.id), ['test-002', ...listedExamples.map(example => example.id)]);
   assert.deepEqual(site.retiredProducts.map(product => product.id), ['test-001']);
-  assert.equal(site.getCategory('manos')?.productCount, 2);
-  assert.deepEqual(site.productsByCategory('manos').map(product => product.id), ['test-002', 'ejemplo-guante-recubierto']);
+  assert.equal(site.getCategory('manos')?.productCount, 4);
+  assert.deepEqual(site.productsByCategory('manos').map(product => product.id), ['test-002', 'ejemplo-guante-recubierto', 'ejemplo-guante-de-nitrilo', 'ejemplo-guante-de-carnaza']);
   assert.equal(site.getBrand('ansell')?.productCount, 1);
   assert.deepEqual(site.productsByBrand('ansell').map(product => product.id), ['test-002']);
   assert.ok(!site.featuredProducts(99).some(product => product.id === 'test-001'));
@@ -193,7 +193,7 @@ test('producción ignora el ejemplo retirado; la vista previa le da su registro 
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1002', categoryIds: ['manos'], categoryNames: ['Protección de manos'], isExample: true,
   }]);
   assert.equal(preview.getProduct('ejemplo-producto-retirado'), undefined);
-  // Listados, conteos, destacados y rutas son exactamente los de los diez ejemplos.
+  // Listados, conteos, destacados y rutas son exactamente los de los dieciséis ejemplos.
   assert.deepEqual(preview.products, before.products);
   assert.deepEqual(preview.categories, before.categories);
   assert.deepEqual(preview.brands, before.brands);

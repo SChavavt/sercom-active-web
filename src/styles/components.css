@@ -198,6 +198,34 @@
 .masthead__cta:active { background: var(--blue-800); }
 .masthead__cta[aria-current="page"] { box-shadow: inset 0 -4px 0 var(--white); }   /* en /cotizar/: la barra blanca equivale a la azul bajo el enlace actual */
 
+/* Número de productos de la lista junto a «Cotizar mi lista» (QuoteCount): una cajita recta con cifras tabulares, en
+   el color inverso de su fondo (azul sólido con cifras blancas sobre blanco; blanca con cifras azules en el bloque
+   sólido). Siempre fuera del flujo, dentro de su enlace: aparecer, pasar de «3» a «120» o volver a 0 no mueve nada.
+   Sobre la esquina del icono donde el enlace lo muestra (el bloque desde 1360 px, la barra fija del celular): su
+   referencia es el texto, que va justo después del icono y centrado con él; crece hacia la izquierda y hacia arriba,
+   sin tocar el texto. En la fila del menú, al final de la fila (responsive.css 6.10). Oculto con la lista vacía.
+   Su referencia (`position: relative`) se fija solo mientras el enlace lleva `aria-label`, que el script le pone a la
+   vez que muestra el número: con la lista vacía ningún elemento cambia de orden de pintado y la página es la de antes. */
+.quote-count {
+  position: absolute;
+  z-index: 1;
+  min-width: 1.5em;
+  padding: 0 0.2em;
+  background: var(--blue);
+  color: var(--white);
+  /* 11 px con la letra normal; con la letra agrandada crece, a un cuarto del ritmo del texto (12.4 px al 150 %,
+     13.75 px al 200 %): al mismo ritmo tapaba el texto de su enlace, que también crece y ya no deja aire libre */
+  font-size: calc(0.171875rem + 8.25px);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-align: center;
+  white-space: nowrap;
+}
+.masthead__cta[aria-label] > span { position: relative; }
+.masthead__cta .quote-count { right: calc(100% + var(--s-3) - 6px); bottom: calc(50% + 3px); background: var(--white); color: var(--blue); }
+
 .masthead__btn { display: none; }                 /* botones de búsqueda y menú: solo tableta y celular */
 
 /* 4.3 Botones ---------------------------------------------------------------- */
@@ -225,7 +253,14 @@
 .btn--inverse { background: var(--white); border-color: var(--white); color: var(--ink); }
 .btn--inverse:hover { background: var(--blue-100); border-color: var(--blue-100); }
 .btn--inverse:active { background: var(--blue-200); border-color: var(--blue-200); }
+.btn--outline { background: var(--surface); border-color: var(--blue); color: var(--blue); }   /* la acción secundaria de un bloque */
+.btn--outline:hover { background: var(--surface-tint); border-color: var(--blue); }
+.btn--outline:active { background: var(--blue-100); border-color: var(--blue); }
 .btn--block { display: flex; width: 100%; }
+/* Apagado (aria-disabled="true"): sigue en el orden del teclado; el script decide qué hace un clic */
+.btn[aria-disabled="true"],
+.btn[aria-disabled="true"]:hover,
+.btn[aria-disabled="true"]:active { background: var(--surface); border-color: var(--blue-300); color: var(--grey-600); cursor: default; }
 
 /* Fila de acción: un botón que ocupa toda una fila de la lámina (portada) */
 .action {
@@ -250,6 +285,13 @@
 .action--primary .icon { color: var(--white); }
 .action--primary:hover { background: var(--blue-700); }
 .action--primary:active { background: var(--blue-800); }
+/* ActionRow sin href: un <button> con el mismo dibujo que el enlace */
+button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius); text-align: left; }
+.action[aria-disabled="true"],
+.action[aria-disabled="true"]:hover,
+.action[aria-disabled="true"]:active { background: var(--surface); color: var(--grey-600); cursor: default; }
+.action[aria-disabled="true"] .icon,
+.action[aria-disabled="true"]:hover .icon { color: var(--grey-600); transform: none; }
 
 /* Enlace de texto con flecha */
 .more {
@@ -635,3 +677,242 @@
 .grid12 > .grid-fill,
 .register > .grid-fill { grid-column: span var(--fill-lg); background: var(--surface); }
 
+
+/* 4.18 Formularios -------------------------------------------------------------
+   La base de los formularios del paso 2: campo, controles, lista desplegable, selector de cantidad, filas con
+   casilla, botón de pliegue, botón de texto y línea de estado. Todo dentro de la lámina: un campo es una celda (o,
+   con `field--framed`, una casilla con su propio filete dentro de una celda más ancha). Los controles nunca usan
+   letra de menos de 16 px (iOS agrandaría la página al enfocarlos) y miden al menos 44 px de alto en todo ancho.
+   Dibujan su propio filete azul de 1 px solo: `.field--framed`, `.stepper` (las casillas del selector de cantidad),
+   `.check-row__box` (el cuadro de la casilla), `.btn--outline` (4.3: blanco con filete azul, la acción secundaria de
+   un bloque) y un `.btn` apagado (`.btn[aria-disabled="true"]`, de cualquier variante: caja blanca con filete azul
+   claro). Fuera de eso, ningún control tiene borde propio (docs/diseno.md, sección 3). Sin colores de
+   estado: un error se marca con texto en tinta y peso, un icono y una barra de tinta. Componentes: Field, Select,
+   Stepper (+ StepperScript), CheckRow y StatusLine; ActionRow y Button sin href imprimen <button>. */
+
+/* Campo: etiqueta arriba, control, ayuda y error. La barra de error es un ::before: el campo es su referencia. */
+.field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: var(--s-4) var(--pad) var(--s-3);
+  background: var(--surface);
+  transition: background-color var(--ease);
+}
+.field__label { color: var(--grey-600); overflow-wrap: break-word; }
+.field__hint { margin-top: var(--s-1); color: var(--grey-600); font-size: var(--small); line-height: var(--type-small-leading); text-wrap: pretty; }
+.field__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  margin-top: var(--s-2);
+  font-size: 0.9375rem;
+  font-weight: var(--type-strong-weight);
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+.field__error .icon { margin-top: calc((1.35em - 18px) / 2); }
+.field__error > span { min-width: 0; }
+/* Un error que ya no vale pero conserva su lugar mientras el puntero oprime otro control o sigue más abajo que la
+   línea: si se fuera en ese momento, lo que está debajo se movería y el clic, o el clic siguiente, caería en otro
+   lado. Lo pone y lo quita el script de la página (cotizar). */
+.field__error--unseen { visibility: hidden; }
+/* Dentro de una celda blanca más ancha: su propio filete y un relleno más corto; dos seguidos comparten el filete */
+.field--framed { padding: var(--s-3) var(--s-4) var(--s-2); border: var(--line) solid var(--rule); }
+.field--framed + .field--framed { margin-top: calc(-1 * var(--line)); }
+/* Campos lado a lado dentro de UNA celda (por ejemplo «Cantidad» y «Unidad» en las 5 columnas de la ficha, donde una
+   división no caería sobre la retícula de la lámina): los separa el filete suave. Cada campo pide --field-min (14rem
+   por omisión); si no caben, se apilan solos, también con la letra agrandada (el mínimo crece con ella). Para pares. */
+.field-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-min, 14rem)), 1fr));
+  gap: var(--line);
+  background: var(--rule-soft);
+}
+/* Error: barra de tinta de 3 px en el borde izquierdo. `field--invalid` la pone el script donde no hay :has() */
+.field--invalid::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--ink); }
+@supports selector(:has(*)) {
+  .field:has([aria-invalid="true"])::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 3px; background: var(--ink); }
+  /* El anillo de foco y el tinte al pasar se dibujan en la casilla entera, no en el control (sin :has(), el control
+     conserva el anillo de siempre). Los botones y el campo del selector de cantidad llevan cada uno su anillo. */
+  .field:has(.control:focus-visible) { outline: 3px solid var(--focus); outline-offset: -3px; }
+  .field .control:focus-visible { outline: none; }
+  .field:has(.control:hover),
+  .field:has(.control):has(.field__label:hover) { background: var(--surface-tint); }
+}
+
+/* Controles: una línea, varias líneas y lista; misma letra, mismo alto mínimo, sin borde ni fondo propios */
+.control {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: var(--s-2) 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  font-size: 1rem;
+  line-height: 1.35;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.control::placeholder { color: var(--grey-600); opacity: 1; }
+.control--area { min-height: calc(4 * 1.5em + 2 * var(--s-2)); line-height: 1.5; resize: vertical; }
+@supports (field-sizing: content) {
+  .control--area { field-sizing: content; }                /* crece con su texto; nunca menos de cuatro renglones */
+}
+/* Lista: la flecha a la derecha; el texto se detiene antes de ella. Una opción que no cabe en un renglón (texto
+   espaciado o agrandado, columna angosta) pasa al siguiente y la lista crece, donde el navegador lo permite con
+   `appearance: none` (Chromium); donde no, se corta con «…» y la lista abierta la muestra entera. */
+.select { position: relative; min-width: 0; }
+.select__control { padding-right: calc(20px + var(--s-3)); cursor: pointer; white-space: normal; overflow-wrap: break-word; text-overflow: ellipsis; }
+.select__icon { position: absolute; top: 50%; right: 0; margin-top: -10px; color: var(--blue); pointer-events: none; }
+
+/* Selector de cantidad: [−] [ 12 ] [+]; las casillas se separan con los huecos de 1 px sobre el azul, como la lámina */
+.stepper {
+  display: grid;
+  grid-template-columns: 44px minmax(calc(6ch + 2 * var(--s-1)), 1fr) 44px;   /* «99,999» entero en el campo */
+  gap: var(--line);
+  width: 100%;
+  max-width: 15rem;
+  padding: var(--line);
+  background: var(--rule);
+}
+.stepper__btn {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--blue);
+  touch-action: manipulation;                                /* dos toques seguidos no agrandan la página */
+  transition: background-color var(--ease);
+}
+/* Sin JavaScript los dos botones no se imprimen a la vista (js-only): el campo ocupa todo el selector */
+html:not(.js) .stepper { grid-template-columns: minmax(0, 1fr); }
+.stepper__btn:hover { background: var(--surface-tint); }
+.stepper__btn:active { background: var(--blue-100); }
+.stepper__btn[aria-disabled="true"],
+.stepper__btn[aria-disabled="true"]:hover,
+.stepper__btn[aria-disabled="true"]:active { background: var(--surface); color: var(--blue-300); cursor: default; }
+.stepper__input {
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 var(--s-1);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 1rem;                                           /* nunca menos de 16 px, tampoco dentro de un texto pequeño */
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.stepper__input:hover { background: var(--surface-tint); }
+.stepper__btn:focus-visible,
+.stepper__input:focus-visible { outline-offset: -3px; }       /* dentro de su casilla: la vecina no lo tapa */
+
+/* Filas con casilla (CheckRow): mismas medidas que las filas de la barra lateral del catálogo */
+.check-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-content: center;
+  column-gap: var(--s-3);
+  min-height: 44px;
+  padding: var(--s-2) var(--pad);
+  border-top: var(--line) solid var(--rule-soft);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+.check-row:hover { background: var(--surface-tint); }
+/* El cuadro, centrado en el primer renglón del nombre; la casilla nativa, transparente, encima de él */
+.check-row__control { position: relative; align-self: start; width: 18px; height: 18px; margin-top: calc((1.35em - 18px) / 2); }
+.check-row__input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.check-row__box { display: grid; place-items: center; width: 18px; height: 18px; border: var(--line) solid var(--blue); background: var(--surface); color: var(--white); }
+.check-row__box .icon { visibility: hidden; }
+.check-row__input:checked + .check-row__box { background: var(--blue); }
+.check-row__input:checked + .check-row__box .icon { visibility: visible; }
+.check-row:hover .check-row__input:not(:checked) + .check-row__box { background: var(--blue-100); }
+.check-row:hover .check-row__input:checked + .check-row__box { background: var(--blue-700); border-color: var(--blue-700); }
+.check-row:active .check-row__input:not(:checked) + .check-row__box { background: var(--blue-200); }
+.check-row:active .check-row__input:checked + .check-row__box { background: var(--blue-800); }
+.check-row__input:focus-visible + .check-row__box { outline: 3px solid var(--focus); outline-offset: 2px; }
+.check-row__name { align-self: baseline; overflow-wrap: break-word; }
+/* Con número, la coma que el lector dice entre el nombre y «N productos»: va pegada al nombre y sin tamaño (no se
+   ve ni ocupa ancho). Escrita en la celda del número quedaría separada del nombre por un espacio. */
+.check-row__name--counted::after { content: ','; font-size: 0; }
+.check-row__count { align-self: baseline; color: var(--grey-600); font-size: var(--small); font-variant-numeric: tabular-nums; }
+
+/* Botón de pliegue de un grupo (el título de un grupo de filtros): como las filas plegables de la barra lateral */
+.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  width: 100%;
+  min-height: 60px;
+  margin: 0;
+  padding: var(--s-2) var(--pad);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 1.125rem;
+  font-weight: var(--type-button-weight);
+  line-height: 1.2;
+  text-align: left;
+  transition: background-color var(--ease);
+}
+.disclosure:hover { background: var(--surface-tint); }
+.disclosure:focus-visible { outline-offset: -3px; }
+.disclosure > span { min-width: 0; overflow-wrap: break-word; hyphens: auto; }    /* con la letra agrandada y espaciada, antes que salirse */
+.disclosure .icon { color: var(--blue); transition: transform var(--ease); }
+.disclosure[aria-expanded="true"] .icon { transform: rotate(180deg); }
+
+/* Botón que se lee como enlace de texto («Deshacer», «Quitar»), con icono opcional delante */
+.text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--blue);
+  font-weight: var(--type-button-weight);
+  line-height: 1.3;
+  text-align: left;
+  text-decoration: none;
+}
+.text-btn:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.text-btn[aria-disabled="true"],
+.text-btn[aria-disabled="true"]:hover { color: var(--grey-600); text-decoration: none; cursor: default; }
+
+/* Línea de estado (StatusLine): icono azul, frase en tinta y la acción al final o, si no cabe, debajo del texto */
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-1) var(--s-5);
+  min-height: 56px;
+  padding: var(--s-3) var(--pad);
+  background: var(--surface);
+}
+.status:focus-visible { outline-offset: -3px; }
+.status__body { display: flex; flex: 1 1 15rem; align-items: flex-start; gap: var(--s-3); min-width: 0; line-height: 1.45; }
+/* Cada icono va en un <span> (el script lo muestra u oculta con su propiedad `hidden`) */
+.status__icon { display: flex; flex: none; margin-top: calc((1.45em - 20px) / 2); color: var(--blue); }
+.status__text { min-width: 0; overflow-wrap: break-word; text-wrap: pretty; }
+/* La acción empieza donde el texto (el ancho del icono más el hueco): su ancho máximo descuenta ese margen, para que
+   una acción de varias palabras («Quitarlos de mi cotización») se parta en renglones en lugar de salirse de la fila */
+.status__action { display: flex; flex: none; max-width: calc(100% - 20px - var(--s-3)); margin-left: calc(20px + var(--s-3)); }
+.status__action > .more { white-space: normal; }

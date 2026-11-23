@@ -1,0 +1,61 @@
+---
+// Selector de cantidad (`.stepper`): [−] [ 12 ] [+], tres casillas unidas por filetes azules de 1 px (dibuja su
+// propio filete: es un control dentro de una celda), los botones cuadrados de 44 px y el número centrado en cifras
+// tabulares. Va en el slot de Field.
+//
+// SOLO MARCADO, sin <script>, a propósito: la página de cotización arma sus filas clonando un <template> que
+// contiene un Stepper, y Astro imprime el script de un componente otra vez dentro del <template>; cada clon lo
+// ejecutaría una vez más (un clic contaría varias veces). Su script es StepperScript.astro: la página lo imprime UNA
+// vez, fuera de todo <template> y de todo enlace, y ese script atiende a todos los Stepper de la página, también a
+// los que se clonan después.
+//
+// Marcado: el contenedor `[data-stepper]` con `data-min` y `data-max`; el campo de texto `[data-stepper-input]`
+// (type="text", inputmode="numeric", autocomplete="off", maxlength="6": «99,999» tiene seis caracteres) y dos
+// <button type="button">, `[data-stepper-minus]` y `[data-stepper-plus]`, llamados «Disminuir cantidad» y «Aumentar
+// cantidad» (con `label`, «Disminuir cantidad de {label}»). Una página que solo conoce el producto en el navegador
+// reescribe los dos aria-label después de clonar la fila. Con el valor en el mínimo, «Disminuir» ya sale con
+// aria-disabled="true" (y «Aumentar» en el máximo): sigue en el orden del teclado, se ve apagado y un clic no hace
+// nada. Los demás atributos (`aria-describedby`, `data-*`, `required`) pasan al campo de texto.
+//
+// Los dos botones solo funcionan con el script: llevan `js-only`. Sin JavaScript no se imprimen a la vista y queda el
+// campo de texto, que ocupa todo el ancho del selector y se llena a mano como cualquier otro.
+//
+// Una página que escribe `input.value` desde su código (al dibujar una lista, al deshacer) lanza después el evento
+// `stepper:sync`, cuando la fila YA está en el documento, desde el campo o desde el contenedor de varias filas
+// (StepperScript.astro). Antes de insertarla el evento no llega al script.
+//
+// Ancho: llena su campo hasta 15rem. Mínimo: los dos botones (88 px), los filetes (4 px) y el campo, que no baja de
+// 6ch más su relleno para que «99,999» quepa entero: 154 px con la letra normal (unos 99 px + 3.44rem; 209 px al
+// 200 %). La página le da una celda con ese lugar más el relleno del campo, o la apila (consulta de contenedor).
+//
+// Uso:  <Field label="Cantidad" for="cantidad" error><Stepper id="cantidad" name="cantidad" max={MAX_QUANTITY} /></Field>
+//       <StepperScript />   (una vez por página, fuera de cualquier <template>)
+import type { HTMLAttributes } from 'astro/types';
+import Icon from './Icon.astro';
+
+interface Props extends Omit<HTMLAttributes<'input'>, 'value' | 'min' | 'max' | 'type' | 'id' | 'name'> {
+  /** `id` del campo de texto (el `for` del Field). */
+  id: string;
+  name?: string;
+  /** Valor inicial. Por omisión 1. */
+  value?: number;
+  /** Mínimo. Por omisión 1. */
+  min?: number;
+  /** Máximo. Por omisión 99999. */
+  max?: number;
+  /** Se agrega al nombre de los botones: «Disminuir cantidad de {label}». */
+  label?: string;
+  /** Clases extra del contenedor. */
+  class?: string;
+}
+
+const { id, name, value = 1, min = 1, max = 99999, label, class: className, ...attrs } = Astro.props;
+const suffix = label ? ` de ${label}` : '';
+const atMin = Number.isInteger(value) && value <= min;
+const atMax = Number.isInteger(value) && value >= max;
+---
+<div class:list={['stepper', className]} data-stepper data-min={min} data-max={max}>
+  <button class="stepper__btn js-only" type="button" aria-label={`Disminuir cantidad${suffix}`} aria-disabled={atMin ? 'true' : undefined} data-stepper-minus><Icon name="minus" /></button>
+  <input class="stepper__input" id={id} name={name} type="text" inputmode="numeric" autocomplete="off" maxlength="6" value={String(value)} data-stepper-input {...attrs} />
+  <button class="stepper__btn js-only" type="button" aria-label={`Aumentar cantidad${suffix}`} aria-disabled={atMax ? 'true' : undefined} data-stepper-plus><Icon name="plus" /></button>
+</div>

@@ -3,11 +3,20 @@
 // (CatalogNav, 3 columnas) y el área de productos (9 columnas, CatalogGrid). En tableta y celular la barra
 // se vuelve dos filas plegables sobre las tarjetas.
 // El slot va dentro del área de productos, después de la retícula: el catálogo pone ahí el estado
-// «sin resultados» de la búsqueda (oculto hasta que el script lo muestra).
+// «sin resultados» (oculto hasta que el script lo muestra).
 // Solo se usa cuando hay productos que listar; una página sin productos muestra EmptyState a todo lo ancho.
 //
+// `facets` (opcional; solo el catálogo lo pasa: buildFacetGroups de catalog-filters.mjs): con él, la posición de la
+// barra lateral lleva las dos formas, con las mismas clases de columna para que la fila siga llenando doce columnas
+// se vea la que se vea: la barra de enlaces (CatalogNav, `no-js-only`) para quien no tiene JavaScript y los filtros
+// combinables (CatalogFilters, `js-only`) para quien sí; y cada tarjeta lleva sus fichas de filtro en `data-facets`
+// (CatalogGrid). Sin `facets` nada cambia: las páginas de categoría y de marca imprimen lo mismo que antes.
+//
 // Uso:  <CatalogListing products={list} categories={categories} brands={brands} currentBrandId={brand.id} />
+//       <CatalogListing products={products} categories={categories} brands={brands} facets={facetGroups}>…</CatalogListing>
+import type { FacetGroup } from '../types/catalog-filters.ts';
 import type { PublicBrand, PublicCategory, PublicProduct } from '../types/site.ts';
+import CatalogFilters from './CatalogFilters.astro';
 import CatalogGrid from './CatalogGrid.astro';
 import CatalogNav from './CatalogNav.astro';
 
@@ -17,15 +26,24 @@ interface Props {
   brands: readonly PublicBrand[];
   currentCategoryId?: string;
   currentBrandId?: string;
+  /** Grupos de los filtros combinables (solo el catálogo). */
+  facets?: readonly FacetGroup[];
 }
 
-const { products, categories, brands, currentCategoryId, currentBrandId } = Astro.props;
+const { products, categories, brands, currentCategoryId, currentBrandId, facets } = Astro.props;
 ---
 <div class="catalog-body grid12">
-  <CatalogNav class="span-3 span-md-12" categories={categories} brands={brands} currentCategoryId={currentCategoryId} currentBrandId={currentBrandId} />
+  {facets ? (
+    <Fragment>
+      <CatalogNav class="span-3 span-md-12 no-js-only" categories={categories} brands={brands} currentCategoryId={currentCategoryId} currentBrandId={currentBrandId} />
+      <CatalogFilters class="span-3 span-md-12 js-only" groups={facets} />
+    </Fragment>
+  ) : (
+    <CatalogNav class="span-3 span-md-12" categories={categories} brands={brands} currentCategoryId={currentCategoryId} currentBrandId={currentBrandId} />
+  )}
   <section class="catalog-body__results span-9 span-md-12" aria-labelledby="productos-title">
     <h2 class="vh" id="productos-title">Productos</h2>
-    <CatalogGrid products={products} />
+    <CatalogGrid products={products} facets={facets !== undefined} />
     <slot />
   </section>
 </div>

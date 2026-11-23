@@ -1,0 +1,46 @@
+---
+// Acciones de un mensaje que arma la página (solo con JavaScript): «Cotizar mi lista» y «Solicitud especial».
+// De arriba abajo, en el marcado y en pantalla, en todo estado:
+//   - el aviso de mensaje largo (StatusLine oculta, `data-long-notice`), que aparece cuando el mensaje no cabe en un
+//     enlace;
+//   - «Enviar … por WhatsApp» (fila principal) y «Enviar … por correo», enlaces con la plantilla impresa al compilar
+//     (`data-message-send`); en el estado largo sus etiquetas pasan a las de `longWhatsapp` y `longMail`
+//     (`data-long-label`) y la de WhatsApp deja el dibujo principal;
+//   - «Copiar solicitud» (<button>, `data-copy-request`), que en el estado largo toma el dibujo principal;
+//   - la línea de estado de la copia (`data-copy-status`, con sus dos frases en data-copied y data-copy-failed);
+//   - una celda blanca vacía que estira la columna hasta el alto de la fila (junto al borrador).
+// SOLO MARCADO: lo atiende src/lib/message-page.mjs, que el script de cada página llama una vez. Los demás atributos
+// (el gancho de región de la página: `data-cotizar`, `data-solicitud`) pasan a la columna.
+// Abrir WhatsApp o el correo no es un envío: nada aquí dice que algo se envió.
+import type { HTMLAttributes } from 'astro/types';
+import ActionRow from './ActionRow.astro';
+import StatusLine from './StatusLine.astro';
+
+interface Props extends HTMLAttributes<'div'> {
+  whatsappHref: string;
+  mailHref: string;
+  whatsappLabel: string;
+  mailLabel: string;
+  /** Etiquetas cuando el mensaje no cabe en un enlace. */
+  longWhatsapp: string;
+  longMail: string;
+  /** El aviso de mensaje largo. */
+  notice: string;
+  class?: string;
+}
+
+const { whatsappHref, mailHref, whatsappLabel, mailLabel, longWhatsapp, longMail, notice, class: className, ...attrs } = Astro.props;
+---
+<div class:list={['mensaje__actions', className]} {...attrs}>
+  <StatusLine icon="info" data-long-notice>{notice}</StatusLine>
+  <ActionRow href={whatsappHref} primary icon="whatsapp" data-message-send="whatsapp" data-long-label={longWhatsapp} data-primary-fits>{whatsappLabel}</ActionRow>
+  <ActionRow href={mailHref} icon="mail" data-message-send="mailto" data-long-label={longMail}>{mailLabel}</ActionRow>
+  <ActionRow type="button" icon="copy" data-copy-request data-primary-long>Copiar solicitud</ActionRow>
+  <StatusLine
+    icons={['check', 'alert-circle']}
+    data-copy-status
+    data-copied="Solicitud copiada. Pégala en WhatsApp o en tu correo."
+    data-copy-failed="No pudimos copiarla automáticamente. Selecciona el texto de “Así queda tu mensaje” y cópialo."
+  />
+  <div class="mensaje__fill" aria-hidden="true"></div>
+</div>

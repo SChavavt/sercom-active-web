@@ -6,11 +6,15 @@
 //   <DraftMessage text={contactLinks.list().text} id="borrador-title" class="span-4 span-md-12" />
 //
 // `data-draft-text` marca el párrafo para que un script de la página pueda reescribirlo: un
-// <span class="draft__line"> por línea, con `textContent` (solicitud especial con búsqueda).
+// <span class="draft__line"> por línea, con `textContent`. Los demás atributos (`data-*`) pasan a la celda: con
+// JavaScript, «Cotizar mi lista» y «Solicitud especial» imprimen un segundo borrador, «Así queda tu mensaje», marcado
+// con `data-message-draft`, que src/lib/message-page.mjs reescribe con cada cambio (el de siempre queda para la página
+// sin JavaScript).
 // Estilos: src/styles/pages/atencion.css.
+import type { HTMLAttributes } from 'astro/types';
 import '../styles/pages/atencion.css';
 
-interface Props {
+interface Props extends Omit<HTMLAttributes<'div'>, 'id' | 'title'> {
   /** Texto del mensaje, con saltos de línea `\n`. */
   text: string;
   /** id del título. */
@@ -22,11 +26,11 @@ interface Props {
   class?: string;
 }
 
-const { text, id, title = 'Así empieza tu mensaje', headingLevel = 3, class: className } = Astro.props;
+const { text, id, title = 'Así empieza tu mensaje', headingLevel = 3, class: className, ...attrs } = Astro.props;
 const Heading = `h${headingLevel}` as 'h2' | 'h3';
 const lines = text.split('\n');
 ---
-<div class:list={['draft', className]}>
+<div class:list={['draft', className]} {...attrs}>
   <Heading class="draft__title eyebrow label" id={id}>{title}</Heading>
   <p class="draft__text" data-draft-text>{lines.map((line, index) => <Fragment>{index > 0 && '\n'}<span class="draft__line">{line}</span></Fragment>)}</p>
 </div>

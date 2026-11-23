@@ -5,7 +5,9 @@
    Mismas reglas que la hoja global: celdas blancas sobre la lámina azul, filetes por huecos de 1 px,
    dentro de una celda solo el filete suave; solo variables de tokens.css y fonts.css.
    Puntos de corte: 1099 (tableta) y 699 (celular), con max-width; 1100 con min-width (computadora, notas de la
-   solicitud especial) y 1359 con max-width (el número de la 404).
+   solicitud especial, columnas de la lista y de las acciones del mensaje) y 1359 con max-width (el número de la 404).
+   Lo que solo se ve con JavaScript (la lista de «Cotizar mi lista», los campos y las acciones del mensaje) usa clases
+   propias (`cotizar__…`, `mensaje__…`, `solicitud__fields`): sin JavaScript la página se dibuja igual que antes.
    ========================================================================== */
 
 /* --- Registro numerado (ItemRegister) ------------------------------------- */
@@ -174,4 +176,73 @@
   .nf__num { padding: var(--s-6) var(--pad) var(--s-1); font-size: 4rem; line-height: 1; }
   .nf__body { padding: var(--s-4) var(--pad) var(--s-7); gap: var(--s-4); }
   .nf__row { row-gap: 0; }                 /* número y mensaje forman una sola celda */
+}
+
+/* --- Cotizar mi lista: la lista que se arma en el sitio (solo con JavaScript) ------ */
+/* Un renglón es una fila de la lámina (li.grid12): producto, variante, cantidad y unidad. 3 + 3 + 3 + 3 desde 1100 px
+   (una celda de 2 columnas sería más angosta que el selector de cantidad, 154 px, y cortaría «caja con 100 piezas»);
+   6 + 6 y 6 + 6 en tableta; cada celda a todo lo ancho en el celular y con la letra agrandada. Un producto sin
+   variantes conserva su celda blanca de variante para llenar la fila (en el celular no hace falta). El aviso de
+   renglón repetido va debajo, a todo lo ancho. Un producto retirado: su celda y la frase en el resto de la fila. */
+.cotizar__rows { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.cotizar__line { display: grid; }
+.cotizar__row > * { grid-column: span 12; }
+@media (min-width: 1100px) {
+  .cotizar__row > .cotizar__cell { grid-column: span 3; }
+  .cotizar__row > .cotizar__retired { grid-column: span 9; }
+}
+@media (min-width: 700px) and (max-width: 1099px) {
+  .cotizar__row > .cotizar__cell, .cotizar__row > .cotizar__retired { grid-column: span 6; }
+}
+@media (max-width: 699px) {
+  .cotizar__row > .cotizar__blank { display: none; }
+}
+@container lamina (width < calc((1rem - 16px) * 400)) {
+  .cotizar__row > .cotizar__cell, .cotizar__row > .cotizar__retired { grid-column: span 12; }
+  .cotizar__row > .cotizar__blank { display: none; }
+}
+.cotizar__product { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: var(--s-4) var(--pad); background: var(--surface); }
+.cotizar__tag { margin-bottom: var(--s-2); }
+.cotizar__name { max-width: 100%; font-weight: 650; line-height: 1.35; text-decoration: none; overflow-wrap: break-word; }
+.cotizar__name:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+/* El nombre es un enlace de un renglón de texto (21,6 px de alto). En tableta y celular su objetivo táctil crece a 44 px
+   con un relleno que no mueve nada (el margen negativo lo compensa); el anillo del foco se dibuja sobre el texto, no
+   sobre el relleno, para que no cruce la marca y el código del renglón de abajo. */
+@media (max-width: 1099px) {
+  .cotizar__name { position: relative; padding-block: 12px; margin-block: -12px; }
+  .cotizar__name:focus-visible { outline: none; }
+  .cotizar__name:focus-visible::after { content: ''; position: absolute; inset: 12px 0; outline: 3px solid var(--focus); outline-offset: 2px; pointer-events: none; }
+}
+.cotizar__meta { max-width: 100%; margin-top: var(--s-1); color: var(--grey-700); font-size: var(--small); line-height: var(--type-small-leading); overflow-wrap: break-word; }
+.cotizar__meta .t-code { color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
+.cotizar__remove { margin-top: var(--s-2); }
+.cotizar__value { display: flex; align-items: center; min-height: 44px; padding: var(--s-2) 0; overflow-wrap: break-word; }
+.cotizar__blank { background: var(--surface); }
+.cotizar__retired { display: flex; align-items: center; min-width: 0; padding: var(--s-4) var(--pad); background: var(--surface); overflow-wrap: break-word; }
+
+/* --- Acciones del mensaje (MessageActions) y su borrador ----------------------- */
+/* Columna de celdas: aviso, acciones, estado de la copia y una celda blanca que la estira hasta el alto de la fila. En
+   computadora va a la derecha del borrador (4 + 8 columnas, como la columna lateral del título); en el marcado va
+   antes, y en tableta y celular queda antes del borrador. */
+.mensaje__actions { display: flex; flex-direction: column; gap: var(--line); }
+.mensaje__fill { flex: 1; background: var(--surface); }
+@media (min-width: 1100px) {
+  .mensaje > .mensaje__side { grid-column: 9 / span 4; grid-row: 1; }
+  .mensaje > .mensaje__draft { grid-column: 1 / span 8; grid-row: 1; }
+}
+@media (max-width: 1099px) {
+  .mensaje__fill { display: none; }
+}
+/* El enlace «Privacidad» dentro de la nota de lo que se guarda */
+.mensaje__privacy { color: var(--blue); font-weight: 650; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.mensaje__privacy:hover { text-decoration-thickness: 2px; }
+@media (max-width: 1099px) {
+  .mensaje__privacy { display: inline-block; padding-block: 12px; margin-block: -12px; }   /* 44 px de objetivo táctil */
+}
+
+/* Colores forzados: las filas nuevas de la lámina y la columna de las acciones (responsive.css 6.8) */
+@media (forced-colors: active) {
+  :where(.cotizar__rows, .cotizar__line, .mensaje__actions) > :where(:not(.vh, script, style, template, .cotizar__row, .cotizar__line)) {
+    outline: var(--line) solid CanvasText;
+  }
 }

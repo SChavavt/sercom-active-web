@@ -1,0 +1,54 @@
+---
+// Filtros combinables del catálogo (`.catalog-filters`): «Limpiar filtros» y un grupo de casillas por parámetro
+// («Categorías» y «Marcas»), cada opción con su número de productos. Una sola copia de los controles para todos los
+// anchos. Solo funciona con JavaScript: va con `js-only` junto a la barra de enlaces (CatalogNav con `no-js-only`),
+// en la misma posición y con las mismas clases de columna (CatalogListing).
+//   - Computadora (1100 px o más): llena la celda de 3 columnas de la barra lateral. «Limpiar filtros» va arriba
+//     (solo mientras hay algo marcado) y los dos grupos abiertos debajo.
+//   - Tableta y celular: los títulos de los grupos son filas a todo lo ancho sobre las tarjetas, cerradas al cargar;
+//     cada lista se abre bajo su título y «Limpiar filtros» va en una fila después de ellos (el script lo pasa al
+//     final del documento por debajo de 1100 px: el orden del teclado es el que se ve).
+// El título de cada grupo es un botón de pliegue (`.disclosure`, aria-expanded y aria-controls) que funciona en
+// todos los anchos. Sin JavaScript nada de esto se ve.
+//
+// Este componente no lleva <script>: lo atiende el script de CatalogSearch (uno por página), que lee y escribe:
+//   [data-catalog-filters]          el grupo de los filtros («Filtros»); el script le pone data-filters-ready al
+//                                   terminar de preparar los pliegues;
+//   [data-filter-clear]             «Limpiar filtros» (oculto con hidden mientras no hay nada marcado);
+//   [data-filter-toggle]            el título de un grupo, que abre y cierra la lista que nombra aria-controls;
+//   [data-filter-selected]          dentro del título: « (2 seleccionadas)», oculto con 0; la cifra visible va en
+//                                   [data-filter-selected-count] y el resto, solo para el lector, en
+//                                   [data-filter-selected-text] (los dos salen de selectedLabel de catalog-filters.mjs);
+//   [data-filter-option]            cada casilla: name = parámetro del grupo, value = id de la opción;
+//   [data-check-count-value/-text]  el número de cada opción (CheckRow).
+// Los grupos y sus opciones los calcula la página al compilar (buildFacetGroups de catalog-filters.mjs).
+//
+// Uso:  <CatalogFilters groups={facetGroups} class="span-3 span-md-12 js-only" />
+import type { FacetGroup } from '../types/catalog-filters.ts';
+import CheckRow from './CheckRow.astro';
+import Icon from './Icon.astro';
+
+interface Props {
+  groups: readonly FacetGroup[];
+  /** Clases de columna y de visibilidad. */
+  class?: string;
+}
+
+const { groups, class: className } = Astro.props;
+---
+<div class:list={['catalog-filters', className]} role="group" aria-labelledby="filtros-title" data-catalog-filters>
+  <h2 class="vh" id="filtros-title">Filtros</h2>
+  <div class="catalog-filters__cells">
+    <button class="text-btn catalog-filters__clear" type="button" data-filter-clear hidden><Icon name="close" class="icon--16" /><span>Limpiar filtros</span></button>
+    {groups.map(group => (
+      <div class="catalog-filters__group">
+        <h3 class="catalog-filters__title"><button class="disclosure" type="button" aria-expanded="true" aria-controls={`filtros-${group.param}`} data-filter-toggle><span>{group.label}<span data-filter-selected hidden> (<span data-filter-selected-count></span><span class="vh" data-filter-selected-text></span>)</span></span><Icon name="chevron-down" /></button></h3>
+        <ul class="check-list catalog-filters__panel" id={`filtros-${group.param}`}>
+          {group.options.map(option => (
+            <li><CheckRow name={group.param} value={option.id} label={option.label} count={option.count} autocomplete="off" data-filter-option /></li>
+          ))}
+        </ul>
+      </div>
+    ))}
+  </div>
+</div>

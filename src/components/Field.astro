@@ -1,0 +1,67 @@
+---
+// Campo de formulario (`.field`): una casilla con regla, como las de un cajetín de plano. Arriba la etiqueta pequeña
+// en mayúsculas (`.label`), debajo el control a todo lo ancho y sin borde propio, después un texto de ayuda gris
+// opcional y el contenedor del error, oculto hasta que un script lo muestra. Sin script, nada.
+//
+// Dos situaciones, las dos con el mismo marcado:
+//   - Celda de la lámina (lo normal): el campo es hijo de una `grid12` o de una columna de celdas, con su clase de
+//     columna (`span-6 span-sm-12`). Es blanco y los huecos de 1 px de la lámina son su borde.
+//   - Dentro de una celda blanca más ancha, junto a otro contenido: `framed` (clase `field--framed`) le dibuja su
+//     propio filete azul de 1 px y un relleno más corto. Dos campos así seguidos comparten el filete.
+//
+// El control va en el slot y lleva el `id` que recibe `for`:
+//   - una línea: <input class="control" type="text" id="…" name="…" />
+//   - varias líneas: <textarea class="control control--area" id="…" name="…"></textarea> (cuatro renglones como mínimo,
+//     crece con su texto donde el navegador sabe hacerlo, y el visitante puede estirarlo hacia abajo)
+//   - lista: <Select id="…" name="…">…<option>s…</Select> (Select.astro)
+//   - cantidad: <Stepper id="…" … /> (Stepper.astro; su script va aparte, StepperScript.astro)
+// El slot `label` agrega algo dentro de la etiqueta, después del texto (por ejemplo una parte solo para el lector de
+// pantalla que un script completa: <span class="vh" slot="label" data-row-name></span>).
+//
+// Convenciones (las siguen las páginas):
+//   - Ids: la ayuda es `{for}-ayuda` y el error `{for}-error`. El control lleva aria-describedby="{for}-ayuda" si hay
+//     ayuda. El error se agrega a aria-describedby solo mientras se ve.
+//   - Mostrar un error (script de la página): escribir el texto con textContent en el elemento `[data-field-error]`
+//     del contenedor, quitar `hidden` del contenedor, poner aria-invalid="true" en el control, agregar `{for}-error` a
+//     su aria-describedby y llevar el foco al control. El campo se marca con una barra de tinta de 3 px en su borde
+//     izquierdo (con :has(); donde no lo hay, la página pone además la clase `field--invalid` en el campo).
+//     Quitarlo: lo contrario, y vaciar el texto. Si el error se quita porque el foco salió del campo con el puntero
+//     oprimiendo otro control, la línea conserva su lugar sin verse (clase `field__error--unseen`) mientras el puntero
+//     esté a su altura o más abajo: si se fuera antes, lo que está debajo se movería y el clic, o el clic siguiente,
+//     caería en otro lado.
+//   - Foco: con :has() el anillo se dibuja en la casilla entera y no en el control; sin :has(), el control conserva
+//     el anillo de siempre. Los tres elementos del Stepper llevan cada uno su anillo, dentro de su casilla.
+//   - El texto de ayuda es texto real: no se usa el placeholder para dar instrucciones.
+//
+// Uso:
+//   <Field label="Unidad" for="unidad" class="span-6 span-sm-12">
+//     <Select id="unidad" name="unidad"><option>par</option><option>caja</option></Select>
+//   </Field>
+//   <Field label="Cantidad" for="cantidad" error class="span-6 span-sm-12">
+//     <Stepper id="cantidad" name="cantidad" />
+//   </Field>
+import type { HTMLAttributes } from 'astro/types';
+import Icon from './Icon.astro';
+
+interface Props extends HTMLAttributes<'div'> {
+  /** Texto de la etiqueta. */
+  label: string;
+  /** `id` del control. */
+  for: string;
+  /** Texto de ayuda bajo el control (id `{for}-ayuda`). */
+  hint?: string;
+  /** Imprime el contenedor del error (id `{for}-error`, oculto). */
+  error?: boolean;
+  /** Dibuja su propio filete azul: para un campo dentro de una celda blanca más ancha. */
+  framed?: boolean;
+  class?: string;
+}
+
+const { label, for: htmlFor, hint, error = false, framed = false, class: className, ...attrs } = Astro.props;
+---
+<div class:list={['field', { 'field--framed': framed }, className]} {...attrs}>
+  <label class="field__label label" for={htmlFor}>{label}<slot name="label" /></label>
+  <slot />
+  {hint && <p class="field__hint" id={`${htmlFor}-ayuda`}>{hint}</p>}
+  {error && <p class="field__error" id={`${htmlFor}-error`} hidden><Icon name="alert-circle" class="icon--18" /><span data-field-error></span></p>}
+</div>

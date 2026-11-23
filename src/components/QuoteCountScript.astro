@@ -1,0 +1,46 @@
+---
+// Script del número junto a «Cotizar mi lista» (QuoteCount.astro). SOLO SCRIPT, sin marcado: SiteHeader lo imprime
+// UNA vez por página, al final del encabezado y fuera de todo enlace (el número va dentro de enlaces; ver el comentario
+// de QuoteCount.astro). Mismo patrón que PageLinkScript.astro y StepperScript.astro.
+//
+// Al cargar y con cada aviso de la lista guardada (`quoteStore.subscribe`, venga de donde venga: una escritura en esta
+// página, otra pestaña o la caché de ida y vuelta del navegador), el número es la cantidad de renglones guardados.
+// Para cada `[data-quote-count]`: `badgeText(n)` como texto y oculto con 0; su enlace se llama
+// «{texto del enlace}, {listCountLabel(n)}» («Cotizar mi lista, 3 productos») mientras n es mayor que 0, y sin
+// aria-label con 0. El texto de cada enlace se lee UNA vez, al cargar y sin el número: después de la primera vez el
+// texto del enlace ya incluye las cifras.
+// Solo lee: nunca escribe en la lista. No conoce nombres de productos (estas páginas no llevan el índice) ni escribe
+// textos del sitio: el texto es el del enlace y las frases salen de quote-list.mjs.
+---
+<script>
+  import { badgeText, listCountLabel } from '../lib/quote-list.mjs';
+  import { quoteStore } from '../lib/quote-store.mjs';
+  import type { QuoteLine } from '../types/quote.ts';
+
+  /** El texto que se ve de un enlace, sin el número: el nombre que lleva a la vista. */
+  function linkText(link: HTMLAnchorElement) {
+    const copy = link.cloneNode(true) as HTMLAnchorElement;
+    for (const badge of copy.querySelectorAll('[data-quote-count]')) badge.remove();
+    return (copy.textContent ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  const counts = [...document.querySelectorAll<HTMLElement>('[data-quote-count]')].flatMap(badge => {
+    const link = badge.closest('a');
+    return link ? [{ badge, link, text: linkText(link) }] : [];
+  });
+
+  function render(lines: readonly QuoteLine[]) {
+    const count = lines.length;
+    for (const { badge, link, text } of counts) {
+      badge.textContent = badgeText(count);
+      badge.hidden = count === 0;
+      if (count > 0) link.setAttribute('aria-label', `${text}, ${listCountLabel(count)}`);
+      else link.removeAttribute('aria-label');
+    }
+  }
+
+  if (counts.length > 0) {
+    render(quoteStore.read());
+    quoteStore.subscribe(lines => render(lines));
+  }
+</script>

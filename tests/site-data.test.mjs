@@ -6,7 +6,9 @@ import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 const { brands, catalog, examples } = await loadProjectData();
 const categoryIds = catalog.categories.map(category => category.id);
 const brandIds = brands.map(brand => brand.id);
-// Los diez ejemplos de los listados; el undécimo es el ejemplo de producto retirado (solo tiene su página).
+// Los dieciséis ejemplos de los listados; el último del archivo es el ejemplo de producto retirado (solo tiene su página).
+// Productos de ejemplo por categoría, en el orden del catálogo: tres guantes; dos de ojos, cabeza, respiratoria y calzado.
+const EXAMPLES_PER_CATEGORY = [3, 2, 2, 2, 1, 1, 1, 2, 1, 1];
 const exampleIds = examples.filter(example => example.retired !== true).map(example => example.id);
 const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 
@@ -63,23 +65,30 @@ test('producción ignora los ejemplos aunque se le entreguen, incluso si son inv
   assert.deepEqual(createSiteData({ mode: 'production', catalog, brands }).products, []);
 });
 
-test('vista previa con los datos reales: diez categorías en borrador y diez ejemplos', () => {
+test('vista previa con los datos reales: diez categorías en borrador y dieciséis ejemplos', () => {
   const site = preview();
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.deepEqual(site.categories.map(category => category.id), categoryIds);
-  assert.ok(site.categories.every(category => category.isDraft === true && category.productCount === 1));
+  assert.ok(site.categories.every(category => category.isDraft === true));
+  assert.deepEqual(site.categories.map(category => category.productCount), EXAMPLES_PER_CATEGORY);
   assert.deepEqual(site.products.map(product => product.id), exampleIds);
-  assert.equal(site.products.length, 10);
+  assert.equal(site.products.length, 16);
   assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
   assert.deepEqual(site.paths, { categoryIds, brandIds, productIds: exampleIds });
   // El ejemplo retirado no está en ningún listado: solo en su colección.
   assert.deepEqual(site.retiredProducts.map(product => product.id), [RETIRED_EXAMPLE_ID]);
   assert.equal(site.getProduct(RETIRED_EXAMPLE_ID), undefined);
+  // Cada ejemplo conserva su marca de ejemplo (la proyección no la cambia): tres marcas, ninguna con página.
+  assert.deepEqual(site.products.map(product => product.brandName), examples.filter(example => example.retired !== true).map(example => example.brandName));
+  assert.deepEqual([...new Set(site.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
+  assert.deepEqual(site.products.filter(product => product.brandName !== 'Marca de ejemplo').map(product => [product.code, product.brandName]), [
+    ['EJ-1003', 'Marca de ejemplo Beta'], ['EJ-1004', 'Marca de ejemplo Gamma'], ['EJ-2002', 'Marca de ejemplo Beta'],
+    ['EJ-3002', 'Marca de ejemplo Gamma'], ['EJ-4002', 'Marca de ejemplo Beta'], ['EJ-8002', 'Marca de ejemplo Gamma'],
+  ]);
   for (const product of site.products) {
     assert.equal(product.isExample, true);
     assert.equal(product.brandId, null);
-    assert.equal(product.brandName, 'Marca de ejemplo');
     assert.equal(product.image, null);
     assert.deepEqual(product.documents, []);
     assert.equal(product.url, `/productos/${product.id}/`);
@@ -103,7 +112,7 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
   assert.deepEqual(manos, {
     id: 'manos', name: 'Protección de manos', shortName: 'Manos',
     summary: 'Guantes recubiertos, de cuero, desechables, anticorte, para químicos y mangas',
-    isDraft: true, productCount: 1, url: '/categorias/manos/',
+    isDraft: true, productCount: 3, url: '/categorias/manos/',
   });
   assert.deepEqual(site.getBrand('ansell'), {
     id: 'ansell', name: 'Ansell', kind: 'brand',
@@ -127,10 +136,11 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
 
 test('búsquedas por id, por categoría y por marca, y selección de destacados', () => {
   const site = preview();
-  for (const id of categoryIds) {
+  categoryIds.forEach((id, index) => {
     assert.equal(site.getCategory(id)?.id, id);
-    assert.deepEqual(site.productsByCategory(id).map(product => product.categoryIds), [[id]]);
-  }
+    assert.deepEqual(site.productsByCategory(id).map(product => product.categoryIds), Array(EXAMPLES_PER_CATEGORY[index]).fill([id]));
+  });
+  assert.deepEqual(site.productsByCategory('manos').map(product => product.code), ['EJ-1001', 'EJ-1003', 'EJ-1004']);
   for (const id of exampleIds) assert.equal(site.getProduct(id)?.id, id);
   for (const id of brandIds) assert.equal(site.getBrand(id)?.id, id);
   assert.equal(site.getCategory('no-existe'), undefined);
@@ -139,11 +149,14 @@ test('búsquedas por id, por categoría y por marca, y selección de destacados'
   assert.deepEqual(site.productsByCategory('no-existe'), []);
   assert.deepEqual(site.productsByBrand('no-existe'), []);
   assert.deepEqual(site.featuredProducts(4).map(product => product.code), ['EJ-1001', 'EJ-2001', 'EJ-3001', 'EJ-4001']);
-  assert.equal(site.featuredProducts().length, 8);
-  assert.equal(site.featuredProducts(99).length, 10);
+  // Ocho destacados, uno por categoría en turno: los seis ejemplos nuevos no cambian la portada.
+  assert.deepEqual(site.featuredProducts().map(product => product.code), ['EJ-1001', 'EJ-2001', 'EJ-3001', 'EJ-4001', 'EJ-5001', 'EJ-6001', 'EJ-7001', 'EJ-8001']);
+  assert.equal(site.featuredProducts(99).length, 16);
   assert.deepEqual(site.featuredProducts(0), []);
   assert.deepEqual(site.featuredProducts(-3), []);
-  assert.equal(new Set(site.featuredProducts(10).map(product => product.id)).size, 10);
+  assert.equal(new Set(site.featuredProducts(16).map(product => product.id)).size, 16);
+  // Después de una vuelta por las diez categorías, la segunda toma el siguiente de cada una que todavía tiene.
+  assert.deepEqual(site.featuredProducts(16).slice(10).map(product => product.code), ['EJ-1003', 'EJ-2002', 'EJ-3002', 'EJ-4002', 'EJ-8002', 'EJ-1004']);
 });
 
 test('una ficha aprobada llega por getPublishedProducts con la forma pública y sin datos internos', () => {
@@ -176,8 +189,8 @@ test('vista previa con una ficha aprobada: la ficha real va primero y los ejempl
   const site = createSiteData({ mode: 'preview', catalog: syntheticCatalog(), brands, exampleProducts: examples });
   assert.deepEqual(site.categories.map(category => category.isDraft), [false, ...Array(9).fill(true)]);
   assert.deepEqual(site.products.map(product => product.id), ['test-001', ...exampleIds]);
-  assert.deepEqual(site.products.map(product => product.isExample), [false, ...Array(10).fill(true)]);
-  assert.equal(site.getCategory('manos')?.productCount, 2);
+  assert.deepEqual(site.products.map(product => product.isExample), [false, ...Array(16).fill(true)]);
+  assert.equal(site.getCategory('manos')?.productCount, 4);
   // Los destacados recorren las categorías por turnos: no se agotan en la primera.
   assert.deepEqual(site.featuredProducts(3).map(product => product.code), ['TEST-001/A', 'EJ-2001', 'EJ-3001']);
   assert.deepEqual(site.featuredProducts(11).at(-1)?.code, 'EJ-1001');
@@ -223,7 +236,7 @@ test('los datos devueltos están congelados y no comparten memoria con los archi
   // Los resultados de los ayudantes son listas nuevas: se pueden ordenar sin afectar a nadie.
   const list = site.productsByCategory('manos');
   list.pop();
-  assert.equal(site.productsByCategory('manos').length, 1);
+  assert.equal(site.productsByCategory('manos').length, 3);
   assert.notEqual(site.featuredProducts(2), site.featuredProducts(2));
   assert.equal(examples[0].variants.length, 4);
   assert.ok(!Object.isFrozen(examples[0]) && !Object.isFrozen(brands[0]) && !Object.isFrozen(catalog.categories[0]));
@@ -276,14 +289,14 @@ test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', as
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID), undefined);
 });
 
-test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async () => {
+test('site-data.mjs en vista previa: diez categorías y dieciséis ejemplos', async () => {
   globalThis.__CATALOG_PREVIEW__ = true;
   const site = await import('../src/lib/site-data.mjs?vista-previa');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.equal(site.categories.length, 10);
-  assert.equal(site.products.length, 10);
+  assert.equal(site.products.length, 16);
   assert.equal(site.brands.length, 19);
   assert.deepEqual(site.paths, { categoryIds, brandIds, productIds: exampleIds });
   assert.equal(site.getProduct('ejemplo-orejera')?.code, 'EJ-5001');
@@ -293,7 +306,8 @@ test('site-data.mjs en vista previa: diez categorías y diez ejemplos', async ()
   assert.equal(site.routes.catalog, '/catalogo/');
   assert.deepEqual(site.retiredProducts.map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID)?.categoryIds[0], 'manos');
-  assert.equal(site.getCategory('manos')?.productCount, 1);
+  assert.equal(site.getCategory('manos')?.productCount, 3);
+  assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.brandName, 'Marca de ejemplo Beta');
 });
 
 test('site-data.mjs no se puede cargar en un navegador ni fuera de una compilación', async () => {

@@ -1,30 +1,47 @@
 ---
 // Botón sólido (`.btn`): un enlace con aspecto de botón para la acción principal de un bloque.
-// Variantes: azul (por omisión) e `inverse` (blanco, para usarlo sobre la banda azul). `block` ocupa todo el ancho.
-// Sin `href` se imprime un <button>: úsalo solo si un script le da una función (nunca un control que no hace nada).
+// Variantes: azul (por omisión), `inverse` (blanco, para usarlo sobre la banda azul) y `outline` (blanco con filete
+// azul de 1 px y texto azul: la acción secundaria de un bloque). `block` ocupa todo el ancho.
+// Con `type` y sin `href` se imprime un <button>: `type="button"` si lo atiende un script de la página (nunca un
+// control que no hace nada), `type="submit"` si envía su formulario. El botón lleva su propio gancho `data-*` y recibe
+// todos los demás atributos (`data-*`, `aria-*`, `id`, `hidden`). Con aria-disabled="true" se ve apagado y no cambia
+// al pasar el puntero.
+// Hay que escribir uno de los dos, `href` o `type`, y nunca los dos; los tipos lo exigen. Así un `href` que puede
+// faltar no pasa `npm run check`, y un enlace sin destino nunca se vuelve en silencio un botón que no hace nada.
+//
+// Uso:  <Button href={general.whatsapp} icon="whatsapp">Contactar por WhatsApp</Button>
+//       <Button type="button" variant="outline" icon="copy" data-copy-request>Copiar solicitud</Button>
 import type { HTMLAttributes } from 'astro/types';
 import type { IconName } from '../lib/icons.ts';
 import Icon from './Icon.astro';
 
-interface Props extends Omit<HTMLAttributes<'a'>, 'type'> {
-  /** Destino. Sin él se imprime <button type={type}>. */
-  href?: string;
-  variant?: 'primary' | 'inverse';
+interface Shared extends Omit<HTMLAttributes<'a'>, 'type' | 'href'> {
+  variant?: 'primary' | 'inverse' | 'outline';
   /** Ocupa todo el ancho de su celda. */
   block?: boolean;
   /** Icono antes del texto (por ejemplo `whatsapp`). */
   icon?: IconName;
   /** Icono después del texto (por ejemplo `arrow-right`). */
   iconEnd?: IconName;
-  /** Solo para <button>. */
-  type?: 'button' | 'submit';
 }
+/** Un enlace: `href` es un texto, nunca `undefined`. */
+interface AsLink extends Shared {
+  href: string;
+  type?: never;
+}
+/** Un botón: sin `href` y con `type` escrito. */
+interface AsButton extends Shared {
+  href?: never;
+  /** `button` (lo atiende un script de la página) o `submit` (envía su formulario). */
+  type: 'button' | 'submit';
+}
+type Props = AsLink | AsButton;
 
 const { href, variant = 'primary', block = false, icon, iconEnd, type = 'button', class: className, ...attrs } = Astro.props;
-const classes = ['btn', { 'btn--inverse': variant === 'inverse', 'btn--block': block }, className];
+const classes = ['btn', { 'btn--inverse': variant === 'inverse', 'btn--outline': variant === 'outline', 'btn--block': block }, className];
 ---
-{href ? (
-  <a class:list={classes} href={href} {...attrs}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</a>
+{href !== undefined ? (
+  <a class:list={classes} href={href} {...(attrs as HTMLAttributes<'a'>)}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</a>
 ) : (
   <button class:list={classes} type={type} {...(attrs as HTMLAttributes<'button'>)}>{icon && <Icon name={icon} />}<span><slot /></span>{iconEnd && <Icon name={iconEnd} />}</button>
 )}

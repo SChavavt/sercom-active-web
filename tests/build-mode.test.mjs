@@ -6,17 +6,19 @@ import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, posix } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 import { isPreviewFlag, PREVIEW_FLAG, previewFlagWarning } from '../src/lib/build-mode.mjs';
 import { listFiles, readJson, readText, ROOT } from './helpers.mjs';
 
 const packageJson = await readJson('package.json');
 const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path}`);
 // Código sin comentarios: los comentarios pueden nombrar archivos que el código no importa.
-// («//» solo cuenta como comentario al inicio de la línea o después de un espacio, para no cortar «https://…».)
+// («//» y «/*» solo abren un comentario al inicio de la línea o después de un espacio: así «//» no corta «https://…» y
+// el «/*» de una expresión regular como `/^\/*/` no esconde el código que sigue hasta el siguiente «*/».)
 // Un texto entre comillas se salta entero: «'../data/**/*.json'» lleva «/**/», que no es un comentario. Las comillas
 // simples y dobles no pasan de una línea, así que un apóstrofo suelto del texto de una página solo afecta a su línea.
-const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
-const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, before) => string ?? before ?? '');
+const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|(^|\s)\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
+const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, beforeBlock, beforeLine) => string ?? beforeBlock ?? beforeLine ?? '');
 // Tipos de archivo que leen las pruebas de las fuentes (ejemplos, colecciones, disco, capa de datos, datos de contacto):
 // las páginas y componentes .astro, los scripts y las hojas de estilo. No leen Markdown, MDX ni HTML.
 const SOURCE_FILE = /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/;
@@ -712,41 +714,297 @@ test('src/pages/ solo tiene páginas de los tipos que leen las pruebas de las fu
   assert.deepEqual(unread, [], 'una página de src/pages/ es de un tipo que las pruebas de las fuentes no leen (capa de datos, datos de contacto, ejemplos, disco): antes de agregarla, haz que esas pruebas lean ese tipo (SOURCE_FILE en tests/build-mode.test.mjs) y que revisen su contenido');
 });
 
-test('los módulos para el navegador no importan datos ni usan APIs de Node o de Astro', () => {
-  const allowed = {
-    'src/lib/text.mjs': [],
-    'src/lib/search.mjs': ['./text.mjs'],
-    'src/lib/routes.mjs': ['./search.mjs'],
-    'src/lib/contact-core.mjs': ['./text.mjs'],
+// Lo que llega al navegador. Astro empaqueta cada <script> de una plantilla con todo lo que importa, de módulo en
+// módulo: un módulo nuevo de src/lib/ que importa site-data.mjs llevaría el catálogo al JavaScript público aunque
+// ningún script nombre site-data.mjs. Por eso la revisión no compara nombres: parte de cada <script> de src/, sigue
+// cada importación hasta el final y exige que cada módulo alcanzado esté en BROWSER_MODULES, con sus importaciones
+// exactas y sin datos ni APIs de Node o de Astro. Una entrada que ningún script alcanza también falla: el mapa es la
+// lista de lo que llega al navegador, y una entrada de más ataría a estas reglas un módulo que ya solo corre al compilar.
+//
+// Los módulos para el navegador, cada uno con lo que carga al ejecutarse, en el orden del archivo.
+const BROWSER_MODULES = {
+  'src/lib/text.mjs': [],
+  'src/lib/search.mjs': ['./text.mjs'],
+  'src/lib/routes.mjs': ['./search.mjs'],
+  'src/lib/contact-core.mjs': ['./text.mjs'],
+  'src/lib/catalog-filters.mjs': ['./routes.mjs', './search.mjs', './text.mjs'],
+  'src/lib/quote-list.mjs': ['./text.mjs'],
+  'src/lib/quote-store.mjs': ['./quote-list.mjs'],
+  'src/lib/message-page.mjs': ['./contact-core.mjs'],
+};
+// Lo que un script de navegador puede importar fuera de src/ (un paquete, una dirección), cada uno con su motivo. Hoy
+// nada: los scripts solo importan módulos de src/lib/ y tipos de src/types/, que no cargan nada.
+const BROWSER_PACKAGES = {};
+// Lo que solo corre al compilar: la capa de datos, lo que la arma y la valida, y cualquier archivo de datos. Un script
+// que alcanza uno lleva los datos al navegador; la revisión no sigue lo que ese módulo importa.
+const BUILD_ONLY = /^src\/data\/|\.json$|^src\/lib\/(?:site-data|site-data-core|contact|catalog-policy|build-mode)\.mjs$/;
+// Lo que no usa el código de un módulo para el navegador ni el de un <script> (leído sin comentarios).
+const BROWSER_FORBIDDEN = /\bnode:|\bastro:|\bprocess\.|import\.meta|\brequire\(|\.json\b|__CATALOG_PREVIEW__/;
+// Un bloque de datos (`<script type="application/json">`): el navegador no lo ejecuta.
+const DATA_BLOCK = /\stype\s*=\s*(["'])application\/(?:ld\+)?json\1/i;
+const SCRIPT_ELEMENT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// Extensiones que Vite prueba, en este orden, cuando la ruta de una importación no lleva ninguna (resolve.extensions).
+const VITE_EXTENSIONS = ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json'];
+const CODE_MODULE = /\.(?:[cm]?[jt]s|[jt]sx)$/;
+const JS_MODULE = /\.(?:[cm]?js|jsx)$/;
+
+/**
+ * Lo que carga al ejecutarse un código (un módulo o el cuerpo de un <script>), leído con el analizador de TypeScript y
+ * no con expresiones: los comentarios son los que ve el compilador, así que un «/*» dentro de una expresión regular no
+ * esconde la importación que sigue. Devuelve las rutas de `import … from '…'`, `import '…'`, `export … from '…'` e
+ * `import('…')`, en el orden del archivo; cada `import()` cuya ruta no es un texto entre comillas (una variable, una
+ * plantilla, una expresión), y el código sin comentarios. No cuentan las menciones solo de tipo, que el compilador
+ * borra: `import type`, `export type … from`, `typeof import('…')` y los tipos de JSDoc. `import { type A } from '…'`
+ * sí cuenta: con verbatimModuleSyntax (activo en astro/tsconfigs/base.json) equivale a `import {} from '…'`, que carga
+ * el módulo. La compilación de Astro 7.4 lo borra (medido); la revisión no depende de eso y lo lee de más: para un
+ * tipo se escribe `import type`.
+ * @param {string} text
+ * @param {boolean} javascript `true` para un módulo .js o .mjs; el cuerpo de un <script> de Astro es TypeScript.
+ */
+function runtimeImports(text, javascript) {
+  const source = ts.createSourceFile('codigo', text, ts.ScriptTarget.Latest, true, javascript ? ts.ScriptKind.JS : ts.ScriptKind.TS);
+  const specifiers = [];
+  const computed = [];
+  const visit = node => {
+    // `import type` se marca en la cláusula (`phaseModifier`, como `import defer`); `export type`, en la declaración.
+    const typeOnly = ts.isImportDeclaration(node) ? node.importClause?.phaseModifier === ts.SyntaxKind.TypeKeyword : ts.isExportDeclaration(node) && node.isTypeOnly;
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && !typeOnly) {
+      if (node.moduleSpecifier) specifiers.push(ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : node.moduleSpecifier.getText(source));
+    } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [argument] = node.arguments;
+      if (argument && ts.isStringLiteral(argument)) specifiers.push(argument.text);
+      else computed.push(node.getText(source));
+    }
+    ts.forEachChild(node, visit);
   };
-  for (const [path, imports] of Object.entries(allowed)) {
-    const code = sources.get(path);
-    assert.ok(code, path);
-    assert.deepEqual(importsOf(code), imports, path);
-    assert.doesNotMatch(code, /\bnode:|\bastro:|\bprocess\.|import\.meta|\brequire\(|\.json\b|__CATALOG_PREVIEW__/, path);
+  visit(source);
+  return { specifiers, computed, code: ts.createPrinter({ removeComments: true }).printFile(source) };
+}
+
+/**
+ * Archivo de src/ al que Vite lleva una importación de `from`, o `undefined` si no hay ninguno: «./» y «../» desde la
+ * carpeta de `from`, «/» desde la raíz del proyecto; sin extensión, con las de Vite o como carpeta con `index`; «.js»
+ * también como «.ts», como lo resuelve Vite desde TypeScript. Un paquete, una dirección («https:», «//»), una ruta que
+ * sale de src/ o un archivo que no está en `files` dan `undefined`.
+ * @param {Map<string, string>} files
+ */
+function resolveBrowserSpecifier(files, from, specifier) {
+  let base;
+  if (specifier.startsWith('/')) base = posix.normalize(specifier.slice(1));
+  else if (specifier.startsWith('./') || specifier.startsWith('../')) base = posix.join(posix.dirname(from), specifier);
+  if (!base?.startsWith('src/')) return undefined;
+  const candidates = [base, ...VITE_EXTENSIONS.map(extension => `${base}${extension}`), ...VITE_EXTENSIONS.map(extension => `${base}/index${extension}`),
+    base.replace(/\.([cm]?)js(x?)$/, '.$1ts$2')];
+  return candidates.find(candidate => files.has(candidate));
+}
+
+/**
+ * Lo que alcanzan los <script> de las plantillas .astro de `files`, siguiendo cada importación de módulo en módulo, y
+ * lo que falla. La plantilla se lee tal cual, sin el frontmatter (que corre al compilar) y con sus comentarios: un
+ * <script> dentro de un comentario también se revisa. Por sus atributos:
+ * - sin atributos: Astro lo empaqueta con todo lo que importa; se sigue cada importación.
+ * - un bloque de datos (`type="application/json"` o `"application/ld+json"`): no se ejecuta; no se lee.
+ * - `src`: falla. El código del sitio se carga con import dentro del <script>, que es lo que esta revisión sigue.
+ * - cualquier otro (`is:inline`, `type="module"`, `defer`…): Astro lo deja tal cual y el navegador pediría cada ruta
+ *   a la dirección publicada, sin empaquetar. Puede llevar código, pero ninguna importación.
+ * @param {Map<string, string>} files Todos los archivos de src/ («src/lib/x.mjs») con su contenido tal cual.
+ * @param {Record<string, string[]>} [modules] El mapa de módulos para el navegador.
+ * @param {Record<string, string>} [packages] Lo que se puede importar fuera de src/, con su motivo.
+ * @returns {{ scripts: number, reached: Map<string, string[]>, problems: { kind: string, path: string, message: string }[] }}
+ *   `scripts`: los <script> con código; `reached`: cada archivo alcanzado con la cadena de importaciones desde la
+ *   plantilla; `problems`: cada falla con su tipo, el archivo donde está y un mensaje que dice qué hacer.
+ */
+function browserReach(files, modules = BROWSER_MODULES, packages = BROWSER_PACKAGES) {
+  const problems = [];
+  const report = (kind, path, message) => problems.push({ kind, path, message: `${path}: ${message}` });
+  const reached = new Map();
+  const queue = [];
+  let scripts = 0;
+  const checkCode = (path, { code, computed }) => {
+    const forbidden = code.match(BROWSER_FORBIDDEN);
+    if (forbidden) report('contenido', path, `usa «${forbidden[0]}» (una API de Node o de Astro, import.meta, require(), un .json o la constante de la vista previa): el código que llega al navegador no lee datos ni depende de la compilación`);
+    for (const call of computed) report('dinamico', path, `${call}: la ruta de import() no es un texto entre comillas y la revisión no puede saber qué carga; escríbela entera, como texto`);
+  };
+  const follow = (chain, specifier) => {
+    const from = chain.at(-1);
+    if (Object.hasOwn(packages, specifier)) return;
+    if (/[?#]/.test(specifier)) {
+      report('sufijo', from, `importa «${specifier}»: un sufijo de Vite (?raw, ?url, ?worker…) cambia lo que se carga y la revisión no lo sigue; importa el módulo sin sufijo`);
+      return;
+    }
+    const target = resolveBrowserSpecifier(files, from, specifier);
+    if (!target) {
+      report('fuera', from, `importa «${specifier}», que no es un archivo de src/ (un paquete, una dirección, una ruta que sale de src/ o un archivo que no existe): un script de navegador solo importa módulos de src/; lo de fuera se agrega a BROWSER_PACKAGES de tests/build-mode.test.mjs con su motivo`);
+      return;
+    }
+    if (reached.has(target)) return;
+    reached.set(target, [...chain, target]);
+    queue.push(target);
+  };
+
+  for (const [path, text] of files) {
+    if (!path.endsWith('.astro')) continue;
+    const template = text.replace(/^---\r?\n[\s\S]*?\r?\n---/, '');
+    const elements = [...template.matchAll(SCRIPT_ELEMENT)];
+    if (elements.length !== (template.match(/<script\b/gi) ?? []).length) {
+      report('sin-cerrar', path, 'hay un <script> que la revisión no reconoce: ciérralo con </script> y no escribas «>» en sus atributos');
+    }
+    for (const [, attributes, body] of elements) {
+      if (DATA_BLOCK.test(attributes)) continue;
+      scripts += 1;
+      if (/\ssrc\s*=/i.test(attributes)) {
+        report('src', path, `<script${attributes}> carga código con «src», que esta revisión no sigue: escribe el import dentro de un <script> sin atributos`);
+        continue;
+      }
+      const loads = runtimeImports(body, false);
+      checkCode(path, loads);
+      if (attributes.trim()) {
+        if (loads.specifiers.length > 0) report('en-linea', path, `<script${attributes}> importa «${loads.specifiers.join('», «')}»: Astro no empaqueta un <script> con atributos y el navegador pediría esa ruta a la dirección publicada; quita los atributos o la importación`);
+        continue;
+      }
+      for (const specifier of loads.specifiers) follow([path], specifier);
+    }
   }
+
+  // La cola crece mientras se recorre: cada módulo alcanzado se lee una vez.
+  for (const path of queue) {
+    const via = reached.get(path).join(' → ');
+    if (BUILD_ONLY.test(path)) {
+      report('compilacion', path, `lo alcanza un script de navegador (${via}) y solo corre al compilar: llevaría los datos al JavaScript público. Ningún script lo importa, ni directa ni indirectamente; los datos viajan en el HTML (docs/datos-y-modos.md, sección 2)`);
+      continue;
+    }
+    if (!CODE_MODULE.test(path)) {
+      report('no-modulo', path, `lo alcanza un script de navegador (${via}) y no es un módulo de JavaScript ni de TypeScript: un script de navegador solo importa módulos`);
+      continue;
+    }
+    const loads = runtimeImports(files.get(path), JS_MODULE.test(path));
+    if (!Object.hasOwn(modules, path)) {
+      report('sin-listar', path, `lo alcanza un script de navegador (${via}) y no está en BROWSER_MODULES de tests/build-mode.test.mjs: si es un módulo sin datos, agrégalo con sus importaciones; si lee datos, ningún script lo importa (los datos viajan en el HTML)`);
+    } else if (JSON.stringify(loads.specifiers) !== JSON.stringify(modules[path])) {
+      report('importaciones', path, `importa ${JSON.stringify(loads.specifiers)} y BROWSER_MODULES dice ${JSON.stringify(modules[path])}: lo nuevo también llega al navegador; si es apto, corrige su lista en tests/build-mode.test.mjs`);
+    }
+    checkCode(path, loads);
+    for (const specifier of loads.specifiers) follow(reached.get(path), specifier);
+  }
+  for (const path of Object.keys(modules)) {
+    if (!reached.has(path)) report('sobrante', path, 'está en BROWSER_MODULES y ningún <script> lo alcanza: quítalo del mapa, que es la lista de lo que llega al navegador');
+  }
+  return { scripts, reached, problems };
+}
+
+// El árbol de hoy, con el que se comparan los casos de abajo: cada caso agrega o cambia archivos y espera solo sus fallas.
+const siteReach = browserReach(allSources);
+const siteProblems = new Set(siteReach.problems.map(problem => problem.message));
+/** Fallas nuevas («tipo archivo», ordenadas) del árbol de hoy con estos archivos agregados o cambiados. */
+const reachProblems = (extra, modules, packages) => browserReach(new Map([...allSources, ...Object.entries(extra)]), modules, packages).problems
+  .filter(problem => !siteProblems.has(problem.message)).map(problem => `${problem.kind} ${problem.path}`).sort();
+const NEW_PAGE = 'src/components/Nuevo.astro';
+const BRIDGE = 'src/lib/puente.mjs';
+/** Una plantilla con un <script> que lleva `body`. */
+const withScript = body => `---\nimport Icon from './Icon.astro';\n---\n<p>Nuevo</p>\n<script>\n  ${body}\n</script>\n`;
+
+test('los módulos para el navegador no importan datos ni usan APIs de Node o de Astro', () => {
+  const messages = siteReach.problems.map(problem => problem.message);
+  assert.deepEqual(messages, [], messages.join('\n'));
+  // El sitio tiene scripts de navegador (la plantilla base y el encabezado, al menos): la revisión no puede pasar sin ver ninguno.
+  assert.ok(siteReach.scripts > 0, 'la revisión no encontró ningún <script> en las plantillas');
+  assert.deepEqual([...siteReach.reached.keys()].sort(), Object.keys(BROWSER_MODULES).sort());
 });
 
 test('ningún <script> de navegador importa los módulos de datos', () => {
-  const buildOnly = /site-data|contact\.mjs|catalog-policy|build-mode|\.json|\/data\//;
-  let scripts = 0;
-  for (const [path, code] of sources) {
-    if (!path.endsWith('.astro')) continue;
-    const template = code.replace(/^---\r?\n[\s\S]*?\r?\n---/, '');
-    // Cada <script> de la plantilla pasa por la revisión: si la expresión dejara de reconocerlos, la prueba falla.
-    const opened = (template.match(/<script\b/gi) ?? []).length;
-    assert.equal([...template.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].length, opened, `${path}: hay un <script> que la revisión no reconoce`);
-    for (const match of template.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
-      scripts += 1;
-      for (const specifier of importsOf(match[2])) assert.doesNotMatch(specifier, buildOnly, `${path}: un <script> importa ${specifier}`);
-      assert.doesNotMatch(match[1], /\bsrc=["'][^"']*(?:site-data|contact\.mjs|\.json)/, path);
-    }
-  }
-  // La comprobación sí reconoce una importación indebida.
-  const misuse = "<script>\n  import { products } from '../lib/site-data.mjs';\n</script>";
-  assert.match(importsOf(misuse.replace(/<\/?script>/g, ''))[0], buildOnly);
-  // El sitio tiene scripts de navegador (la plantilla base y el encabezado, al menos): la revisión no puede pasar sin ver ninguno.
-  assert.ok(scripts > 0, 'la revisión no encontró ningún <script> en las plantillas');
+  const cases = [
+    // Directamente, como texto con la ruta completa, sin extensión o desde la raíz.
+    [{ [NEW_PAGE]: withScript("import { products } from '../lib/site-data.mjs';") }, ['compilacion src/lib/site-data.mjs']],
+    [{ [NEW_PAGE]: withScript("import { products } from '../lib/site-data';") }, ['compilacion src/lib/site-data.mjs']],
+    [{ [NEW_PAGE]: withScript("import { contactLinks } from '/src/lib/contact.mjs';") }, ['compilacion src/lib/contact.mjs']],
+    // Las dos que pasaban antes: un módulo nuevo entre el script y la capa de datos, con import y con import().
+    [{ [NEW_PAGE]: withScript("import { todo } from '../lib/puente.mjs';"), [BRIDGE]: "import { products } from './site-data.mjs';\nexport const todo = products;" },
+      ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/puente.mjs']],
+    [{ [NEW_PAGE]: withScript("const modulo = await import('../lib/puente.mjs');"), [BRIDGE]: "import { contactDetails } from './contact.mjs';\nexport const x = contactDetails;" },
+      ['compilacion src/lib/contact.mjs', 'sin-listar src/lib/puente.mjs']],
+    // Una cadena de tres módulos que termina en site-data.mjs.
+    [{
+      [NEW_PAGE]: withScript("import { a } from '../lib/uno.mjs';"), 'src/lib/uno.mjs': "export { b as a } from './dos.mjs';",
+      'src/lib/dos.mjs': "import { c } from './tres.mjs';\nexport const b = c;", 'src/lib/tres.mjs': "import { brands } from './site-data.mjs';\nexport const c = brands;",
+    }, ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/dos.mjs', 'sin-listar src/lib/tres.mjs', 'sin-listar src/lib/uno.mjs']],
+    // Importación por efecto, reexportación con nombre y con «*», import() con texto dentro de un módulo.
+    [{ [NEW_PAGE]: withScript("import '../lib/puente.mjs';"), [BRIDGE]: "import './site-data.mjs';" }, ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/puente.mjs']],
+    [{ [NEW_PAGE]: withScript("import { products } from '../lib/puente.mjs';"), [BRIDGE]: "export { products } from './site-data.mjs';" }, ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/puente.mjs']],
+    [{ [NEW_PAGE]: withScript("import { contactLinks } from '../lib/puente.mjs';"), [BRIDGE]: "export * from './contact.mjs';" }, ['compilacion src/lib/contact.mjs', 'sin-listar src/lib/puente.mjs']],
+    [{ [NEW_PAGE]: withScript("import { cargar } from '../lib/puente.mjs';"), [BRIDGE]: "export const cargar = () => import('./site-data.mjs');" }, ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/puente.mjs']],
+    // import() con una ruta calculada, en el script o en un módulo: falla aunque no se sepa qué carga.
+    [{ [NEW_PAGE]: withScript("const ruta = '../lib/site-data.mjs';\n  const modulo = await import(ruta);") }, ['dinamico src/components/Nuevo.astro']],
+    [{ [NEW_PAGE]: withScript("import { cargar } from '../lib/puente.mjs';"), [BRIDGE]: 'export const cargar = nombre => import(`./${nombre}.mjs`);' }, ['dinamico src/lib/puente.mjs', 'sin-listar src/lib/puente.mjs']],
+    // Un módulo sin datos que no está en el mapa también falla: hay que listarlo.
+    [{ [NEW_PAGE]: withScript("import { x } from '../lib/puente.mjs';"), [BRIDGE]: 'export const x = 1;' }, ['sin-listar src/lib/puente.mjs']],
+    // Un módulo que importa un .json, de datos o de otra carpeta.
+    [{ [NEW_PAGE]: withScript("import { x } from '../lib/puente.mjs';"), [BRIDGE]: "import catalogo from '../data/catalog.json' with { type: 'json' };\nexport const x = catalogo;" },
+      ['compilacion src/data/catalog.json', 'contenido src/lib/puente.mjs', 'sin-listar src/lib/puente.mjs']],
+    [{ [NEW_PAGE]: withScript("import { x } from '../lib/puente.mjs';"), [BRIDGE]: "import kit from '../assets/icons/icons.json';\nexport const x = kit;" },
+      ['compilacion src/assets/icons/icons.json', 'contenido src/lib/puente.mjs', 'sin-listar src/lib/puente.mjs']],
+    // Un módulo del mapa que empieza a importar datos o a usar una API de Node.
+    [{ 'src/lib/quote-list.mjs': "import { products } from './site-data.mjs';\nexport const x = products;" }, ['compilacion src/lib/site-data.mjs', 'importaciones src/lib/quote-list.mjs']],
+    [{ 'src/lib/text.mjs': `${allSources.get('src/lib/text.mjs')}\nexport const modo = process.env.NODE_ENV;` }, ['contenido src/lib/text.mjs']],
+  ];
+  for (const [extra, expected] of cases) assert.deepEqual(reachProblems(extra), expected, Object.values(extra).join('\n---\n'));
+
+  // El mensaje lleva la cadena completa, desde la plantilla.
+  const chain = browserReach(new Map([...allSources, ...Object.entries(cases[5][0])])).problems.find(problem => problem.kind === 'compilacion');
+  assert.match(chain.message, /\(src\/components\/Nuevo\.astro → src\/lib\/uno\.mjs → src\/lib\/dos\.mjs → src\/lib\/tres\.mjs → src\/lib\/site-data\.mjs\)/);
+  // Un módulo nuevo sin datos pasa cuando está en el mapa con sus importaciones; una entrada que nadie alcanza falla.
+  const bridge = { [NEW_PAGE]: withScript("import { x } from '../lib/puente.mjs';"), [BRIDGE]: "import { normalizeText } from './text.mjs';\nexport const x = normalizeText('a');" };
+  assert.deepEqual(reachProblems(bridge, { ...BROWSER_MODULES, [BRIDGE]: ['./text.mjs'] }), []);
+  assert.deepEqual(reachProblems(bridge, { ...BROWSER_MODULES, [BRIDGE]: [] }), ['importaciones src/lib/puente.mjs']);
+  assert.deepEqual(reachProblems({}, { ...BROWSER_MODULES, 'src/lib/viejo.mjs': [] }), ['sobrante src/lib/viejo.mjs']);
+});
+
+test('la revisión de los scripts del navegador lee cada <script> y cada forma de importar', () => {
+  const page = template => ({ [NEW_PAGE]: template });
+  const cases = [
+    // Solo de tipo: el compilador lo borra y no carga nada.
+    [page(withScript("import type { QuoteLine } from '../types/quote.ts';\n  import type { products } from '../lib/site-data.mjs';\n  export type { PublicBrand } from '../types/site.ts';\n  let datos: typeof import('../lib/site-data.mjs') | undefined;\n  const lineas: QuoteLine[] = [];")), []],
+    // `import { type A }` sí se sigue (ver runtimeImports): el tipo se importa con `import type`.
+    [page(withScript("import { type QuoteLine } from '../types/quote.ts';")), ['sin-listar src/types/quote.ts']],
+    // Un valor de un archivo .ts sí llega al navegador: se sigue y tiene que estar en el mapa.
+    [{ ...page(withScript("import { doble } from '../lib/util.ts';")), 'src/lib/util.ts': 'export const doble = (n: number): number => n * 2;' }, ['sin-listar src/lib/util.ts']],
+    [{ ...page(withScript("import { doble } from '../lib/util.js';")), 'src/lib/util.ts': 'export const doble = (n: number): number => n * 2;' }, ['sin-listar src/lib/util.ts']],
+    [{ ...page(withScript("import { x } from '../lib/datos';")), 'src/lib/datos/index.mjs': "export * from '../site-data.mjs';" }, ['compilacion src/lib/site-data.mjs', 'sin-listar src/lib/datos/index.mjs']],
+    // Lo que no es un archivo de src/: un paquete, un módulo de Astro, una dirección, una ruta que sale de src/, un archivo que no existe.
+    [page(withScript("import { debounce } from 'lodash-es';")), ['fuera src/components/Nuevo.astro']],
+    [page(withScript("import { navigate } from 'astro:transitions/client';")), ['contenido src/components/Nuevo.astro', 'fuera src/components/Nuevo.astro']],
+    [page(withScript("import { x } from 'https://cdn.example.com/x.mjs';")), ['fuera src/components/Nuevo.astro']],
+    [page(withScript("import { x } from '//cdn.example.com/x.mjs';")), ['fuera src/components/Nuevo.astro']],
+    [page(withScript("import { scan } from '../../scripts/scan-dist.mjs';")), ['fuera src/components/Nuevo.astro']],
+    [page(withScript("import { x } from '../lib/no-existe.mjs';")), ['fuera src/components/Nuevo.astro']],
+    // Un sufijo de Vite cambia lo que se carga.
+    [page(withScript("import texto from '../lib/site-data.mjs?raw';")), ['sufijo src/components/Nuevo.astro']],
+    // El código del script sigue la misma regla que los módulos.
+    [page(withScript('const modo = import.meta.env.MODE;')), ['contenido src/components/Nuevo.astro']],
+    // Por sus atributos: `src` falla; uno que Astro no empaqueta no importa nada; un bloque de datos no se lee.
+    [page('<script src="../lib/text.mjs"></script>'), ['src src/components/Nuevo.astro']],
+    [page("<script is:inline>import '../lib/text.mjs';</script>"), ['en-linea src/components/Nuevo.astro']],
+    [page("<script type=\"module\">const { x } = await import('../lib/text.mjs');</script>"), ['en-linea src/components/Nuevo.astro']],
+    [page("<script is:inline>document.documentElement.classList.add('js');</script>"), []],
+    [page('<script type="application/json" data-indice>{"ruta": "../lib/site-data.mjs", "datos": "catalog.json"}</script>'), []],
+    [page("<script type='application/ld+json'>{\"@context\": \"https://schema.org\"}</script>"), []],
+    // Un <script> sin cerrar no se puede leer.
+    [page("<p>Nuevo</p>\n<script>\n  import { products } from '../lib/site-data.mjs';\n"), ['sin-cerrar src/components/Nuevo.astro']],
+    // Lo que parece un comentario y no lo es no esconde la importación: un «//» en el texto de la plantilla, un «/*» en
+    // una expresión regular. Un <script> dentro de un comentario de la plantilla también se lee.
+    [page("<p>Medidas // talla</p><script>import { products } from '../lib/site-data.mjs';</script>"), ['compilacion src/lib/site-data.mjs']],
+    [page(withScript("const separador = /[ /*]/;\n  import { products } from '../lib/site-data.mjs';\n  // */")), ['compilacion src/lib/site-data.mjs']],
+    [page("<!-- <script>import '../lib/site-data.mjs';</script> -->"), ['compilacion src/lib/site-data.mjs']],
+    // Un comentario de verdad no carga nada, y el frontmatter corre al compilar.
+    [page(withScript("// import { products } from '../lib/site-data.mjs';\n  /* const m = await import('../lib/contact.mjs'); */\n  /** @type {import('../lib/site-data.mjs').products} */\n  const x = 1;")), []],
+    [page("---\nimport { products } from '../lib/site-data.mjs';\n---\n<p>{products.length}</p>"), []],
+  ];
+  for (const [extra, expected] of cases) assert.deepEqual(reachProblems(extra), expected, Object.values(extra).join('\n---\n'));
+  // Lo que se agrega a BROWSER_PACKAGES con su motivo pasa y no se sigue.
+  assert.deepEqual(reachProblems(page(withScript("import { debounce } from 'lodash-es';")), BROWSER_MODULES, { 'lodash-es': 'motivo' }), []);
+  // Las cuentas: cada script con código cuenta una vez; un bloque de datos no cuenta.
+  const counted = browserReach(new Map([[NEW_PAGE, `${withScript('const a = 1;')}<script type="application/json">{}</script><script is:inline>const b = 2;</script>`]]), {});
+  assert.equal(counted.scripts, 2);
+  assert.deepEqual(counted.problems, []);
 });
 
 test('la vista previa nunca se compila en la carpeta dist/ del proyecto', async () => {
