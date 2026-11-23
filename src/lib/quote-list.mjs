@@ -805,8 +805,11 @@ export function unknownLinesMessage(count) {
   return `${formatQuantity(total)} productos de tu cotización no aparecen en esta página y no se incluyen en tu mensaje. Vuelve a cargar la página; si siguen igual, ya no están en el catálogo.`;
 }
 
-/** Un clic «repetido»: a lo más este tiempo después del anterior y a esta distancia de él, en píxeles de CSS. */
-export const REPEATED_PRESS = Object.freeze({ ms: 500, px: 24 });
+/**
+ * Un clic «repetido»: a lo más `ms` después del anterior y a `px` o menos de él, en píxeles de CSS. Si el navegador lo
+ * cuenta como parte del mismo clic múltiple (`chained` en `isRepeatedPress`), a lo más `chainMs` después.
+ */
+export const REPEATED_PRESS = Object.freeze({ ms: 500, px: 24, chainMs: 1000 });
 
 /**
  * ¿Es `press` un clic repetido de `previous`: en el mismo punto y enseguida (`REPEATED_PRESS`)? Lo usa «Cotizar mi
@@ -814,14 +817,20 @@ export const REPEATED_PRESS = Object.freeze({ ms: 500, px: 24 });
  * clic caería en lo que quedó bajo el puntero, que ya es otra cosa. El medio segundo es el tiempo de un doble clic; la
  * distancia, la mitad de un control de 48 px: un clic más lejos ya apunta a otra cosa, y sí cuenta. `time` es el de los
  * eventos (`event.timeStamp`); `x` e `y`, su posición en la ventana.
+ *
+ * `chained` dice que el navegador cuenta este clic como parte del mismo clic múltiple que `previous` (su `detail` es
+ * mayor que 1 y todos los clics desde `previous` fueron repetidos). Quien tiene el doble clic más lento en su sistema
+ * (Windows admite hasta 900 ms) da el segundo clic después del medio segundo: con `chained` el plazo es `chainMs`. No
+ * se alarga más: después de ese segundo, un clic en el mismo punto siempre cuenta.
  * @param {{ time: number, x: number, y: number } | null | undefined} previous
  * @param {{ time: number, x: number, y: number } | null | undefined} press
+ * @param {boolean} [chained]
  * @returns {boolean}
  */
-export function isRepeatedPress(previous, press) {
+export function isRepeatedPress(previous, press, chained = false) {
   if (!previous || !press) return false;
   const elapsed = press.time - previous.time;
-  if (!(elapsed >= 0 && elapsed <= REPEATED_PRESS.ms)) return false;
+  if (!(elapsed >= 0 && elapsed <= (chained ? REPEATED_PRESS.chainMs : REPEATED_PRESS.ms))) return false;
   return Math.hypot(press.x - previous.x, press.y - previous.y) <= REPEATED_PRESS.px;
 }
 

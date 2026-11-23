@@ -816,26 +816,37 @@ const items = [
       // Quitar, unir, vaciar y deshacer cambian la lista de lugar: bajo el puntero queda otra cosa (el enlace de otro
       // producto, «Deshacer», la cantidad de otro renglón). El segundo clic de un doble clic no es para eso: durante
       // medio segundo, un clic repetido en ese mismo punto (`isRepeatedPress`, con pruebas) no activa nada ni mueve el
-      // foco. Un clic en otro lugar, o después de esa pausa, cuenta como siempre; con el teclado no hay nada que cuidar.
-      // Se decide al oprimir, y el clic sigue a su presión: si el puntero oprimió dentro del medio segundo y soltó después,
-      // ese clic tampoco cuenta.
+      // foco, con ningún botón del ratón. Un clic en otro lugar, o después de esa pausa, cuenta como siempre; con el
+      // teclado no hay nada que cuidar. Se decide al oprimir, y el clic sigue a su presión: si el puntero oprimió dentro
+      // del medio segundo y soltó después, ese clic tampoco cuenta. Quien tiene el doble clic más lento en su sistema da
+      // el segundo clic después del medio segundo, pero el navegador lo cuenta como parte del mismo clic múltiple
+      // (`detail` mayor que 1): mientras todos los clics desde el que movió la lista hayan sido repetidos, uno así tampoco
+      // cuenta, hasta un segundo después de aquel.
       let moved: { time: number; x: number; y: number } | null = null;
+      /** Todos los clics desde `moved` fueron repetidos: el siguiente todavía puede ser parte del mismo clic múltiple. */
+      let chained = false;
       /** Lo que se decidió de la presión en curso (`null`: no hay ninguna): su clic corre la misma suerte. */
       let strayPress: boolean | null = null;
       const stray = (event: MouseEvent) => {
         if (event.detail === 0) return;
-        let repeated = isRepeatedPress(moved, { time: event.timeStamp, x: event.clientX, y: event.clientY });
-        if (event.type === 'mousedown') strayPress = repeated;
-        else {
-          repeated = strayPress ?? repeated;
+        const press = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+        let repeated: boolean;
+        if (event.type === 'mousedown') {
+          repeated = isRepeatedPress(moved, press, chained && event.detail > 1);
+          chained = chained && repeated;
+          strayPress = repeated;
+        } else {
+          repeated = strayPress ?? isRepeatedPress(moved, press);
           strayPress = null;
         }
         if (!repeated) return;
         event.preventDefault();
         event.stopImmediatePropagation();
       };
+      // `auxclick` es el clic de los demás botones: el de en medio abriría en otra pestaña el enlace que quedó debajo.
       document.addEventListener('mousedown', stray, true);
       document.addEventListener('click', stray, true);
+      document.addEventListener('auxclick', stray, true);
 
       // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, desde que oprime hasta que suelta: dice si el foco sale de
       // un campo porque el visitante está por activar un control con el puntero. Se sigue con `mousedown` y `mouseup`, que
@@ -983,7 +994,10 @@ const items = [
         else if (target.closest('[data-quote-undo]')) undoLast();
         else return;
         // La lista cambió de lugar bajo el puntero: un clic repetido aquí mismo no activa nada (`stray`).
-        if (event.detail > 0) moved = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+        if (event.detail > 0) {
+          moved = { time: event.timeStamp, x: event.clientX, y: event.clientY };
+          chained = true;
+        }
       });
 
       // Otra pestaña cambió la lista, o el navegador restauró la página: se muestra lo guardado, sin escribir nada.

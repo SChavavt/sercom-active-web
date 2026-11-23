@@ -831,7 +831,7 @@ test('addStatusStands: tras el cambio de otra pestaña, en la ficha solo se qued
 test('isRepeatedPress: un clic en el mismo punto y enseguida es el segundo de un doble clic; más tarde o más lejos, no', () => {
   const first = { time: 1000, x: 400, y: 300 };
   const press = (ms, dx = 0, dy = 0) => ({ time: first.time + ms, x: first.x + dx, y: first.y + dy });
-  assert.deepEqual(REPEATED_PRESS, { ms: 500, px: 24 });
+  assert.deepEqual(REPEATED_PRESS, { ms: 500, px: 24, chainMs: 1000 });
   // El segundo clic de un doble clic: unas décimas de segundo después, sin moverse o casi.
   assert.equal(isRepeatedPress(first, press(150)), true);
   assert.equal(isRepeatedPress(first, press(0)), true);
@@ -852,4 +852,25 @@ test('isRepeatedPress: un clic en el mismo punto y enseguida es el segundo de un
   assert.equal(isRepeatedPress(first, null), false);
   assert.equal(isRepeatedPress(first, { time: Number.NaN, x: 400, y: 300 }), false);
   assert.equal(isRepeatedPress(first, { time: 1100, x: Number.NaN, y: 300 }), false);
+});
+
+test('isRepeatedPress: el clic que el navegador cuenta como parte del mismo clic múltiple tiene un segundo, y no más', () => {
+  const first = { time: 1000, x: 400, y: 300 };
+  const press = (ms, dx = 0, dy = 0) => ({ time: first.time + ms, x: first.x + dx, y: first.y + dy });
+  // Un doble clic lento (quien lo configuró así en su sistema): el segundo clic llega después del medio segundo.
+  assert.equal(isRepeatedPress(first, press(650), true), true);
+  assert.equal(isRepeatedPress(first, press(900), true), true);
+  assert.equal(isRepeatedPress(first, press(1000), true), true);
+  // Dentro del medio segundo no cambia nada.
+  assert.equal(isRepeatedPress(first, press(150), true), true);
+  // El plazo no se alarga: después del segundo, ese clic cuenta aunque el navegador lo siga contando como repetido.
+  assert.equal(isRepeatedPress(first, press(1001), true), false);
+  assert.equal(isRepeatedPress(first, press(5000), true), false);
+  // La distancia es la misma: un clic múltiple en otro punto es otro clic.
+  assert.equal(isRepeatedPress(first, press(650, 25, 0), true), false);
+  assert.equal(isRepeatedPress(first, press(650, 24, 0), true), true);
+  // Sin esa señal (el clic no viene encadenado), el plazo sigue siendo el medio segundo.
+  assert.equal(isRepeatedPress(first, press(650), false), false);
+  assert.equal(isRepeatedPress(first, press(650)), false);
+  assert.equal(isRepeatedPress(null, press(650), true), false);
 });
