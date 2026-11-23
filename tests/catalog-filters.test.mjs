@@ -35,6 +35,8 @@ const groups = buildFacetGroups(products, { categories, brands });
 const items = products.map(product => ({ search: searchText(product), facets: facetText(product) }));
 const visibleCodes = result => products.filter((_, index) => result.visible[index]).map(product => product.code);
 const state = (query, filters = {}) => ({ query, filters: { ...emptyFilters(), ...filters } });
+// Los conteos no heredan nada (ni siquiera de Object): para compararlos con un objeto escrito aquí se copian.
+const plainCounts = counts => ({ categoria: { ...counts.categoria }, marca: { ...counts.marca } });
 
 test('FACET_PARAMS: categorías y luego marcas, congelado', () => {
   assert.deepEqual(FACET_PARAMS, ['categoria', 'marca']);
@@ -205,21 +207,21 @@ test('O dentro de un grupo, Y entre grupos y Y con la búsqueda', () => {
 
 test('conteos de opción: con la búsqueda y lo marcado en los OTROS grupos', () => {
   // Sin nada marcado: los conteos de los grupos.
-  assert.deepEqual(applyCatalogState(items, state(''), groups).optionCounts, {
+  assert.deepEqual(plainCounts(applyCatalogState(items, state(''), groups).optionCounts), {
     categoria: { manos: 3, cabeza: 2, calzado: 1, soldadura: 1 },
     marca: { 'marca-alfa': 1, 'marca-beta': 2, 'marca-gamma-nandu': 2, 'marca-delta': 1 },
   });
   // Con una búsqueda y una marca: las categorías cuentan lo que daría cada una con esa marca; las marcas, lo que daría
   // cada una con la búsqueda (su propio grupo no se cuenta).
   const result = applyCatalogState(items, state('guante', { marca: ['marca-beta'] }), groups);
-  assert.deepEqual(result.optionCounts, {
+  assert.deepEqual(plainCounts(result.optionCounts), {
     categoria: { manos: 1, cabeza: 0, calzado: 0, soldadura: 1 },
     marca: { 'marca-alfa': 1, 'marca-beta': 1, 'marca-gamma-nandu': 0, 'marca-delta': 1 },
   });
   assert.deepEqual(visibleCodes(result), ['SP-3']);
   // Con opciones marcadas en los dos grupos.
   const both = applyCatalogState(items, state('', { categoria: ['cabeza'], marca: ['marca-gamma-nandu'] }), groups);
-  assert.deepEqual(both.optionCounts, {
+  assert.deepEqual(plainCounts(both.optionCounts), {
     categoria: { manos: 0, cabeza: 1, calzado: 1, soldadura: 0 },
     marca: { 'marca-alfa': 0, 'marca-beta': 1, 'marca-gamma-nandu': 1, 'marca-delta': 0 },
   });
@@ -233,7 +235,47 @@ test('los ceros también están: cada opción de los grupos tiene su número', (
     assert.ok(Object.values(result.optionCounts[group.param]).every(count => count === 0), group.param);
   }
   // Sin grupos, los conteos quedan vacíos.
-  assert.deepEqual(applyCatalogState(items, state(''), []).optionCounts, { categoria: {}, marca: {} });
+  assert.deepEqual(plainCounts(applyCatalogState(items, state(''), []).optionCounts), { categoria: {}, marca: {} });
+});
+
+test('los conteos no heredan nada: un id que no es una opción no da una función de Object', () => {
+  const { optionCounts } = applyCatalogState(items, state(''), groups);
+  for (const param of FACET_PARAMS) {
+    assert.equal(Object.getPrototypeOf(optionCounts[param]), null, param);
+    for (const id of ['constructor', 'toString', 'hasOwnProperty', 'valueOf', '__proto__']) assert.equal(optionCounts[param][id], undefined, `${param} ${id}`);
+  }
+  // Una opción que sí se llama así cuenta como cualquier otra.
+  const odd = [{ param: 'marca', label: 'Marcas', options: [{ id: 'constructor', label: 'Constructor', count: 1 }] }];
+  const result = applyCatalogState([{ search: 'guante', facets: 'marca:constructor' }, { search: 'casco', facets: '' }], state(''), odd);
+  assert.equal(result.optionCounts.marca.constructor, 1);
+  assert.deepEqual(Object.keys(result.optionCounts.marca), ['constructor']);
+});
+
+test('con unas tarjetas o unos grupos que faltan o mal formados no lanza: cuentan como ninguno', () => {
+  const empty = { visible: [], count: 0, optionCounts: { categoria: {}, marca: {} } };
+  const plain = result => ({ ...result, optionCounts: plainCounts(result.optionCounts) });
+  for (const missing of [null, undefined, 42, 'grupos', {}]) {
+    assert.deepEqual(plain(applyCatalogState(missing, state(''), missing)), empty, String(missing));
+    assert.deepEqual(plain(applyCatalogState(missing, null, missing)), empty, String(missing));
+    assert.deepEqual(restrictFilters({ categoria: ['manos'], marca: ['marca-alfa'] }, missing), emptyFilters(), String(missing));
+    assert.deepEqual(restrictFilters(missing, missing), emptyFilters(), String(missing));
+    // Las tarjetas sí se aplican aunque falten los grupos.
+    assert.equal(applyCatalogState(items, state('guante'), missing).count, 3, String(missing));
+  }
+  // Lo que no es un grupo, un grupo con opciones que no son una lista, una opción sin id y un parámetro desconocido.
+  const broken = [null, 7, 'x', { param: 'marca', options: 'marca-alfa' }, { param: 'color', options: [{ id: 'rojo' }] },
+    { param: 'categoria', options: [null, {}, { id: 7 }, { id: 'manos', label: 'Protección de manos', count: 3 }] }];
+  assert.deepEqual(restrictFilters({ categoria: ['manos', 'cabeza'], marca: ['marca-alfa'] }, broken), { categoria: ['manos'], marca: [] });
+  const result = applyCatalogState(items, state('', { categoria: ['manos'] }), broken);
+  assert.deepEqual(visibleCodes(result), ['SP-1', 'SP-3', 'SP-5']);
+  assert.deepEqual(plainCounts(result.optionCounts), { categoria: { manos: 3 }, marca: {} });
+  // Un grupo sin opciones no ofrece nada.
+  assert.deepEqual(restrictFilters({ categoria: ['manos'] }, [{ param: 'categoria' }]), emptyFilters());
+  assert.deepEqual(plainCounts(applyCatalogState(items, state(''), [{ param: 'categoria' }]).optionCounts), { categoria: {}, marca: {} });
+  // Una tarjeta que falta o sin sus textos no coincide con una búsqueda ni lleva fichas, y no rompe a las demás.
+  const holes = applyCatalogState([null, undefined, {}, { search: 'guante sintetico', facets: 'categoria:manos' }], state('guante', { categoria: ['manos'] }), groups);
+  assert.deepEqual(holes.visible, [false, false, false, true]);
+  assert.equal(holes.count, 1);
 });
 
 test('un estado con ids desconocidos no filtra nada después de restrictFilters', () => {

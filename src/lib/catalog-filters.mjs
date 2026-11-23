@@ -15,7 +15,7 @@
 // Ninguna función cambia sus argumentos.
 /** @import { CatalogFilters, CatalogItem, CatalogResult, CatalogState, FacetGroup, FacetOption, FacetParam, FacetProduct } from '../types/catalog-filters.ts' */
 import { routes } from './routes.mjs';
-import { displayQuery, isActiveQuery, matchesSearchText, SEARCH_PARAM } from './search.mjs';
+import { displayQuery, isActiveQuery, searchMatcher, SEARCH_PARAM } from './search.mjs';
 import { normalizeText } from './text.mjs';
 
 /** Los parámetros de los grupos, en el orden de los grupos en la página y en la dirección. */
@@ -30,6 +30,10 @@ const MAX_IDS_PER_PARAM = 50;
 
 /** @param {unknown} value @returns {value is string} */
 const isSlug = value => typeof value === 'string' && value.length <= MAX_ID_LENGTH && SLUG.test(value);
+/** Los grupos que llegan, o ninguno si no son una lista. @param {unknown} groups @returns {readonly FacetGroup[]} */
+const groupList = groups => (Array.isArray(groups) ? groups.filter(group => typeof group === 'object' && group !== null) : []);
+/** Las opciones de un grupo, o ninguna si no son una lista. @param {FacetGroup | null | undefined} group @returns {readonly FacetOption[]} */
+const optionList = group => (Array.isArray(group?.options) ? group.options.filter(option => typeof option?.id === 'string') : []);
 
 /**
  * Id de un nombre visible, para una marca sin página de marca (`brandId` nulo): el nombre normalizado (`normalizeText`)
@@ -162,17 +166,18 @@ export function parseCatalogState(search) {
 
 /**
  * Deja en los filtros solo los ids que ofrecen los grupos, en el orden de sus opciones (el orden canónico). Un grupo
- * que no está en `groups` queda sin nada marcado.
+ * que no está en `groups` queda sin nada marcado. Nunca lanza: unos grupos que faltan o mal formados no ofrecen nada.
  * @param {Partial<CatalogFilters> | null | undefined} filters
- * @param {readonly FacetGroup[]} groups
+ * @param {readonly FacetGroup[] | null | undefined} groups
  * @returns {CatalogFilters}
  */
 export function restrictFilters(filters, groups) {
   const result = emptyFilters();
+  const offered = groupList(groups);
   for (const param of FACET_PARAMS) {
     const chosen = new Set(Array.isArray(filters?.[param]) ? filters[param] : []);
-    const group = groups.find(candidate => candidate.param === param);
-    result[param] = group ? group.options.map(option => option.id).filter(id => chosen.has(id)) : [];
+    const group = offered.find(candidate => candidate.param === param);
+    result[param] = optionList(group).map(option => option.id).filter(id => chosen.has(id));
   }
   return result;
 }
@@ -227,11 +232,14 @@ export function catalogHref(state) {
  *   - `count`: tarjetas visibles;
  *   - `optionCounts[param][id]`: tarjetas que coinciden con la búsqueda y con lo marcado en los OTROS grupos y llevan
  *     esa opción (lo que el visitante obtendría marcando solo esa opción en su grupo, con lo demás como está). Cada
- *     opción de `groups` tiene su número, también 0.
+ *     opción de `groups` tiene su número, también 0. Los dos objetos no heredan nada (un id como «constructor» que no
+ *     es una opción da `undefined`, no una función).
  * Usa los filtros tal como llegan: para ignorar ids que la página no ofrece, pasa antes por `restrictFilters`.
- * @param {readonly CatalogItem[]} items
- * @param {{ query?: unknown, filters?: Partial<CatalogFilters> | null }} state
- * @param {readonly FacetGroup[]} groups
+ * La consulta se prepara una sola vez (`searchMatcher`), no por tarjeta. Nunca lanza: unas tarjetas o unos grupos que
+ * faltan o mal formados cuentan como ninguno.
+ * @param {readonly CatalogItem[] | null | undefined} items
+ * @param {{ query?: unknown, filters?: Partial<CatalogFilters> | null } | null | undefined} state
+ * @param {readonly FacetGroup[] | null | undefined} groups
  * @returns {CatalogResult}
  */
 export function applyCatalogState(items, state, groups) {
@@ -239,11 +247,12 @@ export function applyCatalogState(items, state, groups) {
     const values = state?.filters?.[param];
     return { param, tokens: (Array.isArray(values) ? values : []).map(id => `${param}:${id}`) };
   });
-  const cards = items.map(item => {
+  const matches = searchMatcher(state?.query);
+  const cards = (Array.isArray(items) ? items : []).map(item => {
     const facets = new Set(String(item?.facets ?? '').split(' ').filter(Boolean));
     return {
       facets,
-      query: matchesSearchText(item?.search, state?.query),
+      query: matches(item?.search),
       // Por grupo: ¿la tarjeta cumple con lo marcado en ese grupo? (un grupo sin nada marcado no restringe)
       groups: selected.map(({ tokens }) => tokens.length === 0 || tokens.some(token => facets.has(token))),
     };
@@ -251,12 +260,12 @@ export function applyCatalogState(items, state, groups) {
   const visible = cards.map(card => card.query && card.groups.every(Boolean));
 
   /** @type {CatalogResult['optionCounts']} */
-  const optionCounts = { categoria: {}, marca: {} };
-  for (const group of groups) {
+  const optionCounts = { categoria: Object.create(null), marca: Object.create(null) };
+  for (const group of groupList(groups)) {
     const position = FACET_PARAMS.indexOf(group.param);
     if (position === -1) continue;
     const candidates = cards.filter(card => card.query && card.groups.every((ok, index) => index === position || ok));
-    for (const option of group.options) {
+    for (const option of optionList(group)) {
       const token = `${group.param}:${option.id}`;
       optionCounts[group.param][option.id] = candidates.filter(card => card.facets.has(token)).length;
     }
