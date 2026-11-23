@@ -4,11 +4,12 @@ import { filterProducts, matchesQuery, matchesSearchText, queryTokens, SEARCH_PA
 import { requestDescription } from '../src/lib/contact-core.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
 import { cleanQuery, normalizeCode, normalizeText } from '../src/lib/text.mjs';
-import { loadProjectData } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
 // Los dieciséis ejemplos de la vista previa, con la forma pública que reciben las páginas.
-const exampleProducts = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples }).products;
+// Los productos de la vista previa sin fichas reales (catálogo vaciado): solo los dieciséis ejemplos, con cualquier catálogo.
+const exampleProducts = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples }).products;
 // Productos sintéticos de prueba con códigos parecidos a los de un fabricante. Nunca se importan en el sitio.
 const synthetic = [
   { name: 'Guante sintético de prueba', brandName: 'Marca Alfa', code: '37-175', categoryNames: ['Protección de manos'], variants: [{ code: '37-175-09' }, { code: '37-175-10' }] },

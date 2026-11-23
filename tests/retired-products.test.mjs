@@ -6,9 +6,12 @@ import assert from 'node:assert/strict';
 import { getPublishedProducts, getRetiredProducts, isPublicRetired, validateCatalog } from '../src/lib/catalog-policy.mjs';
 import { assertDistinctProductIds, createSiteData, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { matchesQuery } from '../src/lib/search.mjs';
-import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
+import { allKeys, allStrings, emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
+// El tema de estas pruebas son los retirados, no los datos reales: parten del catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha), así dan lo mismo con cualquier catálogo válido.
+const emptied = emptiedCatalog(catalog);
 const brandScope = { sources: brands.map(brand => ({ entity_id: brand.id, name: brand.name, entity_type: brand.kind })) };
 const listedExamples = examples.filter(example => example.retired !== true);
 
@@ -28,9 +31,9 @@ const record = (fields = {}) => ({
   approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
   ...fields,
 });
-/** El catálogo real con la categoría «manos» aprobada y las fichas indicadas. */
+/** El catálogo real vaciado, con la categoría «manos» aprobada y las fichas indicadas. */
 function withProducts(...products) {
-  const copy = structuredClone(catalog);
+  const copy = structuredClone(emptied);
   copy.categories[0].status = 'approved';
   copy.products.push(...products);
   return copy;
@@ -181,13 +184,13 @@ test('los campos internos y los textos que ya nadie mantiene nunca llegan al reg
 
 test('producción ignora el ejemplo retirado; la vista previa le da su registro y nada más cambia', () => {
   const exampleProducts = [...listedExamples, retiredExample()];
-  const production = createSiteData({ mode: 'production', catalog, brands, exampleProducts });
+  const production = createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts });
   assert.deepEqual(production.retiredProducts, []);
   assert.equal(production.getRetiredProduct('ejemplo-producto-retirado'), undefined);
   assert.doesNotMatch(JSON.stringify(production.retiredProducts), /ejemplo/i);
 
-  const preview = createSiteData({ mode: 'preview', catalog, brands, exampleProducts });
-  const before = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: listedExamples });
+  const preview = createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts });
+  const before = createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts: listedExamples });
   assert.deepEqual(preview.retiredProducts, [{
     id: 'ejemplo-producto-retirado', url: '/productos/ejemplo-producto-retirado/', name: 'Producto de ejemplo retirado',
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1002', categoryIds: ['manos'], categoryNames: ['Protección de manos'], isExample: true,

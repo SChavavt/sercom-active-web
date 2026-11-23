@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getPublishedProducts, validateCatalog } from '../src/lib/catalog-policy.mjs';
-import { loadProjectData } from './helpers.mjs';
+import { getPublishedProducts, getRetiredProducts, validateCatalog } from '../src/lib/catalog-policy.mjs';
+import { loadProjectData, publicCatalog } from './helpers.mjs';
 
 const { catalog, registry } = await loadProjectData();
 
@@ -34,13 +34,21 @@ test('las diez categorías llevan nombre corto y línea orientativa, en el orden
   for (const category of catalog.categories) assert.deepEqual(Object.keys(category).sort(), ['id', 'name', 'shortName', 'status', 'summary']);
 });
 
-test('todas las categorías siguen en borrador: solo el contacto comercial puede aprobarlas', () => {
-  assert.deepEqual([...new Set(catalog.categories.map(category => category.status))], ['draft']);
+test('cada categoría está en borrador o aprobada, y una ficha aprobada solo está en categorías aprobadas', () => {
+  for (const category of catalog.categories) assert.ok(['draft', 'approved'].includes(category.status), category.id);
+  const { approvedCategoryIds, approvedProducts } = publicCatalog(catalog);
+  for (const product of approvedProducts) {
+    for (const id of product.categoryIds) assert.ok(approvedCategoryIds.includes(id), `${product.id}: ${id}`);
+  }
 });
 
-test('el catálogo real pasa la validación y hoy no publica ninguna ficha', () => {
+test('el catálogo real pasa la validación y publica exactamente sus fichas aprobadas', () => {
   assert.deepEqual(validateCatalog(catalog, registry), []);
-  assert.deepEqual(getPublishedProducts(catalog, registry), []);
+  const { approvedProductIds, publicRetiredIds } = publicCatalog(catalog);
+  // Nada sin aprobar se publica: ni un borrador, ni una ficha en revisión, ni un retirado.
+  assert.deepEqual(getPublishedProducts(catalog, registry).map(product => product.id), approvedProductIds);
+  // Un retirado solo conserva su página si fue público.
+  assert.deepEqual(getRetiredProducts(catalog, registry).map(product => product.id), publicRetiredIds);
 });
 
 test('shortName y summary son opcionales, pero si existen deben ser texto no vacío', () => {

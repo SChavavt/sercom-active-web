@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanDist } from '../scripts/scan-dist.mjs';
 import { matchesSearchText, SEARCH_PARAM } from '../src/lib/search.mjs';
-import { listFiles, loadProjectData, ROOT } from './helpers.mjs';
+import { listFiles, loadProjectData, publicCatalog, ROOT } from './helpers.mjs';
 
 const PROBE = join(ROOT, 'tests', 'build-probe');
 // --root es relativo a la carpeta del proyecto y --config es relativo a --root.
@@ -24,6 +24,10 @@ const MARKERS = /EJ-\d|marca de ejemplo|ejemplo-|de ejemplo/i;
 const MISUSE_CHUNK = /^_astro\/script-con-datos\./;
 
 const data = await loadProjectData();
+// Lo que el catálogo real debe mostrar en cada compilación, derivado de los mismos datos: la sonda se compila con el
+// catálogo del repositorio, sea cual sea.
+const real = publicCatalog(data.catalog);
+const listedIn = (html, attribute) => [...html.matchAll(new RegExp(`${attribute}="([^"]+)"`, 'g'))].map(match => match[1]);
 // Los dieciséis ejemplos de los listados; el ejemplo retirado solo tiene su página informativa.
 const listedExamples = data.examples.filter(example => example.retired !== true);
 const retiredExamples = data.examples.filter(example => example.retired === true);
@@ -88,17 +92,21 @@ after(async () => {
   ]);
 });
 
-test('producción: la sonda imprime los datos reales y ningún ejemplo', () => {
+test('producción: la sonda imprime exactamente las categorías y las fichas aprobadas, y ningún ejemplo', () => {
   const { files } = builds.production;
   const index = files.get('index.html');
   assert.match(index, /<body data-mode="production" data-env-file="leido">/);
   for (const brand of data.brands) assert.ok(index.includes(`<li data-brand="${brand.id}">${brand.name}</li>`), brand.id);
-  assert.doesNotMatch(index, /data-product=|data-category=|data-retired=/);
+  // Nada sin aprobar llega a la salida: ni una categoría en borrador ni una ficha en borrador, en revisión o retirada.
+  assert.deepEqual(listedIn(index, 'data-category'), real.approvedCategoryIds);
+  assert.deepEqual(listedIn(index, 'data-product'), real.approvedProductIds);
+  assert.deepEqual(listedIn(index, 'data-retired'), real.publicRetiredIds);
   const json = JSON.parse(files.get('datos.json'));
   assert.equal(json.mode, 'production');
-  assert.deepEqual(json.products, []);
-  assert.deepEqual(json.retiredProducts, []);
-  assert.deepEqual(json.categories, []);
+  assert.deepEqual(json.products.map(product => product.id), real.approvedProductIds);
+  assert.ok(json.products.every(product => product.isExample === false));
+  assert.deepEqual(json.retiredProducts.map(product => product.id), real.publicRetiredIds);
+  assert.deepEqual(json.categories.map(category => category.id), real.approvedCategoryIds);
   assert.equal(json.brands.length, 19);
   // El script de la página trae la búsqueda y los enlaces, sin datos.
   const scripts = [...files.keys()].filter(path => path.endsWith('.js'));
@@ -153,7 +161,7 @@ test('vista previa (control): los mismos archivos sí contienen los dieciséis e
   }
   // El ejemplo retirado solo está en su lista, con solo lo que lo identifica.
   assert.equal(retiredExamples.length, 1);
-  assert.deepEqual([...index.matchAll(/data-retired="([^"]+)"/g)].map(match => match[1]), retiredExamples.map(example => example.id));
+  assert.deepEqual(listedIn(index, 'data-retired'), [...real.publicRetiredIds, ...retiredExamples.map(example => example.id)]);
   for (const example of retiredExamples) {
     assert.ok(!index.includes(`data-product="${example.id}"`), example.id);
     for (const token of [example.name, example.code]) assert.ok(index.includes(token), token);
@@ -161,12 +169,16 @@ test('vista previa (control): los mismos archivos sí contienen los dieciséis e
   }
   const json = JSON.parse(files.get('datos.json'));
   assert.equal(json.mode, 'preview');
-  assert.deepEqual(json.products.map(product => product.id), listedExamples.map(example => example.id));
-  assert.deepEqual(json.retiredProducts.map(product => [product.id, product.isExample, product.brandId, Object.keys(product).length]), retiredExamples.map(example => [example.id, true, null, 9]));
-  assert.ok(json.products.every(product => product.isExample === true && product.brandId === null));
+  // Las fichas aprobadas del catálogo real van primero; después, los ejemplos.
+  assert.deepEqual(json.products.map(product => product.id), [...real.approvedProductIds, ...listedExamples.map(example => example.id)]);
+  const exampleProducts = json.products.filter(product => product.isExample === true);
+  assert.deepEqual(exampleProducts.map(product => product.id), listedExamples.map(example => example.id));
+  assert.deepEqual(json.retiredProducts.filter(product => product.isExample === true).map(product => [product.id, product.isExample, product.brandId, Object.keys(product).length]), retiredExamples.map(example => [example.id, true, null, 9]));
+  assert.deepEqual(json.retiredProducts.filter(product => product.isExample !== true).map(product => product.id), real.publicRetiredIds);
+  assert.ok(exampleProducts.every(product => product.brandId === null));
   // Cada ejemplo llega con su marca de ejemplo, sin cambiarla.
-  assert.deepEqual(json.products.map(product => product.brandName), listedExamples.map(example => example.brandName));
-  assert.deepEqual([...new Set(json.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
+  assert.deepEqual(exampleProducts.map(product => product.brandName), listedExamples.map(example => example.brandName));
+  assert.deepEqual([...new Set(exampleProducts.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
   assert.equal(json.categories.length, 10);
   // Con la bandera activa, el script que importa el módulo de datos sí carga el archivo de ejemplos:
   // es la rama que la compilación de producción elimina.
@@ -180,7 +192,10 @@ test('vista previa: la búsqueda del navegador sobre los data-search compilados 
   const decode = text => text.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos|#39));/gi, (_entity, decimal, hex, name) => (
     decimal ? String.fromCodePoint(Number(decimal)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }[name.toLowerCase()]));
   const index = builds.preview.files.get('index.html');
-  const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }));
+  // Solo las tarjetas de los ejemplos: lo esperado es de ellos, y las fichas reales que haya no lo cambian.
+  const exampleIds = new Set(listedExamples.map(example => example.id));
+  const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }))
+    .filter(card => exampleIds.has(card.id));
   assert.equal(cards.length, 16);
   const found = location => cards.filter(card => matchesSearchText(card.search, new URL(location, 'https://sitio.example/').searchParams.get(SEARCH_PARAM))).map(card => card.id);
   const all = listedExamples.map(example => example.id);

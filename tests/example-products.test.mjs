@@ -5,7 +5,7 @@ import { buildFacetGroups } from '../src/lib/catalog-filters.mjs';
 import { filterProducts } from '../src/lib/search.mjs';
 import { createSiteData, EXAMPLE_BRAND_NAME, EXAMPLE_BRAND_NAMES, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { normalizeText } from '../src/lib/text.mjs';
-import { allStrings, loadProjectData } from './helpers.mjs';
+import { allStrings, emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples, registry } = await loadProjectData();
 const categoryIds = catalog.categories.map(category => category.id);
@@ -126,7 +126,8 @@ test('las categorías de los ejemplos existen y cada categoría tiene un ejemplo
 });
 
 test('los filtros de la vista previa: un grupo «Marcas» con las tres marcas y «Categorías» con conteos que suman', () => {
-  const site = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+  // Sin fichas reales (catálogo vaciado): los filtros de los dieciséis ejemplos, con cualquier catálogo.
+  const site = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples });
   const groups = buildFacetGroups(site.products, { categories: site.categories, brands: site.brands });
   assert.deepEqual(groups.map(group => [group.param, group.label]), [['categoria', 'Categorías'], ['marca', 'Marcas']]);
   const [categoryGroup, brandGroup] = groups;
@@ -188,7 +189,7 @@ test('validateExampleProducts acepta el archivo real', () => {
 test('un ejemplo sin variantes se acepta y llega a la vista previa con la lista vacía, y cada marca de ejemplo se proyecta tal cual', () => {
   assert.equal(mutated(example => { example.variants = []; }), '');
   for (const name of EXAMPLE_BRAND_NAMES) assert.equal(mutated(example => { example.brandName = name; }), '', name);
-  const site = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+  const site = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples });
   assert.deepEqual(site.getProduct('ejemplo-respirador-desechable')?.variants, []);
   assert.equal(site.getProduct('ejemplo-respirador-desechable')?.saleUnit, 'caja');
   assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.saleUnit, 'caja con 100 piezas');
@@ -196,7 +197,7 @@ test('un ejemplo sin variantes se acepta y llega a la vista previa con la lista 
   for (const example of listed) assert.equal(site.getProduct(example.id)?.brandName, example.brandName, example.id);
   const retiredCopy = structuredClone(examples);
   retiredCopy.at(-1).brandName = 'Marca de ejemplo Gamma';
-  const withRetired = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: retiredCopy });
+  const withRetired = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: retiredCopy });
   assert.equal(withRetired.getRetiredProduct('ejemplo-producto-retirado')?.brandName, 'Marca de ejemplo Gamma');
 });
 

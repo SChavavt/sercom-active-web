@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { CHECKS, RULES, SOON_EXPRESSIONS, scanDist } from '../scripts/scan-dist.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
-import { loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
 
 const data = await loadProjectData();
 const ROBOTS = 'User-agent: *\nDisallow: /\n';
@@ -670,62 +670,67 @@ test('R-RULE-04 y R-RULE-06: normas y certificaciones son aviso en producción y
   assert.deepEqual(plain.findings, []);
 });
 
+// Las pruebas de R-RULE-14 tratan de la regla, no de los datos reales: parten del catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha), así dan lo mismo con cualquier catálogo válido.
+const emptiedData = { ...data, catalog: emptiedCatalog(data.catalog) };
+const scanEmptied = (files, options = {}) => scan(files, { data: emptiedData, ...options });
+
 test('R-RULE-14: solo se generan páginas de registros que pueden mostrarse', async () => {
   // Producción: las diez categorías están en borrador y no hay fichas aprobadas.
-  const draftCategory = await scan({ 'categorias/manos/index.html': page('<h1>Protección de manos</h1>') });
+  const draftCategory = await scanEmptied({ 'categorias/manos/index.html': page('<h1>Protección de manos</h1>') });
   assert.deepEqual(failures(draftCategory).map(finding => [finding.id, finding.file]), [['R-RULE-14', 'categorias/manos']]);
-  assert.deepEqual(failedIds(await scan({ 'productos/guante-x/index.html': page('<h1>Guante</h1>') })), ['R-RULE-14']);
-  assert.deepEqual(failedIds(await scan({ 'marcas/marca-desconocida/index.html': page('<h1>Marca</h1>') })), ['R-RULE-14']);
+  assert.deepEqual(failedIds(await scanEmptied({ 'productos/guante-x/index.html': page('<h1>Guante</h1>') })), ['R-RULE-14']);
+  assert.deepEqual(failedIds(await scanEmptied({ 'marcas/marca-desconocida/index.html': page('<h1>Marca</h1>') })), ['R-RULE-14']);
   // Las diecinueve marcas pueden tener página, y la lista de marcas puede existir sin ellas.
   const brandPages = Object.fromEntries(data.brands.map(brand => [`marcas/${brand.id}/index.html`, page(`<h1>${brand.name}</h1>`)]));
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), ...brandPages })), []);
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>') })), []);
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), 'marcas/ansell/index.html': page('<h1>Ansell</h1>') })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>'), ...brandPages })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>') })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>'), 'marcas/ansell/index.html': page('<h1>Ansell</h1>') })), []);
 
   // Vista previa: categorías en borrador y ejemplos sí; cualquier otra página no.
   const options = { preview: true };
   const home = { 'index.html': previewPage('<h1>Inicio</h1>') };
-  const categoryPages = Object.fromEntries(data.catalog.categories.map(category => [`categorias/${category.id}/index.html`, previewPage(`<h1>${category.name}</h1>`)]));
+  const categoryPages = Object.fromEntries(emptiedData.catalog.categories.map(category => [`categorias/${category.id}/index.html`, previewPage(`<h1>${category.name}</h1>`)]));
   const productPages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
-  assert.deepEqual(failures(await scan({ ...home, ...categoryPages, ...productPages }, options)), []);
-  assert.deepEqual(failedIds(await scan({ ...home, ...productPages, 'productos/otro/index.html': previewPage('<h1>Otro</h1>') }, options)), ['R-RULE-14']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...categoryPages, ...productPages }, options)), []);
+  assert.deepEqual(failedIds(await scanEmptied({ ...home, ...productPages, 'productos/otro/index.html': previewPage('<h1>Otro</h1>') }, options)), ['R-RULE-14']);
   // Si ya hay páginas de producto o de categoría, no puede faltar la de ningún registro visible.
   const { 'productos/ejemplo-orejera/index.html': _product, ...withoutProduct } = productPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutProduct }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-orejera»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutProduct }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-orejera»']);
   const { 'categorias/soldadura/index.html': _category, ...withoutCategory } = categoryPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutCategory }, options)).map(finding => finding.message), ['falta la página de categoría «soldadura»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutCategory }, options)).map(finding => finding.message), ['falta la página de categoría «soldadura»']);
   // Un sitio que todavía no genera esas páginas (solo las listas) no falla por eso.
-  assert.deepEqual(failures(await scan({ ...home, 'catalogo/index.html': previewPage('<h1>Catálogo</h1>'), 'categorias/index.html': previewPage('<h1>Categorías</h1>') }, options)), []);
+  assert.deepEqual(failures(await scanEmptied({ ...home, 'catalogo/index.html': previewPage('<h1>Catálogo</h1>'), 'categorias/index.html': previewPage('<h1>Categorías</h1>') }, options)), []);
 
   // Con una categoría y una ficha aprobadas, sus páginas son válidas en producción.
-  const approved = structuredClone(data.catalog);
+  const approved = structuredClone(emptiedData.catalog);
   approved.categories[0].status = 'approved';
   approved.products.push({ id: 'guante-aprobado', status: 'approved' }, { id: 'guante-borrador', status: 'draft' });
-  const withApproved = { ...data, catalog: approved };
-  assert.deepEqual(failures(await scan({ 'categorias/manos/index.html': page(), 'productos/guante-aprobado/index.html': page() }, { data: withApproved })), []);
-  assert.deepEqual(failedIds(await scan({ 'productos/guante-aprobado/index.html': page(), 'productos/guante-borrador/index.html': page() }, { data: withApproved })), ['R-RULE-14']);
+  const withApproved = { ...emptiedData, catalog: approved };
+  assert.deepEqual(failures(await scanEmptied({ 'categorias/manos/index.html': page(), 'productos/guante-aprobado/index.html': page() }, { data: withApproved })), []);
+  assert.deepEqual(failedIds(await scanEmptied({ 'productos/guante-aprobado/index.html': page(), 'productos/guante-borrador/index.html': page() }, { data: withApproved })), ['R-RULE-14']);
 });
 
 test('R-RULE-14: un producto retirado tiene página solo si fue público, y el ejemplo retirado solo en la vista previa', async () => {
   const approval = { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true };
-  const editorial = structuredClone(data.catalog);
+  const editorial = structuredClone(emptiedData.catalog);
   editorial.products.push(
     { id: 'guante-retirado', status: 'retired', approval },
     { id: 'guante-retirado-sin-aprobacion', status: 'retired' },
     { id: 'guante-retirado-sin-suministro', status: 'retired', approval: { ...approval, supplyConfirmed: false } },
   );
-  const withRetired = { ...data, catalog: editorial };
+  const withRetired = { ...emptiedData, catalog: editorial };
   // Producción: el retirado que fue público tiene su página; los que nunca lo fueron, no.
-  assert.deepEqual(failures(await scan({ 'productos/guante-retirado/index.html': page() }, { data: withRetired })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'productos/guante-retirado/index.html': page() }, { data: withRetired })), []);
   for (const id of ['guante-retirado-sin-aprobacion', 'guante-retirado-sin-suministro']) {
-    const result = await scan({ 'productos/guante-retirado/index.html': page(), [`productos/${id}/index.html`]: page() }, { data: withRetired });
+    const result = await scanEmptied({ 'productos/guante-retirado/index.html': page(), [`productos/${id}/index.html`]: page() }, { data: withRetired });
     assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-14', `productos/${id}`]], id);
   }
   // Si ya hay páginas de producto, no puede faltar la del retirado público.
   const approved = structuredClone(editorial);
   approved.categories[0].status = 'approved';
   approved.products.push({ id: 'guante-aprobado', status: 'approved' });
-  const missing = await scan({ 'productos/guante-aprobado/index.html': page() }, { data: { ...data, catalog: approved } });
+  const missing = await scanEmptied({ 'productos/guante-aprobado/index.html': page() }, { data: { ...emptiedData, catalog: approved } });
   assert.deepEqual(failures(missing).map(finding => finding.message), ['falta la página de producto «guante-retirado»']);
 
   // Vista previa: el ejemplo retirado tiene su página, y no puede faltar.
@@ -734,18 +739,18 @@ test('R-RULE-14: un producto retirado tiene página solo si fue público, y el e
   const options = { preview: true };
   const home = { 'index.html': previewPage('<h1>Inicio</h1>') };
   const productPages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
-  assert.deepEqual(failures(await scan({ ...home, ...productPages }, options)), []);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...productPages }, options)), []);
   const { 'productos/ejemplo-producto-retirado/index.html': _retired, ...withoutRetired } = productPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutRetired }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-producto-retirado»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutRetired }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-producto-retirado»']);
   // Su página sin la etiqueta «Ejemplo» falla, como la de cualquier ejemplo.
-  const untagged = await scan({ ...home, ...productPages, 'productos/ejemplo-producto-retirado/index.html': previewPage(exampleCard(retiredExamples[0], false)) }, options);
+  const untagged = await scanEmptied({ ...home, ...productPages, 'productos/ejemplo-producto-retirado/index.html': previewPage(exampleCard(retiredExamples[0], false)) }, options);
   assert.deepEqual(failures(untagged).map(finding => [finding.id, finding.file]), [['R-RULE-03', 'productos/ejemplo-producto-retirado/index.html']]);
 
   // Producción: el ejemplo retirado no existe; su página falla por los datos y por las marcas de ejemplo.
-  const leaked = await scan({ 'productos/ejemplo-producto-retirado/index.html': page('<h1>Producto retirado</h1>') });
+  const leaked = await scanEmptied({ 'productos/ejemplo-producto-retirado/index.html': page('<h1>Producto retirado</h1>') });
   assert.deepEqual(failedIds(leaked), ['R-RULE-03', 'R-RULE-14']);
   for (const token of [retiredExamples[0].name, retiredExamples[0].code]) {
-    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${token}</p>`) })), ['R-RULE-03'], token);
+    assert.deepEqual(failedIds(await scanEmptied({ 'pagina/index.html': page(`<p>${token}</p>`) })), ['R-RULE-03'], token);
   }
 });
 

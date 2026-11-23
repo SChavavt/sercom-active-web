@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterProducts, matchesQuery, matchesSearchText, resultSummary, resultSummaryParts, SEARCH_SYNONYMS, searchMatcher, searchText, singularForms, tokenAlternatives } from '../src/lib/search.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
-import { loadProjectData } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
-const previewProducts = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples }).products;
+// Los productos de la vista previa sin fichas reales (catálogo vaciado): solo los dieciséis ejemplos, con cualquier catálogo.
+const previewProducts = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples }).products;
 
 // Productos sintéticos de prueba con la forma pública que usa la búsqueda. Nunca se importan en el sitio.
 const product = (name, categoryNames = ['Protección de manos'], extra = {}) => ({ name, brandName: 'Marca Alfa', code: 'SP-100', categoryNames, variants: [], ...extra });

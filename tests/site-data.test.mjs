@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSiteData, DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE, routes } from '../src/lib/site-data-core.mjs';
-import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
+import { allKeys, allStrings, emptiedCatalog, loadProjectData, publicCatalog } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
+// Las pruebas de los ejemplos, de los modos y de una ficha sintética usan el catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha): dan lo mismo con cualquier catálogo válido. Las que tratan de los
+// datos reales comparan con lo que se deriva de ellos (`publicCatalog`), nunca con una cifra escrita a mano.
+const emptied = emptiedCatalog(catalog);
+const real = publicCatalog(catalog);
 const categoryIds = catalog.categories.map(category => category.id);
 const brandIds = brands.map(brand => brand.id);
 // Los dieciséis ejemplos de los listados; el último del archivo es el ejemplo de producto retirado (solo tiene su página).
@@ -20,12 +25,14 @@ const INTERNAL_KEYS = ['approval', 'source', 'status', 'sourceUrl', 'usageConfir
 
 const production = () => createSiteData({ mode: 'production', catalog, brands, exampleProducts: examples });
 const preview = () => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+// Los mismos modos sobre el catálogo vaciado: solo los ejemplos y las diez categorías en borrador.
+const emptyPreview = () => createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts: examples });
 const printable = site => ({ mode: site.mode, isPreview: site.isPreview, categories: site.categories, brands: site.brands, products: site.products, paths: site.paths });
 
 // Catálogo sintético de prueba: la categoría «manos» aprobada y una ficha aprobada con todos sus datos internos.
 // Nunca se importa en el sitio.
 function syntheticCatalog(change = () => {}) {
-  const copy = structuredClone(catalog);
+  const copy = emptiedCatalog(catalog);
   copy.categories[0].status = 'approved';
   copy.products.push({
     id: 'test-001', brandId: 'ansell', model: 'TEST-001/A', name: 'Producto sintético de prueba', categoryIds: ['manos'], status: 'approved',
@@ -41,32 +48,72 @@ function syntheticCatalog(change = () => {}) {
   return copy;
 }
 
-test('producción con los datos reales: ninguna categoría en borrador, ningún producto y las diecinueve marcas', () => {
+/**
+ * Lo que un sitio armado con el catálogo real muestra, comparado con lo que se deriva de los mismos datos: en
+ * producción, exactamente las categorías y las fichas aprobadas; en la vista previa, además las categorías en borrador
+ * y los ejemplos. Ninguna ficha en borrador, en revisión o retirada está en una lista, y un retirado que fue público
+ * solo tiene su registro (su página). Sirve para `createSiteData` y para el módulo `site-data.mjs`.
+ */
+function assertRealData(site) {
+  const isPreview = site.isPreview;
+  const categoryStatus = new Map(catalog.categories.map(category => [category.id, category.status]));
+  const visibleCategoryIds = isPreview ? categoryIds : real.approvedCategoryIds;
+  const listedIds = isPreview ? [...real.approvedProductIds, ...exampleIds] : real.approvedProductIds;
+  assert.deepEqual(site.paths, { categoryIds: visibleCategoryIds, brandIds, productIds: listedIds });
+  assert.deepEqual(site.categories.map(category => [category.id, category.isDraft]), visibleCategoryIds.map(id => [id, categoryStatus.get(id) !== 'approved']));
+  assert.deepEqual(site.products.map(product => product.id), listedIds);
+  assert.deepEqual(site.products.map(product => product.isExample), listedIds.map(id => exampleIds.includes(id)));
+  assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
+  assert.deepEqual(site.retiredProducts.map(product => product.id), isPreview ? [...real.publicRetiredIds, RETIRED_EXAMPLE_ID] : real.publicRetiredIds);
+  // Nada sin aprobar está en una lista; un retirado público solo tiene su registro.
+  for (const id of real.unlistedProductIds) assert.equal(site.getProduct(id), undefined, id);
+  for (const id of real.publicRetiredIds) assert.equal(site.getRetiredProduct(id)?.id, id);
+  if (!isPreview) for (const id of exampleIds) assert.equal(site.getProduct(id), undefined, id);
+  // Conteos y listados por categoría y por marca: solo lo listado (los ejemplos no tienen marca real).
+  for (const category of site.categories) {
+    const expected = site.products.filter(product => product.categoryIds.includes(category.id)).map(product => product.id);
+    assert.deepEqual(site.productsByCategory(category.id).map(product => product.id), expected, category.id);
+    assert.equal(category.productCount, expected.length, category.id);
+  }
+  for (const brand of site.brands) {
+    const expected = real.approvedProducts.filter(product => product.brandId === brand.id).map(product => product.id);
+    assert.deepEqual(site.productsByBrand(brand.id).map(product => product.id), expected, brand.id);
+    assert.equal(brand.productCount, expected.length, brand.id);
+  }
+  const featured = site.featuredProducts().map(product => product.id);
+  assert.equal(featured.length, Math.min(8, listedIds.length));
+  assert.ok(featured.every(id => listedIds.includes(id)));
+}
+
+test('producción con los datos reales: solo las categorías y las fichas aprobadas, y las diecinueve marcas', () => {
   const site = production();
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
-  assert.deepEqual(site.categories, []);
-  assert.deepEqual(site.products, []);
-  assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
-  assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
-  assert.deepEqual(site.featuredProducts(), []);
-  assert.equal(site.getCategory('manos'), undefined);
-  assert.equal(site.getProduct(exampleIds[0]), undefined);
-  assert.deepEqual(site.productsByCategory('manos'), []);
-  assert.deepEqual(site.productsByBrand('ansell'), []);
-  assert.ok(site.brands.every(brand => brand.productCount === 0));
+  assertRealData(site);
+  assert.ok(site.products.every(product => product.isExample === false));
+});
+
+test('vista previa con los datos reales: lo de producción, las categorías en borrador y los ejemplos', () => {
+  const site = preview();
+  assert.equal(site.mode, 'preview');
+  assert.equal(site.isPreview, true);
+  assertRealData(site);
+  // Las fichas reales van antes que los ejemplos.
+  assert.deepEqual(site.products.filter(product => !product.isExample).map(product => product.id), real.approvedProductIds);
 });
 
 test('producción ignora los ejemplos aunque se le entreguen, incluso si son inválidos', () => {
-  const text = JSON.stringify(printable(production()));
+  const text = JSON.stringify(printable(createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts: examples })));
   assert.doesNotMatch(text, /EJ-\d|ejemplo/i);
-  const site = createSiteData({ mode: 'production', catalog, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] });
+  const site = createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] });
   assert.deepEqual(site.products, []);
-  assert.deepEqual(createSiteData({ mode: 'production', catalog, brands }).products, []);
+  assert.deepEqual(createSiteData({ mode: 'production', catalog: emptied, brands }).products, []);
+  // Con el catálogo real, lo mismo con ejemplos que sin ellos.
+  assert.deepEqual(createSiteData({ mode: 'production', catalog, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] }).products, production().products);
 });
 
-test('vista previa con los datos reales: diez categorías en borrador y dieciséis ejemplos', () => {
-  const site = preview();
+test('vista previa sin fichas reales: diez categorías en borrador y dieciséis ejemplos', () => {
+  const site = emptyPreview();
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.deepEqual(site.categories.map(category => category.id), categoryIds);
@@ -98,7 +145,7 @@ test('vista previa con los datos reales: diez categorías en borrador y diecisé
 });
 
 test('las proyecciones tienen exactamente los campos públicos acordados', () => {
-  const site = preview();
+  const site = emptyPreview();
   for (const category of site.categories) assert.deepEqual(Object.keys(category), CATEGORY_KEYS);
   for (const brand of site.brands) {
     assert.deepEqual(Object.keys(brand), BRAND_KEYS);
@@ -135,7 +182,7 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
 });
 
 test('búsquedas por id, por categoría y por marca, y selección de destacados', () => {
-  const site = preview();
+  const site = emptyPreview();
   categoryIds.forEach((id, index) => {
     assert.equal(site.getCategory(id)?.id, id);
     assert.deepEqual(site.productsByCategory(id).map(product => product.categoryIds), Array(EXAMPLES_PER_CATEGORY[index]).fill([id]));
@@ -230,14 +277,14 @@ test('createSiteData rechaza modos, marcas y ejemplos inválidos', () => {
   broken[0].brandName = 'Ansell';
   assert.throws(() => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: broken }), /la marca debe ser «Marca de ejemplo»/);
   assert.throws(() => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: null }), /debe ser una lista/);
-  // Sin ejemplos, la vista previa solo muestra las categorías.
-  const empty = createSiteData({ mode: 'preview', catalog, brands });
+  // Sin ejemplos ni fichas reales, la vista previa solo muestra las categorías.
+  const empty = createSiteData({ mode: 'preview', catalog: emptied, brands });
   assert.equal(empty.categories.length, 10);
   assert.deepEqual(empty.products, []);
 });
 
 test('los datos devueltos están congelados y no comparten memoria con los archivos de origen', () => {
-  const site = preview();
+  const site = emptyPreview();
   assert.ok(Object.isFrozen(site) && Object.isFrozen(site.products) && Object.isFrozen(site.products[0]) && Object.isFrozen(site.products[0].variants[0]));
   assert.ok(Object.isFrozen(site.categories[0]) && Object.isFrozen(site.brands[0].manufacturerLinks) && Object.isFrozen(site.paths.productIds));
   assert.throws(() => { site.products.push(site.products[0]); }, TypeError);
@@ -281,41 +328,36 @@ test('aviso de sitio en preparación de la compilación de producción, hasta el
 // Astro define la constante __CATALOG_PREVIEW__ al compilar; aquí se define a mano antes de cargar el módulo.
 const EXPORTS = ['DEVELOPMENT_NOTICE', 'EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
 
-test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', async () => {
+test('site-data.mjs en producción: solo las categorías y las fichas aprobadas, sin ejemplos', async () => {
   globalThis.__CATALOG_PREVIEW__ = false;
   const site = await import('../src/lib/site-data.mjs?produccion');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
   assert.equal(site.DEVELOPMENT_NOTICE, DEVELOPMENT_NOTICE);
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
-  assert.equal(site.categories.length, 0);
-  assert.equal(site.products.length, 0);
   assert.equal(site.brands.length, 19);
-  assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
-  assert.deepEqual(site.featuredProducts(), []);
+  assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera'), undefined);
-  assert.deepEqual(site.retiredProducts, []);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID), undefined);
 });
 
-test('site-data.mjs en vista previa: diez categorías y dieciséis ejemplos', async () => {
+test('site-data.mjs en vista previa: lo de producción, las diez categorías y los dieciséis ejemplos', async () => {
   globalThis.__CATALOG_PREVIEW__ = true;
   const site = await import('../src/lib/site-data.mjs?vista-previa');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.equal(site.categories.length, 10);
-  assert.equal(site.products.length, 16);
+  assert.equal(site.products.filter(product => product.isExample).length, 16);
   assert.equal(site.brands.length, 19);
-  assert.deepEqual(site.paths, { categoryIds, brandIds, productIds: exampleIds });
+  assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera')?.code, 'EJ-5001');
-  assert.equal(site.getCategory('auditiva')?.productCount, 1);
-  assert.deepEqual(site.productsByCategory('soldadura').map(product => product.code), ['EJ-1101']);
+  // Los ejemplos de cada categoría, en su orden, después de las fichas reales que haya.
+  assert.deepEqual(site.productsByCategory('soldadura').filter(product => product.isExample).map(product => product.code), ['EJ-1101']);
   assert.equal(site.featuredProducts(3).length, 3);
   assert.equal(site.routes.catalog, '/catalogo/');
-  assert.deepEqual(site.retiredProducts.map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
+  assert.deepEqual(site.retiredProducts.filter(product => product.isExample).map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID)?.categoryIds[0], 'manos');
-  assert.equal(site.getCategory('manos')?.productCount, 3);
   assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.brandName, 'Marca de ejemplo Beta');
 });
 

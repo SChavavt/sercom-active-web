@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPublicRetired } from '../src/lib/catalog-policy.mjs';
 
 /** Carpeta del proyecto. */
 export const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -17,6 +18,37 @@ export async function loadProjectData() {
     readJson('src/data/preview/example-products.json'), readJson('research/Sercom_Active_Fuentes_Catalogos.json'),
   ]);
   return { business, catalog, brands, examples, registry };
+}
+
+/**
+ * El catálogo real vaciado: las mismas categorías, todas en borrador, y ninguna ficha. Es una copia: no cambia el
+ * catálogo recibido. Para las pruebas cuyo tema no son los datos reales (los ejemplos, los modos, una ficha sintética),
+ * que así dan lo mismo con cualquier catálogo válido: con borradores cargados o con fichas y categorías aprobadas.
+ */
+export function emptiedCatalog(catalog) {
+  const copy = structuredClone(catalog);
+  for (const category of copy.categories) category.status = 'draft';
+  copy.products = [];
+  return copy;
+}
+
+/**
+ * Lo que cada compilación debe mostrar del catálogo real, derivado de los mismos datos (nunca una cifra escrita a mano):
+ * producción muestra exactamente las categorías y las fichas `approved`; los retirados que fueron públicos solo tienen
+ * su página. La vista previa suma las categorías en borrador y los ejemplos.
+ */
+export function publicCatalog(catalog) {
+  const approvedCategoryIds = catalog.categories.filter(category => category.status === 'approved').map(category => category.id);
+  const approvedProducts = catalog.products.filter(product => product.status === 'approved');
+  const publicRetired = catalog.products.filter(isPublicRetired);
+  return {
+    approvedCategoryIds,
+    approvedProducts,
+    approvedProductIds: approvedProducts.map(product => product.id),
+    publicRetiredIds: publicRetired.map(product => product.id),
+    /** Las fichas que no se muestran en ninguna lista: borradores, en revisión y retirados. */
+    unlistedProductIds: catalog.products.filter(product => product.status !== 'approved').map(product => product.id),
+  };
 }
 
 /**
