@@ -4,7 +4,7 @@ Complementa el plan maestro v1.2. Las fuentes de precios y límites se revisaron
 
 ## 1. Recomendación
 
-**GitHub + Astro/TypeScript + catálogo en JSON validado, con salida estática; Cloudflare Pages Free como alojamiento propuesto al lanzar.** El propietario creó el repositorio público y confirmó continuar con esa visibilidad. La primera versión no necesita base de datos: el contenido público se genera al compilar. El navegador busca y filtra el catálogo; en el paso 2 también conservará temporalmente una lista de cotización. WhatsApp y el correo son el canal de atención.
+**GitHub + Astro/TypeScript + catálogo en JSON validado, con salida estática; Cloudflare Pages Free como alojamiento propuesto al lanzar.** El propietario creó el repositorio público y confirmó continuar con esa visibilidad. La primera versión no necesita base de datos: el contenido público se genera al compilar. El navegador busca y filtra el catálogo y, desde el paso 2, guarda la lista de cotización del visitante en ese mismo navegador, sin servidor. WhatsApp y el correo son el canal de atención.
 
 Un sitio estático puede ser interactivo. «Estático» describe cómo se publica el contenido; no obliga a una página sin buscador, filtros o lista. La base de datos sirve cuando hay información que debe guardarse o editarse en un servidor; no es necesaria solo por tener categorías y cientos de productos.
 
@@ -31,7 +31,7 @@ Las cuotas y precios no son una promesa permanente: se verifican otra vez al pub
 | Marcas que se manejan | `src/data/brands.json` | Edición junto con el registro de investigación |
 | Fuentes de marcas y proveedores | `research/Sercom_Active_Fuentes_Catalogos.json` | Registro interno, fuera de la salida web |
 | Productos de ejemplo | `src/data/preview/example-products.json` | Solo en la vista previa de diseño |
-| Lista del cliente | En su navegador, cuando se construya (paso 2) | Sin sincronización entre dispositivos; sin datos sensibles |
+| Lista del cliente («Mi cotización») | En su navegador: `localStorage` (clave `cotizacion:v1`) para la lista y `sessionStorage` (`cotizacion:borrador:v1`) para lo que escribe en «Cotizar mi lista» | La cambia solo el visitante; sin servidor, cuenta, cookies ni sincronización entre dispositivos. Solo identificadores, cantidades y unidades. Formato y reglas en [`datos-y-modos.md`](datos-y-modos.md#10-la-lista-guardada-en-el-navegador). |
 | Mensaje de cotización | WhatsApp o correo del cliente | El cliente revisa y envía; el sitio no acredita recepción |
 | Historial de cambios del catálogo | Git | Commit y revisión |
 
@@ -43,7 +43,7 @@ Las páginas reciben una proyección pública de los datos (`src/lib/site-data.m
 | --- | --- | --- |
 | Datos | `src/data/` | JSON versionados (sección 3). |
 | Tipos | `src/types/` | `catalog.ts` (archivo editorial), `site.ts` (forma pública), `contact.ts`. |
-| Capa de datos | `src/lib/` | `catalog-policy.mjs` (validación y proyección de aprobados y retirados), `site-data-core.mjs` y `site-data.mjs` (datos públicos por modo, solo al compilar), `contact-core.mjs` y `contact.mjs` (enlaces y borradores de contacto), `routes.mjs`, `search.mjs`, `text.mjs`, `grid-fill.mjs`, `product-title.mjs`, `build-mode.mjs`, `icons.ts`, `ayuda.ts`. |
+| Capa de datos | `src/lib/` | `catalog-policy.mjs` (validación y proyección de aprobados y retirados), `site-data-core.mjs` y `site-data.mjs` (datos públicos por modo, solo al compilar), `contact-core.mjs` y `contact.mjs` (enlaces y borradores de contacto), `routes.mjs`, `search.mjs`, `text.mjs`, `catalog-filters.mjs` (filtros del catálogo), `quote-list.mjs` (reglas de la lista de cotización), `quote-store.mjs` (su almacén en el navegador), `message-page.mjs` (las páginas que arman un mensaje), `grid-fill.mjs`, `product-title.mjs`, `build-mode.mjs`, `icons.ts`, `ayuda.ts`. |
 | Plantilla y componentes | `src/layouts/BaseLayout.astro`, `src/components/` | Plantilla común, encabezado, pie, barra fija, avisos y componentes compartidos. |
 | Páginas | `src/pages/` | Portada, catálogo, categorías, marcas, producto (ficha o retirado), cotizar, solicitud especial, contacto, privacidad y 404. Las rutas con parámetro salen de los datos. |
 | Estilos | `src/styles/` | Hoja global por capas y tres hojas de página. Guía en [`diseno.md`](diseno.md). |
@@ -52,7 +52,11 @@ Las páginas reciben una proyección pública de los datos (`src/lib/site-data.m
 | Pruebas | `tests/` | Pruebas de Node y una sonda de compilación (`tests/build-probe/`). |
 | Configuración | `astro.config.mjs`, `package.json`, `vercel.json`, `.github/workflows/quality.yml` | Salida estática con rutas terminadas en diagonal; la bandera de vista previa; el alojamiento y la verificación automática. |
 
-Astro compila cada página a HTML. Los únicos scripts del navegador son pequeños y de mejora progresiva (encabezado, búsqueda del catálogo, línea del enlace en los borradores y búsqueda en la solicitud especial); no importan datos. La única dependencia de ejecución es Astro.
+Astro compila cada página a HTML. Los scripts del navegador son de mejora progresiva y no importan datos, ni directamente ni a través de otro módulo: una prueba de las fuentes (`tests/build-mode.test.mjs`) sigue cada importación de cada `<script>` y solo admite los módulos sin datos de `BROWSER_MODULES` (ver `datos-y-modos.md`, sección 2). La única dependencia de ejecución es Astro.
+
+**Módulos del navegador.** Los ocho módulos sin datos son `text.mjs`, `search.mjs`, `routes.mjs`, `contact-core.mjs`, `catalog-filters.mjs`, `quote-list.mjs`, `quote-store.mjs` y `message-page.mjs`. Las decisiones que no tocan la página (qué coincide con una búsqueda, qué filtros se combinan, qué renglones son iguales, qué deshace «Deshacer», qué productos van en el mensaje, si el mensaje cabe en un enlace) son funciones puras con pruebas de Node; los scripts de las páginas las llaman y solo se ocupan del documento. Qué script usa cada uno: [`diseno.md`](diseno.md#10-scripts-del-navegador).
+
+**Un solo módulo toca el almacenamiento.** Solo `src/lib/quote-store.mjs` usa `localStorage` y `sessionStorage`; los demás leen y escriben la lista a través de él, y una prueba de las fuentes (`tests/browser-code.test.mjs`) falla si otro archivo los nombra o usa cookies. Así lo que se guarda en el navegador del visitante se revisa en un solo archivo, junto con la página de privacidad.
 
 ## 5. Bases de datos y alternativas posteriores
 
