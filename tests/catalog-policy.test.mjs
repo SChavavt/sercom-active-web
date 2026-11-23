@@ -24,7 +24,8 @@ test('los borradores no salen al catálogo y la aprobación interna no se export
   const products = getPublishedProducts(fixture(), registry);
   assert.equal(products.length, 1);
   assert.equal('approval' in products[0], false);
-  assert.equal('usageConfirmed' in products[0].image, false);
+  // De la foto se publica la página de donde viene (el crédito bajo la foto), nunca su uso.
+  assert.deepEqual(products[0].image, { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' });
 });
 
 test('bloquea publicación sin evidencia y costos anidados', () => {
@@ -364,7 +365,7 @@ test('una ficha aprobada puede no tener foto; si la lleva, con el uso confirmado
 test('una ficha aprobada sin foto se publica con image: null y sin ningún dato interno', () => {
   const [without, withFile] = getPublishedProducts(catalogWith({ image: undefined }, { image: FILE_IMAGE }), registry);
   assert.equal(without.image, null);
-  assert.deepEqual(withFile.image, { file: 'guante-de-prueba-37-175.jpg', alt: 'Guante verde de prueba' });
+  assert.deepEqual(withFile.image, { file: 'guante-de-prueba-37-175.jpg', alt: 'Guante verde de prueba', sourceUrl: FILE_IMAGE.sourceUrl });
   // Las mismas claves que una ficha con foto: sin `hasPhoto` ni nada parecido.
   assert.deepEqual(Object.keys(without), Object.keys(withFile));
   const text = JSON.stringify(without);
@@ -372,14 +373,12 @@ test('una ficha aprobada sin foto se publica con image: null y sin ningún dato 
   assert.doesNotMatch(text, /Revisor de prueba|example\.invalid\/(?:source|test)/);
 });
 
-test('lo publicado de la imagen es exactamente { file, alt } o { url, width, height, alt }, sin su fuente ni su uso', () => {
+test('lo publicado de la imagen es exactamente { file, alt, sourceUrl } o { url, width, height, alt, sourceUrl }, sin su uso', () => {
+  // `sourceUrl` es la dirección del crédito que la ficha muestra bajo la foto; `usageConfirmed` nunca se publica.
   const [fromFile, fromUrl] = getPublishedProducts(catalogWith({ image: FILE_IMAGE }, { image: URL_IMAGE }), registry);
-  assert.deepEqual(fromFile.image, { file: 'guante-de-prueba-37-175.jpg', alt: 'Guante verde de prueba' });
-  assert.deepEqual(fromUrl.image, { url: 'https://example.invalid/fotos/guante.jpg', width: 1600, height: 1200, alt: 'Guante verde de prueba' });
-  for (const product of [fromFile, fromUrl]) {
-    assert.equal('sourceUrl' in product.image, false);
-    assert.equal('usageConfirmed' in product.image, false);
-  }
+  assert.deepEqual(fromFile.image, { file: 'guante-de-prueba-37-175.jpg', alt: 'Guante verde de prueba', sourceUrl: FILE_IMAGE.sourceUrl });
+  assert.deepEqual(fromUrl.image, { url: 'https://example.invalid/fotos/guante.jpg', width: 1600, height: 1200, alt: 'Guante verde de prueba', sourceUrl: URL_IMAGE.sourceUrl });
+  for (const product of [fromFile, fromUrl]) assert.equal('usageConfirmed' in product.image, false);
 });
 
 // --- Normas (`standards`): cada una con su texto y la página del fabricante donde consta, en cualquier estado -------
@@ -436,6 +435,7 @@ test('lo publicado de las normas es solo su texto, en el orden de los datos; sin
   const [withNorms, without] = getPublishedProducts(catalogWith({ standards: [norm('EN 388:2016 4131A'), norm('ANSI/ISEA 105-2016 A4')] }, {}), registry);
   assert.deepEqual(withNorms.standards, ['EN 388:2016 4131A', 'ANSI/ISEA 105-2016 A4']);
   assert.deepEqual(without.standards, []);
-  assert.equal(JSON.stringify(withNorms).includes('sourceUrl'), false);
+  // La fuente de una norma no se publica (la de la foto sí: es el crédito bajo la foto).
+  assert.equal(JSON.stringify(withNorms.standards).includes('sourceUrl'), false);
   assert.equal(JSON.stringify(withNorms).includes(NORM_SOURCE), false);
 });

@@ -340,10 +340,14 @@ export function getPublishedProducts(catalog, registry) {
   }));
 }
 
-/** Lo público de una fotografía: `{ file, alt }` o `{ url, width, height, alt }`; nunca su fuente ni su uso. */
+/**
+ * Lo público de una fotografía: `{ file, alt, sourceUrl }` o `{ url, width, height, alt, sourceUrl }`. `sourceUrl`, la
+ * página del fabricante de donde viene, es la dirección del crédito que la ficha muestra bajo la foto; su uso
+ * (`usageConfirmed`) nunca se publica.
+ */
 const publicImage = image => (Object.hasOwn(image, 'file')
-  ? { file: image.file, alt: image.alt }
-  : { url: image.url, width: image.width, height: image.height, alt: image.alt });
+  ? { file: image.file, alt: image.alt, sourceUrl: image.sourceUrl }
+  : { url: image.url, width: image.width, height: image.height, alt: image.alt, sourceUrl: image.sourceUrl });
 
 /**
  * Producto retirado que fue público: estado `retired` con una aprobación comercial completa. Conserva una página
@@ -360,4 +364,44 @@ export function getRetiredProducts(catalog, registry) {
   return catalog.products.filter(isPublicRetired).map(p => ({
     id: p.id, brandId: p.brandId, model: p.model, name: p.name, categoryIds: [...p.categoryIds],
   }));
+}
+
+/** Tipos de recurso del registro que nunca se publican como enlace ni respaldan la fuente de una foto. */
+export const BLOCKED_RESOURCE_TYPES = Object.freeze(['deprecated', 'unverified_current', 'gated_landing']);
+
+/** El servidor de una dirección, en minúsculas y sin `www.` al principio; `null` si no es una dirección. */
+const hostOf = value => {
+  try { return new URL(String(value)).hostname.toLowerCase().replace(/^www\./, ''); } catch { return null; }
+};
+
+/**
+ * La foto de una ficha aprobada viene del sitio de su fabricante: la ficha muestra bajo la foto un crédito que enlaza
+ * `image.sourceUrl`. Su servidor (sin `www.`) debe ser el de algún recurso de la entidad de la marca en el registro de
+ * investigación verificado como accesible y de un tipo que no está bloqueado. Un borrador, una ficha en revisión o un
+ * retirado no publican foto y no se revisan. Se llama aparte de `validateCatalog` (desde `validateProject`, en
+ * `scripts/validate-catalog.mjs`) porque la compilación valida el catálogo con las marcas, sin los recursos del registro.
+ * @param {unknown} catalog
+ * @param {unknown} registry
+ * @returns {string[]} Errores; lista vacía si todo es correcto.
+ */
+export function photoSourceErrors(catalog, registry) {
+  const products = Array.isArray(/** @type {any} */ (catalog)?.products) ? /** @type {any} */ (catalog).products : [];
+  const sources = Array.isArray(/** @type {any} */ (registry)?.sources) ? /** @type {any} */ (registry).sources : [];
+  const errors = [];
+  for (const [index, product] of products.entries()) {
+    if (product?.status !== 'approved' || !isRecord(product.image)) continue;
+    const found = hostOf(product.image.sourceUrl);
+    if (!found || !isHttps(product.image.sourceUrl)) continue;
+    const source = sources.find(entry => entry?.entity_id === product.brandId);
+    if (!source) continue;
+    const hosts = [...new Set((Array.isArray(source.resources) ? source.resources : [])
+      .filter(resource => String(resource?.verification ?? '').startsWith('accesible') && !BLOCKED_RESOURCE_TYPES.includes(resource?.type))
+      .map(resource => hostOf(resource.url)).filter(Boolean))];
+    if (hosts.includes(found)) continue;
+    const known = hosts.length
+      ? (hosts.length === 1 ? `el sitio de ${source.name} en el registro es ${hosts[0]}` : `los sitios de ${source.name} en el registro son ${hosts.slice(0, -1).join(', ')} y ${hosts.at(-1)}`)
+      : `${source.name} no tiene en el registro ningún sitio verificado como accesible`;
+    errors.push(`products[${index}] (${product.id}).image.sourceUrl: la foto viene de ${found}, pero ${known}. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.`);
+  }
+  return errors;
 }

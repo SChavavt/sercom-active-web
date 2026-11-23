@@ -21,8 +21,19 @@ const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 const CATEGORY_KEYS = ['id', 'name', 'shortName', 'summary', 'isDraft', 'productCount', 'url'];
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'hasCatalog', 'productCount', 'url'];
 const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'standards', 'image', 'documents', 'isExample'];
+/** Las rutas de las claves `key` que no están dentro de un objeto `image` (por ejemplo, la fuente de una norma). */
+function keysOutsideImage(value, key, path = '') {
+  if (Array.isArray(value)) return value.flatMap((child, index) => keysOutsideImage(child, key, `${path}[${index}]`));
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([name, child]) => [
+    ...(name === key && !path.endsWith('.image') ? [`${path}.${name}`] : []),
+    ...keysOutsideImage(child, key, `${path}.${name}`),
+  ]);
+}
 // Nombres de campos internos que nunca deben verse en los datos públicos.
-const INTERNAL_KEYS = ['approval', 'source', 'status', 'sourceUrl', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
+// `sourceUrl` solo llega como la página de donde viene una foto (`image.sourceUrl`, el crédito bajo la foto): lo
+// revisa `keysOutsideImage`.
+const INTERNAL_KEYS = ['approval', 'source', 'status', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
 
 const production = () => createSiteData({ mode: 'production', catalog, brands, exampleProducts: examples });
 const preview = () => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
@@ -251,7 +262,7 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
     summary: 'No es un artículo comercial.', characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'], saleUnit: 'pieza',
     variants: [{ id: 'talla-9', label: 'Talla 9', code: 'TEST-001/A-9' }],
     standards: [],
-    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' },
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     isExample: false,
   }]);
@@ -260,12 +271,15 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
   assert.equal(site.getBrand('3m')?.productCount, 0);
   assert.deepEqual(site.featuredProducts().map(product => product.id), ['test-001']);
 
-  // Nada de lo que se puede imprimir lleva aprobación, fuente, estado ni datos del registro.
+  // Nada de lo que se puede imprimir lleva aprobación, fuente, estado ni datos del registro; de la foto, solo la página
+  // de donde viene, como image.sourceUrl.
   const data = JSON.parse(JSON.stringify(printable(site)));
   const keys = new Set(allKeys(data));
   for (const key of INTERNAL_KEYS) assert.ok(!keys.has(key), `campo interno publicado: ${key}`);
+  assert.deepEqual(keysOutsideImage(data, 'sourceUrl'), []);
   const text = allStrings(data).join(' | ');
-  assert.doesNotMatch(text, /Revisor de prueba|2026-11-18|example\.invalid\/source|example\.invalid\/test(?!\.png)|approved|draft/);
+  assert.equal(text.split('https://example.invalid/source').length - 1, 1, 'la página de donde viene la foto, una vez');
+  assert.doesNotMatch(text, /Revisor de prueba|2026-11-18|example\.invalid\/test(?!\.png)|approved|draft/);
 });
 
 test('vista previa con una ficha aprobada: la ficha real va primero y los ejemplos se suman', () => {
@@ -283,9 +297,9 @@ test('la foto de una ficha llega a la forma pública como { file, alt } o { url,
   const fromFile = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
     product.image = { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true };
   }) });
-  assert.deepEqual(fromFile.getProduct('test-001')?.image, { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba' });
+  assert.deepEqual(fromFile.getProduct('test-001')?.image, { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' });
   const fromUrl = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
-  assert.deepEqual(fromUrl.getProduct('test-001')?.image, { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' });
+  assert.deepEqual(fromUrl.getProduct('test-001')?.image, { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' });
   // Los ejemplos de la vista previa siguen sin foto.
   const preview = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog() });
   assert.ok(preview.products.filter(product => product.isExample).every(product => product.image === null));
@@ -319,7 +333,7 @@ test('las normas de una ficha llegan a la forma pública como su texto, sin su f
   assert.ok(site.products.filter(product => product.isExample).every(product => product.standards.length === 0));
   const data = JSON.parse(JSON.stringify(printable(site)));
   assert.doesNotMatch(allStrings(data).join(' | '), /norma-a|norma-b/);
-  assert.ok(!new Set(allKeys(data)).has('sourceUrl'));
+  assert.deepEqual(keysOutsideImage(data, 'sourceUrl'), []);
   // Sin normas, la lista está vacía.
   const without = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
   assert.deepEqual(without.getProduct('test-001')?.standards, []);

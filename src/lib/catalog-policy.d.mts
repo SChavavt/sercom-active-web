@@ -24,3 +24,12 @@ export function isPublicRetired(product: unknown): boolean;
 
 /** Exportación explícita de los retirados públicos: solo identificación. Lanza un error si el catálogo no es válido. */
 export function getRetiredProducts(catalog: unknown, registry: BrandScope): PublishedRetiredProduct[];
+
+/** Tipos de recurso del registro que nunca se publican como enlace ni respaldan la fuente de una foto. */
+export const BLOCKED_RESOURCE_TYPES: readonly string[];
+
+/**
+ * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) es del sitio de su marca en el registro:
+ * un recurso accesible y de un tipo no bloqueado con el mismo servidor (sin `www.`). Devuelve los errores.
+ */
+export function photoSourceErrors(catalog: unknown, registry: unknown): string[];

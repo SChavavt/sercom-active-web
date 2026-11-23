@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { brandSummary, photoSummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
+import { photoSourceErrors } from '../src/lib/catalog-policy.mjs';
 import { emptiedCatalog, loadProjectData, makeTree, png, readText, removeTree } from './helpers.mjs';
 
 // El validador (`npm run validate:catalog`) corrido sobre una carpeta temporal con los datos del repositorio y un
@@ -16,8 +17,12 @@ const product = (index, change = {}) => ({
   approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
   ...change,
 });
-const fileImage = file => ({ file, alt: 'Foto del guante ficticio', sourceUrl: 'https://example.invalid/origen', usageConfirmed: true });
-const urlImage = { url: 'https://example.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto del guante ficticio', sourceUrl: 'https://example.invalid/origen', usageConfirmed: true };
+// La foto de una ficha aprobada viene del sitio de su fabricante (photoSourceErrors): las fichas ficticias son de
+// Ansell y su foto viene de una página inventada en el servidor de su sitio en el registro.
+const ANSELL_SITE = JSON.parse(registryText).sources.find(source => source.entity_id === 'ansell').resources.find(resource => resource.type === 'web').url;
+const PHOTO_PAGE = new URL('/pagina-ficticia-de-la-foto', ANSELL_SITE).href;
+const fileImage = file => ({ file, alt: 'Foto del guante ficticio', sourceUrl: PHOTO_PAGE, usageConfirmed: true });
+const urlImage = { url: 'https://example.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto del guante ficticio', sourceUrl: PHOTO_PAGE, usageConfirmed: true };
 /** El catálogo del repositorio vaciado, con «manos» aprobada y las fichas dadas. */
 function catalogOf(...products) {
   const copy = emptiedCatalog(catalog);
@@ -109,4 +114,41 @@ test('el resumen de las marcas dice cuántas tienen algún enlace, cuántas un c
   // Con los datos del repositorio, la línea contada a mano desde la tabla de enlaces acordada.
   const { lines } = await validate(catalogOf());
   assert.ok(lines.includes('Marcas públicas: 19 / 16 con algún enlace del fabricante / 14 con catálogo del fabricante (6 en PDF).'), lines.join('\n'));
+});
+
+test('la foto de una ficha aprobada viene de un sitio de su fabricante en el registro; si no, el mensaje dice de dónde viene y qué hacer', async () => {
+  const foreign = { ...urlImage, sourceUrl: 'https://example.invalid/origen' };
+  const { errors } = await validate(catalogOf(product(1, { image: urlImage }), product(2, { image: foreign })));
+  assert.deepEqual(errors, ['products[1] (guante-ficticio-2).image.sourceUrl: la foto viene de example.invalid, pero el sitio de Ansell en el registro es ansell.com. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.']);
+  // Un borrador o una ficha en revisión no publican la foto: no se revisa.
+  assert.deepEqual((await validate(catalogOf(product(1), product(2, { status: 'draft', image: foreign }), product(3, { status: 'in_review', image: foreign })))).errors, []);
+  // Con o sin «www.», y sin distinguir mayúsculas en el servidor.
+  for (const sourceUrl of ['https://ansell.com/mx/es/pagina-ficticia', 'https://WWW.Ansell.com/pagina-ficticia']) {
+    assert.deepEqual((await validate(catalogOf(product(1, { image: { ...urlImage, sourceUrl } })))).errors, [], sourceUrl);
+  }
+});
+
+test('el servidor de la foto debe ser el de un recurso de la marca verificado como accesible y de un tipo no bloqueado', () => {
+  const registry = { sources: [
+    { entity_id: 'marca-a', name: 'Marca A', entity_type: 'brand', resources: [
+      { type: 'web', url: 'https://www.marca-a.example/', verification: 'accesible (2026-11-23)' },
+      { type: 'catalog_platform', url: 'https://catalogo.marca-a.example/', verification: 'accesible (2026-11-23)' },
+      { type: 'unverified_current', url: 'https://nuevo.marca-a.example/', verification: 'accesible (2026-11-23)' },
+      { type: 'pdf', url: 'https://archivos.marca-a.example/catalogo.pdf', verification: 'sin comprobar' },
+    ] },
+    { entity_id: 'marca-b', name: 'Marca B', entity_type: 'brand', resources: [
+      { type: 'web', url: 'https://marca-b.example/', verification: 'sin comprobar' },
+    ] },
+  ] };
+  const photo = (brandId, sourceUrl, status = 'approved') => ({ id: `ficha-${brandId}`, brandId, status, image: { url: 'https://example.invalid/f.jpg', width: 800, height: 600, alt: 'Foto', sourceUrl, usageConfirmed: true } });
+  const errorsOf = (...products) => photoSourceErrors({ products }, registry);
+  assert.deepEqual(errorsOf(photo('marca-a', 'https://marca-a.example/producto/1'), photo('marca-a', 'https://catalogo.marca-a.example/x')), []);
+  // Un tipo bloqueado o un recurso sin comprobar no respaldan la foto; otro subdominio tampoco.
+  for (const sourceUrl of ['https://nuevo.marca-a.example/x', 'https://archivos.marca-a.example/foto', 'https://tienda.marca-a.example/x']) {
+    const host = new URL(sourceUrl).hostname;
+    assert.deepEqual(errorsOf(photo('marca-a', sourceUrl)), [`products[0] (ficha-marca-a).image.sourceUrl: la foto viene de ${host}, pero los sitios de Marca A en el registro son marca-a.example y catalogo.marca-a.example. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.`], sourceUrl);
+  }
+  assert.deepEqual(errorsOf(photo('marca-b', 'https://marca-b.example/x')), ['products[0] (ficha-marca-b).image.sourceUrl: la foto viene de marca-b.example, pero Marca B no tiene en el registro ningún sitio verificado como accesible. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.']);
+  // Solo las fichas aprobadas; un retirado no muestra su foto.
+  assert.deepEqual(errorsOf(photo('marca-b', 'https://marca-b.example/x', 'draft'), photo('marca-b', 'https://marca-b.example/x', 'retired')), []);
 });

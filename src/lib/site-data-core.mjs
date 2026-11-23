@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -106,8 +106,6 @@ const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUni
 const VARIANT_KEYS = ['id', 'label', 'code'];
 /** «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma»: las marcas que acepta un ejemplo, para los errores. */
 const BRAND_CHOICES = `${EXAMPLE_BRAND_NAMES.slice(0, -1).map(name => `«${name}»`).join(', ')} o «${EXAMPLE_BRAND_NAMES.at(-1)}»`;
-/** Tipos de recurso del registro que nunca se publican como enlace. */
-const BLOCKED_RESOURCE_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];
 
 /**
  * Valida la estructura de `src/data/brands.json`.
@@ -422,11 +420,11 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
         // Solo el texto de cada norma: la ficha las muestra en «Normas» y ninguna otra parte del sitio las usa.
         standards: [...product.standards],
-        // Solo lo que dibuja la página: el archivo o la dirección con sus medidas, y el texto alternativo. Sin foto,
-        // `null`: la página muestra el pictograma de la categoría.
+        // Solo lo que muestra la página: el archivo o la dirección con sus medidas, el texto alternativo y la página de
+        // donde viene la foto (el crédito bajo la foto). Sin foto, `null`: la página muestra el pictograma de la categoría.
         image: product.image === null ? null : 'file' in product.image
-          ? { file: product.image.file, alt: product.image.alt }
-          : { url: product.image.url, width: product.image.width, height: product.image.height, alt: product.image.alt },
+          ? { file: product.image.file, alt: product.image.alt, sourceUrl: product.image.sourceUrl }
+          : { url: product.image.url, width: product.image.width, height: product.image.height, alt: product.image.alt, sourceUrl: product.image.sourceUrl },
         documents: product.documents.map(document => ({ label: document.label, url: document.url })),
         isExample: false,
       };

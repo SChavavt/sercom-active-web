@@ -11,13 +11,14 @@ export interface Category {
 /**
  * Fotografía de una ficha: un archivo de `src/assets/productos/` (`file`; el ancho y el alto se leen del archivo) o una
  * dirección absoluta `https` con su ancho y alto en píxeles (`url`). Nunca las dos. `sourceUrl` dice de dónde viene la
- * foto y `usageConfirmed`, si su uso está confirmado; ninguno de los dos se publica.
+ * foto (la página del sitio del fabricante, que la ficha enlaza en el crédito bajo la foto) y `usageConfirmed`, si su
+ * uso está confirmado, que no se publica.
  */
 export type ProductImage =
   | { file: string; alt: string; sourceUrl: string; usageConfirmed: boolean }
   | { url: string; width: number; height: number; alt: string; sourceUrl: string; usageConfirmed: boolean };
-/** Lo público de una fotografía (`getPublishedProducts`): sin su fuente ni su marca de uso. */
-export type PublishedImage = { file: string; alt: string } | { url: string; width: number; height: number; alt: string };
+/** Lo público de una fotografía (`getPublishedProducts`): con la página de donde viene (el crédito), sin su marca de uso. */
+export type PublishedImage = { file: string; alt: string; sourceUrl: string } | { url: string; width: number; height: number; alt: string; sourceUrl: string };
 export interface Product {
   id: string;
   brandId: string;

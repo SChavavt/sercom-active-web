@@ -67,6 +67,8 @@ export interface PublicFileImage {
   /** Nombre del archivo en `src/assets/productos/`, sin carpeta. */
   readonly file: string;
   readonly alt: string;
+  /** Página `https` del fabricante de donde viene la foto: la ficha la enlaza en el crédito bajo la foto. */
+  readonly sourceUrl: string;
 }
 
 export interface PublicUrlImage {
@@ -76,6 +78,8 @@ export interface PublicUrlImage {
   readonly width: number;
   readonly height: number;
   readonly alt: string;
+  /** Página `https` del fabricante de donde viene la foto: la ficha la enlaza en el crédito bajo la foto. */
+  readonly sourceUrl: string;
 }
 
 export interface PublicDocument {

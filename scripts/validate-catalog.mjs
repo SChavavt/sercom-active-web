@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateCatalog, getPublishedProducts, getRetiredProducts } from '../src/lib/catalog-policy.mjs';
+import { validateCatalog, getPublishedProducts, getRetiredProducts, photoSourceErrors } from '../src/lib/catalog-policy.mjs';
 import { crossCheckBrands, MANUFACTURER_LINK_LABELS, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { reviewCatalogText } from './catalog-text.mjs';
 import { checkProductPhotos, PHOTO_FOLDER } from './product-photos.mjs';
@@ -67,6 +67,9 @@ export async function validateProject(root) {
   // Es la revisión que impide que un archivo de más llegue a la salida: la compilación copia todo lo que hay en la
   // carpeta. El escáner lo vuelve a revisar sobre la salida (R-FOTO-02).
   errors.push(...await checkProductPhotos(catalog, join(root, PHOTO_FOLDER)));
+  // La página de donde viene la foto de cada ficha aprobada es del sitio de su fabricante: la ficha la enlaza en el
+  // crédito de la foto. Va aparte de validateCatalog porque necesita los recursos del registro (catalog-policy.mjs).
+  errors.push(...photoSourceErrors(catalog, registry));
   const sourceIds = new Set();
   for (const source of registry.sources) {
     if (sourceIds.has(source.entity_id)) errors.push(`Fuente duplicada: ${source.entity_id}`);
