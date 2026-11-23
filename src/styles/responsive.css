@@ -645,9 +645,22 @@
 }
 /* La categoría de una tarjeta de producto («Vial y señalización», en mayúsculas espaciadas) se parte con guion y, en
    último caso, donde no quepa, en lugar de salirse de la tarjeta (en el celular y en las cuatro columnas de
-   computadora). Solo con la letra agrandada (el interruptor de arriba). */
+   computadora). Solo con la letra agrandada (el interruptor de arriba).
+   El nombre tampoco se sale: con la letra al 200 %, «desechable» ensanchaba la página en las dos columnas del
+   celular a 360 px y «Respirador» pisaba la tarjeta vecina en las cuatro columnas de computadora de 1360 a 1439 px.
+   Una palabra que no cabe en su renglón pasa al siguiente por donde quepa. Donde el navegador deja fijar un mínimo
+   de letras se parte con guion, y solo las palabras de ocho letras o más (con tres al menos a cada lado del guion):
+   las más cortas caben casi siempre en la columna más angosta que se revisa (163 px para un nombre a 36 px, en esas
+   cuatro columnas), y sin ese mínimo el título equilibrado (`text-wrap: balance`) partía «ejem-plo» y «me-dia»
+   aunque cupieran enteras. Un navegador sin ese mínimo no pone guiones en el nombre. */
 @container lamina (width < calc((1rem - 16px) * 400)) {
   .product__cat { hyphens: auto; overflow-wrap: break-word; }
+  .product__name { overflow-wrap: break-word; }
+}
+@supports (hyphenate-limit-chars: 8 3 3) {
+  @container lamina (width < calc((1rem - 16px) * 400)) {
+    .product__name { hyphens: auto; hyphenate-limit-chars: 8 3 3; }
+  }
 }
 /* Acciones de la tarjeta de producto: con la letra agrandada «Cotizar» baja a menudo a una segunda fila
    (components.css, «Las dos acciones van en una fila»). Su etiqueta empieza entonces donde la de «Ver ficha», en el
