@@ -594,10 +594,24 @@ const items = [
         return drawn[Math.min(Math.max(0, index), drawn.length - 1)] ?? null;
       }
 
+      /**
+       * La frase «La cantidad volvió a …» de la región viva habla de un renglón (`restoredRow`). Deja de ser cierta cuando
+       * ese renglón cambia o se va, y entonces se borra; lo que pase en los demás renglones no la toca. Sin argumento se
+       * borra siempre: la lista entera cambió.
+       */
+      let restoredRow: Element | null = null;
+      function quietRestored(row?: Element | null) {
+        if (!restoredRow) return;
+        if (row !== undefined && row !== restoredRow && restoredRow.isConnected) return;
+        restoredRow = null;
+        page.quiet('quantity');
+      }
+
       function removeRow(index: number) {
         const row = rows[index];
         if (!row || row.status === 'unknown') return;
         const result = removeLines(lines, [index]);
+        quietRestored(drawn[index]?.element ?? null);
         drawn[index]?.element.remove();
         drawn.splice(index, 1);
         store(result.lines);
@@ -612,6 +626,9 @@ const items = [
         if (keep < 0 || !canMerge(rows, index)) return;
         const result = mergeLines(lines, keep, index);
         if (!result.ok) return;
+        // Un renglón se va y el otro cambia de cantidad.
+        quietRestored(drawn[index]?.element ?? null);
+        quietRestored(drawn[keep]?.element ?? null);
         const kept = result.lines[result.index];
         const keptRow = rows[keep];
         const keptUnit = keptRow?.status === 'ok' ? keptRow.unit : kept.unit;
@@ -642,6 +659,7 @@ const items = [
       function emptyList() {
         if (lines.length === 0) return;
         const previous = lines;
+        quietRestored();
         for (const item of drawn) item?.element.remove();
         drawn = [];
         store([]);
@@ -671,6 +689,7 @@ const items = [
         else if (last.kind === 'merge') {
           const restored = updateLine(lines, last.index, { quantity: last.previous }).lines;
           const keptDrawn = drawn[last.index];
+          quietRestored(keptDrawn?.element ?? null);
           if (keptDrawn && restored[last.index]) setQuantity(keptDrawn, restored[last.index]);
           next = restoreLines(restored, last.removed);
           focusIndex = last.removed[0]?.index ?? -1;
@@ -730,6 +749,7 @@ const items = [
         if (!(input instanceof HTMLInputElement) || !input.matches('[data-stepper-input]')) return;
         const index = indexOf(input);
         if (index < 0) return;
+        quietRestored(drawn[index]?.element ?? null);
         if (input.value.trim() === '') {
           hideError(input);
           return;
@@ -748,6 +768,16 @@ const items = [
         afterEdit();
       });
 
+      // Lo que el puntero (ratón, dedo o lápiz) está oprimiendo, hasta la siguiente tecla: dice si el foco sale de un campo
+      // porque el visitante está por activar un control con el puntero.
+      let pressed: Element | null = null;
+      document.addEventListener('pointerdown', event => {
+        pressed = event.target instanceof Element ? event.target : null;
+      }, true);
+      document.addEventListener('keydown', () => {
+        pressed = null;
+      }, true);
+
       // Al salir del campo con una cantidad vacía o no válida, vuelve la última válida, y se dice.
       list.addEventListener('focusout', event => {
         const input = event.target;
@@ -759,7 +789,14 @@ const items = [
         input.value = String(line.quantity);
         hideError(input);
         input.dispatchEvent(new CustomEvent('stepper:sync', { bubbles: true }));
-        page.announce(restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit)));
+        // Si el foco sale porque el puntero está oprimiendo «Quitar» o «Unirlos» de este mismo renglón, o «Vaciar
+        // cotización», el renglón está por irse y su cantidad no se anuncia: se oiría junto con «Quitaste …». Con el
+        // teclado sí se anuncia aunque el foco llegue a uno de esos botones (el renglón sigue ahí hasta que se active), y
+        // la frase se borra si después el renglón cambia o se va (`quietRestored`).
+        const leaving = pressed?.closest('[data-quote-remove], [data-quote-merge], [data-quote-clear]');
+        if (leaving && (leaving.matches('[data-quote-clear]') || input.closest('li')?.contains(leaving))) return;
+        restoredRow = input.closest('li');
+        page.announce(restoredMessage(quantityLabel(line.quantity, row?.status === 'ok' ? row.unit : line.unit)), 'quantity');
       });
 
       // Variante y unidad se guardan al cambiar; nunca se unen renglones (una lista cambia con cada flecha).
@@ -774,6 +811,7 @@ const items = [
         if (!patch) return;
         const result = updateLine(lines, index, patch);
         if (!result.ok) return;
+        quietRestored(drawn[index]?.element ?? null);
         endMergeUndo(index);
         store(result.lines);
         afterEdit();
@@ -810,6 +848,7 @@ const items = [
         const changed = JSON.stringify(stored.map(keyOf)) !== JSON.stringify(lines.map(keyOf));
         hideStatus();
         hideWriteFailed();
+        if (changed) quietRestored();
         lines = stored;
         render();
         if (held && (!held.isConnected || held.closest('[hidden]'))) {
