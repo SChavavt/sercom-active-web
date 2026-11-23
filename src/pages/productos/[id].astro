@@ -12,9 +12,13 @@
 //      dos partes se apilan, la imagen primero y baja.
 //   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
 //   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
-// Paso 2: «Agregar a mi cotización» irá bajo las dos acciones de cotizar, antes del aviso de disponibilidad;
-// hoy no se imprime nada para él.
-// Las variantes son información, no controles (la elección de variante llega en el paso 2).
+//   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
+//   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
+//   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
+// La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización».
+// Volver a los resultados: si la ficha se abrió desde el catálogo con una búsqueda o filtros (la dirección de la página
+// anterior es /catalogo/?…), el script de abajo hace que «Catálogo» de la fila de ruta lleve a esos mismos resultados.
+// No guarda nada; con cualquier otra página anterior el enlace queda como se imprimió.
 // Producto retirado (R-STATE-04): la misma dirección conserva una página informativa. La ruta y «Más productos…»
 // son los de la ficha; la hoja y la banda de solicitud especial las imprime RetiredProduct (ver su comentario).
 // Textos: brief 6.4 y brief de la ficha. Estilos: src/styles/pages/producto.css.
@@ -26,9 +30,11 @@ import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import Icon from '../../components/Icon.astro';
 import Note from '../../components/Note.astro';
 import PageLinkScript from '../../components/PageLinkScript.astro';
+import QuoteAdd from '../../components/QuoteAdd.astro';
 import ProductCard from '../../components/ProductCard.astro';
 import RetiredProduct from '../../components/RetiredProduct.astro';
 import SectionHead from '../../components/SectionHead.astro';
+import StepperScript from '../../components/StepperScript.astro';
 import Tag from '../../components/Tag.astro';
 import { categoryIcon } from '../../lib/icons.ts';
 import { isLongProductName } from '../../lib/product-title.mjs';
@@ -143,9 +149,11 @@ const moreOdd = more.items.length % 2 === 1;
       {product.summary && <div class="producto__summary cell"><p>{product.summary}</p></div>}
 
       <div class="producto__actions">
-        <ActionRow href={quote.whatsapp} primary icon="whatsapp" data-page-link={pageLink}>Cotizar este producto</ActionRow>
-        <ActionRow href={quote.mailto} icon="mail" data-page-link={pageLink}>Cotizar por correo</ActionRow>
+        <ActionRow href={quote.whatsapp} primary icon="whatsapp" data-page-link={pageLink} data-quote-direct>Cotizar este producto</ActionRow>
+        <ActionRow href={quote.mailto} icon="mail" data-page-link={pageLink} data-quote-direct>Cotizar por correo</ActionRow>
       </div>
+
+      <QuoteAdd product={product} />
 
       <Note class="producto__note">Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.</Note>
 
@@ -228,4 +236,25 @@ const moreOdd = more.items.length % 2 === 1;
   )}
 
   <PageLinkScript />
+  {product && <StepperScript />}
 </BaseLayout>
+
+<script>
+  // Volver a los resultados: la ficha abierta desde el catálogo con una búsqueda o filtros. La dirección anterior es
+  // texto que no controla el sitio: solo pasa por `new URL`, la comparación con el origen de la página y las dos
+  // funciones del catálogo, que reescriben la dirección completa con los parámetros conocidos.
+  import { catalogHref, parseCatalogState } from '../../lib/catalog-filters.mjs';
+  import { routes } from '../../lib/routes.mjs';
+
+  const catalogLink = [...document.querySelectorAll<HTMLAnchorElement>('.producto__crumbs a')].find(link => link.getAttribute('href') === routes.catalog);
+  if (catalogLink && document.referrer) {
+    try {
+      const previous = new URL(document.referrer);
+      if (previous.origin === window.location.origin && previous.pathname === routes.catalog && previous.search) {
+        catalogLink.href = catalogHref(parseCatalogState(previous.search));
+      }
+    } catch {
+      // Una dirección que no se puede leer: el enlace queda como se imprimió.
+    }
+  }
+</script>

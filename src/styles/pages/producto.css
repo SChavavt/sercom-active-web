@@ -118,6 +118,11 @@
 
 .producto__actions { display: grid; gap: var(--line); }
 
+/* «Agregar a mi cotización» (QuoteAdd, solo con JavaScript): sigue la columna de celdas de las acciones, con los
+   filetes de 1 px entre las suyas: variante, cantidad y unidad (una celda, .field-group, que se apila sola), la nota,
+   el botón y la línea de estado. Mismo orden en todos los anchos. */
+.producto__quote { display: flex; flex-direction: column; gap: var(--line); }
+
 /* Producto retirado (RetiredProduct): aviso con la etiqueta del cuadro sólido en tinta, no en azul: es un
    estado, no un enlace ni una acción. Ocupa el alto que falte para que la columna llegue al pie del marco. */
 .producto__retired { flex: 1 0 auto; padding: var(--s-6) var(--pad) var(--s-7); }
@@ -195,4 +200,10 @@
   .producto__chip { min-height: 64px; }
 
   .producto__doc { column-gap: var(--s-3); }
+}
+
+/* Colores forzados: las celdas de «Agregar a mi cotización» reciben su contorno, como las demás de la columna
+   (responsive.css 6.8) */
+@media (forced-colors: active) {
+  :where(.producto__quote) > :where(:not(.vh, script, style, template)) { outline: var(--line) solid CanvasText; }
 }

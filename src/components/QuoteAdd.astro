@@ -1,0 +1,229 @@
+---
+// «Agregar a mi cotización» de la ficha de producto (`.producto__quote`): una columna de celdas bajo «Cotizar este
+// producto» y «Cotizar por correo», antes del aviso de disponibilidad. Solo en la ficha de un producto público (nunca
+// en la de un retirado ni en las tarjetas). Estilos: src/styles/pages/producto.css.
+//
+// Solo con JavaScript (`js-only`): sin él no se imprime nada a la vista y la ficha es la de siempre. Las celdas, en
+// este orden:
+//   - «Variante» (`name="variante"`), solo si el producto tiene más de una: «Talla o color por definir» (valor vacío,
+//     elegida) y una opción por variante (texto: su etiqueta; valor: su id). Con una sola variante no hay control (se
+//     guarda esa) y sin variantes no hay nada (se guarda `variantId` vacío);
+//   - «Cantidad» (Stepper, 1, hasta MAX_QUANTITY, con su contenedor de error) y «Unidad» (`unitOptions` de la unidad de
+//     venta, la primera elegida), lado a lado en UNA celda (`.field-group`: se apilan solos cuando no caben);
+//   - la nota que explica que lo elegido también va en los dos enlaces de arriba;
+//   - el botón «Agregar a mi cotización» (no es la acción principal de la página: esa es «Cotizar este producto»);
+//   - la línea de estado (oculta hasta que se usa) con «Ver mi cotización», y la región viva oculta a la vista.
+// StepperScript lo imprime la página, una vez.
+//
+// El script de este componente (abajo) solo importa quote-list.mjs, quote-store.mjs y contact-core.mjs. Del producto
+// lee únicamente su entrada pública, impresa al compilar como un índice de un producto (`[data-quote-index]`); si no
+// puede leerla oculta el formulario y no hace nada más. Las frases fijas van en atributos data-* de esta plantilla; las
+// que llevan datos las arma quote-list.mjs.
+//   - Agregar: con una cantidad no válida (`parseQuantity`) muestra el error del campo, lleva el foco al campo y no
+//     agrega nada (nada se valida mientras se escribe; el error se va en cuanto la cantidad es válida). Si no,
+//     `addLine` sobre la lista guardada y `quoteStore.write(result.lines)`; la frase (agregado, sumado, lista llena o
+//     el navegador no deja guardar) va en la línea de estado y en la región viva. El foco y los campos se quedan como
+//     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder.
+//   - Enlaces directos (`[data-quote-direct]`, «Cotizar este producto» y «Cotizar por correo»): cada línea de su
+//     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
+//     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
+//     mientras la cantidad no es válida). Con `withFieldValues` sobre el `href` de cada enlace: no guarda una copia.
+import { buildQuoteIndex, jsonForScript, LIST_FULL_MESSAGE, MAX_QUANTITY, QUANTITY_ERROR, unitOptions } from '../lib/quote-list.mjs';
+import { routes } from '../lib/site-data.mjs';
+import type { PublicProduct } from '../types/site.ts';
+import ActionRow from './ActionRow.astro';
+import Field from './Field.astro';
+import Icon from './Icon.astro';
+import Note from './Note.astro';
+import Select from './Select.astro';
+import StatusLine from './StatusLine.astro';
+import Stepper from './Stepper.astro';
+
+interface Props {
+  product: PublicProduct;
+}
+
+const { product } = Astro.props;
+// La entrada pública del producto para el script: un índice de un solo producto.
+const index = buildQuoteIndex([product], []);
+const units = unitOptions(product.saleUnit);
+const chooseVariant = product.variants.length > 1;
+---
+<form
+  class="producto__quote js-only"
+  data-quote-add
+  novalidate
+  data-quantity-error={QUANTITY_ERROR}
+  data-full-message={LIST_FULL_MESSAGE}
+  data-storage-message="Tu navegador no permite guardar la lista en este equipo. Usa “Cotizar este producto” para pedirlo directamente o escríbelo en “Cotizar mi lista”."
+>
+  <script type="application/json" data-quote-index set:html={jsonForScript(index)}></script>
+  {chooseVariant && (
+    <Field label="Variante" for="agregar-variante">
+      <Select id="agregar-variante" name="variante">
+        <option value="" selected>Talla o color por definir</option>
+        {product.variants.map(variant => <option value={variant.id}>{variant.label}</option>)}
+      </Select>
+    </Field>
+  )}
+  <div class="field-group">
+    <Field label="Cantidad" for="agregar-cantidad" error>
+      <Stepper id="agregar-cantidad" name="cantidad" max={MAX_QUANTITY} />
+    </Field>
+    <Field label="Unidad" for="agregar-unidad">
+      <Select id="agregar-unidad" name="unidad">
+        {units.map((unit, position) => <option value={unit} selected={position === 0}>{unit}</option>)}
+      </Select>
+    </Field>
+  </div>
+  <Note class="producto__quote-hint">Lo que elijas aquí también va en “Cotizar este producto” y “Cotizar por correo”.</Note>
+  <ActionRow type="submit" icon="clipboard-plus">Agregar a mi cotización</ActionRow>
+  <StatusLine icons={['check', 'alert-circle']} data-quote-status>
+    <a class="more" slot="action" href={routes.quoteList} data-quote-view>Ver mi cotización<Icon name="arrow-right" /></a>
+  </StatusLine>
+  <p class="vh" role="status" data-live></p>
+</form>
+
+<script>
+  import { MESSAGE_LABELS, withFieldValues } from '../lib/contact-core.mjs';
+  import { addedMessage, addLine, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel, reconcileList, variantText } from '../lib/quote-list.mjs';
+  import { quoteStore } from '../lib/quote-store.mjs';
+
+  /** Las piezas del formulario, o null si falta alguna (entonces no se muestra). */
+  function parts(form: HTMLFormElement) {
+    const index = parseQuoteIndex(form.querySelector('[data-quote-index]')?.textContent ?? '');
+    const product = index.products[0];
+    const input = form.elements.namedItem('cantidad');
+    const unit = form.elements.namedItem('unidad');
+    const variant = form.elements.namedItem('variante');
+    const status = form.querySelector<HTMLElement>('[data-quote-status]');
+    const statusText = status?.querySelector<HTMLElement>('[data-status-text]');
+    const live = form.querySelector<HTMLElement>('[data-live]');
+    const error = input instanceof HTMLInputElement ? document.getElementById(`${input.id}-error`) : null;
+    const errorText = error?.querySelector<HTMLElement>('[data-field-error]');
+    if (!product || !(input instanceof HTMLInputElement) || !(unit instanceof HTMLSelectElement)) return null;
+    if (variant !== null && !(variant instanceof HTMLSelectElement)) return null;
+    if (!status || !statusText || !live || !error || !errorText) return null;
+    return { index, product, input, unit, select: variant, status, statusText, live, error, errorText };
+  }
+
+  const form = document.querySelector<HTMLFormElement>('form[data-quote-add]');
+  const found = form ? parts(form) : null;
+  // Sin la entrada del producto (o sin alguna de sus piezas) el formulario no puede funcionar: no se muestra.
+  if (form && !found) form.hidden = true;
+
+  if (form && found) {
+    const { index, product, input, unit, select, status, statusText, live, error, errorText } = found;
+    const maps = indexMaps(index);
+    const view = form.querySelector('[data-quote-view]')?.closest<HTMLElement>('.status__action') ?? null;
+    const messages = {
+      quantity: form.dataset.quantityError ?? '',
+      full: form.dataset.fullMessage ?? '',
+      storage: form.dataset.storageMessage ?? '',
+    };
+    const describedBy = (input.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+
+    /** La variante del renglón: la elegida, la única que tiene el producto, o ninguna (null: se guarda ''). */
+    const chosenVariant = () => {
+      if (product.variants.length === 1) return product.variants[0];
+      return product.variants.find(entry => entry.id === select?.value) ?? null;
+    };
+
+    // ---- error de la cantidad (Field.astro: el contenedor `{id}-error`) ----
+    const showError = () => {
+      errorText.textContent = messages.quantity;
+      error.hidden = false;
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', [...describedBy, error.id].join(' '));
+      input.closest('.field')?.classList.add('field--invalid');
+    };
+    const hideError = () => {
+      if (error.hidden) return;
+      errorText.textContent = '';
+      error.hidden = true;
+      input.removeAttribute('aria-invalid');
+      if (describedBy.length > 0) input.setAttribute('aria-describedby', describedBy.join(' '));
+      else input.removeAttribute('aria-describedby');
+      input.closest('.field')?.classList.remove('field--invalid');
+    };
+
+    // ---- línea de estado y región viva (StatusLine.astro) ----
+    let frame = 0;
+    const say = (sentence: string, icon: 'check' | 'alert-circle', showLink: boolean) => {
+      statusText.textContent = sentence;
+      for (const mark of status.querySelectorAll<HTMLElement>('[data-status-icon]')) mark.hidden = mark.dataset.statusIcon !== icon;
+      if (view) view.hidden = !showLink;
+      status.hidden = false;
+      // La misma frase otra vez también se anuncia: se vacía la región y se escribe en el cuadro siguiente.
+      live.textContent = '';
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { live.textContent = sentence; });
+    };
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const quantity = parseQuantity(input.value);
+      if (quantity === null) {
+        // La frase anterior ya no vale; el error lo lee el lector de pantalla al llegar el foco al campo.
+        status.hidden = true;
+        cancelAnimationFrame(frame);
+        live.textContent = '';
+        showError();
+        input.focus();
+        return;
+      }
+      hideError();
+      const line = { productId: product.id, variantId: chosenVariant()?.id ?? '', quantity, unit: unit.value };
+      const result = addLine(quoteStore.read(), line);
+      if (result.status === 'full') {
+        say(messages.full, 'alert-circle', false);
+        return;
+      }
+      // `write` recibe la lista (nunca el resultado de addLine) y dice si el navegador la guardó.
+      if (result.status === 'invalid' || !quoteStore.write(result.lines)) {
+        say(messages.storage, 'alert-circle', false);
+        return;
+      }
+      const summary = lineSummary(reconcileList([line], maps).rows[0]);
+      const sentence = result.status === 'merged'
+        ? addedMessage({ summary, total: quantityLabel(result.quantity, line.unit) })
+        : addedMessage({ summary });
+      say(sentence, 'check', true);
+    });
+
+    // El error se va en cuanto el campo tiene una cantidad válida (escrita o con los botones del selector).
+    input.addEventListener('input', () => {
+      if (parseQuantity(input.value) !== null) hideError();
+    });
+
+    // ---- enlaces directos: cada línea solo después de que el visitante cambió SU campo ----
+    const links = [...document.querySelectorAll<HTMLAnchorElement>('a[data-quote-direct]')];
+    const touched = { variant: false, quantity: false };
+    const applyLinks = () => {
+      const values: Record<string, string> = {};
+      if (touched.variant) {
+        // De vuelta en «Talla o color por definir», la línea queda vacía: el visitante no eligió nada.
+        const variant = chosenVariant();
+        values[MESSAGE_LABELS.variant] = variant ? variantText(product, variant) : '';
+      }
+      if (touched.quantity) {
+        const quantity = parseQuantity(input.value);
+        values[MESSAGE_LABELS.quantity] = quantity === null ? '' : quantityLabel(quantity, unit.value);
+      }
+      if (Object.keys(values).length === 0) return;
+      for (const link of links) link.href = withFieldValues(link.href, values);
+    };
+    select?.addEventListener('change', () => { touched.variant = true; applyLinks(); });
+    input.addEventListener('input', () => { touched.quantity = true; applyLinks(); });
+    unit.addEventListener('change', () => { touched.quantity = true; applyLinks(); });
+
+    // Un campo que el navegador devolvió con otro valor (al volver a la página) también lo eligió el visitante.
+    const restored = () => {
+      if (select && select.value !== '') touched.variant = true;
+      if (input.value !== input.defaultValue || unit.selectedIndex !== 0) touched.quantity = true;
+      applyLinks();
+    };
+    restored();
+    window.addEventListener('pageshow', restored);
+  }
+</script>
