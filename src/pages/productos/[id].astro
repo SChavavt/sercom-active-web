@@ -23,6 +23,11 @@
 // Volver a los resultados: si la ficha se abrió desde el catálogo con una búsqueda o filtros (la dirección de la página
 // anterior es /catalogo/?…), el script de abajo hace que «Catálogo» de la fila de ruta lleve a esos mismos resultados.
 // No guarda nada; con cualquier otra página anterior el enlace queda como se imprimió.
+// Crédito de la foto: con fotografía, el marco y su pie («Foto: {marca}») van juntos en un <figure>, que en computadora
+// se queda a la vista mientras se leen los datos. La marca enlaza la página del fabricante de donde viene la foto
+// (image.sourceUrl, que el validador exige del sitio de la marca en el registro) y abre otra pestaña. Su nombre accesible
+// es «Foto de {marca}, página del fabricante (se abre en otra pestaña)», distinto del de la fila Marca, que lleva a la
+// página de la marca en este sitio. Sin foto (pictograma), en un retirado y en las tarjetas no hay crédito.
 // Producto retirado (R-STATE-04): la misma dirección conserva una página informativa. La ruta y «Más productos…»
 // son los de la ficha; la hoja y la banda de solicitud especial las imprime RetiredProduct (ver su comentario).
 // Textos: brief 6.4 y brief de la ficha. Estilos: src/styles/pages/producto.css.
@@ -113,14 +118,22 @@ const moreOdd = more.items.length % 2 === 1;
   {product ? (<Fragment>
   <section class="producto grid12" aria-labelledby="titulo">
     <div class:list={['producto__media', 'span-7', 'span-md-12', { 'producto__media--photo': product.image }]}>
-      <div class="producto__frame">
-        {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
-        {product.image ? (
-          <ProductPhoto image={product.image} place="page" class="producto__img" productId={product.id} />
-        ) : (
+      {product.image ? (
+        <figure class="producto__figure">
+          <div class="producto__frame">
+            {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
+            <ProductPhoto image={product.image} place="page" class="producto__img" productId={product.id} />
+          </div>
+          <figcaption class="producto__credit t-small">
+            <span aria-hidden="true">Foto: </span><a class="producto__credit-link" href={product.image.sourceUrl} target="_blank" rel="noopener noreferrer"><span class="vh">Foto de </span>{product.brandName}<span class="vh">, página del fabricante (se abre en otra pestaña)</span></a>
+          </figcaption>
+        </figure>
+      ) : (
+        <div class="producto__frame">
+          {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
           <span class="producto__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
 
     <div class="producto__body span-5 span-md-12">

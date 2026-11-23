@@ -10,7 +10,7 @@ Material de terceros incluido en el repositorio y en el sitio compilado. El logo
 | Icono de WhatsApp de Simple Icons (1) | `src/assets/icons/icons.json` | CC0 1.0 |
 | Fotografías de producto (hoy, ninguna) | `src/assets/productos/` o una dirección `https`, según la ficha | La de cada foto, con su uso confirmado y su origen en la ficha (sección «Fotografías de producto») |
 
-Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias no exigen un crédito visible en el sitio.
+Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias de la tipografía y de los iconos no exigen un crédito visible en el sitio; las fotografías de producto llevan uno (sección «Fotografías de producto»).
 
 Nada más de terceros llega al sitio compilado, salvo las fotografías de producto cuando las haya: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
 
@@ -26,6 +26,9 @@ Hoy ninguna ficha está aprobada y no hay ninguna fotografía en el repositorio 
 
 - La ficha registra de dónde viene (`image.sourceUrl`, la página `https` de origen) y `image.usageConfirmed: true`; el validador rechaza la foto de una ficha aprobada sin las dos cosas ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#3-flujo-para-agregar-un-producto-real), paso 4).
 - Una foto guardada como archivo está en `src/assets/productos/`, que solo guarda las de fichas aprobadas porque el repositorio es público; la compilación la copia a `dist/_astro/` convertida a WebP y en varios anchos. Una foto por dirección (`image.url`) no se copia: la página la pide a ese servidor.
+- Las fotografías son de sus fabricantes y vienen de sus propios sitios. La página de cada producto muestra bajo la foto el crédito «Foto: {marca}», que enlaza la página de donde viene (`image.sourceUrl`); el validador exige que esa página sea del sitio de la marca en el registro de investigación ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#6-imágenes-documentos-y-variantes), «Crédito de la foto»).
+- Una foto se quita si su fabricante lo pide: se borra `image` de la ficha (y su archivo de `src/assets/productos/`) y el producto se muestra con el pictograma de su categoría.
+- MCR Safety publica sus condiciones para usar las imágenes de sus productos (https://www.mcrsafety.com.mx/politicas/compartir-contenido/, leída el 23 de noviembre de 2026): nombrarla como fuente, enlazar a donde está la imagen original y quitarla si lo solicita. El sitio hace eso mismo con todas las marcas: el crédito y el retiro de arriba.
 - Las condiciones de cada foto (crédito, plazo, dónde se puede usar) son las que dé su titular, y se cumplen ficha por ficha; este archivo no las lista una por una.
 
 ## Iconos

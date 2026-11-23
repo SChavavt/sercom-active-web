@@ -6,7 +6,7 @@
 import ProductPhoto from '../../../../src/components/ProductPhoto.astro';
 import foto from '../foto-sintetica.png';
 
-const image = { file: 'foto-sintetica.png', alt: 'Foto sintética de la sonda' };
+const image = { file: 'foto-sintetica.png', alt: 'Foto sintética de la sonda', sourceUrl: 'https://fotos.sonda.invalid/origen' };
 const photos = { 'foto-sintetica.png': foto };
 ---
 <!doctype html>
@@ -18,6 +18,6 @@ const photos = { 'foto-sintetica.png': foto };
   <body>
     <div id="tarjeta"><ProductPhoto image={image} place="card" class="product__img" productId="sonda-tarjeta" photos={photos} /></div>
     <div id="ficha"><ProductPhoto image={image} place="page" class="producto__img" productId="sonda-ficha" photos={photos} /></div>
-    <div id="direccion"><ProductPhoto image={{ url: 'https://fotos.sonda.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto de la sonda por dirección' }} place="card" class="product__img" productId="sonda-direccion" /></div>
+    <div id="direccion"><ProductPhoto image={{ url: 'https://fotos.sonda.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto de la sonda por dirección', sourceUrl: 'https://fotos.sonda.invalid/origen' }} place="card" class="product__img" productId="sonda-direccion" /></div>
   </body>
 </html>

@@ -249,8 +249,9 @@ test('la sonda dibuja una foto local con el mismo componente que las fichas: Web
     // Para un navegador sin WebP, el formato del archivo (PNG).
     assert.match(attribute(img, 'src'), /^\/_astro\/foto-sintetica\.[\w-]+\.png$/, id);
     assert.ok(files.has(attribute(img, 'src').slice(1)), id);
-    // `sizes`: el ancho que ocupa una foto de 4:3 contenida en el marco de cada lugar.
-    const sizes = place === 'card' ? '(max-width: 699px) 50vw, (max-width: 1099px) 39.2vw, 323px' : '(max-width: 699px) 213px, (max-width: 1099px) 347px, 627px';
+    // `sizes`: el ancho que ocupa una foto de 4:3 contenida en el marco de cada lugar. En la ficha en celular, el marco
+    // de 4:3 de todo el ancho menos 20 px de relleno a cada lado (350 px a 390, medido en el navegador).
+    const sizes = place === 'card' ? '(max-width: 699px) 50vw, (max-width: 1099px) 39.2vw, 323px' : '(max-width: 699px) calc(100vw - 40px), (max-width: 1099px) 347px, 627px';
     assert.equal(attribute(source, 'sizes'), sizes, id);
     assert.equal(attribute(img, 'sizes'), sizes, id);
     // Medidas del archivo, texto alternativo, clase del lugar y carga.
