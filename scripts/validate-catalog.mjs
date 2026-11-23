@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { validateCatalog, getPublishedProducts, getRetiredProducts } from '../src/lib/catalog-policy.mjs';
 import { crossCheckBrands, validateExampleProducts } from '../src/lib/site-data-core.mjs';
+import { reviewCatalogText } from './catalog-text.mjs';
 import { checkProductPhotos, PHOTO_FOLDER } from './product-photos.mjs';
 const read = async path => JSON.parse(await readFile(new URL(path, import.meta.url), 'utf8'));
 const [catalog, registry, brands, examples] = await Promise.all([
@@ -9,6 +10,8 @@ const [catalog, registry, brands, examples] = await Promise.all([
   read('../src/data/brands.json'), read('../src/data/preview/example-products.json'),
 ]);
 const errors = validateCatalog(catalog, registry);
+// El texto de cada ficha, en cualquier estado, frente a las reglas de redacción del escáner (catalog-text.mjs).
+errors.push(...reviewCatalogText(catalog, { registry, brands }));
 // Los archivos de las fotografías: solo los de fichas aprobadas, con su formato, medidas y peso (product-photos.mjs).
 errors.push(...await checkProductPhotos(catalog, fileURLToPath(new URL(`../${PHOTO_FOLDER}/`, import.meta.url))));
 const sourceIds = new Set();
