@@ -12,11 +12,12 @@ import { listFiles, readJson, readText, ROOT } from './helpers.mjs';
 const packageJson = await readJson('package.json');
 const sourceFiles = (await listFiles(join(ROOT, 'src'))).map(path => `src/${path}`);
 // Código sin comentarios: los comentarios pueden nombrar archivos que el código no importa.
-// («//» solo cuenta como comentario al inicio de la línea o después de un espacio, para no cortar «https://…».)
+// («//» y «/*» solo abren un comentario al inicio de la línea o después de un espacio: así «//» no corta «https://…» y
+// el «/*» de una expresión regular como `/^\/*/` no esconde el código que sigue hasta el siguiente «*/».)
 // Un texto entre comillas se salta entero: «'../data/**/*.json'» lleva «/**/», que no es un comentario. Las comillas
 // simples y dobles no pasan de una línea, así que un apóstrofo suelto del texto de una página solo afecta a su línea.
-const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
-const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, before) => string ?? before ?? '');
+const COMMENT_OR_STRING = /("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\[\s\S]|[^`\\])*`)|(^|\s)\/\*[\s\S]*?\*\/|<!--[\s\S]*?-->|(^|\s)\/\/.*$/gm;
+const stripComments = text => text.replace(COMMENT_OR_STRING, (_match, string, beforeBlock, beforeLine) => string ?? beforeBlock ?? beforeLine ?? '');
 // Tipos de archivo que leen las pruebas de las fuentes (ejemplos, colecciones, disco, capa de datos, datos de contacto):
 // las páginas y componentes .astro, los scripts y las hojas de estilo. No leen Markdown, MDX ni HTML.
 const SOURCE_FILE = /\.(?:astro|[cm]?[jt]s|[jt]sx|css)$/;
