@@ -536,13 +536,17 @@ const items = [
         refreshMessage();
       }
 
-      /** Guarda la lista; si el navegador no deja, la página sigue con la de la memoria y lo dice. */
+      /**
+       * Guarda la lista; si el navegador no deja, la página sigue con la de la memoria y lo dice. Cuando vuelve a
+       * guardar, el aviso se va, también de la región viva.
+       */
       function store(next: QuoteLine[]) {
         lines = next;
         const saved = quoteStore.write(next);
         if (writeFailed && writeFailed.hidden !== saved) {
           writeFailed.hidden = saved;
-          if (!saved) page.announce(writeFailed.querySelector('[data-status-text]')?.textContent ?? '');
+          if (!saved) page.announce(writeFailed.querySelector('[data-status-text]')?.textContent ?? '', 'write');
+          else page.quiet('write');
         }
       }
 

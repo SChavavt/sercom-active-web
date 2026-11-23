@@ -47,14 +47,24 @@ test('un mensaje que no cabe en un enlace deja TODOS los enlaces sin texto', () 
   assert.equal(state.hrefs[2], '/catalogo/');
 });
 
-test('los demás enlaces toman el de la acción de su canal solo cuando el mensaje cambió y cabe', () => {
+test('los demás enlaces toman el de la acción de su canal en cuanto el mensaje cambió, también en el estado largo', () => {
   const sends = { whatsapp: `${list.whatsapp}x`, mailto: `${list.mailto}y` };
   assert.equal(otherLinkHref(general.whatsapp, sends, { fits: true, changed: true }), sends.whatsapp);
   assert.equal(otherLinkHref(general.mailto, sends, { fits: true, changed: true }), sends.mailto);
-  // Nada escrito ni agregado todavía, o el estado largo: el impreso.
+  // Nada escrito ni agregado todavía: el impreso.
   assert.equal(otherLinkHref(general.whatsapp, sends, { fits: true, changed: false }), general.whatsapp);
-  assert.equal(otherLinkHref(general.mailto, sends, { fits: false, changed: true }), general.mailto);
-  // Otro tipo de enlace, o un canal sin acción: el suyo.
+  // Estado largo: el de la acción, que ya va sin texto; nunca el saludo general impreso.
+  const long = messageLinkHrefs([list.whatsapp, list.mailto], 'x'.repeat(LINK_LIMITS.whatsapp + LINK_LIMITS.mailto), template);
+  assert.equal(long.fits, false);
+  const longSends = { whatsapp: long.hrefs[0], mailto: long.hrefs[1] };
+  assert.equal(otherLinkHref(general.whatsapp, longSends, { fits: false, changed: true }), longSends.whatsapp);
+  assert.equal(otherLinkHref(general.mailto, longSends, { fits: false, changed: true }), longSends.mailto);
+  assert.equal(messageOf(otherLinkHref(general.whatsapp, longSends, { fits: false, changed: true })), '');
+  // Otro tipo de enlace: el suyo. Un canal sin acción: el impreso mientras cabe y, en el estado largo, sin texto.
   assert.equal(otherLinkHref('/cotizar/', sends, { fits: true, changed: true }), '/cotizar/');
+  assert.equal(otherLinkHref('/cotizar/', sends, { fits: false, changed: true }), '/cotizar/');
   assert.equal(otherLinkHref(general.mailto, { whatsapp: sends.whatsapp }, { fits: true, changed: true }), general.mailto);
+  const bare = otherLinkHref(general.mailto, { whatsapp: sends.whatsapp }, { fits: false, changed: true });
+  assert.equal(messageOf(bare), '');
+  assert.ok(bare.startsWith(general.mailto.split('?')[0]), 'el mismo destinatario');
 });

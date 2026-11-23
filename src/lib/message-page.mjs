@@ -8,10 +8,14 @@
 //     texto, las etiquetas de las acciones cambian («Abrir WhatsApp para pegar mi lista»), la acción de copiar toma el
 //     dibujo principal y aparece el aviso de arriba de las acciones (también en la región viva, una vez, al cambiar);
 //   - a los demás enlaces de WhatsApp y de correo de la página (franja, encabezado, pie, barra fija del celular) les da el
-//     `href` que tiene en ese momento la acción de envío de su canal, cuando el visitante ya cambió el mensaje y cabe; si
-//     no, el que traían impreso;
+//     `href` que tiene en ese momento la acción de envío de su canal en cuanto el visitante cambió el mensaje: con el
+//     texto mientras cabe y SIN texto en el estado largo, como las acciones (quien copió su solicitud y abre WhatsApp
+//     desde la barra fija la pega en un mensaje vacío, no detrás del saludo general); mientras no cambia nada, el que
+//     traían impreso;
 //   - «Copiar solicitud»: copia el mensaje (portapapeles del navegador o, si falta o falla, la forma antigua) y muestra
 //     la línea de estado que corresponde; esa línea se va cuando el mensaje cambia.
+// La región viva dice cada frase una vez y no se queda con una que dejó de ser cierta: la de la copia se borra cuando el
+// mensaje cambia, la del estado largo cuando el mensaje vuelve a caber, y la página borra las suyas con `quiet`.
 // Abrir WhatsApp o el correo no es un envío: este módulo nunca escribe una confirmación ni cambia nada al pulsar una
 // acción de envío.
 //
@@ -29,7 +33,7 @@
 // Apto para el navegador y para node:test: solo importa `contact-core.mjs`; no corre nada al importarse, no lee datos
 // y no toca el almacenamiento. Las funciones puras de arriba tienen pruebas en tests/message-page.test.mjs.
 /** @import { LinkChannel } from '../types/contact.ts' */
-import { draftLinks, linkChannel, messageOf } from './contact-core.mjs';
+import { draftLinks, linkChannel, messageOf, withMessage } from './contact-core.mjs';
 
 /**
  * Los `href` de los enlaces de mensaje para un mensaje. Con el mensaje igual a la plantilla de la página, los enlaces
@@ -48,9 +52,11 @@ export function messageLinkHrefs(originals, message, template) {
 }
 
 /**
- * El `href` de un enlace de WhatsApp o de correo fuera de las regiones de mensaje: el de la acción de envío de su canal
- * cuando el mensaje cambió y cabe; si no (nada escrito ni agregado todavía, o el estado largo), el impreso. Un enlace de
- * otro tipo, o un canal sin acción de envío, conserva el suyo.
+ * El `href` de un enlace de WhatsApp o de correo fuera de las regiones de mensaje. Mientras el mensaje es el de la
+ * plantilla (nada escrito ni agregado todavía), el impreso. En cuanto cambia, el de la acción de envío de su canal: con
+ * el texto si cabe y sin texto en el estado largo (las acciones ya van sin texto). Si su canal no tiene acción de envío,
+ * el impreso mientras el mensaje cabe y, en el estado largo, ese mismo sin texto: ningún enlace de la página abre la
+ * aplicación con otro mensaje escrito cuando el aviso pide pegar el que se copió. Un enlace de otro tipo conserva el suyo.
  * @param {string} original
  * @param {Partial<Record<LinkChannel, string>>} sendHrefs El `href` actual de cada acción de envío.
  * @param {{ fits: boolean, changed: boolean }} state
@@ -58,8 +64,10 @@ export function messageLinkHrefs(originals, message, template) {
  */
 export function otherLinkHref(original, sendHrefs, { fits, changed }) {
   const channel = linkChannel(original);
-  if (!channel || !fits || !changed) return original;
-  return sendHrefs?.[channel] ?? original;
+  if (!channel || !changed) return original;
+  const send = sendHrefs?.[channel];
+  if (send !== undefined) return send;
+  return fits ? original : withMessage(original, '');
 }
 
 /**
@@ -136,17 +144,43 @@ export function createMessagePage(root, { regions }) {
   /** Cuenta las copias: una respuesta del portapapeles que llega tarde no pisa la de una copia más nueva. */
   let copies = 0;
 
-  /** Escribe una frase en la región viva; para repetir la misma, la vacía y la escribe en el cuadro siguiente. */
-  const announce = (/** @type {string} */ text) => {
+  /** De quién es la frase que tiene ahora la región viva ('copy', 'long' o lo que diga la página); '' si está vacía. */
+  let liveFrom = '';
+  /** Cuenta las frases: una que espera su cuadro no se escribe si mientras tanto llegó otra o se borró. */
+  let liveTurn = 0;
+
+  /**
+   * Escribe una frase en la región viva; para repetir la misma, la vacía y la escribe en el cuadro siguiente. `from`
+   * dice de quién es, para borrarla con `quiet` cuando deje de ser cierta.
+   * @param {string} text
+   * @param {string} [from]
+   */
+  const announce = (text, from = 'page') => {
     if (!(live instanceof HTMLElement)) return;
+    liveTurn += 1;
+    const turn = liveTurn;
     live.textContent = '';
+    liveFrom = from;
     requestAnimationFrame(() => {
-      live.textContent = text;
+      if (turn === liveTurn) live.textContent = text;
     });
+  };
+
+  /**
+   * Vacía la región viva si su frase es de `from`: quien recorre la página después no encuentra algo que ya no es
+   * cierto. Vaciarla no se anuncia.
+   * @param {string} from
+   */
+  const quiet = from => {
+    if (!(live instanceof HTMLElement) || liveFrom !== from) return;
+    liveTurn += 1;
+    liveFrom = '';
+    live.textContent = '';
   };
 
   const hideCopyStatus = () => {
     if (copyStatus instanceof HTMLElement && !copyStatus.hidden) copyStatus.hidden = true;
+    quiet('copy');
   };
 
   /** El borrador, un renglón por línea: solo cambia los renglones que cambiaron. */
@@ -200,7 +234,8 @@ export function createMessagePage(root, { regions }) {
     }
     if (!started || state.fits !== fits) {
       showFits(state.fits);
-      if (started && !state.fits && notice) announce(notice.querySelector('[data-status-text]')?.textContent ?? '');
+      if (started && !state.fits && notice) announce(notice.querySelector('[data-status-text]')?.textContent ?? '', 'long');
+      if (state.fits) quiet('long');
       fits = state.fits;
     }
     started = true;
@@ -216,7 +251,7 @@ export function createMessagePage(root, { regions }) {
       if (icon instanceof HTMLElement) icon.hidden = icon.dataset.statusIcon !== (copied ? 'check' : 'alert-circle');
     }
     copyStatus.hidden = false;
-    announce(sentence);
+    announce(sentence, 'copy');
   };
 
   const copy = async () => {
@@ -246,6 +281,7 @@ export function createMessagePage(root, { regions }) {
     template,
     update,
     announce,
+    quiet,
     /** El mensaje que muestran ahora el borrador y los enlaces. */
     get message() {
       return current;
