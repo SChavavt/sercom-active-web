@@ -126,7 +126,7 @@ Todo esto existe en la vista previa, que tiene productos de ejemplo. En producci
 
 ### 4.1 Comandos
 
-Las cifras del paso 2 son del código del commit `1ce2ecc` (el último que cambió el código; estos documentos no lo cambian). La batería completa de pruebas corrió en GitHub, por la decisión de la sección 2.2: flujo «Verificar catálogo y sitio», comprobación «verify», corrida 45165806852 del 23 de noviembre de 2026, con resultado correcto en cada paso. `npm run check`, `npm run verify` y el escáner con `--launch` se corrieron además el 23 de noviembre en una computadora de trabajo, con Node.js 24.22.3 y npm 11.19.1; las cifras de `check` y de `verify` son las mismas que en GitHub. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
+Las cifras del paso 2 son del código del commit `1ce2ecc`, el último que cambió el código. Después solo cambiaron estos documentos y algunos comentarios del código, y las dos compilaciones salen idénticas byte a byte a las de `1ce2ecc`. La batería completa de pruebas corrió en GitHub, por la decisión de la sección 2.2: flujo «Verificar catálogo y sitio», comprobación «verify», corrida 45165806852 del 23 de noviembre de 2026, con resultado correcto en cada paso. `npm run check`, `npm run verify` y el escáner con `--launch` se corrieron además el 23 de noviembre en una computadora de trabajo, con Node.js 24.22.3 y npm 11.19.1; las cifras de `check` y de `verify` son las mismas que en GitHub. Estas son las únicas cifras del proyecto que cambian con el tiempo; cada una va con el comando que la da.
 
 | Comando | Resultado |
 | --- | --- |
