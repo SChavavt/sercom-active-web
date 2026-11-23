@@ -455,7 +455,12 @@
   /* formularios (components.css 4.18). Los controles ya reciben su contorno arriba; el selector de cantidad pierde
      los filetes de su fondo azul y quedan los contornos de sus tres casillas. Las filas con casilla muestran la
      casilla nativa del sistema (marcada, foco) en lugar del cuadro dibujado. La barra de error y lo apagado toman
-     colores del sistema. */
+     colores del sistema. Un control sin borde propio no tiene relleno a los lados: aquí lo recibe, para que el texto
+     no toque su contorno, y el contorno de un botón de texto se separa de sus letras. */
+  .control { padding-inline: var(--s-2); }
+  .select__control { padding-right: calc(20px + var(--s-3) + var(--s-2)); }
+  .select__icon { right: var(--s-2); }
+  .text-btn { outline-offset: var(--s-1); }
   :where(.field-group) > * { outline: var(--line) solid CanvasText; }
   .check-row__input { opacity: 1; }
   .check-row__box { visibility: hidden; }

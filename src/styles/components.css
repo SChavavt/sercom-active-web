@@ -655,8 +655,9 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
    casilla, botón de pliegue, botón de texto y línea de estado. Todo dentro de la lámina: un campo es una celda (o,
    con `field--framed`, una casilla con su propio filete dentro de una celda más ancha). Los controles nunca usan
    letra de menos de 16 px (iOS agrandaría la página al enfocarlos) y miden al menos 44 px de alto en todo ancho.
-   Dibujan su propio filete azul de 1 px solo: `.field--framed`, `.stepper` (las casillas del selector de cantidad)
-   y `.check-row__box` (el cuadro de la casilla). Fuera de eso, ningún control tiene borde propio. Sin colores de
+   Dibujan su propio filete azul de 1 px solo: `.field--framed`, `.stepper` (las casillas del selector de cantidad),
+   `.check-row__box` (el cuadro de la casilla) y un `.btn` apagado (`.btn[aria-disabled="true"]`, de cualquier
+   variante: caja blanca con filete azul claro). Fuera de eso, ningún control tiene borde propio. Sin colores de
    estado: un error se marca con texto en tinta y peso, un icono y una barra de tinta. Componentes: Field, Select,
    Stepper (+ StepperScript), CheckRow y StatusLine; ActionRow y Button sin href imprimen <button>. */
 
@@ -759,6 +760,8 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
   touch-action: manipulation;                                /* dos toques seguidos no agrandan la página */
   transition: background-color var(--ease);
 }
+/* Sin JavaScript los dos botones no se imprimen a la vista (js-only): el campo ocupa todo el selector */
+html:not(.js) .stepper { grid-template-columns: minmax(0, 1fr); }
 .stepper__btn:hover { background: var(--surface-tint); }
 .stepper__btn:active { background: var(--blue-100); }
 .stepper__btn[aria-disabled="true"],
@@ -772,6 +775,7 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
   border: 0;
   border-radius: var(--radius);
   background: var(--surface);
+  font-size: 1rem;                                           /* nunca menos de 16 px, tampoco dentro de un texto pequeño */
   font-variant-numeric: tabular-nums;
   text-align: center;
   appearance: none;
@@ -809,6 +813,9 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
 .check-row:active .check-row__input:checked + .check-row__box { background: var(--blue-800); }
 .check-row__input:focus-visible + .check-row__box { outline: 3px solid var(--focus); outline-offset: 2px; }
 .check-row__name { align-self: baseline; overflow-wrap: break-word; }
+/* Con número, la coma que el lector dice entre el nombre y «N productos»: va pegada al nombre y sin tamaño (no se
+   ve ni ocupa ancho). Escrita en la celda del número quedaría separada del nombre por un espacio. */
+.check-row__name--counted::after { content: ','; font-size: 0; }
 .check-row__count { align-self: baseline; color: var(--grey-600); font-size: var(--small); font-variant-numeric: tabular-nums; }
 
 /* Botón de pliegue de un grupo (el título de un grupo de filtros): como las filas plegables de la barra lateral */
@@ -869,7 +876,8 @@ button.action { width: 100%; margin: 0; border: 0; border-radius: var(--radius);
 }
 .status:focus-visible { outline-offset: -3px; }
 .status__body { display: flex; flex: 1 1 15rem; align-items: flex-start; gap: var(--s-3); min-width: 0; line-height: 1.45; }
-.status__icon { margin-top: calc((1.45em - 20px) / 2); color: var(--blue); }
+/* Cada icono va en un <span> (el script lo muestra u oculta con su propiedad `hidden`) */
+.status__icon { display: flex; flex: none; margin-top: calc((1.45em - 20px) / 2); color: var(--blue); }
 .status__text { min-width: 0; overflow-wrap: break-word; text-wrap: pretty; }
 .status__action { display: flex; flex: none; max-width: 100%; margin-left: calc(20px + var(--s-3)); }
 .status__action > .more { white-space: normal; }

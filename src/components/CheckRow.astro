@@ -7,11 +7,15 @@
 // forzados se ve la casilla nativa del sistema (responsive.css 6.8). Las opciones nunca se deshabilitan.
 // Un nombre largo pasa a otro renglón y el número se queda en el primero.
 //
-// Número (`count`, opcional; se imprime también con 0): como en la barra lateral, la cifra visible (oculta al lector)
-// y «, N productos» solo para el lector, dentro de `[data-check-count]`. Un script que cambia el número reescribe con
-// textContent la cifra (`[data-check-count-value]`) y el texto oculto (`[data-check-count-text]`, «, 1 producto»,
-// «, 12 productos»: `resultSummary` de search.mjs). El nombre accesible de la casilla es el de la fila:
-// «Protección de manos, 12 productos».
+// Número (`count`, opcional; se imprime también con 0): la cifra visible (oculta al lector) y «N productos» solo
+// para el lector, en la celda del número. Un script que cambia el número reescribe con textContent la cifra
+// (`[data-check-count-value]`) y el texto oculto (`[data-check-count-text]`: `resultSummary(n)` de search.mjs,
+// «1 producto», «12 productos»). El nombre accesible de la casilla es el de la fila, igual que en la barra lateral:
+// «Protección de manos, 12 productos». La coma no está en el HTML: la pone el CSS al final del nombre, sin tamaño
+// (`.check-row__name--counted::after`, components.css 4.18), porque el navegador separa con un espacio el texto de
+// dos celdas de la rejilla y una coma escrita en la celda del número quedaría suelta («Protección de manos , 12
+// productos»). Así el texto del nombre en el HTML es solo el nombre; donde esa coma no se lea, la fila dice
+// «Protección de manos 12 productos».
 // Los demás atributos (`data-*`, `id`, `aria-*`, `form`) pasan a la casilla. Va dentro de un <li> de una lista
 // `.check-list` (o de cualquier lista: la fila lleva su filete superior).
 //
@@ -36,5 +40,5 @@ const { name, value, label, count, checked = false, class: className, ...attrs }
 ---
 <label class:list={['check-row', className]}>
   <span class="check-row__control"><input class="check-row__input" type="checkbox" name={name} value={value} checked={checked} {...attrs} /><span class="check-row__box" aria-hidden="true"><Icon name="check" class="icon--16" /></span></span>
-  <span class="check-row__name">{label}</span>{count !== undefined && ' '}{count !== undefined && <span class="check-row__count" data-check-count><span aria-hidden="true" data-check-count-value>{count}</span><span class="vh" data-check-count-text>, {resultSummary(count)}</span></span>}
+  <span class:list={['check-row__name', count !== undefined && 'check-row__name--counted']}>{label}</span>{count !== undefined && ' '}{count !== undefined && <span class="check-row__count"><span aria-hidden="true" data-check-count-value>{count}</span><span class="vh" data-check-count-text>{resultSummary(count)}</span></span>}
 </label>

@@ -17,6 +17,13 @@
 // aria-disabled="true" (y «Aumentar» en el máximo): sigue en el orden del teclado, se ve apagado y un clic no hace
 // nada. Los demás atributos (`aria-describedby`, `data-*`, `required`) pasan al campo de texto.
 //
+// Los dos botones solo funcionan con el script: llevan `js-only`. Sin JavaScript no se imprimen a la vista y queda el
+// campo de texto, que ocupa todo el ancho del selector y se llena a mano como cualquier otro.
+//
+// Una página que escribe `input.value` desde su código (al dibujar una lista, al deshacer) lanza después el evento
+// `stepper:sync`, cuando la fila YA está en el documento, desde el campo o desde el contenedor de varias filas
+// (StepperScript.astro). Antes de insertarla el evento no llega al script.
+//
 // Ancho: llena su campo hasta 15rem. Mínimo: los dos botones (88 px), los filetes (4 px) y el campo, que no baja de
 // 6ch más su relleno para que «99,999» quepa entero: 154 px con la letra normal (unos 99 px + 3.44rem; 209 px al
 // 200 %). La página le da una celda con ese lugar más el relleno del campo, o la apila (consulta de contenedor).
@@ -48,7 +55,7 @@ const atMin = Number.isInteger(value) && value <= min;
 const atMax = Number.isInteger(value) && value >= max;
 ---
 <div class:list={['stepper', className]} data-stepper data-min={min} data-max={max}>
-  <button class="stepper__btn" type="button" aria-label={`Disminuir cantidad${suffix}`} aria-disabled={atMin ? 'true' : undefined} data-stepper-minus><Icon name="minus" /></button>
+  <button class="stepper__btn js-only" type="button" aria-label={`Disminuir cantidad${suffix}`} aria-disabled={atMin ? 'true' : undefined} data-stepper-minus><Icon name="minus" /></button>
   <input class="stepper__input" id={id} name={name} type="text" inputmode="numeric" autocomplete="off" maxlength="6" value={String(value)} data-stepper-input {...attrs} />
-  <button class="stepper__btn" type="button" aria-label={`Aumentar cantidad${suffix}`} aria-disabled={atMax ? 'true' : undefined} data-stepper-plus><Icon name="plus" /></button>
+  <button class="stepper__btn js-only" type="button" aria-label={`Aumentar cantidad${suffix}`} aria-disabled={atMax ? 'true' : undefined} data-stepper-plus><Icon name="plus" /></button>
 </div>
