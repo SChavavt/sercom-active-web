@@ -185,6 +185,113 @@
     ]
   },
   {
+    "id": "ejemplo-guante-de-nitrilo",
+    "name": "Guante de ejemplo de nitrilo",
+    "brandName": "Marca de ejemplo B",
+    "code": "EJ-1003",
+    "categoryIds": ["manos"],
+    "saleUnit": "caja con 100 piezas",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "chico", "label": "Chico", "code": "EJ-1003-CH" },
+      { "id": "mediano", "label": "Mediano", "code": "EJ-1003-M" },
+      { "id": "grande", "label": "Grande", "code": "EJ-1003-G" }
+    ]
+  },
+  {
+    "id": "ejemplo-guante-de-carnaza",
+    "name": "Guante de ejemplo de carnaza",
+    "brandName": "Marca de ejemplo C",
+    "code": "EJ-1004",
+    "categoryIds": ["manos"],
+    "saleUnit": "par",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "unitalla", "label": "Unitalla", "code": "EJ-1004-UNI" }
+    ]
+  },
+  {
+    "id": "ejemplo-goggle-ventilado",
+    "name": "Goggle de ejemplo ventilado",
+    "brandName": "Marca de ejemplo B",
+    "code": "EJ-2002",
+    "categoryIds": ["ojos-y-cara"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "mica-clara", "label": "Mica clara", "code": "EJ-2002-CL" }
+    ]
+  },
+  {
+    "id": "ejemplo-casco-de-ala-completa",
+    "name": "Casco de ejemplo de ala completa",
+    "brandName": "Marca de ejemplo C",
+    "code": "EJ-3002",
+    "categoryIds": ["cabeza"],
+    "saleUnit": "pieza",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "blanco", "label": "Blanco", "code": "EJ-3002-BL" },
+      { "id": "naranja", "label": "Naranja", "code": "EJ-3002-NA" }
+    ]
+  },
+  {
+    "id": "ejemplo-respirador-desechable",
+    "name": "Respirador de ejemplo desechable",
+    "brandName": "Marca de ejemplo B",
+    "code": "EJ-4002",
+    "categoryIds": ["respiratoria"],
+    "saleUnit": "caja",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": []
+  },
+  {
+    "id": "ejemplo-zapato-tipo-choclo",
+    "name": "Zapato de ejemplo tipo choclo",
+    "brandName": "Marca de ejemplo C",
+    "code": "EJ-8002",
+    "categoryIds": ["calzado"],
+    "saleUnit": "par",
+    "summary": "Texto de ejemplo para mostrar cómo se verá el resumen de un producto. No describe un artículo real.",
+    "characteristics": [
+      "Característica de ejemplo: material y recubrimiento",
+      "Característica de ejemplo: uso recomendado",
+      "Característica de ejemplo: presentación y empaque"
+    ],
+    "variants": [
+      { "id": "talla-25", "label": "Talla 25", "code": "EJ-8002-25" },
+      { "id": "talla-26", "label": "Talla 26", "code": "EJ-8002-26" },
+      { "id": "talla-27", "label": "Talla 27", "code": "EJ-8002-27" },
+      { "id": "talla-28", "label": "Talla 28", "code": "EJ-8002-28" },
+      { "id": "talla-29", "label": "Talla 29", "code": "EJ-8002-29" }
+    ]
+  },
+  {
     "id": "ejemplo-producto-retirado",
     "name": "Producto de ejemplo retirado",
     "brandName": "Marca de ejemplo",

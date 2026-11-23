@@ -66,7 +66,7 @@ export interface PublicProduct {
   readonly name: string;
   /** `null` en los ejemplos: no pertenecen a una marca real y no tienen página de marca. */
   readonly brandId: string | null;
-  /** Nombre visible de la marca; «Marca de ejemplo» en los ejemplos. */
+  /** Nombre visible de la marca; en los ejemplos, «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C». */
   readonly brandName: string;
   /** Modelo o código exacto del fabricante. */
   readonly code: string;
@@ -155,12 +155,14 @@ export interface BrandRecord {
 export interface ExampleProductRecord {
   id: string;
   name: string;
+  /** Una de `EXAMPLE_BRAND_NAMES` (`site-data-core.mjs`). */
   brandName: string;
   code: string;
   categoryIds: string[];
   saleUnit: string;
   summary: string;
   characteristics: string[];
+  /** Puede estar vacía: un producto sin variantes. */
   variants: { id: string; label: string; code: string }[];
   /** `true`: ejemplo de producto retirado (solo tiene su página informativa; no entra en ningún listado). */
   retired?: boolean;

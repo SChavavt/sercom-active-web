@@ -7,7 +7,7 @@ import { cleanQuery, normalizeCode, normalizeText } from '../src/lib/text.mjs';
 import { loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
-// Los diez ejemplos de la vista previa, con la forma pública que reciben las páginas.
+// Los dieciséis ejemplos de la vista previa, con la forma pública que reciben las páginas.
 const exampleProducts = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples }).products;
 // Productos sintéticos de prueba con códigos parecidos a los de un fabricante. Nunca se importan en el sitio.
 const synthetic = [
@@ -59,8 +59,9 @@ test('la búsqueda no distingue mayúsculas ni acentos', () => {
   assert.deepEqual(codes(exampleProducts, 'ARNÉS'), ['EJ-6001']);
   assert.deepEqual(codes(exampleProducts, 'Señalización'), ['EJ-9001']);
   assert.deepEqual(codes(exampleProducts, 'senalizacion'), ['EJ-9001']);
-  assert.deepEqual(codes(exampleProducts, 'GUANTE'), ['EJ-1001']);
-  assert.deepEqual(codes(exampleProducts, 'guant'), ['EJ-1001']);
+  assert.deepEqual(codes(exampleProducts, 'GUANTE'), ['EJ-1001', 'EJ-1003', 'EJ-1004']);
+  assert.deepEqual(codes(exampleProducts, 'guant'), ['EJ-1001', 'EJ-1003', 'EJ-1004']);
+  assert.deepEqual(codes(exampleProducts, 'CARNAZA'), ['EJ-1004']);
 });
 
 test('encuentra por código con y sin separadores', () => {
@@ -85,11 +86,11 @@ test('encuentra por marca y por nombre de categoría', () => {
   assert.deepEqual(codes(synthetic, 'BETA'), ['AL026CL/3C', 'S.100 A']);
   assert.deepEqual(codes(synthetic, 'marca'), ['37-175', 'AL026CL/3C', 'S.100 A']);
   assert.deepEqual(codes(exampleProducts, 'marca de ejemplo'), exampleProducts.map(product => product.code));
-  assert.deepEqual(codes(exampleProducts, 'calzado'), ['EJ-8001']);
-  assert.deepEqual(codes(exampleProducts, 'ojos y cara'), ['EJ-2001']);
+  assert.deepEqual(codes(exampleProducts, 'calzado'), ['EJ-8001', 'EJ-8002']);
+  assert.deepEqual(codes(exampleProducts, 'ojos y cara'), ['EJ-2001', 'EJ-2002']);
   assert.deepEqual(codes(synthetic, 'alturas'), ['AL026CL/3C']);
   // «protección» está en el nombre de varias categorías.
-  assert.deepEqual(codes(exampleProducts, 'proteccion'), ['EJ-1001', 'EJ-2001', 'EJ-3001', 'EJ-4001', 'EJ-5001', 'EJ-7001']);
+  assert.deepEqual(codes(exampleProducts, 'proteccion'), ['EJ-1001', 'EJ-2001', 'EJ-3001', 'EJ-4001', 'EJ-5001', 'EJ-7001', 'EJ-1003', 'EJ-1004', 'EJ-2002', 'EJ-3002', 'EJ-4002']);
 });
 
 test('todas las palabras de la consulta deben coincidir, en cualquier campo y en cualquier orden', () => {
@@ -113,7 +114,7 @@ test('conserva el orden y no modifica la lista ni los productos', () => {
   const frozen = Object.freeze([...exampleProducts]);
   assert.deepEqual(codes(frozen, 'de ejemplo'), exampleProducts.map(product => product.code));
   assert.deepEqual(filterProducts(frozen, 'pieza'), []); // la unidad de venta no forma parte de la búsqueda
-  assert.equal(frozen.length, 10);
+  assert.equal(frozen.length, 16);
 });
 
 test('queryTokens separa la consulta en palabras normalizadas y descarta los signos sueltos', () => {
@@ -230,7 +231,7 @@ test('cleanQuery quita sin dejar espacio los rellenos del hangul U+115F, U+1160,
       assert.deepEqual(queryTokens(query), ['casco'], label);
       assert.equal(matchesQuery(casco, query), true, label);
       assert.equal(matchesSearchText(searchText(casco), query), true, label);
-      assert.deepEqual(codes(exampleProducts, query), ['EJ-3001'], label);
+      assert.deepEqual(codes(exampleProducts, query), ['EJ-3001', 'EJ-3002'], label);
       assert.equal(requestDescription(query), 'casco', label);
     }
     // Solo, o solo con otros caracteres que no se ven: consulta vacía.

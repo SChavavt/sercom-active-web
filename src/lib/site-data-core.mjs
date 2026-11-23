@@ -21,8 +21,13 @@ export const PREVIEW_NOTICE = 'Vista previa para revisión. Los productos que ap
 export const DEVELOPMENT_NOTICE = 'Sitio en preparación · Versión inicial para revisión';
 /** Etiqueta visible de cada producto de ejemplo. */
 export const EXAMPLE_TAG = 'Ejemplo';
-/** Marca de todos los productos de ejemplo. Nunca es una marca real. */
+/** Marca del primer producto de ejemplo. Nunca es una marca real. */
 export const EXAMPLE_BRAND_NAME = 'Marca de ejemplo';
+/**
+ * Las únicas marcas que puede llevar un producto de ejemplo: tres, para revisar en la vista previa el grupo de marcas de
+ * los filtros. Ninguna es una marca real ni tiene página de marca (los ejemplos llevan `brandId: null`).
+ */
+export const EXAMPLE_BRAND_NAMES = Object.freeze([EXAMPLE_BRAND_NAME, 'Marca de ejemplo B', 'Marca de ejemplo C']);
 /** Única etiqueta permitida para el enlace de una marca. */
 export const MANUFACTURER_LINK_LABEL = 'Sitio del fabricante';
 
@@ -60,6 +65,8 @@ const LINK_KEYS = ['label', 'url'];
 // `retired: true` marca el ejemplo de producto retirado: tiene su página, pero no entra en ningún listado.
 const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants', 'retired'];
 const VARIANT_KEYS = ['id', 'label', 'code'];
+/** «Marca de ejemplo», «Marca de ejemplo B» o «Marca de ejemplo C»: las marcas que acepta un ejemplo, para los errores. */
+const BRAND_CHOICES = `${EXAMPLE_BRAND_NAMES.slice(0, -1).map(name => `«${name}»`).join(', ')} o «${EXAMPLE_BRAND_NAMES.at(-1)}»`;
 /** Tipos de recurso del registro que nunca se publican como enlace. */
 const BLOCKED_RESOURCE_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];
 
@@ -151,8 +158,9 @@ export function crossCheckBrands(brands, registry) {
 
 /**
  * Valida los productos de ejemplo de la vista previa. Deben ser inconfundibles con fichas reales:
- * identificador «ejemplo-…», código «EJ-0000», nombre con «de ejemplo», marca «Marca de ejemplo»
- * y ninguna mención de una marca real. `retired: true` marca un ejemplo retirado; sus demás reglas no cambian.
+ * identificador «ejemplo-…», código «EJ-0000», nombre con «de ejemplo», una de las marcas de `EXAMPLE_BRAND_NAMES`
+ * y ninguna mención de una marca real. Las variantes pueden faltar (`variants: []`), como en una ficha real.
+ * `retired: true` marca un ejemplo retirado; sus demás reglas no cambian.
  * @param {unknown} examples Contenido de `src/data/preview/example-products.json`.
  * @param {{ categoryIds: readonly string[], brands: readonly Pick<BrandRecord, 'id' | 'name'>[] }} context
  * @returns {string[]} Errores; lista vacía si todo es correcto.
@@ -179,7 +187,7 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     codes.add(example.code);
     if (!isText(example.name) || !hasWord(normalizeText(example.name), 'de ejemplo')) errors.push(`${path}: el nombre debe contener «de ejemplo».`);
-    if (example.brandName !== EXAMPLE_BRAND_NAME) errors.push(`${path}: la marca debe ser «${EXAMPLE_BRAND_NAME}».`);
+    if (typeof example.brandName !== 'string' || !EXAMPLE_BRAND_NAMES.includes(example.brandName)) errors.push(`${path}: la marca debe ser ${BRAND_CHOICES}.`);
     if ('retired' in example && typeof example.retired !== 'boolean') errors.push(`${path}: retired debe ser true o false.`);
     if (!Array.isArray(example.categoryIds) || example.categoryIds.length === 0 || example.categoryIds.some(id => !categoryIds.includes(id))) {
       errors.push(`${path}: faltan categorías existentes.`);
@@ -191,7 +199,7 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     const variants = example.variants;
     const variantIds = new Set();
-    if (!Array.isArray(variants) || variants.length === 0) errors.push(`${path}: requiere al menos una variante.`);
+    if (!Array.isArray(variants)) errors.push(`${path}: variants debe ser una lista (puede estar vacía).`);
     else for (const variant of variants) {
       const valid = isRecord(variant) && unknownKeys(variant, VARIANT_KEYS).length === 0 && isId(variant.id) && !variantIds.has(variant.id)
         && isText(variant.label) && typeof variant.code === 'string' && variant.code.startsWith(`${example.code}-`) && !codes.has(variant.code);
@@ -322,7 +330,7 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
       url: routes.product(example.id),
       name: example.name,
       brandId: null,
-      brandName: EXAMPLE_BRAND_NAME,
+      brandName: example.brandName,
       code: example.code,
       categoryIds: [...example.categoryIds],
       categoryNames: namesOf(example.id, example.categoryIds),
@@ -355,7 +363,7 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
     ...retiredExamples.map(example => {
       const ids = publicCategoryIds(example.categoryIds);
       return {
-        id: example.id, url: routes.product(example.id), name: example.name, brandId: null, brandName: EXAMPLE_BRAND_NAME, code: example.code,
+        id: example.id, url: routes.product(example.id), name: example.name, brandId: null, brandName: example.brandName, code: example.code,
         categoryIds: ids, categoryNames: namesOf(example.id, ids), isExample: true,
       };
     }),

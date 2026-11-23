@@ -24,7 +24,7 @@ const MARKERS = /EJ-\d|marca de ejemplo|ejemplo-|de ejemplo/i;
 const MISUSE_CHUNK = /^_astro\/script-con-datos\./;
 
 const data = await loadProjectData();
-// Los diez ejemplos de los listados; el ejemplo retirado solo tiene su página informativa.
+// Los dieciséis ejemplos de los listados; el ejemplo retirado solo tiene su página informativa.
 const listedExamples = data.examples.filter(example => example.retired !== true);
 const retiredExamples = data.examples.filter(example => example.retired === true);
 // Todo lo que identifica a un ejemplo: ids, nombres, códigos, códigos de variante y textos.
@@ -141,12 +141,12 @@ test('un archivo .env o un valor no reconocido no activan la vista previa', () =
   for (const [path, content] of files) for (const token of fixtureTokens) assert.ok(!content.includes(token), `${path} contiene «${token}»`);
 });
 
-test('vista previa (control): los mismos archivos sí contienen los diez ejemplos y el retirado, cada uno en su lista', () => {
+test('vista previa (control): los mismos archivos sí contienen los dieciséis ejemplos y el retirado, cada uno en su lista', () => {
   const { files, output } = builds.preview;
   assert.match(output, /Vista previa de diseño \(CATALOG_PREVIEW\)/);
   const index = files.get('index.html');
   assert.match(index, /<body data-mode="preview"/);
-  assert.equal(index.match(/data-product="ejemplo-/g).length, 10);
+  assert.equal(index.match(/data-product="ejemplo-/g).length, 16);
   assert.equal(index.match(/data-category="/g).length, 10);
   for (const example of listedExamples) {
     for (const token of [example.id, example.name, example.code, ...example.variants.map(variant => variant.code)]) assert.ok(index.includes(token), token);
@@ -164,6 +164,9 @@ test('vista previa (control): los mismos archivos sí contienen los diez ejemplo
   assert.deepEqual(json.products.map(product => product.id), listedExamples.map(example => example.id));
   assert.deepEqual(json.retiredProducts.map(product => [product.id, product.isExample, product.brandId, Object.keys(product).length]), retiredExamples.map(example => [example.id, true, null, 9]));
   assert.ok(json.products.every(product => product.isExample === true && product.brandId === null));
+  // Cada ejemplo llega con su marca de ejemplo, sin cambiarla.
+  assert.deepEqual(json.products.map(product => product.brandName), listedExamples.map(example => example.brandName));
+  assert.deepEqual([...new Set(json.products.map(product => product.brandName))], ['Marca de ejemplo', 'Marca de ejemplo B', 'Marca de ejemplo C']);
   assert.equal(json.categories.length, 10);
   // Con la bandera activa, el script que importa el módulo de datos sí carga el archivo de ejemplos:
   // es la rama que la compilación de producción elimina.
@@ -178,14 +181,17 @@ test('vista previa: la búsqueda del navegador sobre los data-search compilados 
     decimal ? String.fromCodePoint(Number(decimal)) : hex ? String.fromCodePoint(parseInt(hex, 16)) : { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" }[name.toLowerCase()]));
   const index = builds.preview.files.get('index.html');
   const cards = [...index.matchAll(/<li data-product="([^"]+)" data-search="([^"]*)"/g)].map(match => ({ id: match[1], search: decode(match[2]) }));
-  assert.equal(cards.length, 10);
+  assert.equal(cards.length, 16);
   const found = location => cards.filter(card => matchesSearchText(card.search, new URL(location, 'https://sitio.example/').searchParams.get(SEARCH_PARAM))).map(card => card.id);
   const all = listedExamples.map(example => example.id);
   const expectations = [
     ['/catalogo/', all],
     ['/catalogo/?q=', all],
-    ['/catalogo/?q=guante', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=guante', ['ejemplo-guante-recubierto', 'ejemplo-guante-de-nitrilo', 'ejemplo-guante-de-carnaza']],
+    ['/catalogo/?q=guantes', ['ejemplo-guante-recubierto', 'ejemplo-guante-de-nitrilo', 'ejemplo-guante-de-carnaza']],
     ['/catalogo/?q=GUANTE+recubierto', ['ejemplo-guante-recubierto']],
+    ['/catalogo/?q=gafas', ['ejemplo-lente-de-seguridad']],
+    ['/catalogo/?q=arnes', ['ejemplo-arnes-de-cuerpo-completo']],
     ['/catalogo/?q=EJ-1001', ['ejemplo-guante-recubierto']],
     ['/catalogo/?q=ej1001', ['ejemplo-guante-recubierto']],
     ['/catalogo/?q=ej%201001', ['ejemplo-guante-recubierto']],
@@ -194,6 +200,7 @@ test('vista previa: la búsqueda del navegador sobre los data-search compilados 
     ['/catalogo/?q=se%C3%B1alizaci%C3%B3n', ['ejemplo-cono-de-71-cm']],
     ['/catalogo/?q=senalizacion', ['ejemplo-cono-de-71-cm']],
     ['/catalogo/?q=casco%20cachucha', ['ejemplo-casco-tipo-cachucha']],
+    ['/catalogo/?q=EJ-4002', ['ejemplo-respirador-desechable']],
     ['/catalogo/?q=casco+EJ-1001', []],
     ['/catalogo/?q=zzzz', []],
   ];
