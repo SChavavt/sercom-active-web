@@ -18,7 +18,8 @@
 //     `manufacturerCode`: un número largo es un código, no va en el texto;
 //   - una dirección de correo no va en ninguna ficha (R-RULE-24), ni un enlace o una nota del registro de investigación
 //     (R-RULE-13, la misma lista que usa el escáner); un documento o una foto por dirección que enlazan el registro
-//     tampoco, salvo un «Sitio del fabricante» de brands.json.
+//     tampoco, salvo un enlace del fabricante publicado en brands.json: un documento puede enlazar el catálogo de su
+//     marca (en PDF o en línea) o su sitio.
 //
 // Límites: cada campo se revisa solo. El escáner lee una página como una sola línea, así que una regla también puede
 // encontrar algo entre dos campos que quedan juntos en la página; eso solo lo ve el escaneo de la página compilada,
@@ -102,7 +103,7 @@ export function reviewCatalogText(catalog, { registry, brands }) {
     list(product.documents).forEach((document, i) => {
       if (!isRecord(document) || typeof document.url !== 'string') return;
       if (registryFindings(document.url, leaks).urls.length) {
-        messages.push(`${at(`documents[${i}].url`)}: R-RULE-13, ese enlace es del registro de investigación y no se publica; enlaza la página o la ficha del producto en el sitio del fabricante.`);
+        messages.push(`${at(`documents[${i}].url`)}: R-RULE-13, ese enlace es del registro de investigación y no está entre los enlaces del fabricante publicados en brands.json; enlaza la página o la ficha del producto en el sitio del fabricante, o el catálogo que publica su marca.`);
       }
     });
     if (isRecord(product.image) && typeof product.image.url === 'string' && registryFindings(product.image.url, leaks).urls.length) {

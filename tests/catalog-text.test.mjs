@@ -121,7 +121,7 @@ test('un enlace del registro de investigación no se publica como documento ni c
   const [leak] = leaks.urls;
   assert.ok(leak, 'el registro tiene enlaces que no se publican');
   const documentAt = 'products[0].documents[0].url (guante-ficticio)';
-  assert.deepEqual(review({ documents: [{ label: 'Catálogo general', url: leak }] }), [`${documentAt}: R-RULE-13, ese enlace es del registro de investigación y no se publica; enlaza la página o la ficha del producto en el sitio del fabricante.`]);
+  assert.deepEqual(review({ documents: [{ label: 'Catálogo general', url: leak }] }), [`${documentAt}: R-RULE-13, ese enlace es del registro de investigación y no está entre los enlaces del fabricante publicados en brands.json; enlaza la página o la ficha del producto en el sitio del fabricante, o el catálogo que publica su marca.`]);
   const image = { url: leak, width: 800, height: 600, alt: 'Guante ficticio', sourceUrl: SOURCE, usageConfirmed: true };
   assert.deepEqual(review({ image }), ['products[0].image.url (guante-ficticio): R-RULE-13, ese enlace es del registro de investigación y no se publica; usa la dirección de la foto en el sitio del fabricante o guarda la foto en src/assets/productos/.']);
   // El «Sitio del fabricante» de una marca y una página de producto del mismo sitio sí se publican.
@@ -156,4 +156,14 @@ test('npm run validate:catalog corre la revisión del texto sobre el catálogo',
   assert.match(source, /reviewCatalogText\(catalog, \{ registry, brands \}\)/);
   // Con los datos del repositorio, ningún mensaje.
   assert.deepEqual(reviewCatalogText(data.catalog, sources), []);
+});
+
+test('un documento puede enlazar el catálogo que su marca publica en brands.json, en PDF o en línea; un catálogo del registro sin publicar, no', () => {
+  const published = data.brands.flatMap(brand => brand.manufacturerLinks.filter(link => link.label !== 'Sitio del fabricante').map(link => link.url));
+  assert.ok(published.length >= 14);
+  for (const url of published) assert.deepEqual(review({ documents: [{ label: 'Catálogo de la marca', url }] }), [], url);
+  const publishedAll = new Set(data.brands.flatMap(brand => brand.manufacturerLinks.map(link => link.url)));
+  const unpublished = data.registry.sources.flatMap(source => source.resources).filter(resource => resource.type === 'pdf' && !publishedAll.has(resource.url));
+  assert.ok(unpublished.length >= 2);
+  for (const { url } of unpublished) assert.match(review({ documents: [{ label: 'Catálogo de la marca', url }] }).join('\n'), /R-RULE-13, ese enlace es del registro de investigación y no está entre los enlaces del fabricante publicados en brands\.json/, url);
 });

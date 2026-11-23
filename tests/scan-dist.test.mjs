@@ -1880,3 +1880,37 @@ test('R-FOTO-02 está documentada en --rules', () => {
   assert.match(doc, /_astro\//);
   assert.match(doc, /src\/assets\/productos\//);
 });
+
+// Catálogos del fabricante y crédito de las fotos: los enlaces del fabricante publicados en brands.json (R-RULE-13).
+
+test('R-RULE-13: un catálogo del fabricante publicado pasa en la página de su marca y en /marcas/; un enlace del registro sin publicar sigue fallando', async () => {
+  const PDF = 'Catálogo del fabricante (PDF)';
+  const ONLINE = 'Catálogo en línea del fabricante';
+  const catalogLinks = data.brands.flatMap(brand => brand.manufacturerLinks.filter(link => link.label === PDF || link.label === ONLINE).map(link => ({ brand, link })));
+  assert.ok(catalogLinks.some(({ link }) => link.label === PDF) && catalogLinks.some(({ link }) => link.label === ONLINE));
+  const anchor = ({ brand, link }) => `<a href="${link.url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">${link.label}<span class="vh">, ${brand.name} (se abre en otra pestaña)</span></a>`;
+  for (const entry of catalogLinks) {
+    assert.deepEqual(failures(await scan({ [`marcas/${entry.brand.id}/index.html`]: page(`<h1>${entry.brand.name}</h1>${anchor(entry)}`) })), [], entry.link.url);
+  }
+  assert.deepEqual(failures(await scan({ 'marcas/index.html': page(`<h1>Marcas que manejamos</h1><ul>${catalogLinks.map(entry => `<li>${anchor(entry)}</li>`).join('')}</ul>`) })), []);
+  // Un catálogo del registro que no está publicado falla, en la página de su marca y en cualquier otra.
+  const published = new Set(data.brands.flatMap(brand => brand.manufacturerLinks.map(link => link.url)));
+  const unpublished = data.registry.sources.flatMap(source => source.resources.filter(resource => /pdf/.test(resource.type) && !published.has(resource.url)).map(resource => ({ id: source.entity_id, url: resource.url })));
+  assert.ok(unpublished.length >= 2, 'el registro tiene catálogos en PDF sin publicar');
+  for (const { id, url } of unpublished) {
+    for (const path of [`marcas/${id}/index.html`, 'marcas/index.html', 'catalogo/index.html']) {
+      const result = await scan({ [path]: page(`<a href="${url}" target="_blank" rel="noopener noreferrer">${PDF}<span class="vh"> (se abre en otra pestaña)</span></a>`) });
+      assert.deepEqual(failedIds(result), ['R-RULE-13'], `${path}: ${url}`);
+      assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+    }
+  }
+  // La lista de guías de MCR Safety, que nombra el catálogo de la marca excluida, nunca pasa.
+  const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url));
+  assert.deepEqual(failedIds(await scan({ 'marcas/mcr-safety/index.html': page(`<a href="${guides.url}">Guías</a>`) })), ['R-RULE-13']);
+});
+
+test('R-RULE-13 dice en --rules que pasan los enlaces del fabricante publicados en brands.json', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /salvo los enlaces del fabricante publicados en brands\.json/);
+  assert.doesNotMatch(doc, /salvo los «Sitio del fabricante»/);
+});
