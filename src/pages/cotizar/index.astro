@@ -11,8 +11,9 @@
 //   - «Mi cotización»: la lista guardada en este navegador (src/lib/quote-store.mjs), con un renglón por producto
 //     construido desde un <template> (solo textContent, value y propiedades). Con productos al compilar se imprime
 //     entera, con el índice público de los productos (`data-quote-index`, buildQuoteIndex); sin productos solo el
-//     título, el renglón de los productos que la página no puede ubicar y la línea de estado, dentro de una sección
-//     oculta hasta que haya un renglón guardado que informar;
+//     título, el renglón de los productos que la página no puede ubicar, la línea de estado y el aviso de que el
+//     navegador no guardó un cambio, dentro de una sección oculta hasta que haya un renglón guardado que informar (y
+//     sin el script del selector de cantidad: no hay ninguno);
 //   - «Completa tu solicitud» (con productos) o «Escribe tu lista» (sin productos): tres campos que se guardan solo en
 //     esta pestaña (sessionStorage, por quote-store.mjs);
 //   - «Revisa y envía»: las acciones (MessageActions) y el borrador «Así queda tu mensaje», siempre al día, más las
@@ -148,7 +149,13 @@ const items = [
           />
         </div>
         <StatusLine icon="info" data-quote-blocked>Tu navegador no permite guardar tu cotización en este equipo. Escribe abajo los productos que necesitas.</StatusLine>
-        <StatusLine icon="alert-circle" data-quote-write-failed>Tu navegador no permitió guardar el cambio. Copia o manda tu solicitud antes de salir de esta página.</StatusLine>
+      </Fragment>
+    )}
+    {/* También sin productos al compilar: ahí la página todavía puede escribir (quitar los productos que no ubica) y,
+        si el navegador no guarda ese cambio, tiene que decirlo. */}
+    <StatusLine icon="alert-circle" data-quote-write-failed>Tu navegador no permitió guardar el cambio. Copia o manda tu solicitud antes de salir de esta página.</StatusLine>
+    {hasProducts && (
+      <Fragment>
         <div class="grid12" data-quote-tools hidden>
           <ActionRow class="span-6 span-sm-12" href={routes.catalog}>Seguir agregando productos</ActionRow>
           <ActionRow class="span-6 span-sm-12" type="button" icon="trash" data-quote-clear>Vaciar cotización</ActionRow>
@@ -259,7 +266,9 @@ const items = [
     </div>
   </section>
 
-  <StepperScript />
+  {/* El selector de cantidad solo existe en los renglones (la plantilla de arriba): sin productos al compilar no hay
+      ninguno y su script no se carga. */}
+  {hasProducts && <StepperScript />}
 
   <script>
     import { composeListMessage, listItem } from '../../lib/contact-core.mjs';
@@ -495,7 +504,7 @@ const items = [
         if (empty) empty.hidden = !available || lines.length > 0;
         if (blocked) blocked.hidden = available;
         if (tools) tools.hidden = lines.length === 0;
-        if (collapsible) section!.hidden = lines.length === 0 && statusRow!.hidden;
+        if (collapsible) section!.hidden = lines.length === 0 && statusRow!.hidden && (writeFailed?.hidden ?? true);
       }
 
       /**
@@ -553,6 +562,12 @@ const items = [
           if (!saved) page.announce(writeFailed.querySelector('[data-status-text]')?.textContent ?? '', 'write');
           else page.quiet('write');
         }
+      }
+      /** El aviso de que no se guardó deja de valer cuando la página vuelve a mostrar lo guardado. */
+      function hideWriteFailed() {
+        if (!writeFailed || writeFailed.hidden) return;
+        writeFailed.hidden = true;
+        page.quiet('write');
       }
 
       // ---- la línea de estado y deshacer ------------------------------------------------------------------------
@@ -764,7 +779,7 @@ const items = [
       quoteStore.subscribe((stored, { source }) => {
         if (source === 'write') return;
         hideStatus();
-        if (writeFailed) writeFailed.hidden = true;
+        hideWriteFailed();
         lines = stored;
         render();
       });
