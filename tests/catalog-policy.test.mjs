@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { validateCatalog, getPublishedProducts } from '../src/lib/catalog-policy.mjs';
 import { MAX_UNIT_LENGTH } from '../src/lib/quote-list.mjs';
 
 // Datos sintéticos exclusivamente de prueba; nunca se importan en el sitio.
 const registry = { sources: [{ entity_id: 'test-brand', name: 'Marca sintética de prueba', entity_type: 'brand' }] };
+// La marca excluida, como la nombra el registro de investigación: las pruebas no la escriben.
+const EXCLUDED = JSON.parse(await readFile(new URL('../research/Sercom_Active_Fuentes_Catalogos.json', import.meta.url), 'utf8')).scope.excluded_entities;
 function fixture(status = 'approved') {
   return { schemaVersion: 1, categories: [{ id: 'test-category', name: 'Prueba', status: 'approved' }], products: [{
     id: 'test-001', brandId: 'test-brand', model: 'TEST-001', name: 'Producto sintético de prueba',
@@ -268,6 +271,24 @@ test('la dirección es https y el ancho y el alto son enteros de 1 a 10000', () 
       assert.deepEqual(imageErrors({ ...URL_IMAGE, height: value }, status), ['products[0].image.height: debe ser un número entero de 1 a 10000, el alto de la foto en píxeles.'], `${status} ${value}`);
     }
     for (const value of [1, 10000]) assert.deepEqual(imageErrors({ ...URL_IMAGE, width: value, height: value }, status), [], `${status} ${value}`);
+  }
+});
+
+test('la dirección de la foto no lleva lo reservado a los ejemplos ni la marca excluida, en cualquier estado', () => {
+  const reserved = 'products[0].image.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.';
+  const brand = 'products[0].image.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.';
+  const [longName, shortName] = EXCLUDED;
+  for (const status of STATUSES) {
+    for (const url of ['https://fabricante.invalid/ejemplo-guante.jpg', 'https://fabricante.invalid/fotos/EJ-1001.jpg', 'https://ejemplo.invalid/guante.jpg', 'https://fabricante.invalid/a.jpg?id=ej-2']) {
+      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), [reserved], `${status} ${url}`);
+    }
+    for (const url of [`https://${shortName.toLowerCase()}.com.mx/foto.jpg`, `https://fabricante.invalid/${longName.toLowerCase().replace(' ', '-')}/foto.jpg`, `https://fabricante.invalid/fotos/${shortName}_guante.jpg`]) {
+      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), [brand], `${status} ${url}`);
+    }
+  }
+  // Direcciones parecidas que no son lo reservado.
+  for (const url of ['https://fabricante.invalid/ejemplar.jpg', 'https://fabricante.invalid/casco-ej4.png', 'https://fabricante.invalid/guantes-internos.jpg', 'https://fabricante.invalid/legisla/foto.jpg']) {
+    assert.deepEqual(imageErrors({ ...URL_IMAGE, url }), [], url);
   }
 });
 

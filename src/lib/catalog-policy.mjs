@@ -120,6 +120,11 @@ function inspectImage(image, productPath, errors, line) {
   } else {
     for (const key of Object.keys(image)) if (!urlImageKeys.has(key)) errors.push(`${path}.${key}: campo no definido.`);
     if (!isHttps(image.url)) errors.push(`${path}.url: debe ser una dirección https completa, sin usuario ni contraseña.`);
+    // La dirección se publica tal cual: las mismas dos revisiones que el nombre de un archivo.
+    if (typeof image.url === 'string') {
+      if (reservedFileName(image.url.toLowerCase())) errors.push(`${path}.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.`);
+      if (excluded(image.url.replace(/[-._/:?=&]/g, ' '))) errors.push(`${path}.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.`);
+    }
     for (const [key, side] of [['width', 'ancho'], ['height', 'alto']]) {
       const value = image[key];
       if (value === undefined) errors.push(`${path}.${key}: falta; con url se escribe el ${side} de la foto en píxeles.`);

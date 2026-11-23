@@ -130,6 +130,17 @@ test('un enlace del registro de investigación no se publica como documento ni c
   for (const url of [brandLink, productPage]) assert.deepEqual(review({ documents: [{ label: 'Ficha del producto', url }] }), [], url);
 });
 
+test('el texto alternativo de la foto no lleva lo reservado a los ejemplos ni la marca excluida, en cualquier estado', () => {
+  const [longName, shortName] = data.registry.scope.excluded_entities;
+  const image = alt => ({ image: { url: 'https://example.invalid/foto.jpg', width: 800, height: 600, alt, sourceUrl: SOURCE, usageConfirmed: true } });
+  for (const status of STATUSES) {
+    assert.deepEqual(review({ status, ...image('Foto del guante de ejemplo') }), ['products[0].image.alt (guante-ficticio): R-RULE-03, marca de producto de ejemplo en producción: «de ejemplo». Escríbelo de otra forma.'], status);
+    assert.deepEqual(review({ status, ...image(`Foto del guante ${shortName}`) }), [`products[0].image.alt (guante-ficticio): R-RULE-08, marca excluida: «${shortName}». Escríbelo de otra forma.`], status);
+    assert.equal(review({ status, ...image(`Guante de ${longName}`) }).length, 1, status);
+    assert.deepEqual(review({ status, ...image('Foto del guante ficticio, de frente') }), [], status);
+  }
+});
+
 test('una nota interna del registro copiada en un texto se informa; mencionar un catálogo con otras palabras no', () => {
   const { notes } = registryLeaks(data.registry, data.brands);
   const note = notes.find(text => text.length >= 20 && !/[_]/.test(text));
