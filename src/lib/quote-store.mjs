@@ -14,10 +14,14 @@
 // después de `write()` en esta pestaña, 'storage' después de un cambio en otra pestaña (o de un almacenamiento borrado)
 // y 'pageshow' cuando el navegador restaura la página desde su caché de ida y vuelta.
 //
+// `write()` guarda solo una lista completa de renglones válidos. Con cualquier otra cosa (el objeto que devuelve
+// `addLine` en lugar de su `lines`, las filas de `reconcileList`, una cantidad en texto) devuelve `false` y no toca nada:
+// un descuido de quien llama nunca borra la lista del visitante.
+//
 // Sin efectos hasta que se llama un método: el almacenamiento y la ventana se buscan cuando hacen falta, dentro de
 // try/catch (leer `window.localStorage` lanza cuando el navegador lo bloquea).
 /** @import { QuoteDraft, QuoteLine, QuoteListener, QuoteStore, StorageLike } from '../types/quote.ts' */
-import { DRAFT_LIMITS, parseList, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, serializeList } from './quote-list.mjs';
+import { DRAFT_LIMITS, isValidLine, MAX_LINES, parseList, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, serializeList } from './quote-list.mjs';
 
 /** @typedef {Pick<EventTarget, 'addEventListener' | 'removeEventListener'>} ListenerTarget */
 
@@ -70,10 +74,13 @@ export function createQuoteStore({ local, session, target } = {}) {
     return view && typeof view.addEventListener === 'function' ? view : null;
   };
 
-  /** @type {Set<QuoteListener>} */
-  const listeners = new Set();
+  // Cada llamada a `subscribe` es una suscripción propia, aunque reciba la misma función que otra.
+  /** @type {Set<{ listener: QuoteListener }>} */
+  const subscriptions = new Set();
   /** @type {ListenerTarget | null} */
   let listening = null;
+  /** Número del último aviso que empezó a entregarse. */
+  let delivery = 0;
 
   /** @returns {QuoteLine[]} */
   const read = () => {
@@ -84,11 +91,22 @@ export function createQuoteStore({ local, session, target } = {}) {
     }
   };
 
-  /** @param {QuoteLine[]} lines @param {'write' | 'storage' | 'pageshow'} source */
+  /**
+   * Avisa a cada suscripción, en el orden en que se suscribieron. Si mientras tanto empieza otro aviso (quien escucha
+   * escribió dentro de su función), este se detiene: el aviso más nuevo ya llevó a todos la lista más reciente, y
+   * seguir con este les dejaría como última noticia una lista vieja. Una suscripción cancelada durante la entrega ya no
+   * recibe el aviso.
+   * @param {QuoteLine[]} lines
+   * @param {'write' | 'storage' | 'pageshow'} source
+   */
   const notify = (lines, source) => {
-    for (const listener of [...listeners]) {
+    delivery += 1;
+    const current = delivery;
+    for (const subscription of [...subscriptions]) {
+      if (current !== delivery) return;
+      if (!subscriptions.has(subscription)) continue;
       try {
-        listener(lines.map(line => ({ ...line })), { source });
+        subscription.listener(lines.map(line => ({ ...line })), { source });
       } catch (error) {
         report(error);
       }
@@ -122,6 +140,9 @@ export function createQuoteStore({ local, session, target } = {}) {
     },
     read,
     write(lines) {
+      if (!Array.isArray(lines) || lines.length > MAX_LINES) return false;
+      // Un índice a la vez: `every` se saltaría los huecos de una lista con huecos.
+      for (let index = 0; index < lines.length; index += 1) if (!isValidLine(lines[index])) return false;
       const text = serializeList(lines);
       const stored = parseList(text);
       try {
@@ -137,7 +158,8 @@ export function createQuoteStore({ local, session, target } = {}) {
     },
     subscribe(listener) {
       if (typeof listener !== 'function') return () => {};
-      listeners.add(listener);
+      const subscription = { listener };
+      subscriptions.add(subscription);
       if (!listening) {
         const view = eventTarget();
         if (view) {
@@ -146,9 +168,10 @@ export function createQuoteStore({ local, session, target } = {}) {
           listening = view;
         }
       }
+      // Cancela solo esta suscripción; llamarla otra vez no hace nada.
       return () => {
-        listeners.delete(listener);
-        if (listeners.size === 0 && listening) {
+        if (!subscriptions.delete(subscription)) return;
+        if (subscriptions.size === 0 && listening) {
           listening.removeEventListener('storage', onStorage);
           listening.removeEventListener('pageshow', onPageShow);
           listening = null;

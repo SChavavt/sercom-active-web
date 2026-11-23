@@ -1,7 +1,7 @@
 // El almacén de «Mi cotización», con almacenamientos falsos y un EventTarget en lugar de la ventana.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DRAFT_LIMITS, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY } from '../src/lib/quote-list.mjs';
+import { addLine, DRAFT_LIMITS, indexMaps, MAX_LINES, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removeLines, updateLine } from '../src/lib/quote-list.mjs';
 import { createQuoteStore, quoteStore } from '../src/lib/quote-store.mjs';
 
 /** Almacenamiento falso que anota cada llamada. */
@@ -36,12 +36,57 @@ test('lectura y escritura de ida y vuelta, y una lista vacía quita la clave', (
   assert.equal(store.write([]), true);
   assert.equal(local.data.has(QUOTE_STORAGE_KEY), false);
   assert.deepEqual(local.calls.at(-1), ['removeItem', QUOTE_STORAGE_KEY]);
-  // Solo se guarda lo válido, con cuatro campos.
-  store.write([{ ...lines[0], name: 'No se guarda' }, { productId: 'X' }]);
+  // De cada renglón solo se guardan sus cuatro campos.
+  assert.equal(store.write([{ ...lines[0], name: 'No se guarda' }]), true);
   assert.equal(local.data.get(QUOTE_STORAGE_KEY), JSON.stringify({ v: 1, lines: [lines[0]] }));
   // Basura en la clave: lista vacía.
   local.data.set(QUOTE_STORAGE_KEY, '{basura');
   assert.deepEqual(store.read(), []);
+});
+
+test('write() solo guarda una lista completa de renglones válidos: con otra cosa da false y no toca nada', () => {
+  const stored = [line('guante', 2, 'par', 'talla-8'), line('casco', 1, 'pieza'), line('bota', 3, 'par')];
+  const text = JSON.stringify({ v: 1, lines: stored });
+  const local = fakeStorage({ [QUOTE_STORAGE_KEY]: text });
+  const store = createQuoteStore({ local, session: fakeStorage(), target: new EventTarget() });
+  let notices = 0;
+  store.subscribe(() => { notices += 1; });
+  const maps = indexMaps({ products: [{ id: 'guante', variants: [{ id: 'talla-8' }] }, { id: 'casco' }, { id: 'bota' }] });
+  const sparse = [line('guante')];
+  sparse[2] = line('casco');
+  const refused = [
+    // Los descuidos naturales de quien llama: el objeto que devuelven addLine, updateLine o removeLines en lugar de su
+    // `lines`, y las filas de reconcileList en lugar de los renglones.
+    ['el resultado de addLine', addLine(store.read(), line('lentes'))],
+    ['el resultado de updateLine', updateLine(store.read(), 0, { quantity: 5 })],
+    ['el resultado de removeLines', removeLines(store.read(), [0])],
+    ['las filas de reconcileList', reconcileList(store.read(), maps).rows],
+    ['null', null], ['undefined', undefined], ['un texto', text], ['un número', 3], ['un objeto', {}], ['un renglón suelto', line('guante')],
+    // Una lista con un renglón que no es válido: la cantidad en texto (como llega de un campo), una unidad vacía.
+    ['una cantidad en texto', [stored[0], { ...stored[1], quantity: '3' }, stored[2]]],
+    ['una unidad vacía', [stored[0], line('casco', 1, '')]],
+    ['un id que no es un id', [line('Guante')]],
+    ['un renglón que falta', [stored[0], null]],
+    ['una lista con huecos', sparse],
+    ['más renglones que el máximo', Array.from({ length: MAX_LINES + 1 }, (_, index) => line(`producto-${index}`))],
+  ];
+  const before = local.calls.length;
+  for (const [name, value] of refused) {
+    assert.equal(store.write(value), false, name);
+    assert.equal(local.data.get(QUOTE_STORAGE_KEY), text, name);
+  }
+  // Ni una escritura ni un borrado llegaron al almacenamiento, y nadie recibió un aviso.
+  assert.deepEqual(local.calls.slice(before).filter(([method]) => method !== 'getItem'), []);
+  assert.equal(notices, 0);
+  assert.deepEqual(store.read(), stored);
+  // Con su `lines`, lo mismo sí se guarda; justo el máximo también, y una lista vacía de verdad quita la clave.
+  assert.equal(store.write(addLine(store.read(), line('lentes')).lines), true);
+  assert.equal(store.read().length, 4);
+  assert.equal(store.write(Array.from({ length: MAX_LINES }, (_, index) => line(`producto-${index}`))), true);
+  assert.equal(store.read().length, MAX_LINES);
+  assert.equal(store.write([]), true);
+  assert.equal(local.data.has(QUOTE_STORAGE_KEY), false);
+  assert.equal(notices, 3);
 });
 
 test('available() nunca escribe: no hay clave de prueba', () => {
@@ -154,6 +199,90 @@ test('cancelar la suscripción; los escuchas de la ventana llegan con el primero
   assert.deepEqual(removed, ['storage', 'pageshow']);
   store.write([line('guante')]);
   assert.deepEqual([first, second], [1, 3]);
+});
+
+test('cada suscripción es propia, aunque sea la misma función, y cancelar dos veces no hace nada', () => {
+  const store = createQuoteStore({ local: fakeStorage(), session: fakeStorage(), target: new EventTarget() });
+  let calls = 0;
+  const listener = () => { calls += 1; };
+  const stopA = store.subscribe(listener);
+  const stopB = store.subscribe(listener);
+  store.write([line('guante')]);
+  assert.equal(calls, 2);
+  // Cancelar una deja viva la otra.
+  stopA();
+  store.write([line('casco')]);
+  assert.equal(calls, 3);
+  // Cancelar otra vez la primera no se lleva la segunda, ni una suscripción nueva de la misma función.
+  stopA();
+  const stopC = store.subscribe(listener);
+  stopA();
+  store.write([line('guante')]);
+  assert.equal(calls, 5);
+  stopB();
+  stopB();
+  store.write([line('casco')]);
+  assert.equal(calls, 6);
+  stopC();
+  store.write([line('guante')]);
+  assert.equal(calls, 6);
+  // Lo que no es una función no se suscribe y su cancelación no lanza.
+  for (const bad of [null, undefined, 'x', {}]) assert.doesNotThrow(() => store.subscribe(bad)());
+});
+
+test('si quien escucha escribe dentro de su aviso, la última noticia de todos es la lista más nueva', () => {
+  const local = fakeStorage();
+  const target = new EventTarget();
+  const store = createQuoteStore({ local, session: fakeStorage(), target });
+  const first = [];
+  const badge = [];
+  let nested = false;
+  // La primera suscripción escribe una vez dentro de su aviso (el sitio no lo hace; el almacén no debe depender de eso).
+  store.subscribe((lines, { source }) => {
+    first.push(`${source}:${lines.length}`);
+    if (!nested) {
+      nested = true;
+      store.write([...lines, line('casco')]);
+    }
+  });
+  store.subscribe((lines, { source }) => badge.push(`${source}:${lines.length}`));
+  store.write([line('guante')]);
+  assert.equal(store.read().length, 2);
+  // La segunda suscripción recibe la lista nueva y nunca, después, la vieja.
+  assert.deepEqual(badge, ['write:2']);
+  assert.deepEqual(first, ['write:1', 'write:2']);
+  // Lo mismo cuando la escritura responde a un cambio de otra pestaña.
+  nested = false;
+  first.length = 0;
+  badge.length = 0;
+  local.data.set(QUOTE_STORAGE_KEY, JSON.stringify({ v: 1, lines: [line('bota')] }));
+  target.dispatchEvent(storageEvent(QUOTE_STORAGE_KEY, local));
+  assert.equal(store.read().length, 2);
+  assert.deepEqual(badge, ['write:2']);
+  assert.deepEqual(first, ['storage:1', 'write:2']);
+  // Cuando escribe la ÚLTIMA suscripción, las anteriores ya vieron la lista vieja y luego reciben la nueva.
+  const other = createQuoteStore({ local: fakeStorage(), session: fakeStorage(), target: new EventTarget() });
+  const early = [];
+  let again = false;
+  other.subscribe(lines => early.push(lines.length));
+  other.subscribe(lines => {
+    if (!again) {
+      again = true;
+      other.write([...lines, line('casco')]);
+    }
+  });
+  other.write([line('guante')]);
+  assert.deepEqual(early, [1, 2]);
+});
+
+test('una suscripción cancelada durante un aviso ya no lo recibe', () => {
+  const store = createQuoteStore({ local: fakeStorage(), session: fakeStorage(), target: new EventTarget() });
+  let late = 0;
+  let stopLate = () => {};
+  store.subscribe(() => stopLate());
+  stopLate = store.subscribe(() => { late += 1; });
+  store.write([line('guante')]);
+  assert.equal(late, 0);
 });
 
 test('un error de quien escucha no detiene a los demás ni la escritura', () => {
