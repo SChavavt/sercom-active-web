@@ -716,6 +716,15 @@ const items = [
         return drawn.findIndex(item => item?.element === element);
       };
 
+      /**
+       * El visitante cambió el renglón que quedó de «Unirlos»: su línea de estado dice una cantidad que ya no es la del
+       * renglón, y «Deshacer» le devolvería la cantidad de antes de unir, borrando lo que acaba de escribir. La línea se
+       * va y la unión ya no se deshace (como con cualquier acción siguiente).
+       */
+      function endMergeUndo(index: number) {
+        if (undo?.kind === 'merge' && undo.index === index) hideStatus();
+      }
+
       list.addEventListener('input', event => {
         const input = event.target;
         if (!(input instanceof HTMLInputElement) || !input.matches('[data-stepper-input]')) return;
@@ -734,6 +743,7 @@ const items = [
         if (quantity === lines[index].quantity) return;
         const result = updateLine(lines, index, { quantity });
         if (!result.ok) return;
+        endMergeUndo(index);
         store(result.lines);
         afterEdit();
       });
@@ -764,6 +774,7 @@ const items = [
         if (!patch) return;
         const result = updateLine(lines, index, patch);
         if (!result.ok) return;
+        endMergeUndo(index);
         store(result.lines);
         afterEdit();
       });
