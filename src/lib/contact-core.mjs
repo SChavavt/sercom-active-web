@@ -24,11 +24,14 @@ export const MESSAGE_LABELS = Object.freeze({
 });
 
 /**
- * Largo máximo, en caracteres, del enlace completo de cada canal. Es conservador a propósito: no se pudo medir contra
- * los servicios y se revisará con la prueba en un teléfono real. Con un enlace más largo, la página abre la aplicación
- * sin texto y pide copiar primero (`draftLinks`).
+ * Largo máximo, en caracteres, del enlace completo de cada canal: `{ whatsapp: 1900, mailto: 1900 }`. Es conservador a
+ * propósito: no se pudo medir contra los servicios y se revisará con la prueba en un teléfono real. Con un enlace más
+ * largo, la página abre la aplicación sin texto y pide copiar primero (`draftLinks`).
+ * Se arma con pares [canal, largo] y no con un objeto escrito: el empaquetador escribiría la clave como «mailto:1900»,
+ * y el escáner de la salida lee eso como un enlace de correo a otra dirección.
+ * @type {Readonly<Record<LinkChannel, number>>}
  */
-export const LINK_LIMITS = Object.freeze({ whatsapp: 1900, mailto: 1900 });
+export const LINK_LIMITS = Object.freeze(/** @type {Record<LinkChannel, number>} */ (Object.fromEntries([['whatsapp', 1900], ['mailto', 1900]])));
 
 const LINK_LABEL = MESSAGE_LABELS.link;
 const DESCRIPTION_LABEL = MESSAGE_LABELS.description;
