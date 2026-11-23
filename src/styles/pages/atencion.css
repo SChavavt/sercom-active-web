@@ -205,6 +205,14 @@
 .cotizar__tag { margin-bottom: var(--s-2); }
 .cotizar__name { max-width: 100%; font-weight: 650; line-height: 1.35; text-decoration: none; overflow-wrap: break-word; }
 .cotizar__name:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+/* El nombre es un enlace de un renglón de texto (21,6 px de alto). En tableta y celular su objetivo táctil crece a 44 px
+   con un relleno que no mueve nada (el margen negativo lo compensa); el anillo del foco se dibuja sobre el texto, no
+   sobre el relleno, para que no cruce la marca y el código del renglón de abajo. */
+@media (max-width: 1099px) {
+  .cotizar__name { position: relative; padding-block: 12px; margin-block: -12px; }
+  .cotizar__name:focus-visible { outline: none; }
+  .cotizar__name:focus-visible::after { content: ''; position: absolute; inset: 12px 0; outline: 3px solid var(--focus); outline-offset: 2px; pointer-events: none; }
+}
 .cotizar__meta { max-width: 100%; margin-top: var(--s-1); color: var(--grey-700); font-size: var(--small); line-height: var(--type-small-leading); overflow-wrap: break-word; }
 .cotizar__meta .t-code { color: var(--ink); white-space: normal; overflow-wrap: anywhere; }
 .cotizar__remove { margin-top: var(--s-2); }
