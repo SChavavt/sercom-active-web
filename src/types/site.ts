@@ -96,7 +96,7 @@ export interface PublicProduct {
   readonly variants: readonly PublicVariant[];
   /** Normas del fabricante, solo su texto, en el orden de los datos; lista vacía sin normas y en todos los ejemplos. */
   readonly standards: readonly string[];
-  /** `null` cuando no hay fotografía (todos los ejemplos): la página muestra el icono de la categoría. */
+  /** `null` cuando no hay fotografía (una ficha aprobada sin foto y todos los ejemplos): la página muestra el icono de la categoría. */
   readonly image: PublicImage | null;
   readonly documents: readonly PublicDocument[];
   /** `true` solo en los ejemplos de la vista previa: la página debe mostrar la etiqueta «Ejemplo». */

@@ -257,6 +257,20 @@ test('la foto de una ficha llega a la forma pública como { file, alt } o { url,
   assert.ok(preview.products.filter(product => product.isExample).every(product => product.image === null));
 });
 
+test('una ficha aprobada sin foto llega a la forma pública con image: null y sin datos internos', () => {
+  for (const mode of ['production', 'preview']) {
+    const site = createSiteData({ mode, brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => { delete product.image; }) });
+    const product = site.getProduct('test-001');
+    assert.equal(product?.image, null, mode);
+    assert.deepEqual(Object.keys(product ?? {}), PRODUCT_KEYS, mode);
+    assert.deepEqual(site.productsByCategory('manos').map(item => item.id)[0], 'test-001', mode);
+    const data = JSON.parse(JSON.stringify(printable(site)));
+    const keys = new Set(allKeys(data));
+    for (const key of INTERNAL_KEYS) assert.ok(!keys.has(key), `${mode}: campo interno publicado: ${key}`);
+    assert.doesNotMatch(allStrings(data).join(' | '), /Revisor de prueba|2026-11-18|example\.invalid\/(?:source|test)/, mode);
+  }
+});
+
 test('las normas de una ficha llegan a la forma pública como su texto, sin su fuente; un ejemplo no tiene normas', () => {
   const site = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
     product.standards = [
@@ -297,7 +311,7 @@ test('lo que no está aprobado no se publica, y un catálogo inválido detiene l
   assert.throws(() => build((_, product) => { product.brandId = 'espomega'; }), /un proveedor no es una marca/);
   assert.throws(() => build((_, product) => { product.brandId = 'marca-desconocida'; }), /la marca no está en el alcance permitido/);
   assert.throws(() => build((_, product) => { product.approval.supplyConfirmed = false; }), /falta aprobación comercial/);
-  assert.throws(() => build((_, product) => { product.image.usageConfirmed = false; }), /imagen verificable/);
+  assert.throws(() => build((_, product) => { product.image.usageConfirmed = false; }), /image\.usageConfirmed: el uso de la foto no está confirmado/);
   assert.throws(() => build((_, product) => { product.precio = 10; }), /campo comercial no permitido/);
   assert.throws(() => build((_, product) => { product.id = 'ejemplo-guante-recubierto'; }), /reservado para los ejemplos/);
 });

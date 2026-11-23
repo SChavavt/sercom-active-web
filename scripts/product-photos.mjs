@@ -4,12 +4,15 @@
 //
 // Reglas:
 //   1. Cada ficha `approved` con `image.file` tiene ese archivo en la carpeta, con el nombre exacto (también las
-//      mayúsculas y minúsculas: el alojamiento las distingue aunque la computadora de trabajo no).
+//      mayúsculas y minúsculas: el alojamiento las distingue aunque la computadora de trabajo no). Una ficha aprobada
+//      sin `image`, o con una foto por dirección (`image.url`), no pide ningún archivo: sin foto se publica con el
+//      pictograma de su categoría.
 //   2. La carpeta tiene solo fotos de fichas aprobadas: cada archivo es el `image.file` de al menos una ficha
 //      `approved`. La foto de un borrador, de una ficha en revisión o de un retirado, un archivo suelto o una
 //      subcarpeta son un error. Todo lo que está en la carpeta puede terminar en la salida publicada, y el repositorio
 //      es público: una foto entra al repositorio en el mismo cambio que aprueba su ficha, con su uso confirmado, y
-//      sale cuando la ficha deja de estar aprobada. Sin carpeta no hay fotos todavía, y está bien.
+//      sale cuando la ficha deja de estar aprobada, o después, en su propio cambio, si la ficha se aprobó sin foto.
+//      Sin carpeta no hay fotos todavía, y está bien, aunque haya fichas aprobadas.
 //   3. Cada archivo es una imagen real del formato que dice su extensión (JPEG para .jpg y .jpeg, PNG o WebP); su
 //      lado más largo mide de 600 a 4000 px, y pesa como máximo 1.5 MB.
 // Una ficha que no está aprobada puede nombrar ya su archivo aunque todavía no esté en la carpeta.

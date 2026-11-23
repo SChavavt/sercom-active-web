@@ -105,6 +105,18 @@ test('cada foto es una imagen real del formato de su extensión, de 600 a 4000 p
   ]);
 });
 
+test('una ficha aprobada sin foto no pide ningún archivo, y la carpeta puede no existir', async () => {
+  const bare = { id: 'test-001', status: 'approved' };
+  assert.deepEqual(await check(catalogOf(bare), null), []);
+  assert.deepEqual(await check(catalogOf(bare), {}), []);
+  // Junto a una ficha aprobada con foto: solo se pide ese archivo.
+  const withPhoto = product(2, 'approved', 'guante-de-prueba.jpg');
+  assert.deepEqual(await check(catalogOf(bare, withPhoto), { 'guante-de-prueba.jpg': jpegHeader(1600, 1200) }), []);
+  assert.deepEqual(await check(catalogOf(bare, withPhoto), null), ['products[1].image.file: «guante-de-prueba.jpg» no está en src/assets/productos/; agrega la foto con ese nombre exacto (también las mayúsculas y minúsculas) o corrige el nombre.']);
+  // Un archivo en la carpeta sigue siendo de más si ninguna ficha aprobada lo nombra.
+  assert.deepEqual(await check(catalogOf(bare), { 'guante-de-prueba.jpg': jpegHeader(1600, 1200) }), ['src/assets/productos/guante-de-prueba.jpg: ninguna ficha aprobada usa este archivo; quita el archivo o aprueba su ficha.']);
+});
+
 test('una ficha con foto por dirección o un catálogo mal formado no hacen fallar la revisión de la carpeta', async () => {
   const remote = { id: 'test-001', status: 'approved', image: { url: 'https://example.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto sintética de prueba', sourceUrl: 'https://example.invalid/origen', usageConfirmed: true } };
   assert.deepEqual(await check(catalogOf(remote), {}), []);

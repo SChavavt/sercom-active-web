@@ -91,8 +91,8 @@ function inspectFields(value, path, errors) {
 
 /**
  * Revisa la forma de la fotografía de una ficha, en cualquier estado: `file` o `url` (nunca los dos), con sus claves y
- * ninguna otra, el texto alternativo, la fuente y la marca de uso. Que una ficha aprobada tenga fotografía con el uso
- * confirmado se revisa aparte, con los demás requisitos de `approved`.
+ * ninguna otra, el texto alternativo, la fuente y la marca de uso. Que la foto de una ficha aprobada tenga el uso
+ * confirmado se revisa aparte, con los demás requisitos de `approved`; la foto es opcional.
  * @param {(field: string, value: unknown, covered: boolean, empty: string) => void} line revisa que un texto de la ficha esté limpio
  */
 function inspectImage(image, productPath, errors, line) {
@@ -301,8 +301,10 @@ export function validateCatalog(catalog, registry) {
     if (!Array.isArray(p.characteristics) || p.characteristics.length < 3 || p.characteristics.length > 5 || p.characteristics.some(v => !isText(v))) errors.push(`${path}: requiere de 3 a 5 características verificadas.`);
     if (!p.source) errors.push(`${path}: falta fuente revisada.`);
     if (!hasApproval(p)) errors.push(`${path}: falta aprobación comercial.`);
-    // La forma de la imagen ya se revisó arriba; aquí, que esté y que su uso esté confirmado.
-    if (p.image === undefined || (isRecord(p.image) && p.image.usageConfirmed === false)) errors.push(`${path}: falta imagen verificable con uso confirmado.`);
+    // La foto es opcional: sin `image`, la ficha se publica con el pictograma de su categoría. Su forma ya se revisó
+    // arriba; aquí, que una foto que va no salga sin su uso confirmado. Nunca se quita en silencio: lo decide quien
+    // mantiene el catálogo.
+    if (isRecord(p.image) && p.image.usageConfirmed === false) errors.push(`${path}.image.usageConfirmed: el uso de la foto no está confirmado. Confírmalo y escribe true, o quita image de la ficha: un producto aprobado se publica sin foto, con el pictograma de su categoría.`);
     if (Array.isArray(p.categoryIds) && p.categoryIds.some(id => categories.get(id)?.status !== 'approved')) errors.push(`${path}: categoría pendiente de aprobación.`);
   }
   return errors;
@@ -319,7 +321,8 @@ export function getPublishedProducts(catalog, registry) {
     variants: (p.variants ?? []).map(v => ({ id: v.id, label: v.label, ...(v.manufacturerCode !== undefined && { manufacturerCode: v.manufacturerCode }) })),
     // De cada norma, solo su texto: la fuente no se publica.
     standards: (p.standards ?? []).map(s => s.text),
-    image: publicImage(p.image),
+    // Sin foto, `null`: la tarjeta y la ficha muestran el pictograma de la categoría.
+    image: p.image === undefined ? null : publicImage(p.image),
     documents: (p.documents ?? []).map(d => ({ label: d.label, url: d.url })),
   }));
 }

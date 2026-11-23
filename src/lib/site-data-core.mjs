@@ -340,8 +340,9 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
         // Solo el texto de cada norma: la ficha las muestra en «Normas» y ninguna otra parte del sitio las usa.
         standards: [...product.standards],
-        // Solo lo que dibuja la página: el archivo o la dirección con sus medidas, y el texto alternativo.
-        image: 'file' in product.image
+        // Solo lo que dibuja la página: el archivo o la dirección con sus medidas, y el texto alternativo. Sin foto,
+        // `null`: la página muestra el pictograma de la categoría.
+        image: product.image === null ? null : 'file' in product.image
           ? { file: product.image.file, alt: product.image.alt }
           : { url: product.image.url, width: product.image.width, height: product.image.height, alt: product.image.alt },
         documents: product.documents.map(document => ({ label: document.label, url: document.url })),

@@ -28,9 +28,9 @@ test('bloquea publicación sin evidencia y costos anidados', () => {
   const missingApproval = fixture();
   missingApproval.products[0].approval.supplyConfirmed = false;
   assert.throws(() => getPublishedProducts(missingApproval, registry), /aprobación comercial/);
-  const missingImage = fixture();
-  missingImage.products[0].image.usageConfirmed = false;
-  assert.throws(() => getPublishedProducts(missingImage, registry), /imagen verificable/);
+  const unconfirmedImage = fixture();
+  unconfirmedImage.products[0].image.usageConfirmed = false;
+  assert.throws(() => getPublishedProducts(unconfirmedImage, registry), /image\.usageConfirmed: el uso de la foto no está confirmado/);
   const privateCost = fixture();
   privateCost.products[0].variants = [{ id: 'v-1', label: 'Prueba', manufacturerCode: 'V-1', costo: 100 }];
   assert.throws(() => getPublishedProducts(privateCost, registry), /campo comercial/);
@@ -294,14 +294,22 @@ test('el texto alternativo va limpio, en una línea y con 160 caracteres como m�
   }
 });
 
-test('solo una ficha aprobada exige imagen, y con el uso confirmado; un borrador puede no tenerla o tenerla sin confirmar', () => {
-  const missing = 'products[0]: falta imagen verificable con uso confirmado.';
-  assert.deepEqual(errorsOf({ status: 'approved', image: undefined }), [missing]);
-  assert.deepEqual(imageErrors({ ...FILE_IMAGE, usageConfirmed: false }, 'approved'), [missing]);
-  assert.deepEqual(imageErrors({ ...URL_IMAGE, usageConfirmed: false }, 'approved'), [missing]);
+test('una ficha aprobada puede no tener foto; si la lleva, con el uso confirmado; un borrador acepta las dos', () => {
+  // Sin `image`: válida en cualquier estado; la ficha aprobada se publica con el pictograma de su categoría.
+  for (const status of STATUSES) assert.deepEqual(errorsOf({ status, image: undefined }), [], status);
+  // Con la foto y su uso confirmado: válida (las dos formas).
+  for (const image of [FILE_IMAGE, URL_IMAGE]) assert.deepEqual(imageErrors(image, 'approved'), [], JSON.stringify(image));
+  // Con la foto y el uso sin confirmar: rechazada, con un mensaje que dice las dos salidas. Nunca se quita en silencio.
+  const unconfirmed = 'products[0].image.usageConfirmed: el uso de la foto no está confirmado. Confírmalo y escribe true, o quita image de la ficha: un producto aprobado se publica sin foto, con el pictograma de su categoría.';
+  assert.deepEqual(imageErrors({ ...FILE_IMAGE, usageConfirmed: false }, 'approved'), [unconfirmed]);
+  assert.deepEqual(imageErrors({ ...URL_IMAGE, usageConfirmed: false }, 'approved'), [unconfirmed]);
+  assert.throws(() => getPublishedProducts(catalogWith({ image: { ...URL_IMAGE, usageConfirmed: false } }), registry), /el uso de la foto no está confirmado/);
+  // El mensaje nombra la ficha que lo tiene.
+  assert.deepEqual(errorsOf({}, { image: undefined }, { image: { ...FILE_IMAGE, usageConfirmed: false } }), [unconfirmed.replace('products[0]', 'products[2]')]);
+  // Una ficha que no está aprobada acepta las dos formas sin confirmar, y también sin foto.
   for (const status of ['draft', 'in_review', 'retired']) {
-    assert.deepEqual(errorsOf({ status, image: undefined }), [], status);
     assert.deepEqual(imageErrors({ ...FILE_IMAGE, usageConfirmed: false }, status), [], status);
+    assert.deepEqual(imageErrors({ ...URL_IMAGE, usageConfirmed: false }, status), [], status);
   }
   // Un borrador con la imagen mal formada detiene la validación igual que una ficha aprobada.
   assert.deepEqual(imageErrors({ ...FILE_IMAGE, width: 800, file: 'Foto 1.JPG' }, 'draft'), [
@@ -309,6 +317,17 @@ test('solo una ficha aprobada exige imagen, y con el uso confirmado; un borrador
     'products[0].image.file: «Foto 1.JPG» no es un nombre válido; usa solo minúsculas, cifras y guiones, sin carpeta, con la extensión .jpg, .jpeg, .png o .webp, como «guante-nitrilo-37-175.jpg».',
   ]);
   assert.throws(() => getPublishedProducts(catalogWith({ status: 'draft', image: { ...URL_IMAGE, width: undefined } }), registry), /image\.width: falta/);
+});
+
+test('una ficha aprobada sin foto se publica con image: null y sin ningún dato interno', () => {
+  const [without, withFile] = getPublishedProducts(catalogWith({ image: undefined }, { image: FILE_IMAGE }), registry);
+  assert.equal(without.image, null);
+  assert.deepEqual(withFile.image, { file: 'guante-de-prueba-37-175.jpg', alt: 'Guante verde de prueba' });
+  // Las mismas claves que una ficha con foto: sin `hasPhoto` ni nada parecido.
+  assert.deepEqual(Object.keys(without), Object.keys(withFile));
+  const text = JSON.stringify(without);
+  for (const key of ['approval', 'source', 'status', 'sourceUrl', 'usageConfirmed', 'supplyConfirmed', 'checkedOn']) assert.equal(text.includes(`"${key}"`), false, key);
+  assert.doesNotMatch(text, /Revisor de prueba|example\.invalid\/(?:source|test)/);
 });
 
 test('lo publicado de la imagen es exactamente { file, alt } o { url, width, height, alt }, sin su fuente ni su uso', () => {

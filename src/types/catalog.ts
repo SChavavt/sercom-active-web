@@ -36,7 +36,10 @@ export interface Product {
    * publica). Sin normas, la clave no va. Una norma se escribe solo aquí.
    */
   standards?: { text: string; sourceUrl: string }[];
-  /** Una de dos formas (ver `ProductImage`). Obligatoria para `approved`, con `usageConfirmed: true`. */
+  /**
+   * Una de dos formas (ver `ProductImage`). Opcional en cualquier estado: una ficha aprobada sin foto se publica con el
+   * pictograma de su categoría. Si una ficha aprobada la lleva, con `usageConfirmed: true`.
+   */
   image?: ProductImage;
   source?: { url: string; checkedOn: string };
   approval?: { by: string; on: string; supplyConfirmed: boolean };
@@ -56,7 +59,8 @@ export interface PublishedProduct {
   variants: { id: string; label: string; manufacturerCode?: string }[];
   /** Solo el texto de cada norma, en el orden de los datos; lista vacía sin normas. */
   standards: string[];
-  image: PublishedImage;
+  /** `null` cuando la ficha no tiene foto. */
+  image: PublishedImage | null;
   documents: { label: string; url: string }[];
 }
 /**
