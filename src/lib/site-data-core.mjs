@@ -132,8 +132,13 @@ export function validateBrands(brands) {
   return errors;
 }
 
-/** Un texto para citarlo entre «…» en una línea: cada salto de línea se muestra con su nombre (\n, \r, U+2028, U+2029). */
-const inOneLine = text => text.replace(/[\n\r\u2028\u2029]/g, character => ({ '\n': '\\n', '\r': '\\r', '\u2028': 'U+2028', '\u2029': 'U+2029' })[character] ?? character);
+/** Cómo se muestra cada salto de línea dentro de «…» en un mensaje. */
+const LINE_BREAK_NAMES = new Map([['\n', '\\n'], ['\r', '\\r'], ['\u2028', 'U+2028'], ['\u2029', 'U+2029']]);
+/**
+ * Un texto para citarlo entre «…» en una línea: cada salto de línea se muestra con su nombre (\n, \r, U+2028, U+2029).
+ * @param {string} text
+ */
+const inOneLine = text => text.replace(/[\n\r\u2028\u2029]/g, character => LINE_BREAK_NAMES.get(character) ?? character);
 
 /**
  * Qué tiene mal la edición de un PDF, citándola en una línea (`inOneLine`): no es un texto, está vacía o solo lleva
