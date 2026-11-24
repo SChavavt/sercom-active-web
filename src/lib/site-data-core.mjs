@@ -132,27 +132,36 @@ export function validateBrands(brands) {
   return errors;
 }
 
+/** Un texto para citarlo entre «…» en una línea: cada salto de línea se muestra con su nombre (\n, \r, U+2028, U+2029). */
+const inOneLine = text => text.replace(/[\n\r\u2028\u2029]/g, character => ({ '\n': '\\n', '\r': '\\r', '\u2028': 'U+2028', '\u2029': 'U+2029' })[character] ?? character);
+
 /**
- * Qué tiene mal la edición de un PDF, citándola: no es un texto, está vacía, lleva un carácter que no se ve (con las
- * mismas palabras que el texto de una ficha: `invisibleAt`, `placeIn`), un espacio al principio o al final, dos
- * seguidos, o es más larga que el máximo. `undefined` si no es ninguna de esas: queda la frase general.
+ * Qué tiene mal la edición de un PDF, citándola en una línea (`inOneLine`): no es un texto, está vacía o solo lleva
+ * espacios, solo lleva caracteres que no se ven (con su código), lleva uno en medio (con las mismas palabras que el
+ * texto de una ficha: `invisibleAt`, `placeIn`), un espacio al principio o al final, dos seguidos, o es más larga que
+ * el máximo. `undefined` si no es ninguna de esas: queda la frase general.
  * @param {unknown} edition
  * @returns {string | undefined}
  */
 function editionFault(edition) {
   if (typeof edition !== 'string') return `no es un texto; escribe la edición entre comillas, como la imprime el fabricante («2026», «2026 v2»).`;
-  if (edition.trim() === '') return 'está vacío; si el fabricante no imprime una edición, quita la clave.';
+  if (/^ *$/.test(edition)) return 'está vacío; si el fabricante no imprime una edición, quita la clave.';
+  const characters = [...edition];
+  if (characters.every(character => character === ' ' || invisibleAt(character))) {
+    const codes = [...new Set(characters.filter(character => character !== ' ').map(character => invisibleAt(character)?.code))];
+    return `${characters.length === 1 ? 'solo lleva un carácter que no se ve' : 'solo lleva caracteres que no se ven'} (${codes.join(', ')}); si el fabricante no imprime una edición, quita la clave.`;
+  }
   const hidden = invisibleAt(edition);
   if (hidden) {
     const character = String.fromCodePoint(Number.parseInt(hidden.code.slice(2), 16));
     const place = placeIn(edition, hidden.index);
-    if (/[\n\r\u2028\u2029]/.test(character)) return `«${edition}» lleva un salto de línea ${place}; escríbela en una sola línea.`;
-    return `«${edition}» lleva un carácter invisible (${hidden.code}) ${place}; ${/\s/.test(character) ? 'escríbelo con un espacio normal' : 'bórralo'}.`;
+    if (/[\n\r\u2028\u2029]/.test(character)) return `«${inOneLine(edition)}» lleva un salto de línea ${inOneLine(place)}; escríbela en una sola línea.`;
+    return `«${inOneLine(edition)}» lleva un carácter invisible (${hidden.code}) ${inOneLine(place)}; ${/\s/.test(character) ? 'escríbelo con un espacio normal' : 'bórralo'}.`;
   }
-  if (edition !== edition.trim()) return `«${edition}» empieza o termina con un espacio.`;
-  if (edition.includes('  ')) return `«${edition}» lleva dos espacios seguidos.`;
-  const length = [...edition].length;
-  if (length > MAX_EDITION_LENGTH) return `«${edition}» mide ${length} caracteres; el máximo es ${MAX_EDITION_LENGTH}.`;
+  if (edition !== edition.trim()) return `«${inOneLine(edition)}» empieza o termina con un espacio.`;
+  if (edition.includes('  ')) return `«${inOneLine(edition)}» lleva dos espacios seguidos.`;
+  const length = characters.length;
+  if (length > MAX_EDITION_LENGTH) return `«${inOneLine(edition)}» mide ${length} caracteres; el máximo es ${MAX_EDITION_LENGTH}.`;
   return undefined;
 }
 
@@ -255,7 +264,7 @@ export function crossCheckBrands(brands, registry) {
       else if (BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
         errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro es de tipo «${resource.type}», que nunca se enlaza (${cut80(afterDate(String(resource.verification ?? '')))}). Enlaza otro recurso de la marca.`);
       } else if (!isPublishableResource(resource)) {
-        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro su verificación no dice «accesible» (${resource.type}: ${cut80(String(resource.verification ?? ''))}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`);
+        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas (${resource.type}: ${cut80(String(resource.verification ?? ''))}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`);
       } else if (admitted && !admitted.types.includes(resource.type)) {
         errors.push(`${brand.id}: el enlace ${link.url} lleva la etiqueta «${link.label}», pero en el registro es de tipo «${resource.type}»; esa etiqueta es solo para ${admitted.purpose}. Cambia la etiqueta o enlaza otro recurso de la marca.`);
       }
