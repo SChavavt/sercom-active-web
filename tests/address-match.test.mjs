@@ -189,6 +189,8 @@ const READ_AS_PAGE = {
     'https://www.ⓕabricante.example/recursos/guias/', 'https://ｗｗｗ．ｆａｂｒｉｃａｎｔｅ．example/recursos/guias/', 'https://www。fabricante。example/recursos/guias/',
     'https://www.fabri­cante.example/recursos/guias/', 'https://www.fabri​cante.example/recursos/guias/', 'https://www.fabri͏cante.example/recursos/guias/',
     'https://www.fabri️cante.example/recursos/guias/', 'https://www%2Efabricante.example/recursos/guias/', 'https://www.FABRICANTE.example./recursos/guias/',
+    // U+FEFF, escrito con escape porque no se ve: el analizador lo quita del servidor, y con su %XX también.
+    'https://www.fabri\uFEFFcante.example/recursos/guias/', 'https://www.fabri%EF%BB%BFcante.example/recursos/guias/',
   ],
   // 3. El puerto: 443 y 80 no cuentan, tampoco «:0443» ni un puerto vacío.
   puerto: [
@@ -261,8 +263,9 @@ const WRITTEN_IN = {
   srcset: address => `<img srcset="${address} 1x, /foto.png 2x" alt="">`,
 };
 // Lo que termina una dirección escrita en un texto (una comilla, un espacio) no puede ir en ella: esa grafía la lee el
-// escáner en el valor entero de un atributo.
-const writable = address => !/[\s'"]/.test(address);
+// escáner en el valor entero de un atributo. U+FEFF sí puede ir: una expresión regular lo cuenta como espacio («\s»),
+// pero el navegador lo quita del servidor y no termina nada.
+const writable = address => !/[^\S\uFEFF]|['"]/.test(address);
 
 test('en un texto, cada grafía que el navegador abre como la página se encuentra en un href, una frase, un JSON y un srcset', () => {
   const findPage = addressFinder([PAGE, 'https://www.otra.example/']);
@@ -337,4 +340,42 @@ test('en un JSON, una dirección sin esquema con sus diagonales escapadas («\\/
     assert.deepEqual(findPage(text), [PAGE], text);
   }
   assert.deepEqual(findPage('{"u":"\\/\\/www.fabricante.example\\/recursos\\/otras\\/"}'), []);
+});
+
+test('en un texto, U+FEFF no termina una dirección: el navegador lo quita del servidor, así que el texto se lee también sin él', () => {
+  const findPage = addressFinder([PAGE]);
+  // Dentro del servidor, en cada lugar donde puede ir una dirección: al principio, en medio y al final del nombre.
+  for (const written of [
+    'https://www.fabri\uFEFFcante.example/recursos/guias/', 'https://www.fabricante.example\uFEFF/recursos/guias/', '//\uFEFFwww.fabricante.example/recursos/guias',
+    'http://fabricante\uFEFF.\uFEFFexample/recursos/guias/#x',
+  ]) {
+    assert.ok(samePage(written, PAGE), JSON.stringify(written));
+    for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findPage(write(written)), [PAGE], `${where}: ${JSON.stringify(written)}`);
+  }
+  // Después de la dirección la sigue terminando, como un espacio: lo que sigue es otro texto.
+  assert.deepEqual(findPage(`Ver ${PAGE}\uFEFFy después`), [PAGE]);
+  // Otra página con U+FEFF en el servidor sigue siendo otra página.
+  for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findPage(write('https://www.fabri\uFEFFcante.example/recursos/otras/')), [], where);
+  // En la ruta el navegador no lo quita («…/gui%EF%BB%BFas/» es otra página), pero la lectura sin él la toma por la
+  // página: una falsa alarma posible, en el lado seguro.
+  assert.ok(!samePage('https://www.fabricante.example/recursos/gui\uFEFFas/', PAGE));
+  assert.deepEqual(findPage('<a href="https://www.fabricante.example/recursos/gui\uFEFFas/">x</a>'), [PAGE]);
+});
+
+test('lo que la búsqueda en un texto no ve, como dice la cabecera del módulo: un usuario con un espacio, unas comillas, «<» o una llave, y un tabulador escrito tal cual fuera de unas comillas', () => {
+  const findPage = addressFinder([PAGE]);
+  // El navegador abre estas direcciones como la página, pero la dirección escrita termina en el espacio o en el signo.
+  for (const written of [
+    'https://a b@www.fabricante.example/recursos/guias/', 'https://a"b@www.fabricante.example/recursos/guias/', 'https://a<b@www.fabricante.example/recursos/guias/',
+    'https://a{b}@www.fabricante.example/recursos/guias/', 'https://a«b@www.fabricante.example/recursos/guias/',
+  ]) {
+    assert.ok(samePage(written, PAGE), written);
+    assert.deepEqual(findPage(`<p>Ver ${written} hoy</p>`), [], written);
+    assert.deepEqual(findPage(`0; url=${written}`), [], written);
+  }
+  // Un tabulador o un salto de línea escrito tal cual termina la dirección en una frase; entre comillas sin «<» ni «>», se quita.
+  assert.deepEqual(findPage('<p>Ver https://www.fabricante.example/recursos/gui\tas/ hoy</p>'), []);
+  assert.deepEqual(findPage('<p>Ver https://www.fabricante.example/recursos/gui\nas/ hoy</p>'), []);
+  assert.deepEqual(findPage('<a href="https://www.fabricante.example/recursos/gui\tas/">Guías</a>'), [PAGE]);
+  assert.deepEqual(findPage(`<script>location.href = 'https://www.fabricante.example/recursos/gui\tas/#>';</script>`), []);
 });

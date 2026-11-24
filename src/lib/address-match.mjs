@@ -33,7 +33,8 @@
 // esquema («https:», con o sin diagonales), con «//» o con «www.» donde no la precede una letra, una cifra, «@» ni otro
 // signo de una dirección: un servidor escrito sin «//» ni «www.» («más información en goldeneagle.com.mx») es una
 // frase, y una dirección de correo («ventas@servidor.mx») nunca es una página. Termina donde termina la dirección
-// escrita: en un espacio, unas comillas, «<», «>», «`», «{», «}», «|», «^» o unas comillas angulares o tipográficas; se lee sin los
+// escrita: en un espacio, unas comillas, «<», «>», «`», «{», «}», «|», «^» o unas comillas angulares o tipográficas (U+FEFF, que
+// una expresión regular cuenta como espacio y el navegador quita del servidor, la termina en una lectura y en otra no); se lee sin los
 // signos de puntuación del final («.», «,», «;», «:», «!», «?», «)», «]») y también con ellos («…/x/..» al final es un
 // segmento). Si lo que sigue a la ruta la continúa («…/guias-de-recursos/09-catalogo…», «…/producto.html»), es otra
 // página. «&» en la ruta también la termina: es el final de una dirección que va como valor dentro de la consulta de
@@ -44,6 +45,13 @@
 // Lo que no ve: una dirección que un script arma con pedazos o escribe con escapes de sus letras («\x6d», «\u006d»); un
 // par de la consulta que el servidor no lee y que `TRACKING_PARAMETERS` no tiene («?lang=es», «?=»), «index.html» o
 // «index.php» después de una carpeta, un parámetro de la ruta («;x=1») y otro puerto: cada uno hace otra página.
+// Tampoco ve, fuera del valor entero de un atributo (en una frase, un srcset, un «content="0; url=…"», una cadena de un
+// script o de un JSON), una dirección cuyo usuario lleva un espacio, unas comillas, «<», «>», «{», «}» o unas comillas
+// angulares: ahí termina la dirección escrita, aunque el navegador la abra (el escáner sí la ve en el atributo que la
+// lleva entera). Ni una dirección con un tabulador o un salto de línea escrito tal cual, salvo en una cadena entre
+// comillas sin «<» ni «>» (y, en el escáner, en el valor de un atributo): en el texto que se ve, que el navegador no
+// abre, y en una cadena de un script que además lleve «<» o «>», la dirección termina ahí. Nadie escribe así una
+// dirección por descuido: son formas de esconderla, y la revisión no cubre eso.
 
 /**
  * Pares de una consulta que solo cuentan una visita: no cambian la página. Además, cualquier nombre que empieza con
@@ -229,15 +237,22 @@ export function addressFinder(addresses) {
   return text => {
     if (typeof text !== 'string' || !text) return [];
     const found = new Set();
+    // U+FEFF (el espacio de ancho cero sin separación) es un espacio para una expresión regular, así que termina la
+    // dirección escrita; pero el navegador lo quita del servidor de una dirección y abre la página. Un texto que lo
+    // lleva se lee dos veces: con él, donde termina la dirección, y sin él.
+    const scanRead = (/** @type {string} */ value) => {
+      scanOne(value, found);
+      if (value.includes('\uFEFF')) scanOne(value.replaceAll('\uFEFF', ''), found);
+    };
     /** Cada lectura de un texto: tal cual y con su %XX decodificado, otra vez mientras cambie. */
     const scanDecoded = (/** @type {string} */ value) => {
       let current = withSlashes(value);
-      scanOne(current, found);
+      scanRead(current);
       for (let pass = 0; pass < DECODE_PASSES && current.includes('%'); pass += 1) {
         const next = withSlashes(decodeRuns(current));
         if (next === current) break;
         current = next;
-        scanOne(current, found);
+        scanRead(current);
       }
     };
     scanDecoded(text);
