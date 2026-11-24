@@ -138,6 +138,26 @@ const isUnseen = element => hasClass(element, 'vh') || element.attributes.get('a
 /** El texto que se ve de un elemento, tal como está escrito (sin `.vh` ni aria-hidden="true", espacios intactos). */
 export const visibleText = element => element.content
   .map(part => (typeof part === 'string' ? part : isUnseen(part) ? '' : visibleText(part))).join('');
+// Lo que no se dibuja: espacios, controles, caracteres de formato (de ancho cero, guion suave, de dirección) y los que
+// Unicode marca para ignorar al dibujar.
+const NOT_DRAWN = /[\s\p{Cc}\p{Cf}\p{DI}]/gu;
+/**
+ * Las partes de una variante en el orden del documento (R-VARIANTE-01): `{ hidden }` con el texto de cada elemento
+ * `.vh`, y `{ shown }` con cada tramo de texto que se ve, sin los caracteres que no se dibujan (`NOT_DRAWN`). Lo marcado
+ * aria-hidden="true" o con el atributo `hidden` no cuenta. Un tramo que no dibuja nada no se guarda.
+ * @returns {({ hidden: string } | { shown: string })[]}
+ */
+function variantShown(element) {
+  const parts = [];
+  for (const part of element.content) {
+    if (typeof part === 'string') {
+      const drawn = part.replace(NOT_DRAWN, '');
+      if (drawn) parts.push({ shown: drawn });
+    } else if (hasClass(part, 'vh')) parts.push({ hidden: textOf(part) });
+    else if (part.attributes.get('aria-hidden') !== 'true' && !part.attributes.has('hidden')) parts.push(...variantShown(part));
+  }
+  return parts;
+}
 /**
  * El nombre accesible de un enlace como lo calcula esta revisión: su `aria-label` o, sin él, su texto, también el oculto
  * para la vista (`.vh`), sin lo marcado aria-hidden="true".
@@ -1480,12 +1500,14 @@ export const CHECKS = [
     },
   },
   // R-VARIANTE-01 · Las variantes de una ficha (src/pages/productos/[id].astro): cada <li class="producto__chip"> lleva
-  // su etiqueta (.producto__chip-label) con texto. El código es opcional (muchas tallas no tienen uno propio): cuando
-  // está, .producto__chip-code lleva la palabra oculta «Código» (.vh) y, después, el código; un elemento de código sin
-  // código se leería «Código» y nada más. Una página sin foto también se revisa (R-FOTO-01 solo mira las fotos que hay).
+  // su etiqueta (.producto__chip-label) con texto que se ve. El código es opcional (muchas tallas no tienen uno propio):
+  // cuando está, .producto__chip-code lleva la palabra oculta «Código» (.vh) y, después, el código, con algo que se ve;
+  // un elemento de código sin código se leería «Código» y nada más. Lo que se ve es el texto sin lo oculto (.vh,
+  // aria-hidden="true", el atributo hidden) y sin los caracteres que no se dibujan (`variantShown`). Una página sin foto
+  // también se revisa (R-FOTO-01 solo mira las fotos que hay).
   {
     id: 'R-VARIANTE-01',
-    title: 'En la página de un producto, cada variante (li.producto__chip) lleva una etiqueta (.producto__chip-label) no vacía, y su código (.producto__chip-code), cuando lo lleva, tiene un código después de la palabra oculta «Código»',
+    title: 'En la página de un producto, cada variante (li.producto__chip) lleva una etiqueta (.producto__chip-label) con texto que se ve, y su código (.producto__chip-code), cuando lo lleva, tiene un código que se ve después de la palabra oculta «Código»',
     page(page) {
       if (!isProductRoute(page.route)) return [];
       const problems = [];
@@ -1493,12 +1515,14 @@ export const CHECKS = [
         const inside = allElements(chip);
         const where = `la variante ${index + 1} (${describe(chip)})`;
         const labels = inside.filter(element => hasClass(element, 'producto__chip-label'));
-        if (!labels.some(label => textOf(label))) problems.push(`${where} no lleva una etiqueta con texto (.producto__chip-label): el visitante no sabe qué variante es`);
+        if (!labels.some(label => variantShown(label).some(part => part.shown))) problems.push(`${where} no lleva una etiqueta con texto (.producto__chip-label): el visitante no sabe qué variante es`);
         for (const code of inside.filter(element => hasClass(element, 'producto__chip-code'))) {
-          const hidden = allElements(code).filter(element => element !== code && hasClass(element, 'vh'));
+          const parts = variantShown(code);
           const label = textOf(labels[0] ?? chip);
-          if (!hidden.some(element => /^código$/i.test(textOf(element)))) problems.push(`${where}, «${label}», lleva ${describe(code)} sin la palabra oculta «Código» (.vh) antes del código`);
-          if (!visibleText(code).trim()) problems.push(`${where}, «${label}», lleva ${describe(code)} sin código: si la variante no tiene código propio, la página no imprime ese elemento`);
+          const word = parts.findIndex(part => part.hidden && /^código$/i.test(part.hidden));
+          const shown = parts.findIndex(part => part.shown);
+          if (word === -1 || (shown !== -1 && shown < word)) problems.push(`${where}, «${label}», lleva ${describe(code)} sin la palabra oculta «Código» (.vh) antes del código`);
+          if (shown === -1) problems.push(`${where}, «${label}», lleva ${describe(code)} sin código: si la variante no tiene código propio, la página no imprime ese elemento`);
         }
       }
       return problems;
