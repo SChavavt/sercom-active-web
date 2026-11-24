@@ -170,8 +170,13 @@ function addressTail(text) {
   const slash = cut.search(/\/(?!\/)/);
   return `…${slash === -1 ? cut : cut.slice(slash)}`;
 }
-/** Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio». */
-function placeIn(text, index, tail = tailOf) {
+/**
+ * Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio».
+ * @param {string} text
+ * @param {number} index
+ * @param {(text: string) => string} [tail]
+ */
+export function placeIn(text, index, tail = tailOf) {
   const before = tail(text.slice(0, index));
   return before ? `después de «${before}»` : 'al principio';
 }
@@ -188,7 +193,7 @@ const PLAIN_TEXT = /^[\x20-\x7e]*$/;
  * @param {string} text
  * @returns {{ code: string, index: number } | null}
  */
-function invisibleAt(text) {
+export function invisibleAt(text) {
   if (PLAIN_TEXT.test(text)) return null;
   let index = 0;
   for (const character of text) {

@@ -49,6 +49,15 @@ export function getRetiredProducts(catalog: unknown, registry: BrandScope): Publ
 /** Tipos de recurso del registro que nunca se publican como enlace ni respaldan la fuente de una foto. */
 export const BLOCKED_RESOURCE_TYPES: readonly string[];
 
+/**
+ * El primer carácter de un texto que no se ve (los que no puede llevar el texto de una ficha), con su código («U+200B»)
+ * y su posición; `null` si no hay.
+ */
+export function invisibleAt(text: string): { code: string; index: number } | null;
+
+/** Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio». */
+export function placeIn(text: string, index: number, tail?: (text: string) => string): string;
+
 /** Un recurso del registro que se puede publicar: verificación que empieza con «accesible» y tipo no bloqueado. */
 export function isPublishableResource(resource: unknown): boolean;
 
