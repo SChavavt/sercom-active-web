@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { validateCatalog, getPublishedProducts } from '../src/lib/catalog-policy.mjs';
+import { addressProblem, isHttpsAddress, validateCatalog, getPublishedProducts } from '../src/lib/catalog-policy.mjs';
 import { MAX_UNIT_LENGTH } from '../src/lib/quote-list.mjs';
 
 // Datos sintéticos exclusivamente de prueba; nunca se importan en el sitio.
@@ -260,8 +260,9 @@ test('el nombre del archivo: sin carpeta, en minúsculas, cifras y guiones, con 
 
 test('la dirección es https y el ancho y el alto son enteros de 1 a 10000', () => {
   for (const status of STATUSES) {
-    for (const url of ['http://example.invalid/foto.jpg', '/fotos/guante.jpg', 'https://usuario:clave@example.invalid/foto.jpg', 'foto.jpg', '', 7]) {
-      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), ['products[0].image.url: debe ser una dirección https completa, sin usuario ni contraseña.'], `${status} ${url}`);
+    for (const [url, problem] of [['http://example.invalid/foto.jpg', 'la dirección no empieza con «https://»'], ['/fotos/guante.jpg', 'la dirección no empieza con «https://»'],
+      ['https://usuario:clave@example.invalid/foto.jpg', 'la dirección lleva usuario o contraseña antes del servidor'], ['foto.jpg', 'la dirección no empieza con «https://»'], ['', 'falta'], [7, 'no es un texto']]) {
+      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), [`products[0].image.url: ${problem}; escribe la dirección https completa de la foto, sin usuario ni contraseña.`], `${status} ${url}`);
     }
     const { height, ...noHeight } = URL_IMAGE;
     assert.deepEqual(imageErrors(noHeight, status), ['products[0].image.height: falta; con url se escribe el alto de la foto en píxeles.'], status);
@@ -276,23 +277,136 @@ test('la dirección es https y el ancho y el alto son enteros de 1 a 10000', () 
 });
 
 test('una dirección va escrita completa: https://, un servidor y sin espacios, saltos de línea ni diagonales invertidas, en cada campo que la lleva', () => {
-  const broken = ['https:/example.invalid/a.jpg', 'https:example.invalid/a.jpg', ' https://example.invalid/a.jpg', 'https://example.invalid/a.jpg ', 'https://exa\nmple.invalid/a.jpg',
-    'https://example.invalid/a b.jpg', 'https://example.invalid/a\tb.jpg', 'https://example.invalid/a\u00a0b.jpg', 'https:\\\\example.invalid\\a.jpg', 'https://example.invalid\\a.jpg', 'https:///a.jpg', 'https://'];
+  // Cada dirección rota con lo que tiene de malo, escrito a mano: el mensaje de cada campo dice eso y qué hacer.
+  const broken = [
+    ['https:/example.invalid/a.jpg', 'la dirección no empieza con «https://»'], ['https:example.invalid/a.jpg', 'la dirección no empieza con «https://»'],
+    [' https://example.invalid/a.jpg', 'la dirección tiene un espacio o un salto de línea al principio'],
+    ['https://example.invalid/a.jpg ', 'la dirección tiene un espacio o un salto de línea después de «…/example.invalid/a.jpg»'],
+    ['https://exa\nmple.invalid/a.jpg', 'la dirección tiene un espacio o un salto de línea después de «https://exa»'],
+    ['https://example.invalid/a b.jpg', 'la dirección tiene un espacio o un salto de línea después de «…/example.invalid/a»'],
+    ['https://example.invalid/a\tb.jpg', 'la dirección tiene un espacio o un salto de línea después de «…/example.invalid/a»'],
+    ['https://example.invalid/a\u00a0b.jpg', 'la dirección tiene un espacio o un salto de línea después de «…/example.invalid/a»'],
+    ['https:\\\\example.invalid\\a.jpg', 'la dirección no empieza con «https://»'], ['https://example.invalid\\a.jpg', 'la dirección lleva una diagonal invertida'],
+    ['https:///a.jpg', 'no se puede leer como dirección'], ['https://', 'no se puede leer como dirección'],
+    ['https://example.invalid/ficha\u200b-tecnica.pdf', 'la dirección tiene un carácter invisible (U+200B) después de «…/example.invalid/ficha»'],
+    ['https://example.invalid:8443/a.pdf', 'la dirección lleva un puerto («:8443»)'],
+    ['https://usuario@example.invalid/a.jpg', 'la dirección lleva usuario o contraseña antes del servidor'],
+  ];
   const fields = [
-    ['image.url', url => ({ image: { ...URL_IMAGE, url } }), 'products[0].image.url: debe ser una dirección https completa, sin usuario ni contraseña.'],
-    ['image.sourceUrl', sourceUrl => ({ image: { ...FILE_IMAGE, sourceUrl } }), 'products[0].image.sourceUrl: debe ser una dirección https; escribe la página de donde viene la foto.'],
-    ['standards[0].sourceUrl', sourceUrl => ({ standards: [{ text: 'EN 388:2016 4131A', sourceUrl }] }), 'products[0].standards[0].sourceUrl: debe ser una dirección https; escribe la página o el documento del fabricante donde consta esta norma para este producto.'],
-    ['source.url', url => ({ source: { url, checkedOn: '2026-11-18' } }), 'products[0]: fuente o fecha inválida.'],
-    ['documents[0].url', url => ({ documents: [{ label: 'Ficha técnica', url }] }), 'products[0]: documento inválido.'],
+    ['image.url', url => ({ image: { ...URL_IMAGE, url } }), problem => `products[0].image.url: ${problem}; escribe la dirección https completa de la foto, sin usuario ni contraseña.`],
+    ['image.sourceUrl', sourceUrl => ({ image: { ...FILE_IMAGE, sourceUrl } }), problem => `products[0].image.sourceUrl: ${problem}; escribe la página de donde viene la foto.`],
+    ['standards[0].sourceUrl', sourceUrl => ({ standards: [{ text: 'EN 388:2016 4131A', sourceUrl }] }), problem => `products[0].standards[0].sourceUrl: ${problem}; escribe la página o el documento del fabricante donde consta esta norma para este producto.`],
+    ['source.url', url => ({ source: { url, checkedOn: '2026-11-18' } }), problem => `products[0].source.url: ${problem}; escribe la página del fabricante donde revisaste los datos de la ficha.`],
+    ['documents[0].url', url => ({ documents: [{ label: 'Ficha técnica', url }] }), problem => `products[0].documents[0].url: ${problem}; escribe la dirección completa de la página o del documento del fabricante.`],
   ];
   for (const status of STATUSES) {
     for (const [field, change, message] of fields) {
-      for (const url of broken) assert.deepEqual(errorsOf({ status, ...change(url) }), [message], `${status} ${field} ${JSON.stringify(url)}`);
-      // Una dirección honesta pasa: con acentos, sin diagonal final, con puerto, consulta o fragmento.
-      for (const url of ['https://example.invalid', 'https://example.invalid/catálogo/protección-de-manos', 'https://example.invalid:8443/a.pdf?id=7#pagina=2', 'https://xn--fabricacin-9db.invalid/ficha']) {
+      for (const [url, problem] of broken) assert.deepEqual(errorsOf({ status, ...change(url) }), [message(problem)], `${status} ${field} ${JSON.stringify(url)}`);
+      // Una dirección honesta pasa: con acentos, sin diagonal final, con consulta o fragmento, con el servidor escrito con
+      // sus letras o en su forma xn--.
+      for (const url of ['https://example.invalid', 'https://example.invalid/catálogo/protección-de-manos', 'https://example.invalid/a.pdf?id=7#pagina=2', 'https://xn--fabricacin-9db.invalid/ficha', 'https://fabricación.invalid/ficha']) {
         assert.deepEqual(errorsOf({ status, ...change(url) }), [], `${status} ${field} ${url}`);
       }
     }
+  }
+});
+
+test('addressProblem dice en una frase corta qué tiene de malo una dirección, y isHttpsAddress es no tener nada', () => {
+  // Lo esperado está escrito a mano, caso por caso.
+  const cases = [
+    [undefined, 'falta'], ['', 'falta'], [7, 'no es un texto'], [null, 'no es un texto'], [['https://sitio.mx/a'], 'no es un texto'],
+    ['http://sitio.mx/a', 'no empieza con «https://»'], ['HTTPS://sitio.mx/a', 'no empieza con «https://»'], ['https:/sitio.mx/a', 'no empieza con «https://»'],
+    ['/fotos/guante.jpg', 'no empieza con «https://»'], ['ficha del fabricante', 'no empieza con «https://»'], ['javascript:alert(1)', 'no empieza con «https://»'],
+    ['https://sitio.mx/a b', 'tiene un espacio o un salto de línea después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\r\nb', 'tiene un espacio o un salto de línea después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u2028b', 'tiene un espacio o un salto de línea después de «https://sitio.mx/a»'],
+    ['\nhttps://sitio.mx/a', 'tiene un espacio o un salto de línea al principio'],
+    ['https://sitio.mx/a\\b', 'lleva una diagonal invertida'],
+    // Lo que no se ve: lo mismo que no puede llevar el texto de una ficha, dicho igual.
+    ['https://sitio.mx/a\u200bb', 'tiene un carácter invisible (U+200B) después de «https://sitio.mx/a»'],
+    ['https://si\u200btio.mx/a', 'tiene un carácter invisible (U+200B) después de «https://si»'],
+    ['https://si\u00adtio.mx/a', 'tiene un carácter invisible (U+00AD) después de «https://si»'],
+    ['https://sitio.mx/a\u202eb', 'tiene un carácter invisible (U+202E) después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u0000b', 'tiene un carácter invisible (U+0000) después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u007fb', 'tiene un carácter invisible (U+007F) después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u0085b', 'tiene un carácter invisible (U+0085) después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u200db', 'tiene un carácter invisible (U+200D) después de «https://sitio.mx/a»'],
+    ['https://sitio.mx/a\u{E0100}b', 'tiene un carácter invisible (U+E0100) después de «https://sitio.mx/a»'],
+    ['\ufeffhttps://sitio.mx/a', 'tiene un carácter invisible (U+FEFF) al principio'],
+    ['https://www.fabricante.com.mx/productos/guantes/ficha\u200b.pdf', 'tiene un carácter invisible (U+200B) después de «…/productos/guantes/ficha»'],
+    // Usuario o contraseña, también vacíos.
+    ['https://usuario:clave@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'], ['https://@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'],
+    ['https://:@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'],
+    // El servidor es el nombre de un sitio.
+    ['https://./x', 'el servidor «.» no es el nombre de un sitio'], ['https://../x', 'el servidor «..» no es el nombre de un sitio'],
+    ['https://sitio.mx./x', 'el servidor «sitio.mx.» no es el nombre de un sitio'], ['https://sitio..mx/x', 'el servidor «sitio..mx» no es el nombre de un sitio'],
+    ['https://localhost/x', 'el servidor «localhost» no es el nombre de un sitio'], ['https://[::1]/x', 'el servidor «[::1]» no es el nombre de un sitio'],
+    ['https://[::1]:8443/x', 'el servidor «[::1]» no es el nombre de un sitio'],
+    ['https://127.0.0.1/x', 'el servidor «127.0.0.1» no es el nombre de un sitio'], ['https://2130706433/x', 'el servidor «2130706433» no es el nombre de un sitio'],
+    ['https://1.2.3/x', 'el servidor «1.2.3» no es el nombre de un sitio'], ['https://si"tio.mx/x', 'el servidor «si"tio.mx» no es el nombre de un sitio'],
+    ['https://si_tio.mx/x', 'el servidor «si_tio.mx» no es el nombre de un sitio'], ['https://si%41tio.mx/x', 'el servidor «si%41tio.mx» no es el nombre de un sitio'],
+    ['https://sitio.mx:8443/x', 'lleva un puerto («:8443»)'], ['https://sitio.mx:443/x', 'lleva un puerto («:443»)'], ['https://sitio.mx:/x', 'lleva un puerto («:»)'],
+    ['https://sitio.123/x', 'no se puede leer como dirección'], ['https://?x', 'no se puede leer como dirección'], ['https://#x', 'no se puede leer como dirección'],
+    [`https://sitio.mx/${'a'.repeat(1984)}`, 'mide más de 2,000 caracteres'], [`https://sitio.mx/${'a'.repeat(100000)}`, 'mide más de 2,000 caracteres'],
+  ];
+  assert.equal(`https://sitio.mx/${'a'.repeat(1983)}`.length, 2000);
+  for (const [value, problem] of cases) {
+    assert.equal(addressProblem(value), problem, JSON.stringify(value)?.slice(0, 80));
+    assert.equal(isHttpsAddress(value), false, JSON.stringify(value)?.slice(0, 80));
+  }
+  // Una sola lista de lo que no se ve: un carácter que el nombre de una ficha no puede llevar, una dirección tampoco, y
+  // lo que el nombre sí puede llevar, la dirección también.
+  for (const character of ['\u200b', '\u00ad', '\u202e', '\u0000', '\u007f', '\u0085', '\u200c', '\u200d', '\ufe0f', '\u2060', '\u115f', '\ufffd', '\u{E0100}', 'é', 'ñ', '·', '®', '\u0301']) {
+    const code = `U+${character.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
+    assert.equal(addressProblem(`https://sitio.mx/a${character}b`) !== null, errorsOf({ name: `Guante${character}nitrilo` }).length > 0, code);
+  }
+  // Direcciones honestas, como las publican los fabricantes.
+  for (const value of ['https://sitio.mx', 'https://sitio.mx/', `https://sitio.mx/${'a'.repeat(1983)}`, 'https://SITIO.MX/Guante', 'https://www.sub-dominio.sitio.com.mx/x',
+    'https://sitio.mx/catálogo/protección-de-manos', 'https://fabricación.mx/ficha', 'https://xn--fabricacin-9db.mx/ficha', 'https://sitio.mx//producto/?producto=13',
+    'https://sitio.mx/a%20b?c=1&d=2#e', 'https://sitio.mx/a@b', 'https://sitio.mx/r?u=https://otro.mx/x', 'https://cdn.sitio.mx/is/image/x?wid=2000&hei=2000']) {
+    assert.equal(addressProblem(value), null, value);
+    assert.equal(isHttpsAddress(value), true, value);
+  }
+});
+
+test('cada documento se revisa solo: su etiqueta y su dirección, con su posición', () => {
+  const ok = { label: 'Ficha técnica', url: 'https://example.invalid/ficha.pdf' };
+  for (const status of STATUSES) {
+    assert.deepEqual(errorsOf({ status, documents: [ok, { label: 'Hoja de seguridad', url: 'https://example.invalid/hoja.pdf' }] }), [], status);
+    assert.deepEqual(errorsOf({ status, documents: [ok, ok, { label: 'Hoja de seguridad', url: 'https://example.invalid/a b.pdf' }] }),
+      ['products[0].documents[2].url: la dirección tiene un espacio o un salto de línea después de «…/example.invalid/a»; escribe la dirección completa de la página o del documento del fabricante.'], status);
+    assert.deepEqual(errorsOf({ status, documents: [{ label: 'Ficha técnica' }] }),
+      ['products[0].documents[0].url: falta; escribe la dirección completa de la página o del documento del fabricante.'], status);
+    assert.deepEqual(errorsOf({ status, documents: [ok, { url: 'https://example.invalid/hoja.pdf' }] }),
+      ['products[0].documents[1].label: falta; escribe qué es el documento, como «Ficha técnica».'], status);
+    assert.deepEqual(errorsOf({ status, documents: [{ label: '  ', url: 'https://example.invalid/hoja.pdf' }] }),
+      ['products[0].documents[0].label: está vacío; escribe qué es el documento, como «Ficha técnica».'], status);
+    assert.deepEqual(errorsOf({ status, documents: [{ label: 7, url: 7 }] }), [
+      'products[0].documents[0].label: debe ser un texto; escribe qué es el documento, como «Ficha técnica».',
+      'products[0].documents[0].url: no es un texto; escribe la dirección completa de la página o del documento del fabricante.',
+    ], status);
+    assert.deepEqual(errorsOf({ status, documents: [ok, null] }), ['products[0].documents[1]: debe ser un objeto con label y url.'], status);
+    assert.deepEqual(errorsOf({ status, documents: 'https://example.invalid/ficha.pdf' }), ['products[0].documents: debe ser una lista de documentos, cada uno con label y url.'], status);
+  }
+});
+
+test('la fuente de una ficha: su dirección y su fecha se dicen por separado', () => {
+  for (const status of STATUSES) {
+    assert.deepEqual(errorsOf({ status, source: { url: 'https:/example.invalid/a', checkedOn: '2026-11-18' } }),
+      ['products[0].source.url: la dirección no empieza con «https://»; escribe la página del fabricante donde revisaste los datos de la ficha.'], status);
+    for (const checkedOn of ['18/11/2026', '2026-02-30', '2026-11-18 ', 20261118]) {
+      assert.deepEqual(errorsOf({ status, source: { url: 'https://example.invalid/a', checkedOn } }),
+        [`products[0].source.checkedOn: ${typeof checkedOn === 'string' ? `«${checkedOn}» no es una fecha` : 'no es un texto'}; escribe el día en que revisaste la fuente como AAAA-MM-DD, por ejemplo 2026-11-18.`], `${status} ${checkedOn}`);
+    }
+    assert.deepEqual(errorsOf({ status, source: { url: 'https://example.invalid/a' } }),
+      ['products[0].source.checkedOn: falta; escribe el día en que revisaste la fuente como AAAA-MM-DD, por ejemplo 2026-11-18.'], status);
+    assert.deepEqual(errorsOf({ status, source: { checkedOn: '2026-11-18' } }),
+      ['products[0].source.url: falta; escribe la página del fabricante donde revisaste los datos de la ficha.'], status);
+    assert.deepEqual(errorsOf({ status, source: { url: 'http://example.invalid/a', checkedOn: 'ayer' } }), [
+      'products[0].source.url: la dirección no empieza con «https://»; escribe la página del fabricante donde revisaste los datos de la ficha.',
+      'products[0].source.checkedOn: «ayer» no es una fecha; escribe el día en que revisaste la fuente como AAAA-MM-DD, por ejemplo 2026-11-18.',
+    ], status);
+    assert.deepEqual(errorsOf({ status, source: 'https://example.invalid/a' }), ['products[0].source: debe ser un objeto con url y checkedOn.'], status);
   }
 });
 
@@ -328,7 +442,7 @@ test('el texto alternativo va limpio, en una línea y con 160 caracteres como m�
       assert.deepEqual(imageErrors({ ...image, alt: 'á'.repeat(161) }, status), ['products[0].image.alt: tiene 161 caracteres y el máximo es 160; describe la foto en una línea más corta.'], status);
       const { sourceUrl, ...noSource } = image;
       assert.deepEqual(imageErrors(noSource, status), ['products[0].image.sourceUrl: falta; escribe la página de donde viene la foto.'], status);
-      assert.deepEqual(imageErrors({ ...image, sourceUrl: 'http://example.invalid/origen' }, status), ['products[0].image.sourceUrl: debe ser una dirección https; escribe la página de donde viene la foto.'], status);
+      assert.deepEqual(imageErrors({ ...image, sourceUrl: 'http://example.invalid/origen' }, status), ['products[0].image.sourceUrl: la dirección no empieza con «https://»; escribe la página de donde viene la foto.'], status);
       const { usageConfirmed, ...noUsage } = image;
       for (const value of [undefined, 'si', 1]) {
         assert.deepEqual(imageErrors(value === undefined ? noUsage : { ...image, usageConfirmed: value }, status), ['products[0].image.usageConfirmed: debe ser true o false; true solo con el uso de la foto confirmado.'], `${status} ${value}`);
@@ -425,8 +539,9 @@ test('cada norma lleva la dirección https del fabricante donde consta', () => {
   const where = 'escribe la página o el documento del fabricante donde consta esta norma para este producto.';
   for (const status of STATUSES) {
     assert.deepEqual(errorsOf({ status, standards: [{ text: 'EN 388:2016 4131A' }] }), [`products[0].standards[0].sourceUrl: falta; ${where}`], status);
-    for (const sourceUrl of ['http://example.invalid/ficha', 'ficha del fabricante', '', 'https://usuario:clave@example.invalid/ficha']) {
-      assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A', { sourceUrl })] }), [`products[0].standards[0].sourceUrl: debe ser una dirección https; ${where}`], `${status} ${sourceUrl}`);
+    for (const [sourceUrl, problem] of [['http://example.invalid/ficha', 'la dirección no empieza con «https://»'], ['ficha del fabricante', 'la dirección no empieza con «https://»'], ['', 'falta'],
+      ['https://usuario:clave@example.invalid/ficha', 'la dirección lleva usuario o contraseña antes del servidor']]) {
+      assert.deepEqual(errorsOf({ status, standards: [norm('EN 388:2016 4131A', { sourceUrl })] }), [`products[0].standards[0].sourceUrl: ${problem}; ${where}`], `${status} ${sourceUrl}`);
     }
   }
 });

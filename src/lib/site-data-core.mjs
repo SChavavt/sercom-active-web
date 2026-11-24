@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { addressError, BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, mentionsExcludedBrand } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -83,8 +83,6 @@ const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
-/** Una dirección `https` escrita completa, con la misma regla que las direcciones de una ficha. */
-const isHttps = isHttpsAddress;
 /** @param {Record<string, unknown>} record @param {string[]} allowed */
 const unknownKeys = (record, allowed) => Object.keys(record).filter(key => !allowed.includes(key));
 /** ¿Aparece `needle` como palabra completa dentro de `haystack`? Ambos ya normalizados. */
@@ -166,7 +164,8 @@ function linkErrors(links, path) {
     if (!kind) errors.push(`${where}.label: ${typeof link.label === 'string' ? `«${link.label}» no es una etiqueta de enlace` : 'falta la etiqueta'}; usa una de estas tres: ${LABEL_LIST.replace(/ y «/, ' o «')}.`);
     else if (kinds.includes(kind)) errors.push(`${where}.label: la etiqueta «${link.label}» ya está en otro enlace de la marca; cada etiqueta va una vez.`);
     else kinds.push(kind);
-    if (!isHttps(link.url)) errors.push(`${where}.url: debe ser una URL https escrita completa, como https://www.fabricante.com/catalogo/.`);
+    const urlError = addressError(`${where}.url`, link.url, 'escribe la dirección https completa, como https://www.fabricante.com/catalogo/.');
+    if (urlError) errors.push(urlError);
     else if (urls.has(link.url)) errors.push(`${where}.url: la dirección ${link.url} ya está en otro enlace de la marca; cada dirección va una vez.`);
     else urls.add(link.url);
     for (const [key, what] of /** @type {const} */ ([['edition', 'la edición'], ['megabytes', 'el tamaño en megabytes']])) {
