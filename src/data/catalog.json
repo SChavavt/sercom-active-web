@@ -1,16 +1,2976 @@
 {
   "schemaVersion": 1,
   "categories": [
-    { "id": "manos", "name": "Protección de manos", "shortName": "Manos", "summary": "Guantes recubiertos, de cuero, desechables, anticorte, para químicos y mangas", "status": "draft" },
-    { "id": "ojos-y-cara", "name": "Protección de ojos y cara", "shortName": "Ojos y cara", "summary": "Lentes, goggles y caretas", "status": "draft" },
-    { "id": "cabeza", "name": "Protección de cabeza", "shortName": "Cabeza", "summary": "Cascos, suspensiones y accesorios", "status": "draft" },
-    { "id": "respiratoria", "name": "Protección respiratoria", "shortName": "Respiratoria", "summary": "Respiradores, cartuchos y filtros", "status": "draft" },
-    { "id": "auditiva", "name": "Protección auditiva", "shortName": "Auditiva", "summary": "Tapones y orejeras", "status": "draft" },
-    { "id": "alturas", "name": "Trabajo en alturas", "shortName": "Alturas", "summary": "Arneses, eslingas, retráctiles, anclajes y líneas de vida", "status": "draft" },
-    { "id": "ropa", "name": "Ropa y protección corporal", "shortName": "Ropa", "summary": "Overoles, impermeables, alta visibilidad y prendas especializadas", "status": "draft" },
-    { "id": "calzado", "name": "Calzado industrial", "shortName": "Calzado", "summary": "Botas y calzado de seguridad", "status": "draft" },
-    { "id": "vial-y-senalizacion", "name": "Vial y señalización", "shortName": "Vial y señalización", "summary": "Conos, barreras, cintas y señales", "status": "draft" },
-    { "id": "soldadura", "name": "Soldadura", "shortName": "Soldadura", "summary": "Protección para soldar", "status": "draft" }
+    {
+      "id": "manos",
+      "name": "Protección de manos",
+      "shortName": "Manos",
+      "summary": "Guantes recubiertos, de cuero, desechables, anticorte, para químicos y mangas",
+      "status": "approved"
+    },
+    {
+      "id": "ojos-y-cara",
+      "name": "Protección de ojos y cara",
+      "shortName": "Ojos y cara",
+      "summary": "Lentes, goggles y caretas",
+      "status": "approved"
+    },
+    {
+      "id": "cabeza",
+      "name": "Protección de cabeza",
+      "shortName": "Cabeza",
+      "summary": "Cascos, suspensiones y accesorios",
+      "status": "approved"
+    },
+    {
+      "id": "respiratoria",
+      "name": "Protección respiratoria",
+      "shortName": "Respiratoria",
+      "summary": "Respiradores, cartuchos y filtros",
+      "status": "approved"
+    },
+    {
+      "id": "auditiva",
+      "name": "Protección auditiva",
+      "shortName": "Auditiva",
+      "summary": "Tapones y orejeras",
+      "status": "approved"
+    },
+    {
+      "id": "alturas",
+      "name": "Trabajo en alturas",
+      "shortName": "Alturas",
+      "summary": "Arneses, eslingas, retráctiles, anclajes y líneas de vida",
+      "status": "approved"
+    },
+    {
+      "id": "ropa",
+      "name": "Ropa y protección corporal",
+      "shortName": "Ropa",
+      "summary": "Overoles, impermeables, alta visibilidad y prendas especializadas",
+      "status": "approved"
+    },
+    {
+      "id": "calzado",
+      "name": "Calzado industrial",
+      "shortName": "Calzado",
+      "summary": "Botas y calzado de seguridad",
+      "status": "approved"
+    },
+    {
+      "id": "vial-y-senalizacion",
+      "name": "Vial y señalización",
+      "shortName": "Vial y señalización",
+      "summary": "Conos, barreras, cintas y señales",
+      "status": "approved"
+    },
+    {
+      "id": "soldadura",
+      "name": "Soldadura",
+      "shortName": "Soldadura",
+      "summary": "Protección para soldar",
+      "status": "approved"
+    }
   ],
-  "products": []
+  "products": [
+    {
+      "id": "msa-v-gard-cachucha",
+      "brandId": "msa",
+      "model": "V-Gard",
+      "name": "Casco tipo cachucha de polietileno V-Gard",
+      "categoryIds": [
+        "cabeza"
+      ],
+      "status": "approved",
+      "description": "Casco de seguridad tipo cachucha de polietileno con suspensión ajustable, para proteger la cabeza contra impactos superiores y penetración en industria y construcción.",
+      "characteristics": [
+        "Moldeado en polietileno de alta densidad (HDPE)",
+        "Modelo no ventilado",
+        "Suspensión Fas-Trac III",
+        "Arnés con ajuste en altura",
+        "Acepta la protección auditiva MSA que se monta al casco"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "amarillo",
+          "label": "Amarillo",
+          "manufacturerCode": "M2303431ARF"
+        },
+        {
+          "id": "negro",
+          "label": "Negro",
+          "manufacturerCode": "10031801"
+        },
+        {
+          "id": "azul",
+          "label": "Azul",
+          "manufacturerCode": "M2305611ARF"
+        },
+        {
+          "id": "gris",
+          "label": "Gris",
+          "manufacturerCode": "10031675"
+        },
+        {
+          "id": "blanco",
+          "label": "Blanco",
+          "manufacturerCode": "M2303541ARF"
+        },
+        {
+          "id": "naranja",
+          "label": "Naranja",
+          "manufacturerCode": "M2305761ARF"
+        },
+        {
+          "id": "cafe",
+          "label": "Café",
+          "manufacturerCode": "10031800"
+        },
+        {
+          "id": "rojo",
+          "label": "Rojo",
+          "manufacturerCode": "M2303531ARF"
+        },
+        {
+          "id": "verde",
+          "label": "Verde",
+          "manufacturerCode": "M2304601ARF"
+        },
+        {
+          "id": "magenta",
+          "label": "Magenta",
+          "manufacturerCode": "10155230"
+        }
+      ],
+      "image": {
+        "file": "msa-v-gard-cachucha.jpg",
+        "alt": "Casco de seguridad tipo cachucha de color rojo, con su suspensión de ajuste, visto de lado.",
+        "sourceUrl": "https://mx.msasafety.com/Head-Protection/Hard-Hats/V-Gard%C2%AE-Hard-Hat-Cap-Style/p/000060001300001000?locale=es",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mx.msasafety.com/Head-Protection/Hard-Hats/V-Gard%C2%AE-Hard-Hat-Cap-Style/p/000060001300001000?locale=es",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "msa-advantage-200-ls",
+      "brandId": "msa",
+      "model": "Advantage 200 LS",
+      "name": "Respirador de media cara Advantage 200 LS",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Respirador de media cara de hule termoplástico al que se acoplan cartuchos y filtros Advantage, para proteger contra humos, nieblas y gases según el filtro usado.",
+      "characteristics": [
+        "Pieza facial de hule termoplástico",
+        "Sistema Multiflex que iguala la presión facial",
+        "Diseño facial AnthroCurve",
+        "Se usa con cartuchos y filtros Advantage, que se venden por separado",
+        "Dos correas para el cuello"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-sm",
+          "label": "Talla SM",
+          "manufacturerCode": "815696"
+        },
+        {
+          "id": "talla-md",
+          "label": "Talla MD",
+          "manufacturerCode": "815692"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG",
+          "manufacturerCode": "815700"
+        }
+      ],
+      "standards": [
+        {
+          "text": "Aprobado por NIOSH",
+          "sourceUrl": "https://mx.msasafety.com/Air-Purifying-Respirators-(APR)/Half-Masks/Advantage%C2%AE-200-LS-Half-Mask-Respirator/p/000100000200001120?locale=es"
+        }
+      ],
+      "image": {
+        "file": "msa-advantage-200-ls.jpg",
+        "alt": "Respirador de media cara azul con gris, con arnés de correas negras, visto de tres cuartos y sin cartuchos.",
+        "sourceUrl": "https://mx.msasafety.com/Air-Purifying-Respirators-(APR)/Half-Masks/Advantage%C2%AE-200-LS-Half-Mask-Respirator/p/000100000200001120?locale=es",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mx.msasafety.com/Air-Purifying-Respirators-(APR)/Half-Masks/Advantage%C2%AE-200-LS-Half-Mask-Respirator/p/000100000200001120?locale=es",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "msa-v-form",
+      "brandId": "msa",
+      "model": "V-FORM",
+      "name": "Arnés de cuerpo completo V-FORM",
+      "categoryIds": [
+        "alturas"
+      ],
+      "status": "approved",
+      "description": "Arnés de cuerpo completo para trabajos en altura, con argolla D en la espalda para conectar el sistema de detención de caídas.",
+      "characteristics": [
+        "Corte atlético que se adapta al cuerpo",
+        "Hebilla de conexión rápida en el pecho",
+        "Argolla D en la espalda",
+        "Hebillas tipo cinturón en las piernas"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-xsm",
+          "label": "Talla XSM",
+          "manufacturerCode": "10206057"
+        },
+        {
+          "id": "talla-std",
+          "label": "Talla STD",
+          "manufacturerCode": "10206058"
+        },
+        {
+          "id": "talla-xlg",
+          "label": "Talla XLG",
+          "manufacturerCode": "10206059"
+        }
+      ],
+      "image": {
+        "file": "msa-v-form.jpg",
+        "alt": "Arnés de cuerpo completo de banda verde con detalles negros, visto de frente.",
+        "sourceUrl": "https://mx.msasafety.com/Fall-Protection/Full-Body-Harnesses/V-FORM%E2%84%A2-Safety-Harness/p/000230000200001110?locale=es",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mx.msasafety.com/Fall-Protection/Full-Body-Harnesses/V-FORM%E2%84%A2-Safety-Harness/p/000230000200001110?locale=es",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "msa-discovery-ii",
+      "brandId": "msa",
+      "model": "Discovery II",
+      "name": "Lentes de seguridad de policarbonato Discovery II",
+      "categoryIds": [
+        "ojos-y-cara"
+      ],
+      "status": "approved",
+      "description": "Lentes de seguridad con mica y armazón de policarbonato, patillas suaves y puente nasal suave, para proteger los ojos contra impactos y radiación UV.",
+      "characteristics": [
+        "Mica de policarbonato de 2.2 mm con resina antirrayaduras",
+        "Armazón de policarbonato con tornillos de acero inoxidable",
+        "Puente nasal suave de PVC",
+        "Ancho promedio de 131 mm y patillas de 164 mm",
+        "Peso total de 24 g"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "mica-clara-con-antiempanante",
+          "label": "Mica clara con antiempañante",
+          "manufacturerCode": "10161669"
+        },
+        {
+          "id": "mica-para-interiores-y-exteriores",
+          "label": "Mica para interiores y exteriores",
+          "manufacturerCode": "10161707"
+        },
+        {
+          "id": "mica-gris-con-antiempanante",
+          "label": "Mica gris con antiempañante",
+          "manufacturerCode": "10161670"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI Z87.1",
+          "sourceUrl": "https://mx.msasafety.com/Protecci%C3%B3n-visual/Gafas-de-seguridad/Lente-de-Seguridad-Discovery-II/p/000030000500001494?locale=es"
+        },
+        {
+          "text": "CSA Z94.3",
+          "sourceUrl": "https://mx.msasafety.com/Protecci%C3%B3n-visual/Gafas-de-seguridad/Lente-de-Seguridad-Discovery-II/p/000030000500001494?locale=es"
+        }
+      ],
+      "image": {
+        "file": "msa-discovery-ii.jpg",
+        "alt": "Lentes de seguridad de mica clara con armazón café, vistos de tres cuartos sobre un fondo gris claro.",
+        "sourceUrl": "https://mx.msasafety.com/Protecci%C3%B3n-visual/Gafas-de-seguridad/Lente-de-Seguridad-Discovery-II/p/000030000500001494?locale=es",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mx.msasafety.com/Protecci%C3%B3n-visual/Gafas-de-seguridad/Lente-de-Seguridad-Discovery-II/p/000030000500001494?locale=es",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "mcr-safety-serie-98",
+      "brandId": "mcr-safety",
+      "model": "98",
+      "name": "Lentes de seguridad de una sola mica de policarbonato Serie 98",
+      "categoryIds": [
+        "ojos-y-cara"
+      ],
+      "status": "approved",
+      "description": "Lentes de seguridad de una sola mica de policarbonato, con protecciones laterales integradas y patillas tipo espátula; el fabricante los propone para visitantes.",
+      "characteristics": [
+        "Mica y armazón de policarbonato",
+        "Patillas tipo espátula de policarbonato",
+        "Dieléctricos: no contienen partes de metal",
+        "Mica sin recubrimiento o con recubrimiento duro Duramass",
+        "Armazón en varios tamaños, incluido uno para usarse sobre otros lentes"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "mica-clara",
+          "label": "Mica clara"
+        },
+        {
+          "id": "mica-verde-filtro-2-0",
+          "label": "Mica verde filtro 2.0"
+        },
+        {
+          "id": "mica-verde-filtro-5-0",
+          "label": "Mica verde filtro 5.0"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI/ISEA Z87.1 2025 (Z87+)",
+          "sourceUrl": "https://www.mcrsafety.com.mx/98"
+        },
+        {
+          "text": "CAN/CSA Z94.3",
+          "sourceUrl": "https://www.mcrsafety.com.mx/98"
+        },
+        {
+          "text": "CE EN166",
+          "sourceUrl": "https://www.mcrsafety.com.mx/98"
+        },
+        {
+          "text": "AS/NZS 1337.1",
+          "sourceUrl": "https://www.mcrsafety.com.mx/98"
+        }
+      ],
+      "image": {
+        "file": "mcr-safety-serie-98.jpg",
+        "alt": "Lentes de seguridad transparentes de una sola mica con protecciones laterales, vistos de tres cuartos.",
+        "sourceUrl": "https://www.mcrsafety.com.mx/98",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.mcrsafety.com.mx/98",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "mcr-safety-red-ram-4840",
+      "brandId": "mcr-safety",
+      "model": "4840",
+      "name": "Guante para soldador MIG/TIG de piel de cabra Red Ram 4840",
+      "categoryIds": [
+        "soldadura",
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante de piel de cabra flor sin forro, con puño extendido de carnaza de res y costuras de Kevlar, para soldadura MIG/TIG.",
+      "characteristics": [
+        "Piel de cabra flor grado A, sin forro",
+        "Puño extendido de carnaza de res color rojizo",
+        "Costuras de Kevlar y pulgar recto"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-s",
+          "label": "Talla S"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-l",
+          "label": "Talla L"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        }
+      ],
+      "image": {
+        "file": "mcr-safety-red-ram-4840.jpg",
+        "alt": "Guante de piel de color blanco con puño largo de carnaza rojiza, con los dedos hacia abajo.",
+        "sourceUrl": "https://www.mcrsafety.com.mx/4840",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.mcrsafety.com.mx/4840",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "mcr-safety-cutpro-92752",
+      "brandId": "mcr-safety",
+      "model": "92752",
+      "name": "Guante anticorte de HPPE con palma de poliuretano CutPro 92752",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante tejido de HPPE calibre 13 con palma y puntas de los dedos recubiertas de poliuretano, para protección contra cortes, desgarres y abrasión.",
+      "characteristics": [
+        "Tejido HyperMax de HPPE calibre 13, sin costuras, color gris",
+        "Recubrimiento de poliuretano en palma y puntas de los dedos",
+        "Puño tejido a la altura de la muñeca"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-2xs",
+          "label": "Talla 2XS"
+        },
+        {
+          "id": "talla-xs",
+          "label": "Talla XS"
+        },
+        {
+          "id": "talla-s",
+          "label": "Talla S"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-l",
+          "label": "Talla L"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2xl",
+          "label": "Talla 2XL"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN 388, abrasión 4",
+          "sourceUrl": "https://www.mcrsafety.com.mx/92752"
+        }
+      ],
+      "image": {
+        "file": "mcr-safety-cutpro-92752.webp",
+        "alt": "Guante tejido gris jaspeado puesto en una mano de maniquí, visto por el dorso, con las palabras Cut Pro impresas.",
+        "sourceUrl": "https://www.mcrsafety.com.mx/92752",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.mcrsafety.com.mx/92752",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "dupont-tyvek-400-ty127s",
+      "brandId": "dupont",
+      "model": "TY127S",
+      "name": "Overol desechable con capucha Tyvek 400 TY127S",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol desechable de Tyvek 400 con capucha, que sirve de barrera contra partículas y fibras finas (hasta de 1 micra) y repele líquidos de base acuosa y aerosoles.",
+      "characteristics": [
+        "Tela blanca de polietileno flash-spun Tyvek 400",
+        "Capucha ajustable para respirador y elástico en muñecas y tobillos",
+        "Costuras cosidas; gramaje de 1.2 oz/yd² y espesor de 5.9 milésimas de pulgada",
+        "No es resistente a la flama"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-md",
+          "label": "Talla MD"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2x",
+          "label": "Talla 2X"
+        },
+        {
+          "id": "talla-3x",
+          "label": "Talla 3X"
+        }
+      ],
+      "standards": [
+        {
+          "text": "NOM-017-STPS-2024",
+          "sourceUrl": "https://www.dupont.mx/products/dupont-tyvek-400-ty127s.html"
+        },
+        {
+          "text": "ANSI/ISEA 101 (tallas)",
+          "sourceUrl": "https://www.dupont.mx/products/dupont-tyvek-400-ty127s.html"
+        }
+      ],
+      "image": {
+        "file": "dupont-tyvek-400-ty127s.jpg",
+        "alt": "Overol desechable blanco con capucha y etiqueta azul en el pecho, puesto en un maniquí y visto de frente.",
+        "sourceUrl": "https://www.dupont.mx/products/dupont-tyvek-400-ty127s.html",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.dupont.mx/products/dupont-tyvek-400-ty127s.html",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "dupont-tychem-2000-qc127s",
+      "brandId": "dupont",
+      "model": "QC127S",
+      "name": "Overol desechable con capucha Tychem 2000 QC127S",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol desechable de tela Tyvek con revestimiento de polietileno, con capucha y elástico en muñecas y tobillos, para protección contra salpicaduras de químicos.",
+      "characteristics": [
+        "Tela Tyvek con revestimiento de polietileno, color amarillo",
+        "Capucha y elástico en muñecas y tobillos",
+        "Costuras cosidas; gramaje de 2.5 oz/yd² y espesor de 10 milésimas de pulgada"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-md",
+          "label": "Talla MD"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2x",
+          "label": "Talla 2X",
+          "manufacturerCode": "D14011409"
+        },
+        {
+          "id": "talla-3x",
+          "label": "Talla 3X"
+        }
+      ],
+      "standards": [
+        {
+          "text": "NOM-017-STPS-2024",
+          "sourceUrl": "https://www.dupont.mx/products/dupont-tychem-2000-qc127s.html"
+        },
+        {
+          "text": "ANSI/ISEA 101 (tallas)",
+          "sourceUrl": "https://www.dupont.mx/products/dupont-tychem-2000-qc127s.html"
+        }
+      ],
+      "image": {
+        "file": "dupont-tychem-2000-qc127s.jpg",
+        "alt": "Overol desechable amarillo con capucha y etiqueta naranja en el pecho, puesto en un maniquí y visto de frente.",
+        "sourceUrl": "https://www.dupont.mx/products/dupont-tychem-2000-qc127s.html",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.dupont.mx/products/dupont-tychem-2000-qc127s.html",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "dupont-proshield-60-ng127s",
+      "brandId": "dupont",
+      "model": "NG127S",
+      "name": "Overol desechable con capucha ProShield 60 NG127S",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol desechable de película microporosa laminada sobre polipropileno, con capucha, para partículas no peligrosas, salpicaduras de líquidos ligeros y aerosoles.",
+      "characteristics": [
+        "Película microporosa laminada a polipropileno, color blanco",
+        "Capucha integrada y elástico en puños y tobillos",
+        "Cierre frontal con solapa de protección",
+        "Costuras cosidas; gramaje de 1.8 oz/yd² y espesor de 10 milésimas de pulgada"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-sm",
+          "label": "Talla SM"
+        },
+        {
+          "id": "talla-md",
+          "label": "Talla MD"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2x",
+          "label": "Talla 2X"
+        },
+        {
+          "id": "talla-3x",
+          "label": "Talla 3X"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI/ISEA 101 (tallas)",
+          "sourceUrl": "https://www.dupont.mx/products/dupont-proshield-60-ng127s.html"
+        }
+      ],
+      "image": {
+        "file": "dupont-proshield-60-ng127s.jpg",
+        "alt": "Overol desechable blanco con capucha y etiqueta gris en el pecho, puesto en un maniquí y visto de frente.",
+        "sourceUrl": "https://www.dupont.mx/products/dupont-proshield-60-ng127s.html",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.dupont.mx/products/dupont-proshield-60-ng127s.html",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "jyrsa-eco-2017k",
+      "brandId": "jyrsa",
+      "model": "ECO-2017K",
+      "name": "Casco tipo cachucha de polietileno con ajuste milimétrico ECO-2017K",
+      "categoryIds": [
+        "cabeza"
+      ],
+      "status": "approved",
+      "description": "Casco de seguridad tipo cachucha de polietileno, con suspensión textil de 6 puntos y ajuste milimétrico, para proteger la cabeza contra golpes y riesgo eléctrico.",
+      "characteristics": [
+        "Casco de polietileno de alta y baja densidad",
+        "Tipo I, clase E, dieléctrico",
+        "Suspensión textil de 6 puntos con cinta de nylon de 19 mm",
+        "Ajuste milimétrico de matraca",
+        "Ranuras universales para orejeras o protectores faciales"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "amarillo",
+          "label": "Amarillo",
+          "manufacturerCode": "ECO-2017AMK"
+        },
+        {
+          "id": "amarillo-alta-visibilidad",
+          "label": "Amarillo alta visibilidad",
+          "manufacturerCode": "ECO-2017AMHVK"
+        },
+        {
+          "id": "azul-rey",
+          "label": "Azul rey",
+          "manufacturerCode": "ECO-2017AZK"
+        },
+        {
+          "id": "blanco",
+          "label": "Blanco",
+          "manufacturerCode": "ECO-2017BK"
+        },
+        {
+          "id": "gris",
+          "label": "Gris",
+          "manufacturerCode": "ECO-2017GK"
+        },
+        {
+          "id": "naranja",
+          "label": "Naranja",
+          "manufacturerCode": "ECO-2017ANK"
+        },
+        {
+          "id": "naranja-alta-visibilidad",
+          "label": "Naranja alta visibilidad"
+        },
+        {
+          "id": "negro",
+          "label": "Negro"
+        },
+        {
+          "id": "rojo",
+          "label": "Rojo",
+          "manufacturerCode": "ECO-2017RK"
+        },
+        {
+          "id": "rosa",
+          "label": "Rosa"
+        },
+        {
+          "id": "verde",
+          "label": "Verde",
+          "manufacturerCode": "ECO-2017VK"
+        },
+        {
+          "id": "verde-alta-visibilidad",
+          "label": "Verde alta visibilidad",
+          "manufacturerCode": "ECO-2017VHVK"
+        }
+      ],
+      "standards": [
+        {
+          "text": "NOM-115-STPS-2009",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/ECO-2017AMK.pdf"
+        },
+        {
+          "text": "ANSI/ISEA Z89.1-2014",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/ECO-2017AMK.pdf"
+        },
+        {
+          "text": "NRF-012-CFE-2010",
+          "sourceUrl": "https://jyrsa.com/producto/eco-2017k/"
+        },
+        {
+          "text": "NRF-058-PEMEX-2012",
+          "sourceUrl": "https://jyrsa.com/producto/eco-2017k/"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica ECO-2017AMK, amarillo (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-2017AMK.pdf"
+        },
+        {
+          "label": "Ficha técnica ECO-2017BK, blanco (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-2017BK.pdf"
+        }
+      ],
+      "image": {
+        "file": "jyrsa-eco-2017k.webp",
+        "alt": "Casco de seguridad tipo cachucha de color blanco, visto de lado.",
+        "sourceUrl": "https://jyrsa.com/producto/eco-2017k/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://jyrsa.com/producto/eco-2017k/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "jyrsa-senador-eco-1314",
+      "brandId": "jyrsa",
+      "model": "ECO-1314",
+      "name": "Lentes de seguridad de policarbonato Senador ECO-1314",
+      "categoryIds": [
+        "ojos-y-cara"
+      ],
+      "status": "approved",
+      "description": "Lentes de seguridad con mica cóncava de policarbonato, para proteger los ojos al frente y a los lados contra partículas sólidas y salpicaduras.",
+      "characteristics": [
+        "Mica cóncava de policarbonato, antiimpacto y antirrayaduras",
+        "Mica con protección UV",
+        "Patillas y terminales de material recuperado",
+        "Orificio para cordón"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "mica-clara",
+          "label": "Mica clara",
+          "manufacturerCode": "ECO-1314C"
+        },
+        {
+          "id": "mica-gris",
+          "label": "Mica gris",
+          "manufacturerCode": "ECO-1314G"
+        },
+        {
+          "id": "mica-clara-antiempanante",
+          "label": "Mica clara antiempañante"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI/ISEA Z87.1-2020",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/ECO-1314C.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica ECO-1314C, mica clara (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1314C.pdf"
+        },
+        {
+          "label": "Ficha técnica ECO-1314G, mica gris (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1314G.pdf"
+        }
+      ],
+      "image": {
+        "file": "jyrsa-senador-eco-1314.webp",
+        "alt": "Lentes de seguridad de mica clara con patillas de color verde oscuro, vistos de tres cuartos.",
+        "sourceUrl": "https://jyrsa.com/producto/eco-1314/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://jyrsa.com/producto/eco-1314/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "jyrsa-sr-3180",
+      "brandId": "jyrsa",
+      "model": "SR-3180",
+      "name": "Cono vial de PVC naranja de 45 cm SR-3180",
+      "categoryIds": [
+        "vial-y-senalizacion"
+      ],
+      "status": "approved",
+      "description": "Cono vial de PVC naranja de una sola pieza, para delimitar áreas, señalar obras en construcción o alertar al usuario de un riesgo.",
+      "characteristics": [
+        "PVC de una sola pieza en color naranja",
+        "Altura de 45 cm",
+        "Peso de 1.25 kg",
+        "Base con 8 puntos de apoyo",
+        "Uno o dos reflejantes de 10 cm"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "con-1-reflejante",
+          "label": "Con 1 reflejante",
+          "manufacturerCode": "SR-3180-1RK"
+        },
+        {
+          "id": "con-2-reflejantes",
+          "label": "Con 2 reflejantes",
+          "manufacturerCode": "SR-3180-2RK"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica SR-3180 (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/SR-3180.pdf"
+        },
+        {
+          "label": "Ficha técnica SR-3180-1RK, 1 reflejante (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/SR-3180-1RK.pdf"
+        },
+        {
+          "label": "Ficha técnica SR-3180-2RK, 2 reflejantes (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/SR-3180-2RK.pdf"
+        }
+      ],
+      "image": {
+        "file": "jyrsa-sr-3180.webp",
+        "alt": "Cono vial de color naranja con base cuadrada; la foto lo muestra sin bandas reflejantes.",
+        "sourceUrl": "https://jyrsa.com/producto/sr-3180/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://jyrsa.com/producto/sr-3180/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "jyrsa-eco-1020cr",
+      "brandId": "jyrsa",
+      "model": "ECO-1020CR",
+      "name": "Chaleco de alta visibilidad de poliéster con cierre ECO-1020CR",
+      "categoryIds": [
+        "vial-y-senalizacion",
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Chaleco de tela de alta visibilidad de poliéster, con reflejante textil plateado y cierre frontal, para que quien lo usa sea visto con facilidad.",
+      "characteristics": [
+        "Tela de alta visibilidad de poliéster",
+        "Reflejante textil plateado de 2 pulgadas de ancho",
+        "Cierre de seguridad frontal",
+        "Tallas CH, MD, GD y XG; 2XG y 3XG sobre pedido"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "amarillo-alta-visibilidad",
+          "label": "Amarillo alta visibilidad"
+        },
+        {
+          "id": "naranja-alta-visibilidad",
+          "label": "Naranja alta visibilidad",
+          "manufacturerCode": "ECO-1020ANCR"
+        },
+        {
+          "id": "verde-alta-visibilidad",
+          "label": "Verde alta visibilidad",
+          "manufacturerCode": "ECO-1020VCR"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI Tipo R Clase 2",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/ECO-1020ANCR.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica ECO-1020ANCR, naranja (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1020ANCR.pdf"
+        },
+        {
+          "label": "Ficha técnica ECO-1020VCR, verde (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1020VCR.pdf"
+        },
+        {
+          "label": "Ficha técnica ECO-1020AMCR (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1020AMCR.pdf"
+        }
+      ],
+      "image": {
+        "file": "jyrsa-eco-1020cr.webp",
+        "alt": "Chaleco amarillo de alta visibilidad con franjas reflejantes plateadas, cierre al frente y bolsas, visto de frente.",
+        "sourceUrl": "https://jyrsa.com/producto/eco-1020cr/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://jyrsa.com/producto/eco-1020cr/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "jyrsa-al-1000",
+      "brandId": "jyrsa",
+      "model": "AL-1000",
+      "name": "Mandil aluminizado de viscosa FR y aramida AL-1000",
+      "categoryIds": [
+        "soldadura",
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Mandil de tela aluminizada para proteger el tronco superior contra calor radiante y salpicaduras de metal fundido en fundición, soldadura y metalurgia.",
+      "characteristics": [
+        "Tela de 50 % viscosa FR, 23 % m-aramida, 22 % aluminio y 5 % p-aramida",
+        "Medidas de 60 cm x 90 cm",
+        "Tirantes de 1 pulgada de tela ignífuga",
+        "Broche de plástico",
+        "Costuras con hilo de aramida"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "ISO 6942 C3",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        },
+        {
+          "text": "ISO 9185 D3 (aluminio 780 °C), E3 Fe (hierro 1400 °C)",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        },
+        {
+          "text": "EN 15025 (EN 11612) A1-A2",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        },
+        {
+          "text": "ISO 9151 B1",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        },
+        {
+          "text": "EN ISO 12127-2 F1",
+          "sourceUrl": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica AL-1000 (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/AL-1000.pdf"
+        }
+      ],
+      "image": {
+        "file": "jyrsa-al-1000.webp",
+        "alt": "Mandil aluminizado plateado con tirantes y ribete negros, visto de frente.",
+        "sourceUrl": "https://jyrsa.com/producto/al-1000/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://jyrsa.com/producto/al-1000/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "derma-care-67-700",
+      "brandId": "derma-care",
+      "model": "67-700",
+      "name": "Guante desechable de nitrilo negro 67-700",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante desechable de nitrilo negro, sin polvo y ambidiestro, para manejo de alimentos y residuos orgánicos y para trabajos de pintura en aerosol.",
+      "characteristics": [
+        "Nitrilo de 4 milésimas de pulgada de espesor",
+        "Largo de 240 mm (9.5 pulgadas)",
+        "Puño rolado, libre de polvo",
+        "Guante ambidiestro"
+      ],
+      "saleUnit": "caja con 100 piezas",
+      "variants": [
+        {
+          "id": "talla-ch",
+          "label": "Talla CH"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-g",
+          "label": "Talla G"
+        },
+        {
+          "id": "talla-eg",
+          "label": "Talla EG"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN-374-1:1994",
+          "sourceUrl": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_67-700.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_67-700.pdf"
+        }
+      ],
+      "image": {
+        "file": "derma-care-67-700.jpg",
+        "alt": "Par de guantes desechables de nitrilo de color negro, extendidos con los dedos hacia arriba.",
+        "sourceUrl": "https://dermacare.mx/guante-desechable-de-nitrilo-negro-caja-50-pares/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://dermacare.mx/guante-desechable-de-nitrilo-negro-caja-50-pares/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "derma-care-56-500",
+      "brandId": "derma-care",
+      "model": "56-500",
+      "name": "Guante desechable de látex bajo en polvo 56-500",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante desechable de látex natural, bajo en polvo, para exámenes no estériles y para la manipulación de alimentos.",
+      "characteristics": [
+        "Látex natural de 4 milésimas de pulgada de espesor",
+        "Largo de 9.5 pulgadas",
+        "Puño rolado, bajo en polvo",
+        "Color blanco"
+      ],
+      "saleUnit": "caja con 100 piezas",
+      "variants": [
+        {
+          "id": "talla-ch",
+          "label": "Talla CH"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-g",
+          "label": "Talla G"
+        },
+        {
+          "id": "talla-eg",
+          "label": "Talla EG"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN-374-1:1994",
+          "sourceUrl": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_56-500.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_56-500.pdf"
+        }
+      ],
+      "image": {
+        "file": "derma-care-56-500.jpg",
+        "alt": "Par de guantes desechables de látex de color crema, extendidos con los dedos hacia arriba.",
+        "sourceUrl": "https://dermacare.mx/guante-de-latex-desechable-bajo-en-polvo/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://dermacare.mx/guante-de-latex-desechable-bajo-en-polvo/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "derma-care-56-600",
+      "brandId": "derma-care",
+      "model": "56-600",
+      "name": "Guante desechable de látex libre de polvo 56-600",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante desechable de látex natural libre de polvo, para exploración médica, manipulación de alimentos y manejo de residuos orgánicos.",
+      "characteristics": [
+        "Látex natural de 4 milésimas de pulgada de espesor",
+        "Largo de 240 mm (9.5 pulgadas)",
+        "Puño rolado, libre de polvo",
+        "Color blanco"
+      ],
+      "saleUnit": "caja con 100 piezas",
+      "variants": [
+        {
+          "id": "talla-ch",
+          "label": "Talla CH"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-g",
+          "label": "Talla G"
+        },
+        {
+          "id": "talla-eg",
+          "label": "Talla EG"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN-374-1:1994",
+          "sourceUrl": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_56-600.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://dermacare.mx/wp-content/uploads/2023/12/FT-Dermacare_56-600.pdf"
+        }
+      ],
+      "image": {
+        "file": "derma-care-56-600.jpg",
+        "alt": "Par de guantes desechables de látex de color crema, extendidos con los dedos hacia arriba.",
+        "sourceUrl": "https://dermacare.mx/guante-de-latex-desechable-libre-de-polvo-50-pares-talla-s/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://dermacare.mx/guante-de-latex-desechable-libre-de-polvo-50-pares-talla-s/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "golden-eagle-pc100k-p2pd",
+      "brandId": "golden-eagle",
+      "model": "PC100K-P2PD",
+      "name": "Arnés de cuerpo completo con 4 anillos D PC100K-P2PD",
+      "categoryIds": [
+        "alturas"
+      ],
+      "status": "approved",
+      "description": "Arnés de cuerpo completo con cuatro anillos D, para protección contra caídas, posicionamiento y ascenso o descenso en trabajos en altura.",
+      "characteristics": [
+        "Banda de poliéster de alta tenacidad y herrajes de acero",
+        "Capacidad de 59 a 140 kg",
+        "Anillo D dorsal deslizable, uno esternal y dos laterales en la cintura",
+        "Hebillas de paso en esternón, vientre y piernas",
+        "Incluye 2 portaeslingas, indicador de caídas y cubreetiquetas"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "ANSI Z359.11-2014",
+          "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=27"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://www.goldeneagle.com.mx/wp-content/uploads/ficha-tecnica/114000-PC100K-P2PD.pdf"
+        }
+      ],
+      "image": {
+        "file": "golden-eagle-pc100k-p2pd.webp",
+        "alt": "Arnés de cuerpo completo de banda roja con negro, con un anillo en el pecho y dos a los lados de la cintura, visto de frente.",
+        "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=27",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.goldeneagle.com.mx/producto/?producto=27",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "golden-eagle-saw-d",
+      "brandId": "golden-eagle",
+      "model": "SAW-D",
+      "name": "Eslinga doble con amortiguador de impacto SAW-D",
+      "categoryIds": [
+        "alturas"
+      ],
+      "status": "approved",
+      "description": "Eslinga de doble pierna con amortiguador de impacto y tres ganchos de acero, para conectar el arnés al punto de anclaje y detener caídas con conexión continua.",
+      "characteristics": [
+        "Banda de poliéster de alta tenacidad de 1 pulgada de ancho",
+        "Tres ganchos chicos de acero de 3/4 de pulgada",
+        "Elongación máxima de 1.2 m y fuerza máxima de caída de 408 kg",
+        "Capacidad de 59 a 140 kg",
+        "Peso de 1.60 kg"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "largo-de-1-20-m",
+          "label": "Largo de 1.20 m",
+          "manufacturerCode": "212000-12"
+        },
+        {
+          "id": "largo-de-1-50-m",
+          "label": "Largo de 1.50 m",
+          "manufacturerCode": "212000-15"
+        },
+        {
+          "id": "largo-de-1-83-m",
+          "label": "Largo de 1.83 m",
+          "manufacturerCode": "212000-18"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ANSI Z359.13-2013",
+          "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=104"
+        },
+        {
+          "text": "ANSI Z359.12-2019 (ganchos)",
+          "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=104"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://www.goldeneagle.com.mx/wp-content/uploads/ficha-tecnica/212000-SAW-D.pdf"
+        }
+      ],
+      "image": {
+        "file": "golden-eagle-saw-d.webp",
+        "alt": "Eslinga doble de banda roja con amortiguador de impacto negro y tres ganchos.",
+        "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=104",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.goldeneagle.com.mx/producto/?producto=104",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "golden-eagle-9300",
+      "brandId": "golden-eagle",
+      "model": "9300",
+      "name": "Guante anticorte tejido de Kevlar 9300",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante anticorte tejido de Kevlar, para manipular piezas con filo y para tareas con exposición al calor.",
+      "characteristics": [
+        "Hecho de Kevlar de DuPont",
+        "Tejido en calibre 7",
+        "Guante de peso pesado"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-8",
+          "label": "Talla 8"
+        },
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        }
+      ],
+      "standards": [
+        {
+          "text": "ASTM-F2992-15",
+          "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=131"
+        },
+        {
+          "text": "Nivel de corte A3",
+          "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=131"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica de los modelos 9300 y 9200 (PDF)",
+          "url": "https://www.goldeneagle.com.mx/wp-content/uploads/ficha-tecnica/9300-9300.pdf"
+        }
+      ],
+      "image": {
+        "file": "golden-eagle-9300.webp",
+        "alt": "Par de guantes tejidos de color amarillo con la orilla del puño en rojo y etiquetas cosidas en el dorso.",
+        "sourceUrl": "https://www.goldeneagle.com.mx/producto/?producto=131",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://www.goldeneagle.com.mx/producto/?producto=131",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "mr-seguridad-katana-plus-sg1049",
+      "brandId": "mr-seguridad",
+      "model": "SG1049",
+      "name": "Guante anticorte y antiimpacto Katana Plus SG1049",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante tejido anticorte con palma recubierta de nitrilo arenoso y exoesqueleto de TPR en el dorso contra impactos.",
+      "characteristics": [
+        "Tejido de HPPE, fibra de vidrio, fibra de acero, poliéster y elastano",
+        "Palma recubierta de nitrilo arenoso",
+        "Exoesqueleto de TPR/elastómero en el dorso",
+        "Aletilla de ajuste con velcro en la muñeca"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-7",
+          "label": "Talla 7"
+        },
+        {
+          "id": "talla-8",
+          "label": "Talla 8"
+        },
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        },
+        {
+          "id": "talla-10",
+          "label": "Talla 10"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN 388:2016+A1:2018(4X41EP)",
+          "sourceUrl": "https://mrseguridad.com/product/guante-katana-plus-a5/"
+        },
+        {
+          "text": "ANSI-ISEA 105: 2016 (A5)",
+          "sourceUrl": "https://mrseguridad.com/product/guante-katana-plus-a5/"
+        }
+      ],
+      "image": {
+        "file": "mr-seguridad-katana-plus-sg1049.jpg",
+        "alt": "Guante tejido gris con protecciones amarillas y negras en el dorso y en los dedos, y cinta de ajuste en la muñeca.",
+        "sourceUrl": "https://mrseguridad.com/product/guante-katana-plus-a5/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mrseguridad.com/product/guante-katana-plus-a5/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "mr-seguridad-sq1004",
+      "brandId": "mr-seguridad",
+      "model": "SQ1004",
+      "name": "Tapón auditivo reutilizable de silicona con cordón SQ1004",
+      "categoryIds": [
+        "auditiva"
+      ],
+      "status": "approved",
+      "description": "Tapón auditivo reutilizable de silicona, con cordón plástico y estuche, que se inserta en el oído para reducir la exposición al ruido.",
+      "characteristics": [
+        "Silicona hipoalergénica libre de PVC",
+        "Cordón de plástico",
+        "Se entrega con estuche"
+      ],
+      "saleUnit": "par",
+      "standards": [
+        {
+          "text": "SNR 36 dB, NRR 25 dB",
+          "sourceUrl": "https://mrseguridad.com/product/tapon-auditivo-reusable-con-cordon/"
+        },
+        {
+          "text": "ANSI S3.19-1974",
+          "sourceUrl": "https://mrseguridad.com/fichas-tecnicas-mr/proteccion-auditiva/SQ1004.pdf"
+        },
+        {
+          "text": "ANSI S12.6-2008",
+          "sourceUrl": "https://mrseguridad.com/fichas-tecnicas-mr/proteccion-auditiva/SQ1004.pdf"
+        },
+        {
+          "text": "EN352",
+          "sourceUrl": "https://mrseguridad.com/fichas-tecnicas-mr/proteccion-auditiva/SQ1004.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del producto (PDF)",
+          "url": "https://mrseguridad.com/fichas-tecnicas-mr/proteccion-auditiva/SQ1004.pdf"
+        }
+      ],
+      "image": {
+        "file": "mr-seguridad-sq1004.webp",
+        "alt": "Par de tapones auditivos de color naranja unidos por un cordón azul, junto a su estuche azul oscuro.",
+        "sourceUrl": "https://mrseguridad.com/product/tapon-auditivo-reusable-con-cordon/",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://mrseguridad.com/product/tapon-auditivo-reusable-con-cordon/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "uvex-classic-s360",
+      "brandId": "uvex",
+      "model": "S360",
+      "name": "Goggle de PVC con ventilación indirecta Classic S360",
+      "categoryIds": [
+        "ojos-y-cara"
+      ],
+      "status": "approved",
+      "description": "Goggle de seguridad de PVC con mica de policarbonato antiempañante y ventilación indirecta, para proteger los ojos contra polvo, niebla o salpicaduras químicas.",
+      "characteristics": [
+        "Cuerpo de PVC y mica clara de policarbonato",
+        "Mica de 1.4 mm con recubrimiento antiempañante Uvextreme",
+        "Filtro U6 de 99.9 % de UVB/UVA",
+        "Banda de neopreno gris",
+        "Se usa sobre la mayoría de los lentes graduados"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "ANSI Z87.1+ 2015",
+          "sourceUrl": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection/safety-goggles/uvex-classic"
+        },
+        {
+          "text": "CSA Z94.3",
+          "sourceUrl": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection/safety-goggles/uvex-classic"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Códigos e información de pedido (PDF, en inglés)",
+          "url": "https://prod-edam.honeywell.com/content/dam/honeywell-edam/sps/his/en-us/products/head-eye-face-protection/documents/eye/UX_uvex_classic_uvex-classic.pdf"
+        },
+        {
+          "label": "Constancia de cumplimiento de norma (PDF, en inglés)",
+          "url": "https://prod-edam.honeywell.com/content/dam/honeywell-edam/sps/his/en-us/products/head-eye-face-protection/documents/eye/sps-his-coc-ansi-20-classic.pdf"
+        }
+      ],
+      "image": {
+        "file": "uvex-classic-s360.jpg",
+        "alt": "Goggle de seguridad transparente con banda elástica gris, visto de tres cuartos.",
+        "sourceUrl": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection/safety-goggles/uvex-classic",
+        "usageConfirmed": true
+      },
+      "source": {
+        "url": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection/safety-goggles/uvex-classic",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-alphatec-solvex-37-175",
+      "brandId": "ansell",
+      "model": "37-175",
+      "name": "Guante de nitrilo para químicos AlphaTec Solvex 37-175",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante de nitrilo sin soporte, con interior de algodón flocado y puño guantelete, para trasvasar líquidos, dar mantenimiento a equipos y manejar piezas metálicas.",
+      "characteristics": [
+        "Nitrilo sin soporte con interior de algodón flocado",
+        "Largo de 330 mm con puño guantelete",
+        "Espesor en la palma de 0.45 mm (18 milésimas de pulgada)",
+        "Color verde con acabado Sandpatch"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-6",
+          "label": "Talla 6"
+        },
+        {
+          "id": "talla-7",
+          "label": "Talla 7"
+        },
+        {
+          "id": "talla-8",
+          "label": "Talla 8"
+        },
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        },
+        {
+          "id": "talla-10",
+          "label": "Talla 10"
+        },
+        {
+          "id": "talla-11",
+          "label": "Talla 11"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN ISO 374-1:2016 JKLOPT",
+          "sourceUrl": "https://www.ansell.com/us/en/products/alphatec-solvex-37-175"
+        },
+        {
+          "text": "EN 374 Tipo A",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-solvex-37-175/pds/70NULyhyLvJez7VCzlWrA"
+        },
+        {
+          "text": "EN ISO 374-5:2016",
+          "sourceUrl": "https://www.ansell.com/us/en/products/alphatec-solvex-37-175"
+        },
+        {
+          "text": "EN 388:2016 +A1:2018 4101X",
+          "sourceUrl": "https://www.ansell.com/us/en/products/alphatec-solvex-37-175"
+        },
+        {
+          "text": "ANSI/ISEA 105-2024",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-solvex-37-175/pds/70NULyhyLvJez7VCzlWrA"
+        },
+        {
+          "text": "FDA 21 CFR 177.2600",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-solvex-37-175/pds/70NULyhyLvJez7VCzlWrA"
+        },
+        {
+          "text": "EN ISO 21420:2020",
+          "sourceUrl": "https://www.ansell.com/us/en/products/alphatec-solvex-37-175"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/mx/es/products/alphatec-solvex-37-175/pds/70NULyhyLvJez7VCzlWrA"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/mx/es/products/alphatec-solvex-37-175/pds/70NULyhyLvJez7VCzlWrA",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-hyflex-11-840",
+      "brandId": "ansell",
+      "model": "11-840",
+      "name": "Guante de nylon con palma de espuma de nitrilo HyFlex 11-840",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante tejido de nylon y spandex con palma recubierta de espuma de nitrilo, para manipulación general, montaje de piezas pequeñas y atornillado.",
+      "characteristics": [
+        "Forro de nylon y spandex calibre 15",
+        "Palma recubierta de espuma de nitrilo",
+        "Largo de 200 a 275 mm (8 a 11 pulgadas)",
+        "Puño de muñeca tejido de punto"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-6",
+          "label": "Talla 6"
+        },
+        {
+          "id": "talla-7",
+          "label": "Talla 7"
+        },
+        {
+          "id": "talla-8",
+          "label": "Talla 8"
+        },
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        },
+        {
+          "id": "talla-10",
+          "label": "Talla 10"
+        },
+        {
+          "id": "talla-11",
+          "label": "Talla 11"
+        },
+        {
+          "id": "talla-12",
+          "label": "Talla 12"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN 388:2016 +A1:2018 4131A",
+          "sourceUrl": "https://www.ansell.com/co/es/products/hyflex-11-840-lac"
+        },
+        {
+          "text": "ANSI/ISEA 105-2024 4 2 A1",
+          "sourceUrl": "https://www.ansell.com/co/es/products/hyflex-11-840-lac"
+        },
+        {
+          "text": "EN407:2020 X1XXXX",
+          "sourceUrl": "https://www.ansell.com/co/es/products/hyflex-11-840-lac"
+        },
+        {
+          "text": "EN ISO 21420:2020",
+          "sourceUrl": "https://www.ansell.com/co/es/products/hyflex-11-840-lac"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/co/es/products/hyflex-11-840-lac/pds/C02EE9XYvaJG60ZuTFcw"
+        },
+        {
+          "label": "Declaración de contacto con alimentos",
+          "url": "https://www.ansell.com/co/es/products/hyflex-11-840-lac/fdoc/C02EE9XYvaJG60ZuTFcw"
+        },
+        {
+          "label": "Instrucciones de uso (PDF, varios idiomas)",
+          "url": "https://www.ansell.com/-/media/projects/ansell/website/pim/product-assets/ifus---mechanical-products/new/ifu-mechanical-and-thermal-resistance_split_v3-2-es.ashx"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/co/es/products/hyflex-11-840-lac",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-hyflex-11-730",
+      "brandId": "ansell",
+      "model": "11-730",
+      "name": "Guante anticorte con palma de poliuretano HyFlex 11-730",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante tejido anticorte con palma recubierta de poliuretano, para manipular piezas metálicas con filo o irregulares y ensamblar piezas de metal.",
+      "characteristics": [
+        "Forro de nylon, algodón, spandex, Kevlar y tecnología INTERCEPT",
+        "Tejido calibre 13 con palma recubierta de poliuretano",
+        "Largo de 215 a 270 mm (8.46 a 10.63 pulgadas)",
+        "Muñeca de punto y propiedad antiestática"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-6",
+          "label": "Talla 6"
+        },
+        {
+          "id": "talla-7",
+          "label": "Talla 7"
+        },
+        {
+          "id": "talla-8",
+          "label": "Talla 8"
+        },
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        },
+        {
+          "id": "talla-10",
+          "label": "Talla 10"
+        },
+        {
+          "id": "talla-11",
+          "label": "Talla 11"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN 388:2016 +A1:2018 4X43D",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/hyflex-11-730"
+        },
+        {
+          "text": "ANSI/ISEA 105-2024 4 4 A5",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/hyflex-11-730"
+        },
+        {
+          "text": "EN407:2020 X1XXXX",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/hyflex-11-730"
+        },
+        {
+          "text": "EN ISO 21420:2020",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/hyflex-11-730"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/mx/es/products/hyflex-11-730/pds/9sTDjf1zqIC0cmYMFydQ"
+        },
+        {
+          "label": "Instrucciones de uso (PDF, varios idiomas)",
+          "url": "https://www.ansell.com/-/media/projects/ansell/website/pim/product-assets/ifus---mechanical-products/new/ifu-mechanical-and-thermal-resistance_split_v3-2-es.ashx"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/mx/es/products/hyflex-11-730",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-touchntuff-92-600",
+      "brandId": "ansell",
+      "model": "92-600",
+      "name": "Guante desechable de nitrilo TouchNTuff 92-600",
+      "categoryIds": [
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante desechable de nitrilo contra salpicaduras químicas, para laboratorio, procesamiento de alimentos, producción industrial y mantenimiento.",
+      "characteristics": [
+        "Guante de nitrilo sin silicona",
+        "Largo de 240 mm (9.45 pulgadas)",
+        "Espesor de 0.125 mm en la palma y 0.14 mm en los dedos",
+        "Dispensador de 100 guantes (XS a XL) o de 90 guantes (XXL)"
+      ],
+      "saleUnit": "caja",
+      "variants": [
+        {
+          "id": "talla-xs",
+          "label": "Talla XS (5.5-6)",
+          "manufacturerCode": "92600060"
+        },
+        {
+          "id": "talla-s",
+          "label": "Talla S (6.5-7)",
+          "manufacturerCode": "585834"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M (7.5-8)",
+          "manufacturerCode": "585835"
+        },
+        {
+          "id": "talla-l",
+          "label": "Talla L (8.5-9)",
+          "manufacturerCode": "585836"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL (9.5-10)",
+          "manufacturerCode": "585837"
+        },
+        {
+          "id": "talla-xxl",
+          "label": "Talla XXL (10.5-11)",
+          "manufacturerCode": "92600110"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN ISO 374-1:2016 Type B JKPT",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
+        },
+        {
+          "text": "EN ISO 374-5:2016 Virus",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
+        },
+        {
+          "text": "EN 388:2016 1XXXX",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
+        },
+        {
+          "text": "FDA 21 CFR 177-2600",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/l5N9zFNSBq7484FK2MtjKg"
+        },
+        {
+          "text": "EN ISO 21420:2020",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/l5N9zFNSBq7484FK2MtjKg"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-alphatec-1800-comfort-w18b195",
+      "brandId": "ansell",
+      "model": "W18B195",
+      "name": "Overol desechable con capucha AlphaTec 1800 COMFORT Modelo 195",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol desechable con capucha, de laminado microporoso, para pintura de carrocerías, limpieza y mantenimiento de plantas y manejo de productos en polvo.",
+      "characteristics": [
+        "Laminado microporoso de polipropileno no tejido",
+        "Capucha de 3 piezas de tela SMS",
+        "Elástico en capucha, cintura, tobillos y muñecas",
+        "Cierre frontal de doble sentido con solapa resellable",
+        "Tratamiento antiestático en espalda, axilas y capucha"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-s",
+          "label": "Talla S"
+        },
+        {
+          "id": "talla-m",
+          "label": "Talla M"
+        },
+        {
+          "id": "talla-l",
+          "label": "Talla L"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2xl",
+          "label": "Talla 2XL"
+        },
+        {
+          "id": "talla-3xl",
+          "label": "Talla 3XL"
+        },
+        {
+          "id": "talla-4xl",
+          "label": "Talla 4XL"
+        },
+        {
+          "id": "talla-5xl",
+          "label": "Talla 5XL"
+        }
+      ],
+      "standards": [
+        {
+          "text": "Categoría III (Tipo 5, Tipo 6, EN 1073-2, EN 1149-5)",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195/pds/A2dKQM9w17LO4VGTrGAJZg"
+        },
+        {
+          "text": "EN ISO 13982-1:2004 + A1:2010",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195"
+        },
+        {
+          "text": "EN 13034:2005 + A1:2009",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195"
+        },
+        {
+          "text": "EN 1073-2:2002",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195"
+        },
+        {
+          "text": "EN 1149-5:2008",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195/pds/A2dKQM9w17LO4VGTrGAJZg"
+        },
+        {
+          "label": "Instrucciones de uso (PDF, varios idiomas)",
+          "url": "https://www.ansell.com/-/media/projects/ansell/website/pim/product-assets/alphatec-suits/instructions-for-use---new/puat18c0l2---a1800-comfort-fb-ui_lac---01.ashx"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/mx/es/products/alphatec-1800-comfort-bound-model-195",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "ansell-activarmr-43-216",
+      "brandId": "ansell",
+      "model": "43-216",
+      "name": "Guante para soldador de carnaza ActivArmr 43-216",
+      "categoryIds": [
+        "soldadura",
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante de carnaza de res con puño guantelete, forro de algodón y costuras con hilo Kevlar, para soldadura y trabajos con calor en metalmecánica.",
+      "characteristics": [
+        "Carnaza de res con forro de algodón",
+        "Costuras reforzadas con hilo Kevlar",
+        "Puño guantelete y largo de 378 a 418 mm"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-9",
+          "label": "Talla 9"
+        },
+        {
+          "id": "talla-10",
+          "label": "Talla 10"
+        },
+        {
+          "id": "talla-11",
+          "label": "Talla 11"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN 12477 Tipo A",
+          "sourceUrl": "https://www.ansell.com/mx/es/products/activarmr-43-216/pds/36o3I5aUwutEIJBCM5HItA"
+        },
+        {
+          "text": "EN 12477:2001 + A1:2005",
+          "sourceUrl": "https://www.ansell.com/us/en/products/activarmr-43-216"
+        },
+        {
+          "text": "EN407:2020 413X4X",
+          "sourceUrl": "https://www.ansell.com/us/en/products/activarmr-43-216"
+        },
+        {
+          "text": "EN 388:2016 +A1:2018 3243B",
+          "sourceUrl": "https://www.ansell.com/us/en/products/activarmr-43-216"
+        },
+        {
+          "text": "EN ISO 21420:2020",
+          "sourceUrl": "https://www.ansell.com/us/en/products/activarmr-43-216"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos del producto",
+          "url": "https://www.ansell.com/mx/es/products/activarmr-43-216/pds/36o3I5aUwutEIJBCM5HItA"
+        },
+        {
+          "label": "Declaración UE de conformidad",
+          "url": "https://www.ansell.com/us/en/products/activarmr-43-216/doc/jDHJ6bKT5uuIoMn6GSKxA"
+        }
+      ],
+      "source": {
+        "url": "https://www.ansell.com/mx/es/products/activarmr-43-216/pds/36o3I5aUwutEIJBCM5HItA",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "3m-8210",
+      "brandId": "3m",
+      "model": "8210",
+      "name": "Respirador desechable para partículas 8210",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Respirador desechable en forma de copa contra material particulado y polvos no perjudiciales de lijado, esmerilado y aserrado.",
+      "characteristics": [
+        "Forma de copa",
+        "Filtra 95 % de aerosoles sólidos y líquidos sin aceite",
+        "Clip nasal ajustable"
+      ],
+      "saleUnit": "paquete con 20 piezas",
+      "standards": [
+        {
+          "text": "Aprobado por NIOSH",
+          "sourceUrl": "https://www.3m.com.mx/3M/es_MX/p/d/v000253027/"
+        }
+      ],
+      "source": {
+        "url": "https://www.3m.com.mx/3M/es_MX/p/d/v000253027/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "3m-6200",
+      "brandId": "3m",
+      "model": "6200",
+      "name": "Respirador reutilizable de media cara 6200",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Respirador reutilizable de media cara con conexión de bayoneta, para usarse con filtros o cartuchos 3M contra partículas, gases y vapores.",
+      "characteristics": [
+        "Pieza facial de elastómero termoplástico",
+        "Arnés de cuna con correas ajustables",
+        "Conexión de bayoneta para filtros 2000, 5000 y 7000 y cartuchos 6000",
+        "La pieza facial no incluye cartuchos"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-mediana",
+          "label": "Talla mediana",
+          "manufacturerCode": "6200/07025(AAD)"
+        }
+      ],
+      "standards": [
+        {
+          "text": "Aprobado por NIOSH",
+          "sourceUrl": "https://www.3m.com/3M/en_US/p/d/v101806317/"
+        }
+      ],
+      "source": {
+        "url": "https://www.3m.com/3M/en_US/p/d/v101806317/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "3m-6003",
+      "brandId": "3m",
+      "model": "6003",
+      "name": "Cartucho para vapores orgánicos y gases ácidos 6003",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Cartucho de carbón con conexión de bayoneta para respiradores reutilizables 3M, contra ciertos vapores orgánicos y gases ácidos como cloro y dióxido de azufre.",
+      "characteristics": [
+        "Conexión de bayoneta",
+        "Para cloro, cloruro de hidrógeno, dióxido de azufre y fluoruro de hidrógeno",
+        "Para sulfuro de hidrógeno y ciertos vapores orgánicos",
+        "Se usa con respiradores 3M de las series 6000, 6500, 7500, 7800S y FF-400",
+        "No apto para atmósferas de peligro inmediato para la vida o la salud (IPVS)"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "Aprobado por NIOSH",
+          "sourceUrl": "https://www.3m.com.mx/3M/es_MX/p/d/v000093369/"
+        }
+      ],
+      "source": {
+        "url": "https://www.3m.com.mx/3M/es_MX/p/d/v000093369/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "3m-securefit-sf201af",
+      "brandId": "3m",
+      "model": "SF201AF",
+      "name": "Lentes de seguridad con mica clara antiempañante SecureFit SF201AF",
+      "categoryIds": [
+        "ojos-y-cara"
+      ],
+      "status": "approved",
+      "description": "Lentes de seguridad con mica clara de policarbonato y recubrimiento antiempañante y antirrayaduras, para protección contra impactos.",
+      "characteristics": [
+        "Mica clara de policarbonato",
+        "Recubrimiento antiempañante y antirrayaduras",
+        "Armazón y patillas transparentes",
+        "Absorbe 99.9 % de rayos UVA, UVB y UVC de 200 nm a 380 nm",
+        "Serie 200 de la línea SecureFit"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "ANSI/ISEA-2020 Z87.1",
+          "sourceUrl": "https://www.3m.com/3M/en_US/p/dc/v000255733/"
+        }
+      ],
+      "source": {
+        "url": "https://www.3m.com/3M/en_US/p/dc/v000255733/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "3m-peltor-x4a",
+      "brandId": "3m",
+      "model": "X4A",
+      "name": "Orejera de diadema con copas de perfil bajo PELTOR X4A",
+      "categoryIds": [
+        "auditiva"
+      ],
+      "status": "approved",
+      "description": "Orejera de diadema con copas de perfil bajo, para reducir la exposición al ruido.",
+      "characteristics": [
+        "Copas de diseño de perfil bajo",
+        "Espuma de alta densidad y recuperación lenta",
+        "Con aislamiento eléctrico",
+        "Cojinetes y espumas de repuesto con el kit de higiene HYX4"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "NRR de 25 a 27 dB según el tipo de sujeción",
+          "sourceUrl": "https://www.3m.com/3M/en_US/p/dc/v101643048/"
+        }
+      ],
+      "source": {
+        "url": "https://www.3m.com/3M/en_US/p/dc/v101643048/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "moldex-2200n95",
+      "brandId": "moldex",
+      "model": "2200N95",
+      "name": "Respirador desechable N95 sin válvula 2200N95",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Respirador desechable para partículas, sin válvula, de dos bandas y forma moldeada, para polvos y partículas sin aceite en trabajos industriales.",
+      "characteristics": [
+        "Malla exterior Dura-Mesh",
+        "Revestimiento interior Softspun",
+        "Puente nasal moldeado sin clip metálico, con almohadilla de espuma",
+        "Dos bandas de sujeción",
+        "Contiene látex de hule natural"
+      ],
+      "saleUnit": "caja con 20 piezas",
+      "variants": [
+        {
+          "id": "talla-m-g",
+          "label": "Talla M/G (mediana/grande)",
+          "manufacturerCode": "2200N95"
+        },
+        {
+          "id": "talla-p",
+          "label": "Talla P (pequeña)",
+          "manufacturerCode": "2201N95"
+        },
+        {
+          "id": "talla-bp",
+          "label": "Talla BP (bajo perfil)",
+          "manufacturerCode": "2207N95"
+        }
+      ],
+      "standards": [
+        {
+          "text": "NIOSH N95",
+          "sourceUrl": "https://www.moldex.com/wp-content/uploads/Disposable-Respirator-Combined-Espa%C3%B1ol.docx.pdf"
+        },
+        {
+          "text": "42CFR84",
+          "sourceUrl": "https://www.moldex.com/pdf/datasheets/2200n95.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica de la serie 2200 (PDF, en inglés)",
+          "url": "https://www.moldex.com/pdf/datasheets/2200n95.pdf"
+        },
+        {
+          "label": "Hoja de datos de respiradores desechables (PDF)",
+          "url": "https://www.moldex.com/wp-content/uploads/Disposable-Respirator-Combined-Espa%C3%B1ol.docx.pdf"
+        }
+      ],
+      "source": {
+        "url": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/n95/2200N95/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "moldex-pura-fit-6800",
+      "brandId": "moldex",
+      "model": "6800",
+      "name": "Tapón auditivo desechable de espuma sin cordón Pura-Fit 6800",
+      "categoryIds": [
+        "auditiva"
+      ],
+      "status": "approved",
+      "description": "Tapón auditivo desechable de espuma, cónico y sin cordón, que se inserta en el canal auditivo para reducir la exposición al ruido en áreas de trabajo.",
+      "characteristics": [
+        "Espuma libre de PVC",
+        "Tapón de forma cónica sin cordón",
+        "Color verde brillante"
+      ],
+      "saleUnit": "caja con 200 pares",
+      "standards": [
+        {
+          "text": "ANSI S3.19-1974, NRR 33 dB",
+          "sourceUrl": "https://www.moldex.com/pdf/datasheets/purafit_hojadedatos.pdf"
+        },
+        {
+          "text": "AS/NZS 1270:2002",
+          "sourceUrl": "https://www.moldex.com/product/hearing-protection/disposable-earplugs/purafit/6800/"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Hoja de datos Pura-Fit (PDF)",
+          "url": "https://www.moldex.com/pdf/datasheets/purafit_hojadedatos.pdf"
+        }
+      ],
+      "source": {
+        "url": "https://www.moldex.com/pdf/datasheets/purafit_hojadedatos.pdf",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "moldex-serie-7000",
+      "brandId": "moldex",
+      "model": "7000",
+      "name": "Respirador reutilizable de media cara Serie 7000",
+      "categoryIds": [
+        "respiratoria"
+      ],
+      "status": "approved",
+      "description": "Pieza facial reutilizable de media cara, de elastómero, con montaje tipo bayoneta para cartuchos y filtros contra partículas, gases y vapores.",
+      "characteristics": [
+        "Pieza facial de elastómero, sin cartuchos ni filtros",
+        "Montaje tipo bayoneta para cartuchos y filtros",
+        "Cubierta de exhalación para inspección",
+        "Contiene látex de hule natural"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-pequena",
+          "label": "Talla pequeña",
+          "manufacturerCode": "7001"
+        },
+        {
+          "id": "talla-mediana",
+          "label": "Talla mediana",
+          "manufacturerCode": "7002"
+        },
+        {
+          "id": "talla-grande",
+          "label": "Talla grande",
+          "manufacturerCode": "7003"
+        }
+      ],
+      "standards": [
+        {
+          "text": "Aprobado por NIOSH",
+          "sourceUrl": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/reusable-respirators/facepieces/7002/"
+        },
+        {
+          "text": "42 CFR part 84",
+          "sourceUrl": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/reusable-respirators/facepieces/7002/"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Folleto de respiradores reutilizables (PDF)",
+          "url": "https://www.moldex.com/wp-content/uploads/10-24-Reusable-Respirator-Brochure-finalESP.pdf"
+        }
+      ],
+      "source": {
+        "url": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/reusable-respirators/facepieces/7002/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "lakeland-micromax-tg428",
+      "brandId": "lakeland",
+      "model": "TG428",
+      "name": "Overol desechable con capucha MicroMax TG428",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol desechable MicroMax con capucha, cierre y elástico en muñecas y tobillos, para protección contra suciedad, polvo, grasa y salpicaduras ligeras.",
+      "characteristics": [
+        "Malla de refuerzo tipo rip-stop",
+        "Capucha, cierre y elástico en muñecas y tobillos",
+        "Gramaje de la tela de 2.10 oz/yd²"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-sm",
+          "label": "Talla SM"
+        },
+        {
+          "id": "talla-md",
+          "label": "Talla MD"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2x",
+          "label": "Talla 2X"
+        },
+        {
+          "id": "talla-3x",
+          "label": "Talla 3X"
+        },
+        {
+          "id": "talla-4x",
+          "label": "Talla 4X"
+        },
+        {
+          "id": "talla-5x",
+          "label": "Talla 5X"
+        },
+        {
+          "id": "talla-6x",
+          "label": "Talla 6X"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha de datos MicroMax (PDF, en inglés)",
+          "url": "https://www.lakeland.com/wp-content/uploads/micromax-datasheet.pdf"
+        },
+        {
+          "label": "Tabla de tallas de ropa química y desechable (PDF)",
+          "url": "https://www.lakeland.com/wp-content/uploads/disp_chem_sizing.pdf"
+        }
+      ],
+      "source": {
+        "url": "https://www.lakeland.com/es-la/product/micromax-coverall-hood-elastic-wrist-ankle/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "lakeland-chemmax-1-c1s428y",
+      "brandId": "lakeland",
+      "model": "C1S428Y",
+      "name": "Overol con capucha y película de polietileno ChemMax 1 C1S428Y",
+      "categoryIds": [
+        "ropa"
+      ],
+      "status": "approved",
+      "description": "Overol con película de barrera de polietileno sobre no tejido de polipropileno, con capucha, para protección contra salpicaduras de líquidos ligeros.",
+      "characteristics": [
+        "Película de polietileno sobre no tejido de polipropileno de filamento continuo",
+        "Capucha, solapa sobre el cierre y elástico en puños y tobillos",
+        "Costura reforzada sobrehilada",
+        "Gramaje de la tela de 2.29 oz/yd²"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "talla-md",
+          "label": "Talla MD"
+        },
+        {
+          "id": "talla-lg",
+          "label": "Talla LG"
+        },
+        {
+          "id": "talla-xl",
+          "label": "Talla XL"
+        },
+        {
+          "id": "talla-2x",
+          "label": "Talla 2X"
+        },
+        {
+          "id": "talla-3x",
+          "label": "Talla 3X"
+        },
+        {
+          "id": "talla-4x",
+          "label": "Talla 4X"
+        }
+      ],
+      "standards": [
+        {
+          "text": "EN-1149 (propiedades electrostáticas)",
+          "sourceUrl": "https://www.lakeland.com/wp-content/uploads/chemmax1-datasheet.pdf"
+        },
+        {
+          "text": "ASTM D6978 (fentanilo)",
+          "sourceUrl": "https://www.lakeland.com/wp-content/uploads/chemmax1-datasheet.pdf"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha de datos ChemMax 1 (PDF, en inglés)",
+          "url": "https://www.lakeland.com/wp-content/uploads/chemmax1-datasheet.pdf"
+        },
+        {
+          "label": "Tabla de tallas de ropa química y desechable (PDF)",
+          "url": "https://www.lakeland.com/wp-content/uploads/disp_chem_sizing.pdf"
+        }
+      ],
+      "source": {
+        "url": "https://www.lakeland.com/es-la/product/chemmax-1-serged-seam-coverall-hood-elastic-wrist-ankle/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "herhild-a4a",
+      "brandId": "herhild",
+      "model": "A4A",
+      "name": "Arnés de cuerpo completo con 4 argollas A4A",
+      "categoryIds": [
+        "alturas"
+      ],
+      "status": "approved",
+      "description": "Arnés de cuerpo completo con cuatro argollas de acero forjado, para sistemas personales de protección contra caídas en construcción e industria.",
+      "characteristics": [
+        "Cinta de poliéster de 1 3/4 pulgadas (45 mm) y 1.4 mm de grosor",
+        "Argollas de acero forjado con baño de zinc",
+        "Hebillas de acero de alta tenacidad",
+        "Capacidad de 140 kg (310 lb)",
+        "Color naranja con dos cintas reflejantes"
+      ],
+      "saleUnit": "pieza",
+      "standards": [
+        {
+          "text": "ANSI/ASSP Z359.11-2021",
+          "sourceUrl": "https://herhild.com/producto/arnes-de-cuatro-argollas/"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica A4A (PDF)",
+          "url": "https://herhild.com/download/12493/?tmstv=1795451786"
+        }
+      ],
+      "source": {
+        "url": "https://herhild.com/producto/arnes-de-cuatro-argollas/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "herhild-casco-tipo-cachucha",
+      "brandId": "herhild",
+      "model": "CASCO",
+      "name": "Casco tipo cachucha de termoplástico con suspensión de 8 puntos",
+      "categoryIds": [
+        "cabeza"
+      ],
+      "status": "approved",
+      "description": "Casco de seguridad tipo cachucha de termoplástico, dieléctrico, con suspensión de 8 puntos, para proteger la cabeza contra impactos.",
+      "characteristics": [
+        "Termoplástico o polietileno de alto impacto",
+        "Tipo I, clase E",
+        "Suspensión de 8 puntos de apoyo, sencilla o de matraca",
+        "Propiedad dieléctrica de 20,000 volts"
+      ],
+      "saleUnit": "pieza",
+      "variants": [
+        {
+          "id": "blanco",
+          "label": "Blanco"
+        },
+        {
+          "id": "amarillo",
+          "label": "Amarillo"
+        },
+        {
+          "id": "naranja",
+          "label": "Naranja"
+        },
+        {
+          "id": "rojo",
+          "label": "Rojo"
+        },
+        {
+          "id": "azul",
+          "label": "Azul"
+        },
+        {
+          "id": "gris",
+          "label": "Gris"
+        },
+        {
+          "id": "verde",
+          "label": "Verde"
+        },
+        {
+          "id": "beige",
+          "label": "Beige"
+        },
+        {
+          "id": "negro",
+          "label": "Negro"
+        },
+        {
+          "id": "rosa",
+          "label": "Rosa"
+        }
+      ],
+      "standards": [
+        {
+          "text": "NOM-115-STPS-2009",
+          "sourceUrl": "https://herhild.com/producto/casco-tipo-cachucha/"
+        },
+        {
+          "text": "ANSI Z89.1-1997",
+          "sourceUrl": "https://herhild.com/producto/casco-tipo-cachucha/"
+        },
+        {
+          "text": "NRF-058-PEMEX-2004",
+          "sourceUrl": "https://herhild.com/producto/casco-tipo-cachucha/"
+        },
+        {
+          "text": "LAPEM K3404-203/2008",
+          "sourceUrl": "https://herhild.com/producto/casco-tipo-cachucha/"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Ficha técnica del casco (PDF)",
+          "url": "https://herhild.com/download/12710/?tmstv=1795451803"
+        }
+      ],
+      "source": {
+        "url": "https://herhild.com/producto/casco-tipo-cachucha/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "herhild-gtsolg",
+      "brandId": "herhild",
+      "model": "GTSOLG",
+      "name": "Guante para soldador de carnaza y lona gris GTSOLG",
+      "categoryIds": [
+        "soldadura",
+        "manos"
+      ],
+      "status": "approved",
+      "description": "Guante para soldador de carnaza y lona con forro interior, para soldadura, manejo de metales y trabajos que requieren protección contra el calor.",
+      "characteristics": [
+        "Carnaza y lona gris con forro interior",
+        "Cosido con hilo Kevlar",
+        "Medida de 32 cm"
+      ],
+      "saleUnit": "par",
+      "documents": [
+        {
+          "label": "Ficha técnica GTSOL gris (PDF)",
+          "url": "https://herhild.com/download/12881/?tmstv=1795451869"
+        }
+      ],
+      "source": {
+        "url": "https://herhild.com/producto/guante-soldador-gris/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "duramil-dakota-dielectrica",
+      "brandId": "duramil",
+      "model": "Dakota dieléctrica",
+      "name": "Bota impermeable de PVC con casquillo Dakota dieléctrica",
+      "categoryIds": [
+        "calzado"
+      ],
+      "status": "approved",
+      "description": "Bota impermeable de PVC de 40 cm, dieléctrica, con casquillo de acero e inserto antipunción, para construcción, hidrocarburos y minería.",
+      "characteristics": [
+        "Caña amarilla de PVC flexible en frío",
+        "Altura de 40 cm",
+        "Casquillo de acero y entreplantilla de PVC rígido",
+        "Suela azul de inyección directa",
+        "Forro textil en el interior"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-24",
+          "label": "Talla 24"
+        },
+        {
+          "id": "talla-25",
+          "label": "Talla 25"
+        },
+        {
+          "id": "talla-26",
+          "label": "Talla 26"
+        },
+        {
+          "id": "talla-27",
+          "label": "Talla 27"
+        },
+        {
+          "id": "talla-28",
+          "label": "Talla 28"
+        },
+        {
+          "id": "talla-29",
+          "label": "Talla 29"
+        },
+        {
+          "id": "talla-30",
+          "label": "Talla 30"
+        },
+        {
+          "id": "talla-31",
+          "label": "Talla 31"
+        },
+        {
+          "id": "talla-32",
+          "label": "Talla 32"
+        }
+      ],
+      "source": {
+        "url": "https://duramil.com.mx/catalogo/duramil/dakota-dielectrica/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "duramil-dakota",
+      "brandId": "duramil",
+      "model": "Dakota",
+      "name": "Bota impermeable de PVC Dakota",
+      "categoryIds": [
+        "calzado"
+      ],
+      "status": "approved",
+      "description": "Bota impermeable de PVC de 40 cm con forro textil y suela de inyección directa, para procesos alimentarios, áreas sanitarias, agricultura y construcción.",
+      "characteristics": [
+        "Caña de PVC con forro textil",
+        "Altura de 40 cm",
+        "Entreplantilla de PVC rígido contra la penetración",
+        "Casquillo de acero opcional",
+        "Caña amarilla, blanca o negra; suela azul, blanca o negra"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-24",
+          "label": "Talla 24"
+        },
+        {
+          "id": "talla-25",
+          "label": "Talla 25"
+        },
+        {
+          "id": "talla-26",
+          "label": "Talla 26"
+        },
+        {
+          "id": "talla-27",
+          "label": "Talla 27"
+        },
+        {
+          "id": "talla-28",
+          "label": "Talla 28"
+        },
+        {
+          "id": "talla-29",
+          "label": "Talla 29"
+        },
+        {
+          "id": "talla-30",
+          "label": "Talla 30"
+        },
+        {
+          "id": "talla-31",
+          "label": "Talla 31"
+        },
+        {
+          "id": "talla-32",
+          "label": "Talla 32"
+        }
+      ],
+      "source": {
+        "url": "https://duramil.com.mx/catalogo/duramil/dakota/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    },
+    {
+      "id": "duramil-xr-2000",
+      "brandId": "duramil",
+      "model": "XR-2000",
+      "name": "Bota impermeable de PVC XR-2000",
+      "categoryIds": [
+        "calzado"
+      ],
+      "status": "approved",
+      "description": "Bota impermeable de PVC de 37 cm con forro textil, para construcción, hidrocarburos, jardinería y minería en pisos con agua, tierra o grava.",
+      "characteristics": [
+        "Caña de PVC flexible en frío",
+        "Altura de 37 cm",
+        "Suela color crepé, de inyección directa",
+        "Caña blanca o negra"
+      ],
+      "saleUnit": "par",
+      "variants": [
+        {
+          "id": "talla-24",
+          "label": "Talla 24"
+        },
+        {
+          "id": "talla-25",
+          "label": "Talla 25"
+        },
+        {
+          "id": "talla-26",
+          "label": "Talla 26"
+        },
+        {
+          "id": "talla-27",
+          "label": "Talla 27"
+        },
+        {
+          "id": "talla-28",
+          "label": "Talla 28"
+        },
+        {
+          "id": "talla-29",
+          "label": "Talla 29"
+        },
+        {
+          "id": "talla-30",
+          "label": "Talla 30"
+        }
+      ],
+      "source": {
+        "url": "https://duramil.com.mx/catalogo/duramil/xr-2000/",
+        "checkedOn": "2026-11-23"
+      },
+      "approval": {
+        "by": "Propietario del proyecto",
+        "on": "2026-11-23",
+        "supplyConfirmed": true
+      }
+    }
+  ]
 }
