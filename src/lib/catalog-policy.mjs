@@ -518,6 +518,12 @@ export const BLOCKED_RESOURCE_TYPES = Object.freeze(['deprecated', 'unverified_c
  */
 export const isPublishableResource = resource => String(/** @type {any} */ (resource)?.verification ?? '').startsWith('accesible')
   && !BLOCKED_RESOURCE_TYPES.includes(/** @type {any} */ (resource)?.type);
+/**
+ * Tipos de recurso que viven en el sitio de otro: un visor de archivos (Google Drive) o una plataforma de catálogos
+ * (Salsify) guardan el catálogo de la marca, pero su servidor no es el de la marca, así que no respaldan la fuente de
+ * una foto: con ellos, cualquier archivo de ese servicio pasaría por una foto del fabricante.
+ */
+export const HOSTED_ELSEWHERE_TYPES = Object.freeze(['pdf_viewer', 'catalog_platform']);
 /** Un texto cortado a 80 caracteres, con «…» si se cortó. */
 const cutAt80 = text => ([...text].length > 80 ? `${[...text].slice(0, 80).join('')}…` : text);
 
@@ -530,7 +536,7 @@ const hostOf = value => {
  * La foto de una ficha aprobada viene del sitio de su fabricante: la ficha muestra bajo la foto un crédito que enlaza
  * `image.sourceUrl`. Esa página no puede ser, escrita como sea (`samePage`), una del registro de investigación que no se
  * publica (`isPublishableResource`). Su servidor (sin `www.`) debe ser el de algún recurso publicable de la entidad de
- * la marca en el registro. Un borrador, una ficha en revisión o un
+ * la marca en el registro que no viva en el sitio de otro (`HOSTED_ELSEWHERE_TYPES`). Un borrador, una ficha en revisión o un
  * retirado no publican foto y no se revisan. Se llama aparte de `validateCatalog` (desde `validateProject`, en
  * `scripts/validate-catalog.mjs`) porque la compilación valida el catálogo con las marcas, sin los recursos del registro.
  * @param {unknown} catalog
@@ -555,7 +561,7 @@ export function photoSourceErrors(catalog, registry) {
     const source = sources.find(entry => entry?.entity_id === product.brandId);
     if (!source) continue;
     const hosts = [...new Set((Array.isArray(source.resources) ? source.resources : [])
-      .filter(isPublishableResource)
+      .filter(resource => isPublishableResource(resource) && !HOSTED_ELSEWHERE_TYPES.includes(resource?.type))
       .map(resource => hostOf(resource.url)).filter(Boolean))];
     if (hosts.includes(found)) continue;
     const known = hosts.length

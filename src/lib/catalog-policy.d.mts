@@ -52,8 +52,12 @@ export const BLOCKED_RESOURCE_TYPES: readonly string[];
 /** Un recurso del registro que se puede publicar: verificación que empieza con «accesible» y tipo no bloqueado. */
 export function isPublishableResource(resource: unknown): boolean;
 
+/** Tipos de recurso que viven en el sitio de otro (un visor, una plataforma): no son el sitio de la marca. */
+export const HOSTED_ELSEWHERE_TYPES: readonly string[];
+
 /**
  * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) no es una página del registro que no se
- * publica, y es del sitio de su marca en el registro: un recurso publicable con el mismo servidor (sin `www.`). Devuelve los errores.
+ * publica, y es del sitio de su marca en el registro: un recurso publicable, que no vive en el sitio de otro, con el
+ * mismo servidor (sin `www.`). Devuelve los errores.
  */
 export function photoSourceErrors(catalog: unknown, registry: unknown): string[];

@@ -199,7 +199,7 @@ test('el servidor de la foto debe ser el de un recurso de la marca verificado co
   const registry = { sources: [
     { entity_id: 'marca-a', name: 'Marca A', entity_type: 'brand', resources: [
       { type: 'web', url: 'https://www.marca-a.example/', verification: 'accesible (2026-11-23)' },
-      { type: 'catalog_platform', url: 'https://catalogo.marca-a.example/', verification: 'accesible (2026-11-23)' },
+      { type: 'landing', url: 'https://catalogo.marca-a.example/', verification: 'accesible (2026-11-23)' },
       { type: 'unverified_current', url: 'https://nuevo.marca-a.example/', verification: 'accesible (2026-11-23)' },
       { type: 'pdf', url: 'https://archivos.marca-a.example/catalogo.pdf', verification: 'sin comprobar' },
     ] },
@@ -264,7 +264,8 @@ test('la línea del registro dice cuántas entidades salieron del portal, solo s
   assert.equal(lines[0], `Registro: ${registry.sources.length} entidades (${withdrawn} ${withdrawn === 1 ? 'retirada' : 'retiradas'} del portal) / ${references} referencias.`);
 });
 
-// La página de la foto no es una página del registro que no se publica.
+// La página de la foto no es una página del registro que no se publica, y el sitio de una marca no es el visor ni la
+// plataforma de otro donde está su catálogo.
 const REGISTRY = JSON.parse(registryText);
 /** Lo que el mensaje cita de un recurso del registro: su tipo y su verificación, cortada a 80 caracteres con «…». */
 const cited = resource => `${resource.type}: ${[...resource.verification].length > 80 ? `${[...resource.verification].slice(0, 80).join('')}…` : resource.verification}`;
@@ -300,4 +301,23 @@ test('con los datos reales, la foto de UVEX Classic viene de una página del reg
   assert.equal(resource.type, 'product_page');
   assert.match(resource.verification, /^accesible/);
   assert.deepEqual(photoSourceErrors(catalog, REGISTRY), []);
+});
+
+test('el visor de Google Drive donde está el catálogo de MR Seguridad no es el sitio de MR Seguridad', () => {
+  const mr = REGISTRY.sources.find(source => source.entity_id === 'mr-seguridad');
+  assert.ok(mr.resources.some(resource => resource.type === 'pdf_viewer' && new URL(resource.url).hostname === 'drive.google.com'));
+  assert.deepEqual(photoSourceErrors({ products: [withPhotoFrom('mr-seguridad', 'https://drive.google.com/file/d/archivo-ficticio/view')] }, REGISTRY), [
+    'products[0] (ficha-mr-seguridad).image.sourceUrl: la foto viene de drive.google.com, pero el sitio de MR Seguridad en el registro es mrseguridad.com. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.',
+  ]);
+  // Sus dos fotos reales vienen de mrseguridad.com y pasan.
+  const real = catalog.products.filter(entry => entry.brandId === 'mr-seguridad' && entry.image);
+  assert.equal(real.length, 2);
+  for (const entry of real) assert.equal(new URL(entry.image.sourceUrl).hostname, 'mrseguridad.com');
+  assert.deepEqual(photoSourceErrors({ products: real }, REGISTRY), []);
+  // Una plataforma de catálogos tampoco es el sitio de la marca (registro sintético).
+  const registry = { sources: [{ entity_id: 'marca-a', name: 'Marca A', entity_type: 'brand', resources: [
+    { type: 'web', url: 'https://www.marca-a.example/', verification: 'accesible (2026-11-23)' },
+    { type: 'catalog_platform', url: 'https://plataforma.example/catalogos/marca-a', verification: 'accesible (2026-11-23)' },
+  ] }] };
+  assert.match(photoSourceErrors({ products: [withPhotoFrom('marca-a', 'https://plataforma.example/catalogos/marca-a/foto')] }, registry)[0], /la foto viene de plataforma\.example, pero el sitio de Marca A en el registro es marca-a\.example\./);
 });
