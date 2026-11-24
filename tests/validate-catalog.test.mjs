@@ -116,7 +116,7 @@ test('el resumen de las marcas dice cuántas tienen algún enlace, cuántas un c
     'Marcas públicas: 5 / 4 con algún enlace del fabricante / 3 con catálogo del fabricante (2 en PDF).');
   // Con los datos del repositorio, la línea contada a mano desde la tabla de enlaces acordada.
   const { lines } = await validate(catalogOf());
-  assert.ok(lines.includes('Marcas públicas: 19 / 16 con algún enlace del fabricante / 14 con catálogo del fabricante (6 en PDF).'), lines.join('\n'));
+  assert.ok(lines.includes('Marcas públicas: 15 / 14 con algún enlace del fabricante / 14 con catálogo del fabricante (6 en PDF).'), lines.join('\n'));
 });
 
 test('la foto de una ficha aprobada viene de un sitio de su fabricante en el registro; si no, el mensaje dice de dónde viene y qué hacer', async () => {

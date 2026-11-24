@@ -7,7 +7,10 @@ import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 const { brands, registry } = await loadProjectData();
 
 // «Marcas que manejamos», en el orden de la empresa.
-const ORDER = ['ansell', '3m', 'duramil', 'alto', 'uvex', 'lakeland', 'mcr-safety', 'infra', 'espomega', 'moldex', 'msa', 'herhild', 'dry-pro', 'jyrsa', 'golden-eagle', 'hawk', 'derma-care', 'dupont', 'mr-seguridad'];
+const ORDER = ['ansell', '3m', 'duramil', 'uvex', 'lakeland', 'mcr-safety', 'espomega', 'moldex', 'msa', 'herhild', 'jyrsa', 'golden-eagle', 'derma-care', 'dupont', 'mr-seguridad'];
+// Las entidades del registro que salieron del portal por decisión de quien dirige el proyecto (23 de noviembre de
+// 2026): siguen en el registro con la marca `portal` y no están en brands.json.
+const WITHDRAWN = ['alto', 'infra', 'dry-pro', 'hawk'];
 // Únicos enlaces aprobados para publicar, en su orden, con sus etiquetas: el catálogo del fabricante en PDF (con la
 // edición y el tamaño que se conocen), su catálogo en línea y su sitio. Las demás marcas no llevan enlace.
 const PDF = 'Catálogo del fabricante (PDF)';
@@ -17,11 +20,9 @@ const LINKS = {
   ansell: [{ label: PDF, url: 'https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0', edition: '2023' }, { label: SITE, url: 'https://www.ansell.com/mx/es/industrial' }],
   '3m': [{ label: ONLINE, url: 'https://www.3m.com.mx/3M/es_MX/p/c/epp/i/seguridad/seguridad-personal/' }],
   duramil: [{ label: ONLINE, url: 'https://duramil.com.mx/catalogo/' }],
-  alto: [{ label: SITE, url: 'https://ecommerce.alturasegura.com.mx/' }],
   uvex: [{ label: ONLINE, url: 'https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection' }],
   lakeland: [{ label: ONLINE, url: 'https://www.lakeland.com/es-la/product-catalogs/' }],
   'mcr-safety': [{ label: PDF, url: 'https://www.mcrsafety.com.mx/content/Guides/Mexico/catalogo-de-productos-mcr.pdf' }, { label: SITE, url: 'https://www.mcrsafety.com.mx/' }],
-  infra: [{ label: SITE, url: 'https://grupoinfra.com/librerias-y-descargas' }],
   moldex: [{ label: PDF, url: 'https://www.moldex.com/wp-content/uploads/Moldex-Catalog-ESP.pdf' }, { label: ONLINE, url: 'https://www.moldex.com/es/resources/marketing-sales-resources/literatura-downloads/' }],
   msa: [{ label: ONLINE, url: 'https://mx.msasafety.com/digital-catalogs?locale=es' }],
   herhild: [{ label: PDF, url: 'https://herhild.com/wp-content/uploads/2025/11/Catalogo-HH-Digital-2026v2.pdf' }, { label: ONLINE, url: 'https://herhild.com/productos/' }],
@@ -31,7 +32,7 @@ const LINKS = {
   dupont: [{ label: ONLINE, url: 'https://www.safespec.dupont.mx/tyvek/featured-products.html' }, { label: SITE, url: 'https://www.dupont.mx/personal-protective-equipment.html' }],
   'mr-seguridad': [{ label: PDF, url: 'https://drive.google.com/file/d/1IeQneb8omgWD7EAb8G8WCf2MvJMB4EEp/view?usp=sharing', edition: '2026 v1.1' }, { label: SITE, url: 'https://mrseguridad.com/' }],
 };
-const WITHOUT_LINK = ['espomega', 'dry-pro', 'hawk'];
+const WITHOUT_LINK = ['espomega'];
 const LINK_URLS = Object.values(LINKS).flat().map(link => link.url);
 const BLOCKED_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];
 
@@ -42,14 +43,37 @@ const withBrand = (id, change) => {
   change(list.find(brand => brand.id === id), list);
   return list;
 };
+// Las pruebas que recorren los recursos de todas las entidades del registro también recorren los de las retiradas:
+// sobre una copia del registro sin las marcas `portal` y una lista con esas entidades de vuelta al final, como
+// quedarían si volvieran al portal.
+const unmarked = { ...registry, sources: registry.sources.map(({ portal: _portal, ...source }) => source) };
+const returned = () => [...copy(), ...registry.sources.filter(source => source.portal).map(source => ({ id: source.entity_id, name: source.name, kind: source.entity_type, manufacturerLinks: [] }))];
+const withReturnedBrand = (id, change) => {
+  const list = returned();
+  change(list.find(brand => brand.id === id), list);
+  return list;
+};
 
-test('brands.json lista las diecinueve marcas en el orden acordado', () => {
-  assert.equal(brands.length, 19);
+test('brands.json lista las quince marcas en el orden acordado', () => {
+  assert.equal(brands.length, 15);
   assert.deepEqual(brands.map(brand => brand.id), ORDER);
 });
 
+test('las cuatro entidades retiradas del portal siguen en el registro con su marca, y ninguna está en brands.json', () => {
+  assert.equal(registry.sources.length, 19);
+  const marked = registry.sources.filter(source => Object.hasOwn(source, 'portal'));
+  assert.deepEqual(marked.map(source => source.entity_id), WITHDRAWN);
+  for (const source of marked) {
+    assert.deepEqual(source.portal, { status: 'retirada', on: '2026-11-23', reason: 'Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión.' }, source.entity_id);
+  }
+  // Ningún id de brands.json es una entidad retirada, y cada entidad retirada falta de brands.json: quien edita uno de
+  // los dos archivos recibe el mensaje del validador, no un rompecabezas.
+  for (const id of WITHDRAWN) assert.ok(!brands.some(brand => brand.id === id), id);
+  assert.deepEqual(registryPortalErrors(registry), []);
+});
+
 test('cada marca coincide con el registro de investigación: mismo id, nombre y tipo', () => {
-  assert.deepEqual(brands.map(brand => brand.id).sort(), registry.sources.map(source => source.entity_id).sort());
+  assert.deepEqual(brands.map(brand => brand.id).sort(), registry.sources.map(source => source.entity_id).filter(id => !WITHDRAWN.includes(id)).sort());
   for (const brand of brands) {
     const source = sourceOf(brand.id);
     assert.equal(brand.name, source.name, brand.id);
@@ -66,7 +90,12 @@ test('los enlaces publicados son exactamente los aprobados, en su orden y con su
   assert.deepEqual(brands.filter(brand => brand.manufacturerLinks.length === 0).map(brand => brand.id), WITHOUT_LINK);
   assert.deepEqual(MANUFACTURER_LINK_LABELS, { pdf: PDF, online: ONLINE, site: SITE });
   // Las marcas cuya dirección de catálogo no se pudo abrir el 23 de noviembre de 2026 no publican ese catálogo.
-  for (const id of ['infra', 'espomega', 'hawk']) assert.ok(!brands.find(brand => brand.id === id).manufacturerLinks.some(link => link.label !== SITE), id);
+  for (const [id, type] of [['espomega', 'pdf'], ['msa', 'catalog_platform']]) {
+    const unopened = sourceOf(id).resources.find(resource => resource.type === type);
+    assert.ok(!unopened.verification.startsWith('accesible'), id);
+    assert.ok(!brands.find(brand => brand.id === id).manufacturerLinks.some(link => link.url === unopened.url), id);
+  }
+  assert.ok(!brands.find(brand => brand.id === 'espomega').manufacturerLinks.some(link => link.label !== SITE));
 });
 
 test('cada enlace es un recurso de esa marca en el registro, verificado como accesible y de un tipo publicable', () => {
@@ -114,7 +143,7 @@ test('crossCheckBrands acepta el archivo real', () => {
 test('crossCheckBrands detecta diferencias de id, nombre y tipo con el registro', () => {
   assert.match(crossCheckBrands(withBrand('ansell', brand => { brand.name = 'ANSELL'; }), registry).join('\n'), /ansell: el nombre «ANSELL» no coincide/);
   assert.match(crossCheckBrands(withBrand('espomega', brand => { brand.kind = 'brand'; }), registry).join('\n'), /espomega: kind «brand» no coincide/);
-  assert.match(crossCheckBrands(copy().filter(brand => brand.id !== 'hawk'), registry).join('\n'), /registro: hawk falta en brands\.json/);
+  assert.match(crossCheckBrands(copy().filter(brand => brand.id !== 'jyrsa'), registry).join('\n'), /registro: jyrsa falta en brands\.json/);
   const extra = [...copy(), { id: 'marca-nueva', name: 'Marca nueva', kind: 'brand', manufacturerLinks: [] }];
   assert.match(crossCheckBrands(extra, registry).join('\n'), /marca-nueva: no existe en el registro/);
   assert.deepEqual(crossCheckBrands(brands, { sources: [] }), ['registro: no contiene entidades.']);
@@ -124,14 +153,15 @@ test('crossCheckBrands rechaza enlaces que no son un recurso accesible y publica
   const link = url => [{ label: 'Sitio del fabricante', url }];
   // Un enlace que no está en el registro.
   assert.match(crossCheckBrands(withBrand('uvex', brand => { brand.manufacturerLinks = link('https://example.invalid/'); }), registry).join('\n'), /uvex: el enlace .* no es un recurso de esa entidad/);
-  // El recurso de otra marca.
-  assert.match(crossCheckBrands(withBrand('hawk', brand => { brand.manufacturerLinks = link(LINKS.ansell[1].url); }), registry).join('\n'), /hawk: el enlace .* no es un recurso de esa entidad/);
-  // Recursos del registro que no están verificados como accesibles o cuyo tipo no se publica.
+  // El recurso de otra marca, en una marca sin enlaces.
+  assert.match(crossCheckBrands(withBrand('espomega', brand => { brand.manufacturerLinks = link(LINKS.ansell[1].url); }), registry).join('\n'), /espomega: el enlace .* no es un recurso de esa entidad/);
+  // Recursos del registro que no están verificados como accesibles o cuyo tipo no se publica (también los de las
+  // entidades retiradas, como si volvieran al portal).
   let checked = 0;
   for (const source of registry.sources) {
     for (const resource of source.resources) {
       const publishable = resource.verification.startsWith('accesible') && !BLOCKED_TYPES.includes(resource.type);
-      const errors = crossCheckBrands(withBrand(source.entity_id, brand => { brand.manufacturerLinks = link(resource.url); }), registry);
+      const errors = crossCheckBrands(withReturnedBrand(source.entity_id, brand => { brand.manufacturerLinks = link(resource.url); }), unmarked);
       assert.equal(errors.length === 0, publishable, `${source.entity_id}: ${resource.type} / ${resource.verification}`);
       if (!publishable) {
         assert.match(errors.join('\n'), /no está verificado como accesible/);
@@ -222,7 +252,7 @@ test('crossCheckBrands acepta en cada etiqueta solo los tipos de recurso del reg
     for (const resource of source.resources) {
       if (!resource.verification.startsWith('accesible') || BLOCKED_TYPES.includes(resource.type)) continue;
       for (const label of [PDF, ONLINE, SITE]) {
-        const errors = crossCheckBrands(withBrand(source.entity_id, brand => { brand.manufacturerLinks = [{ label, url: resource.url }]; }), registry);
+        const errors = crossCheckBrands(withReturnedBrand(source.entity_id, brand => { brand.manufacturerLinks = [{ label, url: resource.url }]; }), unmarked);
         const fits = label === SITE || ADMITTED[label].includes(resource.type);
         assert.equal(errors.length === 0, fits, `${source.entity_id}: ${label} → ${resource.type}`);
         if (!fits) {
@@ -248,12 +278,17 @@ test('crossCheckBrands acepta en cada etiqueta solo los tipos de recurso del reg
 });
 
 test('crossCheckBrands rechaza los catálogos que no se pudieron abrir y la lista de guías que nombra a la marca excluida', () => {
-  // INFRA, Espomega y HAWK tienen en el registro una dirección de catálogo sin comprobar o detrás de un formulario.
-  for (const [id, type] of [['infra', 'pdf'], ['espomega', 'pdf'], ['hawk', 'web'], ['hawk', 'gated_landing']]) {
+  // Espomega y MSA tienen en el registro una dirección de catálogo sin comprobar.
+  for (const [id, type] of [['espomega', 'pdf'], ['msa', 'catalog_platform']]) {
     const resource = sourceOf(id).resources.find(candidate => candidate.type === type);
     const label = type === 'pdf' ? PDF : ONLINE;
     assert.match(crossCheckBrands(withBrand(id, brand => { brand.manufacturerLinks = [{ label, url: resource.url }]; }), registry).join('\n'), new RegExp(`${id}: el enlace .* no está verificado como accesible`), `${id} ${type}`);
   }
+  // Una página que exige un formulario para descargar el catálogo (gated_landing) no se enlaza aunque se haya abierto:
+  // la de una entidad retirada, puesta como recurso de JYRSA en una copia del registro.
+  const gated = registry.sources.flatMap(source => source.resources).find(resource => resource.type === 'gated_landing' && resource.verification.startsWith('accesible'));
+  const withGated = { ...registry, sources: registry.sources.map(source => (source.entity_id === 'jyrsa' ? { ...source, resources: [...source.resources, gated] } : source)) };
+  assert.match(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: ONLINE, url: gated.url }]; }), withGated).join('\n'), /jyrsa: el enlace .* no está verificado como accesible \(gated_landing: /);
   // La lista de guías de MCR Safety nunca se enlaza.
   const guides = sourceOf('mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url));
   for (const label of [ONLINE, SITE]) {

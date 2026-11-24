@@ -97,7 +97,7 @@ function assertRealData(site) {
   assert.ok(featured.every(id => listedIds.includes(id)));
 }
 
-test('producción con los datos reales: solo las categorías y las fichas aprobadas, y las diecinueve marcas', () => {
+test('producción con los datos reales: solo las categorías y las fichas aprobadas, y las quince marcas', () => {
   const site = production();
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
@@ -182,8 +182,10 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
     hasCatalog: true, productCount: 0, url: '/marcas/ansell/',
   });
   assert.deepEqual(site.getBrand('espomega'), { id: 'espomega', name: 'Espomega', kind: 'supplier', manufacturerLinks: [], hasCatalog: false, productCount: 0, url: '/marcas/espomega/' });
-  // Una marca con solo su sitio no tiene catálogo.
-  assert.equal(site.getBrand('alto').hasCatalog, false);
+  // Una marca con solo su sitio no tiene catálogo: Ansell sin su catálogo en PDF.
+  const siteOnly = structuredClone(brands);
+  siteOnly.find(brand => brand.id === 'ansell').manufacturerLinks.splice(0, 1);
+  assert.equal(createSiteData({ mode: 'preview', catalog: emptied, brands: siteOnly, exampleProducts: examples }).getBrand('ansell').hasCatalog, false);
   assert.deepEqual(site.getProduct('ejemplo-guante-recubierto'), {
     id: 'ejemplo-guante-recubierto', url: '/productos/ejemplo-guante-recubierto/', name: 'Guante de ejemplo recubierto',
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1001', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
@@ -432,7 +434,7 @@ test('site-data.mjs en producción: solo las categorías y las fichas aprobadas,
   assert.equal(site.DEVELOPMENT_NOTICE, DEVELOPMENT_NOTICE);
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
-  assert.equal(site.brands.length, 19);
+  assert.equal(site.brands.length, 15);
   assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera'), undefined);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID), undefined);
@@ -446,7 +448,7 @@ test('site-data.mjs en vista previa: lo de producción, las diez categorías y l
   assert.equal(site.isPreview, true);
   assert.equal(site.categories.length, 10);
   assert.equal(site.products.filter(product => product.isExample).length, 16);
-  assert.equal(site.brands.length, 19);
+  assert.equal(site.brands.length, 15);
   assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera')?.code, 'EJ-5001');
   // Los ejemplos de cada categoría, en su orden, después de las fichas reales que haya.
