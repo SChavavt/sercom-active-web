@@ -330,3 +330,11 @@ test('un tabulador o un salto de línea en el esquema o entre las dos diagonales
   }
   assert.ok(!samePage('ht\ttps://www.fabricante.example/recursos/otras/', PAGE));
 });
+
+test('en un JSON, una dirección sin esquema con sus diagonales escapadas («\\/\\/www…») se encuentra', () => {
+  const findPage = addressFinder([PAGE]);
+  for (const text of ['{"u":"\\/\\/www.fabricante.example\\/recursos\\/guias\\/"}', '{"u":"\\u002f\\u002fwww.fabricante.example\\u002frecursos\\u002fguias\\u002f"}']) {
+    assert.deepEqual(findPage(text), [PAGE], text);
+  }
+  assert.deepEqual(findPage('{"u":"\\/\\/www.fabricante.example\\/recursos\\/otras\\/"}'), []);
+});
