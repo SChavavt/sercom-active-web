@@ -71,6 +71,12 @@
   overflow-wrap: anywhere;
 }
 .producto__credit-link:hover { text-decoration-thickness: 2px; }
+/* En computadora el marco deja var(--s-9) bajo la foto: el crédito sube hasta quedar a var(--s-5) de una foto que
+   llena el alto del marco, como en tableta. Solo cubre el relleno vacío del marco (la foto no se mueve ni cambia de
+   tamaño), y va encima de la imagen (position: relative) para que su enlace reciba el clic. */
+@media (min-width: 1100px) {
+  .producto__figure .producto__credit { position: relative; margin-top: calc(var(--s-5) - var(--s-9)); }
+}
 
 /* Datos: 5 columnas, una columna de celdas ---------------------------------- */
 .producto__body { display: flex; flex-direction: column; gap: var(--line); min-width: 0; }
