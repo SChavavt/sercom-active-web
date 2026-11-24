@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, symlink, truncate, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { checkProductPhotos, PHOTO_MAX_BYTES, PHOTO_MAX_SIDE, PHOTO_MIN_SIDE } from '../scripts/product-photos.mjs';
 import sharp from 'sharp';
@@ -233,6 +233,26 @@ test('un enlace simbólico en la carpeta, o una carpeta que no es carpeta, se in
     ['src/assets/productos: es un archivo y debe ser una carpeta; quita el archivo y guarda las fotos en una carpeta con ese nombre.', missing]);
   assert.deepEqual(await checkWith(approved, async (folder, directory) => { await symlink(join(directory, 'fuera'), folder); }),
     ['src/assets/productos: es un enlace a otra carpeta; guarda las fotos en la carpeta misma, sin enlazarla.', missing]);
+});
+
+test('un archivo o una carpeta que no se pueden leer dan un mensaje y nunca detienen la revisión', async () => {
+  const directory = await makeTree({ 'no-es-carpeta': 'x' });
+  try {
+    // Más de 2 GiB (un archivo disperso, que no ocupa el disco): la lectura falla con el archivo en su lugar.
+    const folder = join(directory, 'productos');
+    await mkdir(folder);
+    await writeFile(join(folder, 'guante-de-prueba.jpg'), '');
+    await truncate(join(folder, 'guante-de-prueba.jpg'), 2 ** 31);
+    assert.deepEqual(await checkProductPhotos(catalogOf(product(1, 'approved', 'guante-de-prueba.jpg')), folder, LABEL),
+      ['src/assets/productos/guante-de-prueba.jpg: no se pudo leer el archivo; revisa que se pueda abrir y vuelve a guardarlo.']);
+    // Una carpeta dentro de un archivo: no se puede ni mirar; la ficha aprobada sigue pidiendo su foto.
+    assert.deepEqual(await checkProductPhotos(catalogOf(product(1, 'approved', 'guante-de-prueba.jpg')), join(directory, 'no-es-carpeta', 'productos'), LABEL), [
+      'src/assets/productos: no se pudo leer la carpeta; revisa que se pueda abrir.',
+      'products[0].image.file: «guante-de-prueba.jpg» no está en src/assets/productos/; agrega la foto con ese nombre exacto (también las mayúsculas y minúsculas) o corrige el nombre.',
+    ]);
+  } finally {
+    await removeTree(directory);
+  }
 });
 
 test('una ficha aprobada sin foto no pide ningún archivo, y la carpeta puede no existir', async () => {

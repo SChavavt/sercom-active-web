@@ -336,7 +336,7 @@ test('addressProblem dice en una frase corta qué tiene de malo una dirección, 
     ['https://www.fabricante.com.mx/productos/guantes/ficha\u200b.pdf', 'tiene un carácter invisible (U+200B) después de «…/productos/guantes/ficha»'],
     // Usuario o contraseña, también vacíos.
     ['https://usuario:clave@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'], ['https://@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'],
-    ['https://:@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'],
+    ['https://:@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'], ['https://usuario@sitio.mx/x', 'lleva usuario o contraseña antes del servidor'],
     // El servidor es el nombre de un sitio.
     ['https://./x', 'el servidor «.» no es el nombre de un sitio'], ['https://../x', 'el servidor «..» no es el nombre de un sitio'],
     ['https://sitio.mx./x', 'el servidor «sitio.mx.» no es el nombre de un sitio'], ['https://sitio..mx/x', 'el servidor «sitio..mx» no es el nombre de un sitio'],

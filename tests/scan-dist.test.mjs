@@ -2153,3 +2153,15 @@ test('R-FOTO-02: el nombre de una imagen cuenta solo entero, entre signos que no
   // Varias páginas y hojas de estilo: basta con que una la nombre.
   assert.deepEqual(failures(await scan({ [`_astro/${name}`]: 'imagen', 'a/index.html': page('<p>Nada</p>'), 'b/index.html': page('<p>Nada</p>'), '_astro/sitio.C3.css': `.f{background:url(./${name})}` })), []);
 });
+
+test('R-FOTO-02: un punto antes del nombre lo hace otro nombre, con letras inglesas o sin ellas', async () => {
+  // Otro archivo cuyo nombre termina en el de la imagen y empieza con un punto, o con algo y un punto: no la usa.
+  const name = 'suelta.A1.png';
+  for (const body of [`<img src="/_astro/.${name}" alt="A">`, `<p>(.${name})</p>`]) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${name}`]: 'imagen', 'pagina/index.html': page(body) })), ['R-FOTO-02'], body);
+  }
+  const accented = 'guante-ñandú.A1.png';
+  for (const body of [`<img src="/_astro/x.${accented}" alt="A">`, `<img src="/_astro/.${accented}" alt="A">`]) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(body) })), ['R-FOTO-02'], body);
+  }
+});

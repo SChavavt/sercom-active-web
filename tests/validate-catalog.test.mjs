@@ -54,6 +54,9 @@ test('el resumen de fotos se lee como siempre sin fichas aprobadas, o con todas 
   assert.deepEqual(photoSummary(catalogOf()), [line]);
   // Los borradores no cuentan, con foto o sin ella.
   assert.deepEqual(photoSummary(catalogOf(product(1, { status: 'draft' }), product(2, { status: 'in_review', image: fileImage('casco-de-prueba.png') }))), [line]);
+  // Tampoco su foto por dirección.
+  assert.deepEqual(photoSummary(catalogOf(product(1, { status: 'draft', image: urlImage }), product(2, { status: 'in_review', image: urlImage }), product(3, { image: fileImage('guante-de-prueba.jpg') }))),
+    ['Fotos de producto: 1 archivo en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas.']);
   assert.deepEqual(photoSummary(catalogOf(product(1, { image: fileImage('guante-de-prueba.jpg') }))), ['Fotos de producto: 1 archivo en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas.']);
   assert.deepEqual(photoSummary(catalogOf(product(1, { image: fileImage('guante-de-prueba.jpg') }), product(2, { image: fileImage('casco-de-prueba.png') }), product(3, { image: urlImage }))),
     ['Fotos de producto: 2 archivos en src/assets/productos/ y 1 por dirección, todas de fichas aprobadas.']);
