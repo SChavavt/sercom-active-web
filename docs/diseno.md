@@ -138,7 +138,7 @@ Los dos se dibujan igual (`components.css`, 4.1) y no se imprimen en papel. El e
 - Tableta (700 a 1099 px): logotipo, botón «Buscar», WhatsApp, «Cotizar mi lista» y botón «Menú», dibujado al final. La navegación se pliega en un panel con una fila por entrada (incluida «Cotizar mi lista»). **Orden del teclado: Buscar, Menú, WhatsApp, Cotizar**: el botón Menú va en el documento antes de la navegación, porque al abrir el menú el siguiente Tab debe entrar en él, y se dibuja al final con `order: 1`. Ningún orden del documento cumple a la vez eso, el orden de computadora y el orden visual de tableta; es una decisión aceptada.
 - Celular (hasta 699 px): logotipo, «Buscar» y «Menú»; WhatsApp y «Cotizar mi lista» viven en la barra fija (4.4).
 
-El campo «Buscar» (y su botón) solo se imprime si hay productos públicos; la entrada «Categorías», si hay categorías públicas (en producción, hoy ninguno de los dos). Una categoría aprobada sin productos agrega «Categorías», pero no la búsqueda. El botón «Menú» dice «Cerrar» mientras el menú está abierto. Junto a «Cotizar mi lista», en el bloque de la cabecera y en la fila del menú, va el número de renglones guardados (sección 16). En `/catalogo/`, el formulario de búsqueda del encabezado lleva además un campo oculto por cada filtro marcado, para que buscar desde ahí no quite los filtros (sección 10).
+El campo «Buscar» (y su botón) solo se imprime si hay productos públicos; la entrada «Categorías», si hay categorías públicas (desde el paso 3 producción tiene los dos). Una categoría aprobada sin productos agrega «Categorías», pero no la búsqueda. El botón «Menú» dice «Cerrar» mientras el menú está abierto. Junto a «Cotizar mi lista», en el bloque de la cabecera y en la fila del menú, va el número de renglones guardados (sección 16). En `/catalogo/`, el formulario de búsqueda del encabezado lleva además un campo oculto por cada filtro marcado, para que buscar desde ahí no quite los filtros (sección 10).
 
 **Paneles.** En tableta y celular, el menú y la búsqueda son paneles que abre su botón (`aria-expanded`). Un panel se cierra con Escape (el foco vuelve a su botón), con un clic fuera o cuando el foco sale del panel y de su botón. El menú abierto mide como máximo el espacio hasta la barra fija y se desplaza por dentro; `keepFocusInMenu()` desplaza el panel (nunca la página) para que el elemento con foco se vea entero. El panel «Categorías» de computadora es un `<details>` nativo que se cierra con Escape, con un clic fuera o al salir el foco; lleva seis categorías por fila y, con la letra agrandada, dos por fila con «Ver todo el catálogo» a todo lo ancho, como en tableta, cuando la palabra más larga ya no cabe junto a su icono. Sin JavaScript nada queda escondido detrás de un botón. El panel de búsqueda de tableta y celular mide al menos 64 px de alto: el campo y el botón caben en ellos, y cuando el texto de ayuda pasa a dos líneas (abajo) el panel crece con él, sin depender de `:has()`.
 
@@ -299,13 +299,13 @@ Todo lo que depende del catálogo se decide con los datos (`categories.length`, 
 | Estado | Qué se ve |
 | --- | --- |
 | Sin resultados en el catálogo | Un solo `EmptyState`, con tres versiones que elige `emptySituation`: por la búsqueda, «No encontramos productos con esa búsqueda.» / «Puedes pedirnos este producto y lo buscamos por ti.» con «Solicitar este producto», que lleva la búsqueda a la solicitud especial (`?q=…`); por los filtros, «No hay productos con esos filtros.» / «Quita algún filtro o dinos qué necesitas y lo buscamos por ti.» con «Ayúdame a encontrarlo»; por los dos, «No encontramos productos con esa búsqueda y esos filtros.» / «Quita algún filtro, o pídenos este producto y lo buscamos por ti.» con «Solicitar este producto». Con filtros marcados ofrece además «Limpiar filtros» (slot `extra`). |
-| Catálogo vacío (producción hoy) | Portada sin placa ni secciones de categorías y productos, con «Estamos preparando el catálogo» y las tres entradas; `/catalogo/` con su texto de preparación, acciones y marcas; sin búsqueda ni «Categorías» en el encabezado; pie sin columna de categorías. |
+| Catálogo vacío (ninguna categoría ni ficha aprobada; producción antes del paso 3) | Portada sin placa ni secciones de categorías y productos, con «Estamos preparando el catálogo» y las tres entradas; `/catalogo/` con su texto de preparación, acciones y marcas; sin búsqueda ni «Categorías» en el encabezado; pie sin columna de categorías. |
 | Categoría sin productos | `EmptyState` «Estamos cargando los productos de esta categoría.» con «Contactar por WhatsApp» (borrador de la categoría), sin barra lateral. |
 | Marca sin productos | `EmptyState` «Estamos cargando los productos de esta marca.» con «Mientras tanto, consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.» si la marca publica su catálogo (o «Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo.» si no), las demás marcas con la actual marcada y una nota. |
 | Documento no disponible | «Documentación» ofrece «Solicitar ficha técnica» por WhatsApp; nunca una descarga muerta. |
 | Dato no confirmado | Se omite: una ficha sin unidad de venta, resumen, características o variantes no imprime ese bloque; una marca sin enlace del fabricante no muestra ninguno, y sin catálogo su estado vacío no menciona el catálogo del fabricante; un PDF sin edición ni tamaño comprobados no muestra esa línea; la dirección no se publica. |
 | Producto retirado | Página informativa (sección 7). |
-| Lista vacía | `/cotizar/` con JavaScript: «Mi cotización» muestra «Aún no agregas productos del catálogo.» / «Agrégalos desde su ficha o escribe abajo lo que necesitas.» con «Explorar catálogo»; los campos y el mensaje siguen ahí. Sin productos en la compilación (producción hoy), «Mi cotización» solo aparece si el navegador guarda renglones de otra compilación, para informarlos. Sin JavaScript, qué enviar y el borrador. |
+| Lista vacía | `/cotizar/` con JavaScript: «Mi cotización» muestra «Aún no agregas productos del catálogo.» / «Agrégalos desde su ficha o escribe abajo lo que necesitas.» con «Explorar catálogo»; los campos y el mensaje siguen ahí. Sin productos en la compilación (producción antes del paso 3, o un catálogo sin fichas aprobadas), «Mi cotización» solo aparece si el navegador guarda renglones de otra compilación, para informarlos. Sin JavaScript, qué enviar y el borrador. |
 | Estados del paso 2 | Error de cantidad, mensaje largo, almacenamiento que no se puede usar, renglones iguales y renglones que la página no ubica: sección 16. |
 
 ## 9. Hojas de página
@@ -457,19 +457,21 @@ Declaración propuesta, a partir de las tablas de compatibilidad de las propieda
 
 ## 13. Producción y vista previa
 
-| | Producción (`npm run build`, hoy) | Vista previa (`npm run build:preview`) |
+Desde el paso 3 producción tiene categorías y productos aprobados, así que las dos compilaciones dibujan las mismas páginas con los mismos componentes; la vista previa agrega los ejemplos.
+
+| | Producción (`npm run build`) | Vista previa (`npm run build:preview`) |
 | --- | --- | --- |
 | Aviso arriba | «Sitio en preparación · Versión inicial para revisión» en todas las páginas | `PREVIEW_NOTICE` en todas las páginas |
-| Navegación | Catálogo, Marcas, Contacto y el bloque «Cotizar mi lista» | además «Categorías» con su panel |
-| Búsqueda en el encabezado | no hay campo ni botón Buscar (aparecen con el primer producto aprobado) | campo en computadora, botón Buscar en tableta y celular |
-| Portada | sin placa: nota «Estamos preparando el catálogo» y las tres entradas; sin secciones de categorías ni de productos | todas las secciones |
-| Pie | sin columna de categorías | con categorías |
-| Páginas de categoría y de producto | ninguna | las diez categorías, los dieciséis ejemplos y el ejemplo retirado |
-| Filtros del catálogo y «Agregar a mi cotización» | no hay (no hay catálogo ni fichas) | con JavaScript |
-| «Cotizar mi lista» con JavaScript | «Escribe tu lista» (los tres campos) y el mensaje; «Mi cotización» solo aparece para informar renglones guardados por otra compilación | «Mi cotización», «Completa tu solicitud» y el mensaje |
+| Navegación | Catálogo, «Categorías» con su panel, Marcas, Contacto y el bloque «Cotizar mi lista» | la misma |
+| Búsqueda en el encabezado | campo en computadora, botón Buscar en tableta y celular | la misma |
+| Portada | todas las secciones, con las categorías y los productos aprobados | además, los ejemplos entre los productos |
+| Pie | con la columna de categorías | con la columna de categorías |
+| Páginas de categoría y de producto | las de las categorías y las fichas aprobadas (hoy, diez y 46) | además, los dieciséis ejemplos y el ejemplo retirado |
+| Filtros del catálogo y «Agregar a mi cotización» | con JavaScript | con JavaScript |
+| «Cotizar mi lista» con JavaScript | «Mi cotización», «Completa tu solicitud» y el mensaje | lo mismo |
 | Etiqueta «Ejemplo» | nunca | en cada ejemplo |
 
-Cuando se apruebe una categoría, la entrada «Categorías», la placa y las secciones de categorías aparecen solas en producción; la búsqueda del encabezado y las secciones de productos aparecen con el primer producto aprobado. Qué cambia exactamente: [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría).
+Con un catálogo sin categorías ni fichas aprobadas, como estuvo producción hasta el paso 3, nada de eso se imprime: el encabezado no lleva «Categorías» ni la búsqueda, la portada y `/catalogo/` dicen «Estamos preparando el catálogo», no hay filtros ni fichas y «Cotizar mi lista» muestra «Escribe tu lista» (sección 8, «Catálogo vacío»). La entrada «Categorías», la placa y las secciones de categorías aparecen con la primera categoría aprobada; la búsqueda del encabezado y las secciones de productos, con el primer producto aprobado. Qué cambia exactamente: [`datos-y-modos.md`](datos-y-modos.md#93-cómo-aprobar-una-categoría).
 
 ## 14. Reglas
 

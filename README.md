@@ -4,18 +4,19 @@ Sitio de presentación y catálogo de Sercom Active, con atención comercial en 
 
 ## Estado
 
-**Los pasos 1 (diseño y navegación completa) y 2 (buscador, filtros y «Mi cotización») están aprobados e integrados en `main`. El paso 3 (catálogo piloto) está en curso. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
+**Los pasos 1 (diseño y navegación completa) y 2 (buscador, filtros y «Mi cotización») están aprobados e integrados en `main`. El paso 3 (el catálogo con productos reales) está en curso: su primera entrega está en revisión en la solicitud de cambios n.º 3. Nada está publicado:** no hay alojamiento, dominio, cuenta ni pago.
 
 | Paso | Contenido | Estado |
 | --- | --- | --- |
 | 1 | Diseño y navegación completa | Aprobado el 22 de noviembre de 2026 (solicitud de cambios n.º 1) |
 | 2 | Buscador, filtros y «Mi cotización» | Aprobado el 23 de noviembre de 2026 (solicitud de cambios n.º 2) |
-| **3** | **Catálogo piloto (30 a 50 productos reales)** | **En curso: primero la preparación técnica; los productos esperan la selección y la aprobación del contacto comercial** |
+| **3** | **Catálogo con los productos de los proveedores** | **En curso. Primera entrega en revisión (solicitud de cambios n.º 3): 46 productos reales aprobados, el catálogo de cada fabricante a la vista y quince marcas. Después, todos los productos que los proveedores publican en Internet** |
 | 4 | Publicación y QR | Pendiente |
 
 - Todas las páginas existen con el diseño «Lámina técnica» que eligió el propietario: portada, catálogo, categorías, marcas, ficha de producto, «Cotizar mi lista», solicitud especial, contacto, privacidad y la página de error.
 - Con el paso 2, el catálogo se filtra por categoría y por marca, combinadas entre sí y con la búsqueda, que encuentra también plurales y algunos sinónimos; desde la ficha se regresa a los mismos resultados. Cada ficha tiene «Agregar a mi cotización», con talla o color, cantidad y unidad. La lista se guarda solo en el navegador del visitante (no hay servidor, cuenta ni cookies) y en «Cotizar mi lista» se cambia, se completa y se convierte en un mensaje que el visitante envía por WhatsApp o por correo, o copia con «Copiar solicitud»; si el mensaje es demasiado largo para un enlace, la página pide copiarlo y pegarlo. La solicitud especial arma su mensaje con cinco campos. Sin JavaScript, cada página sigue funcionando como en el paso 1.
-- Todavía no hay productos reales aprobados; llegan en el paso 3. Mientras tanto, la versión que se publicaría no muestra productos, y una versión de revisión aparte muestra productos de ejemplo marcados como «Ejemplo», que no son artículos reales.
+- Con la primera entrega del paso 3, la versión que se publicaría muestra las diez categorías y 46 productos reales de 14 marcas: 24 con la foto que publica su fabricante, con su crédito, y 22 con el pictograma de su categoría. Cada marca enlaza el catálogo que publica su fabricante, en PDF o en línea, y «Marcas que manejamos» lista quince nombres. Una versión de revisión aparte muestra además productos de ejemplo marcados como «Ejemplo», que no son artículos reales.
+- El 23 de noviembre de 2026 quien dirige el proyecto cambió la meta del paso 3: ya no es un piloto de 30 a 50 productos, sino todos los que los proveedores publican en Internet (cerca de 1,850 en los sitios de ocho fabricantes), por categorías. Esa carga la hace un programa, marca por marca, en una solicitud de cambios posterior.
 - Lo que el negocio debe confirmar, lo verificado y lo pendiente: [`docs/ESTADO.md`](docs/ESTADO.md). El plan de los cuatro pasos: [`docs/plan-de-trabajo.md`](docs/plan-de-trabajo.md).
 
 El sitio es de Sercom Active en su identidad. Técnicamente es un proyecto aparte: nunca modifica `sercomactive.com` ni supone acceso a ese dominio.
@@ -47,7 +48,7 @@ Antes de proponer cualquier cambio: `npm run check`, `npm test` y `npm run verif
 
 ## Las dos versiones del sitio
 
-Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. **Producción** (`npm run build`) es la que se publicará: solo muestra categorías y productos aprobados, hoy ninguno, y hasta el lanzamiento lleva en cada página el aviso «Sitio en preparación · Versión inicial para revisión». **Vista previa** (`npm run build:preview` o `npm run dev`) sirve para revisar el diseño: muestra las diez categorías y productos de ejemplo, con su propio aviso y la etiqueta «Ejemplo»; nunca se publica ni es la dirección del QR. Hoy ninguna de las dos se deja indexar por buscadores como Google; producción lo hará a partir del lanzamiento. Que la vista previa siga sin indexarse después del lanzamiento requiere un ajuste técnico que todavía está pendiente ([`docs/publicacion.md`](docs/publicacion.md#4-lista-de-lanzamiento)). Guía completa: [`docs/datos-y-modos.md`](docs/datos-y-modos.md).
+Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. **Producción** (`npm run build`) es la que se publicará: solo muestra categorías y productos aprobados (hoy, las diez categorías y 46 productos), y hasta el lanzamiento lleva en cada página el aviso «Sitio en preparación · Versión inicial para revisión». **Vista previa** (`npm run build:preview` o `npm run dev`) sirve para revisar el diseño: muestra las diez categorías y productos de ejemplo, con su propio aviso y la etiqueta «Ejemplo»; nunca se publica ni es la dirección del QR. Hoy ninguna de las dos se deja indexar por buscadores como Google; producción lo hará a partir del lanzamiento. Que la vista previa siga sin indexarse después del lanzamiento requiere un ajuste técnico que todavía está pendiente ([`docs/publicacion.md`](docs/publicacion.md#4-lista-de-lanzamiento)). Guía completa: [`docs/datos-y-modos.md`](docs/datos-y-modos.md).
 
 ## Archivos principales
 
@@ -61,12 +62,13 @@ Cada vez que se genera el sitio (una *compilación*) sale una de dos versiones. 
 | `docs/catalogo-y-actualizaciones.md` | Cómo agregar, aprobar y retirar productos |
 | `docs/arquitectura.md` | Plataforma, costos, estructura del código y evolución de datos |
 | `docs/publicacion.md` | Comprobaciones, alojamiento y lista de lanzamiento |
-| `docs/licencias-de-terceros.md` | Licencias de la fuente y de los iconos |
+| `docs/licencias-de-terceros.md` | Licencias de la fuente, de los iconos y de las dependencias, y de dónde vienen las fotos de producto |
 | `docs/Sercom_Active_Plan_Maestro_Web_y_Catalogo.pdf` | Plan maestro v1.2 |
-| `research/Sercom_Active_Fuentes_Catalogos.json` | Registro de investigación: 19 entidades y 35 referencias; no es un catálogo de productos |
+| `research/Sercom_Active_Fuentes_Catalogos.json` | Registro de investigación: 19 entidades (4 retiradas del portal) y 40 referencias; no es un catálogo de productos |
 | `src/data/business.json` | Contacto, horario y datos del negocio |
 | `src/data/catalog.json` | Categorías y productos; solo los aprobados se muestran |
-| `src/data/brands.json` | «Marcas que manejamos» |
+| `src/assets/productos/` | Las fotos de los productos aprobados, tomadas del sitio de cada fabricante |
+| `src/data/brands.json` | «Marcas que manejamos» y los enlaces al catálogo de cada fabricante |
 | `src/data/preview/example-products.json` | Productos de ejemplo, solo para la vista previa |
 | `src/pages/`, `src/components/`, `src/styles/` | Páginas, componentes y estilos |
 | `src/lib/` | Validación, datos públicos, contacto, búsqueda, filtros, la lista de cotización y su almacén en el navegador |
