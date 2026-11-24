@@ -1,8 +1,9 @@
 ---
 // Tarjeta de producto (`.product`) a partir de un PublicProduct:
-//   imagen (o, sin fotografía, el pictograma de la categoría sobre el rayado), etiqueta «Ejemplo» si es un
+//   fotografía (ProductPhoto; o, sin ella, el pictograma de la categoría sobre el rayado), etiqueta «Ejemplo» si es un
 //   ejemplo de la vista previa, categoría, nombre, marca y código, «Ver ficha» (toda la tarjeta lleva a la
-//   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product.
+//   ficha) y «Cotizar», que abre WhatsApp con el mensaje de producto de contactLinks.product (el mismo de «Cotizar
+//   este producto» en la ficha: con una sola variante, la línea «Variante» ya la nombra, onlyVariantText).
 // El separador «·» va unido a la marca con un espacio de no separación (dentro de su elemento, que el celular
 // oculta junto con él): el renglón solo puede partirse después del separador, nunca empezar con «·».
 // Las dos acciones llevan su nombre completo en aria-label («Ver ficha: {nombre}», «Cotizar: {nombre}»): leído de
@@ -14,10 +15,12 @@
 // se está viendo (la ficha de producto usa el mismo script para sus enlaces).
 import type { PublicProduct } from '../types/site.ts';
 import { absoluteUrl, contactLinks } from '../lib/contact.mjs';
+import { onlyVariantText } from '../lib/quote-list.mjs';
 import { EXAMPLE_TAG } from '../lib/site-data.mjs';
 import { categoryIcon } from '../lib/icons.ts';
 import Icon from './Icon.astro';
 import PageLinkScript from './PageLinkScript.astro';
+import ProductPhoto from './ProductPhoto.astro';
 import Tag from './Tag.astro';
 
 interface Props {
@@ -31,7 +34,7 @@ interface Props {
 const { product, headingLevel = 3, class: className } = Astro.props;
 const Heading = `h${headingLevel}` as 'h2' | 'h3' | 'h4';
 const pageUrl = absoluteUrl(product.url, Astro.site);
-const quote = contactLinks.product({ brandName: product.brandName, code: product.code, name: product.name, url: pageUrl });
+const quote = contactLinks.product({ brandName: product.brandName, code: product.code, name: product.name, url: pageUrl, variant: onlyVariantText(product) });
 const categoryName = product.categoryNames[0];
 const categoryId = product.categoryIds[0];
 ---
@@ -39,7 +42,7 @@ const categoryId = product.categoryIds[0];
   <div class:list={['product__media', { 'product__media--photo': product.image }]}>
     {product.isExample && <Tag>{EXAMPLE_TAG}</Tag>}
     {product.image ? (
-      <img class="product__img" src={product.image.url} alt={product.image.alt} width="400" height="300" loading="lazy" decoding="async" />
+      <ProductPhoto image={product.image} place="card" class="product__img" productId={product.id} />
     ) : (
       <span class="product__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
     )}

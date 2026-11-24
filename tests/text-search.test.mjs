@@ -4,11 +4,12 @@ import { filterProducts, matchesQuery, matchesSearchText, queryTokens, SEARCH_PA
 import { requestDescription } from '../src/lib/contact-core.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
 import { cleanQuery, normalizeCode, normalizeText } from '../src/lib/text.mjs';
-import { loadProjectData } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
 // Los dieciséis ejemplos de la vista previa, con la forma pública que reciben las páginas.
-const exampleProducts = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples }).products;
+// Los productos de la vista previa sin fichas reales (catálogo vaciado): solo los dieciséis ejemplos, con cualquier catálogo.
+const exampleProducts = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples }).products;
 // Productos sintéticos de prueba con códigos parecidos a los de un fabricante. Nunca se importan en el sitio.
 const synthetic = [
   { name: 'Guante sintético de prueba', brandName: 'Marca Alfa', code: '37-175', categoryNames: ['Protección de manos'], variants: [{ code: '37-175-09' }, { code: '37-175-10' }] },
@@ -79,6 +80,56 @@ test('encuentra por el código de una variante', () => {
   assert.deepEqual(codes(exampleProducts, 'EJ-8001-27'), ['EJ-8001']);
   assert.deepEqual(codes(exampleProducts, 'ej800127'), ['EJ-8001']);
   assert.deepEqual(codes(exampleProducts, 'EJ-3001-AZ'), ['EJ-3001']);
+});
+
+test('una variante sin código propio no cambia el texto de búsqueda: el producto se encuentra por su nombre y su código', () => {
+  const product = { name: 'Guante sintético de prueba', brandName: 'Marca sintética', code: 'SP-37-175', categoryNames: ['Protección de manos'], variants: [] };
+  const withSizes = { ...product, variants: [{ code: '' }, { code: '' }, { code: 'SP-37-175-9' }] };
+  assert.equal(searchText({ ...product, variants: [{ code: '' }, { code: '' }] }), searchText(product));
+  assert.equal(matchesSearchText(searchText(withSizes), 'guante sp37175'), true);
+  assert.equal(matchesSearchText(searchText(withSizes), 'sp-37-175-9'), true);
+});
+
+// Las etiquetas de las variantes (tallas y colores), en productos escritos para estas pruebas.
+const withLabels = [
+  { name: 'Casco sintético de prueba', brandName: 'Marca Alfa', code: 'CS-100', categoryNames: ['Protección de cabeza'], variants: [{ label: 'Amarillo', code: 'CS-100-AM' }, { label: 'Azul rey', code: '' }] },
+  { name: 'Overol sintético de prueba', brandName: 'Marca Beta', code: 'OS-200', categoryNames: ['Ropa y protección corporal'], variants: [{ label: 'Talla MD', code: '' }, { label: 'Talla XL', code: '' }] },
+  { name: 'Bota sintética de prueba', brandName: 'Marca Beta', code: 'BS-300', categoryNames: ['Calzado industrial'], variants: [{ label: 'Talla 26', code: '' }, { label: 'Talla 27', code: '' }] },
+  { name: 'Respirador sintético de prueba', brandName: 'Marca Gamma', code: 'RS-400', categoryNames: ['Protección respiratoria'], variants: [{ label: 'Talla mediana', code: 'RS-400-M' }, { label: 'Tamaño Único', code: '' }] },
+  { name: 'Casco sintético sin variantes', brandName: 'Marca Gamma', code: 'CS-500', categoryNames: ['Protección de cabeza'], variants: [] },
+];
+
+test('una palabra de la etiqueta de una variante encuentra el producto', () => {
+  assert.deepEqual(codes(withLabels, 'amarillo'), ['CS-100']);
+  assert.deepEqual(codes(withLabels, 'rey'), ['CS-100']);
+  assert.deepEqual(codes(withLabels, 'xl'), ['OS-200']);
+  assert.deepEqual(codes(withLabels, '27'), ['BS-300']);
+  assert.deepEqual(codes(withLabels, 'talla'), ['OS-200', 'BS-300', 'RS-400']);
+});
+
+test('una palabra del nombre y una de la etiqueta de una variante encuentran el producto juntas', () => {
+  assert.deepEqual(codes(withLabels, 'casco amarillo'), ['CS-100']);
+  assert.deepEqual(codes(withLabels, 'overol xl'), ['OS-200']);
+  assert.deepEqual(codes(withLabels, 'bota talla 27'), ['BS-300']);
+  assert.deepEqual(codes(withLabels, 'casco verde'), []);
+  assert.deepEqual(codes(withLabels, 'overol 27'), []);
+});
+
+test('la etiqueta de una variante no distingue mayúsculas ni acentos, como el nombre', () => {
+  for (const query of ['AMARILLO', 'Amarillo', 'amarillo']) assert.deepEqual(codes(withLabels, query), ['CS-100'], query);
+  for (const query of ['tamaño único', 'TAMANO UNICO', 'tamano unico']) assert.deepEqual(codes(withLabels, query), ['RS-400'], query);
+  assert.equal(searchText(withLabels[3]), 'respirador sintetico de prueba marca gamma rs-400 rs-400-m proteccion respiratoria talla mediana tamano unico rs400 rs400m');
+});
+
+test('la etiqueta se encuentra como la escribe el registro: «mediano» no encuentra «Talla mediana»', () => {
+  assert.deepEqual(codes(withLabels, 'mediana'), ['RS-400']);
+  assert.deepEqual(codes(withLabels, 'mediano'), []);
+});
+
+test('un producto sin variantes se encuentra como antes, por su nombre, su marca, su código y su categoría', () => {
+  assert.equal(searchText(withLabels[4]), 'casco sintetico sin variantes marca gamma cs-500 proteccion de cabeza cs500');
+  assert.deepEqual(codes(withLabels, 'casco'), ['CS-100', 'CS-500']);
+  assert.deepEqual(codes(withLabels, 'cs500'), ['CS-500']);
 });
 
 test('encuentra por marca y por nombre de categoría', () => {

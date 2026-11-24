@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterProducts, matchesQuery, matchesSearchText, resultSummary, resultSummaryParts, SEARCH_SYNONYMS, searchMatcher, searchText, singularForms, tokenAlternatives } from '../src/lib/search.mjs';
 import { createSiteData } from '../src/lib/site-data-core.mjs';
-import { loadProjectData } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
-const previewProducts = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples }).products;
+// Los productos de la vista previa sin fichas reales (catálogo vaciado): solo los dieciséis ejemplos, con cualquier catálogo.
+const previewProducts = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples }).products;
 
 // Productos sintéticos de prueba con la forma pública que usa la búsqueda. Nunca se importan en el sitio.
 const product = (name, categoryNames = ['Protección de manos'], extra = {}) => ({ name, brandName: 'Marca Alfa', code: 'SP-100', categoryNames, variants: [], ...extra });
@@ -80,6 +81,16 @@ test('un plural encuentra el singular con cada una de las tres reglas', () => {
   // Con los ejemplos de la vista previa: «guantes» encuentra los tres guantes y «lentes» el lente (y el goggle no).
   assert.deepEqual(filterProducts(previewProducts, 'guantes').map(item => item.code), ['EJ-1001', 'EJ-1003', 'EJ-1004']);
   assert.deepEqual(filterProducts(previewProducts, 'cascos').map(item => item.code), ['EJ-3001', 'EJ-3002']);
+});
+
+test('las reglas de plurales y sinónimos valen igual para la etiqueta de una variante', () => {
+  const helmet = product('Casco sintético de prueba', ['Protección de cabeza'], { variants: [{ label: 'Amarillo', code: '' }, { label: 'Naranja alta visibilidad', code: '' }] });
+  assert.equal(finds(helmet, 'amarillos'), true);
+  assert.equal(finds(helmet, 'cascos naranjas'), true);
+  assert.equal(finds(helmet, 'verdes'), false);
+  // Un sinónimo de una palabra de la consulta también se busca en las etiquetas: «calzado» encuentra la etiqueta «Bota».
+  const kit = product('Kit sintético de prueba', ['Ropa'], { variants: [{ label: 'Con bota', code: '' }, { label: 'Sin bota', code: '' }] });
+  assert.equal(finds(kit, 'kit calzado'), true);
 });
 
 test('un singular sigue encontrando el plural (la palabra se busca en cualquier parte del texto)', () => {

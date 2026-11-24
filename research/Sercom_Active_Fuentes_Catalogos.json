@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "project": "Sercom Active - catálogo Puebla",
-  "updated_on": "2026-11-18",
+  "updated_on": "2026-11-23",
   "purpose": "Registro central de fuentes para investigación e implementación. No contiene todavía productos importados ni una sincronización operativa.",
   "scope": {
     "excluded_entities": [
@@ -48,7 +48,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_accesible_pdf_localizado",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "portal_y_pdf",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -59,13 +59,13 @@
           "label": "Portal industrial México",
           "url": "https://www.ansell.com/mx/es/industrial",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); portal industrial de México con las familias de producto; enlaza el catálogo general en PDF"
         },
         {
           "label": "Catálogo general enlazado oficialmente",
           "url": "https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0",
-          "type": "document",
-          "verification": "localizado; lectura completa bloqueada por tamaño de consulta, no por inexistencia"
+          "type": "pdf",
+          "verification": "accesible (2026-11-23); se abre y dice «CATÁLOGO DE PRODUCTOS 2023», en español; el portal industrial de México lo enlaza como «Catálogo general (PDF)»"
         }
       ]
     },
@@ -86,7 +86,7 @@
           "label": "Catálogo EPP México",
           "url": "https://www.3m.com.mx/3M/es_MX/p/c/epp/i/seguridad/seguridad-personal/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-18); el 2026-11-23 el sitio rechazó dos veces la lectura automática y no se pudo volver a comprobar"
         }
       ]
     },
@@ -96,7 +96,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_accesible",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "catalogo_web",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -107,7 +107,7 @@
           "label": "Catálogo",
           "url": "https://duramil.com.mx/catalogo/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Catálogo – Duramil»: lista de productos por categoría (Pro Rubber y Duramil) con filtros; la página muestra precios"
         }
       ]
     },
@@ -123,18 +123,23 @@
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Usar portal de productos y pedir el catálogo vigente.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Catálogo web Altura Segura",
           "url": "https://ecommerce.alturasegura.com.mx/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-18); el 2026-11-23 el sitio no respondió a la lectura automática en dos intentos y no se pudo volver a comprobar"
         },
         {
           "label": "Página de descarga",
           "url": "https://www.alturasegura.com.mx/catalogo/",
           "type": "landing",
-          "verification": "error 500 durante consulta"
+          "verification": "error del servidor en las consultas del 2026-11-18 y del 2026-11-23"
         }
       ]
     },
@@ -144,7 +149,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "ficha_de_referencia_accesible_portafolio_pendiente",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "fichas_confirmadas_por_proveedor",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -155,7 +160,13 @@
           "label": "Uvex Classic en Honeywell",
           "url": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection/safety-goggles/uvex-classic",
           "type": "product_page",
-          "verification": "accesible; no es un catálogo completo de la marca"
+          "verification": "accesible (2026-11-23); ficha de un solo producto (Uvex Classic); no es un catálogo completo de la marca"
+        },
+        {
+          "label": "Protección ocular en Honeywell México",
+          "url": "https://automation.honeywell.com/mx/es/products/personal-protective-equipment/eye-protection",
+          "type": "web",
+          "verification": "accesible (2026-11-23); «Anteojos y gafas protectoras Honeywell»: página de la categoría de protección ocular de Honeywell México, donde están los modelos Uvex; la lista de productos se carga con JavaScript y no se leyó"
         }
       ]
     },
@@ -165,7 +176,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "centro_de_catalogos_accesible",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "pdf_y_fichas_regionales",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -176,7 +187,7 @@
           "label": "Centro de catálogos",
           "url": "https://www.lakeland.com/es-la/product-catalogs/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Catálogos de productos»: centro de catálogos en español con cuatro catálogos por línea para descargar; los PDF están en inglés y no se abrieron"
         }
       ]
     },
@@ -186,7 +197,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_y_pdf_localizados",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "portal_y_pdf",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -197,31 +208,31 @@
           "label": "Portal",
           "url": "https://www.mcrsafety.com.mx/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); portada con las familias de producto"
         },
         {
           "label": "Guías y recursos actuales",
           "url": "https://www.mcrsafety.com.mx/recursos/guias-de-recursos/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "no enlazar: la lista de 13 guías incluye el catálogo de la marca excluida; la página responde (2026-11-23)"
         },
         {
           "label": "Página del catálogo MCR",
           "url": "https://www.mcrsafety.com.mx/recursos/guias-de-recursos/09-catalogo-de-productos-mcr/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); página del catálogo con el botón «DESCARGAR» hacia el PDF"
         },
         {
           "label": "PDF de productos MCR",
           "url": "https://www.mcrsafety.com.mx/content/Guides/Mexico/catalogo-de-productos-mcr.pdf",
           "type": "pdf",
-          "verification": "enlace oficial; lectura completa excedió tamaño de consulta"
+          "verification": "accesible (2026-11-23); se abre y empieza con la lista de productos; la página del catálogo lo enlaza con «DESCARGAR»; el servidor lo entrega como PDF, modificado el 2026-10-06, sin decir su tamaño; sin edición impresa a la vista"
         },
         {
           "label": "Política de compartir contenido",
           "url": "https://www.mcrsafety.com.mx/politicas/compartir-contenido/",
           "type": "usage_policy",
-          "verification": "consultada; atribución y condiciones específicas"
+          "verification": "consultada el 2026-11-23: las imágenes de producto pueden usarse citando a MCR Safety como fuente, con enlace a donde está la imagen original, y se retiran si lo piden"
         },
         {
           "label": "Ruta anterior, no usar",
@@ -237,24 +248,35 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "centro_de_descargas_accesible",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "descargas_oficiales_por_linea",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Identificar archivo vigente y modelos de soldadura/EPP efectivamente ofrecidos.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Librerías y descargas",
           "url": "https://grupoinfra.com/librerias-y-descargas",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Librerías y descargas» con filtros por tipo de documento, entre ellos «Catálogo»; los archivos no aparecieron en la lectura"
         },
         {
           "label": "Inicio; anuncia catálogo 2026",
           "url": "https://www.grupoinfra.com/",
           "type": "web",
-          "verification": "localizado por buscador oficial; enlace exacto del archivo por resolver"
+          "verification": "accesible (2026-11-23); la portada enlaza «Descarga Catálogo 2026» hacia un PDF de assets.grupoinfra.com"
+        },
+        {
+          "label": "Catálogo 2026 enlazado desde la portada",
+          "url": "https://assets.grupoinfra.com/librerias/descargas/catalogo_2025_eykn.pdf",
+          "type": "pdf",
+          "verification": "sin comprobar (2026-11-23): la portada oficial lo enlaza como «Descarga Catálogo 2026» y el nombre del archivo dice 2025; el servidor no permite la lectura automática, así que el contenido, las páginas y la edición están sin revisar"
         }
       ]
     },
@@ -264,7 +286,7 @@
       "entity_type": "supplier",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "pdf_localizado_con_error",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "archivo_proporcionado_por_proveedor",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -275,7 +297,7 @@
           "label": "PDF localizado",
           "url": "https://espomega.mx/pdfs/catalogo_con_logo.pdf",
           "type": "pdf",
-          "verification": "error 503 durante consulta; contenido no revisado"
+          "verification": "sin comprobar (2026-11-23): responde como PDF, pero sin texto legible (probablemente solo imágenes); contenido, edición e idioma sin revisar, y no se revisó ninguna página de Espomega que lo enlace"
         }
       ]
     },
@@ -285,7 +307,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "centro_y_pdf_accesibles",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "pdf_y_fichas_por_codigo",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -296,13 +318,13 @@
           "label": "Literatura y fichas",
           "url": "https://www.moldex.com/es/resources/marketing-sales-resources/literatura-downloads/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Descarga de Información»: catálogos de línea completa y resúmenes técnicos para descargar"
         },
         {
           "label": "Catálogo español AMLAT",
           "url": "https://www.moldex.com/wp-content/uploads/Moldex-Catalog-ESP.pdf",
           "type": "pdf",
-          "verification": "abierto por herramienta; 36 páginas; no se han validado todos los productos"
+          "verification": "accesible (2026-11-23); se abre: «PROTECCIÓN RESPIRATORIA, AUDITIVA Y VISUAL», en español, unas 35 páginas, pie «9700-748-S REV AU 11/24»; la página de descargas lo enlaza como «Catálogo Línea Completa AMLAT»"
         }
       ]
     },
@@ -312,7 +334,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "exportacion_estructurada_documentada",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "excel_y_recursos_oficiales",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -322,8 +344,8 @@
         {
           "label": "Portal y guía de exportación",
           "url": "https://mx.msasafety.com/digital-catalogs?locale=es",
-          "type": "export_documentation",
-          "verification": "documenta Excel/recursos enviados por correo; no verifica una API automática disponible para Sercom"
+          "type": "landing",
+          "verification": "accesible (2026-11-23); «Catálogos de Contenidos Digitales»: enlaza los catálogos digitales de MSA por mercado y por producto (en Salsify) y explica cómo exportar su contenido; no verifica una API automática disponible para Sercom"
         },
         {
           "label": "Catálogo industrial Salsify",
@@ -339,7 +361,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "centro_y_pdf_accesibles",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "pdf_y_fichas_de_producto",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -350,19 +372,19 @@
           "label": "Página del catálogo",
           "url": "https://herhild.com/catalogo/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); ofrece el catálogo digital «Catalogo-HH-Digital-2026v2» y, aparte, el de 2025"
         },
         {
           "label": "PDF 2026 v2",
           "url": "https://herhild.com/wp-content/uploads/2025/11/Catalogo-HH-Digital-2026v2.pdf",
           "type": "pdf",
-          "verification": "abierto por herramienta; 25 páginas; no se han validado todos los productos"
+          "verification": "accesible (2026-11-23); se abre; la página del catálogo lo ofrece como «Catalogo-HH-Digital-2026v2», pero el texto leído de su portada dice «CATALOGO 2025» y «DI-30 REV. 01»: edición por confirmar a la vista"
         },
         {
           "label": "Productos",
           "url": "https://herhild.com/productos/",
           "type": "web",
-          "verification": "localizado en sitio oficial"
+          "verification": "accesible (2026-11-23); lista de productos por categoría, 22 páginas, sin precios a la vista; el carrito es para pedir cotización"
         }
       ]
     },
@@ -372,18 +394,23 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "fuente_primaria_vigente_pendiente",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "archivo_proporcionado_por_proveedor",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Pedir catálogo al proveedor; fichas de distribuidores no sustituyen confirmación primaria.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Dominio histórico de referencia",
           "url": "https://www.drypro.mx/",
           "type": "unverified_current",
-          "verification": "no accesible; no se confirma vigencia del sitio"
+          "verification": "no accesible: el 2026-11-23 responde con una redirección (302) al sitio de otra empresa (www.deltaplus.mx/es), que no se siguió; no se confirma la relación ni la vigencia"
         }
       ]
     },
@@ -393,7 +420,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "catalogo_y_fichas_accesibles",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "catalogo_web_y_fichas_por_codigo",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -404,13 +431,13 @@
           "label": "Catálogo web",
           "url": "https://jyrsa.com/catalogo/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); lista de productos con filtros y páginas, sin precios; hay una versión en inglés aparte"
         },
         {
           "label": "Fichas técnicas",
           "url": "https://jyrsa.com/fichas-tecnicas/",
           "type": "landing",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); tabla de códigos con una ficha en PDF por producto; no hay catálogo general en PDF"
         }
       ]
     },
@@ -420,24 +447,30 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_accesible_pdf_localizado",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "catalogo_web_y_pdf",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
-      "next_action": "Descargar y revisar PDF completo; confirmar modelos y evitar servir 49 MB en la carga inicial.",
+      "next_action": "No enlazar la portada ni el blog: el mapa del sitio y el blog llevan páginas ajenas (de casinos); solo páginas de producto y la de categorías. El PDF pesa 49.7 MB: decir su tamaño junto al enlace.",
       "resources": [
         {
           "label": "Categorías y productos",
           "url": "https://www.goldeneagle.com.mx/producto/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); plantilla casi vacía con el menú de categorías; la página de categorías es mejor entrada"
         },
         {
           "label": "Catálogo PDF",
           "url": "https://www.goldeneagle.com.mx/folder/catalogoGE.pdf",
           "type": "pdf",
-          "verification": "localizado; lectura completa excedió tamaño de consulta, aproximadamente 49.7 MB"
+          "verification": "accesible (2026-11-23); se bajó y se revisó con programas: 140 páginas, portada «GOLDEN EAGLE · CATÁLOGO DE PRODUCTOS» sin año impreso, creado el 2026-04-06 y modificado el 2026-05-27, 49,748,485 bytes, sin contenido activo y sin enlaces; ninguna página leída del sitio lo enlaza"
+        },
+        {
+          "label": "Página de categorías de Golden Eagle",
+          "url": "https://www.goldeneagle.com.mx/categorias/",
+          "type": "web",
+          "verification": "accesible (2026-11-23); mosaico de las categorías de producto (arneses, autorretráctiles, guantes y otras), sin precios y sin contenido ajeno"
         }
       ]
     },
@@ -447,18 +480,29 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "catalogo_tras_formulario",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "archivo_obtenido_del_proveedor",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Obtener archivo por el canal comercial autorizado; no automatizar envíos de formularios.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Solicitud de catálogo",
           "url": "https://www.hawk.com.mx/descargar-catalogo/",
           "type": "gated_landing",
-          "verification": "accesible; exige formulario; no se envió"
+          "verification": "accesible (2026-11-23); exige un formulario con datos de contacto para descargar el catálogo; no se envió"
+        },
+        {
+          "label": "Productos en la tienda en línea de HAWK",
+          "url": "https://ecommerce.hawk.com.mx/catalogo.aspx?Cat=Productos",
+          "type": "web",
+          "verification": "sin comprobar (2026-11-23): la página oficial lo enlaza como «PRODUCTOS», pero el servidor no dejó leer sus reglas de acceso automático y la página no se abrió"
         }
       ]
     },
@@ -468,7 +512,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_accesible",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "catalogo_web",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -479,7 +523,13 @@
           "label": "Portal de productos",
           "url": "https://dermacare.mx/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); portada con el menú de categorías y el botón «VER CATÁLOGO»"
+        },
+        {
+          "label": "Catálogo de productos en dermacare.mx",
+          "url": "https://dermacare.mx/productos/",
+          "type": "web",
+          "verification": "accesible (2026-11-23); «Productos - Dermacare»: lista de productos por categoría, 32 páginas, sin precios a la vista; la portada lo enlaza como «VER CATÁLOGO»"
         }
       ]
     },
@@ -489,7 +539,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_y_safespec_accesibles",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "fichas_regionales_safespec",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -500,13 +550,13 @@
           "label": "EPP México",
           "url": "https://www.dupont.mx/personal-protective-equipment.html",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Equipos de protección personal»: enlaza las líneas Tyvek, Tychem y ProShield y el centro de documentos; sin PDF general"
         },
         {
           "label": "SafeSPEC México",
           "url": "https://www.safespec.dupont.mx/tyvek/featured-products.html",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); «Productos Destacados»: productos por línea (Tyvek, Tychem, ProShield) con «Ver todos los productos»; sin precios; «Dónde comprar» lleva a su buscador de puntos de venta"
         }
       ]
     },
@@ -516,7 +566,7 @@
       "entity_type": "brand",
       "scope": "incluido_en_la_lista_del_usuario",
       "source_status": "portal_y_enlace_drive_localizados",
-      "checked_on": "2026-11-18",
+      "checked_on": "2026-11-23",
       "recommended_ingestion": "catalogo_web_y_pdf_oficial",
       "unattended_api_or_feed_verified": false,
       "monitoring_active": false,
@@ -527,13 +577,13 @@
           "label": "Portal y recursos",
           "url": "https://mrseguridad.com/",
           "type": "web",
-          "verification": "accesible"
+          "verification": "accesible (2026-11-23); portada con las categorías y productos, sin precios; enlaza «Catálogo 2026 NUEVO» hacia el archivo de Google Drive"
         },
         {
           "label": "Catálogo MR Seguridad 2026 v1.1",
           "url": "https://drive.google.com/file/d/1IeQneb8omgWD7EAb8G8WCf2MvJMB4EEp/view?usp=sharing",
           "type": "pdf_viewer",
-          "verification": "enlazado oficialmente; visor localizado, contenido completo no extraído"
+          "verification": "accesible (2026-11-23); el visor de Google Drive muestra el archivo «Catalogo MR Seguridad 2026 v1.1 Comprimido.pdf»; la portada oficial lo enlaza como «Catálogo 2026 NUEVO»; sus páginas no se revisaron"
         }
       ]
     }

@@ -1,0 +1,103 @@
+---
+// Fotografía de un producto (`PublicImage`), en la tarjeta (`place="card"`) y en la ficha (`place="page"`). Solo de
+// compilación. Dos formas:
+//   - `file`: un archivo de src/assets/productos/. Se dibuja con Picture de astro:assets: WebP en varios anchos y, para
+//     un navegador sin WebP, los mismos anchos en el formato de la foto (JPEG para JPEG, PNG para PNG; PNG también
+//     para una foto WebP, porque conserva la transparencia), con `width` y `height` sacados del archivo y `sizes` según
+//     el lugar. Nunca se agranda una foto: un ancho mayor que el del archivo se cambia por el del archivo.
+//     Un nombre que no está en la carpeta detiene la compilación con un mensaje que nombra el producto y el archivo,
+//     en lugar de imprimir una imagen rota. El validador (scripts/product-photos.mjs) ya lo revisa antes de compilar;
+//     esto cubre `astro build` sin él.
+//   - `url`: una dirección que la página imprime tal cual en un <img> con el ancho y el alto declarados; nunca se
+//     descarga al compilar. `referrerpolicy="no-referrer"`: el otro servidor no sabe en qué página está el visitante.
+// En la tarjeta la foto carga cuando se acerca a la vista (`loading="lazy"`); en la ficha es el contenido principal de
+// la primera pantalla y carga de inmediato con prioridad alta. Las dos se decodifican sin detener la página.
+// La clase va en el <img> (`product__img`, `producto__img`): el marco conserva su proporción fija y la foto se
+// contiene dentro, completa, sin recortarse ni deformarse (components.css, producto.css).
+//
+// Anchos y `sizes`: salen de los marcos medidos en el navegador a 1440, 1280, 768, 390 y 360 px de ancho. El marco
+// tiene proporción fija y la foto se contiene en él, así que el ancho que ocupa depende de la proporción de la foto:
+// `sizes` se calcula para cada foto con su ancho y su alto, y un navegador no baja una foto de más del doble del ancho
+// que ocupa (entre un ancho de la lista y el siguiente hay 1.5 veces como máximo), con dos límites:
+//   - El piso es 160 px, el ancho más chico de las dos listas. Una foto que se dibuja con menos de 80 px de ancho (una
+//     muy alta en una tarjeta: una de 1:4 ocupa unos 33 px a 360 px de pantalla) baja igual el archivo de 160 px, más
+//     del doble de lo que ocupa; son unos 4 KB.
+//   - El techo es la foto misma: el validador acepta desde 400 px por el lado más largo (scripts/product-photos.mjs),
+//     y ningún archivo generado es más ancho que el original. El marco de la ficha mide como máximo 690 × 470 px, así
+//     que una foto de 400 px se ve como mucho 1.2 veces más grande en una pantalla común; en una de densidad 2 el
+//     navegador amplía el original, el más ancho que hay.
+//   - Tarjeta: marco de 4:3 en computadora y celular, del ancho de la tarjeta (de 242 a 323 px desde 1100 px, la mitad
+//     de la pantalla en celular), y de 16:10 en tableta, de casi la mitad de la pantalla (359 px a 768).
+//   - Ficha: en computadora, el contenido del marco de 4:3 mide hasta 690 × 470 px (a 1440 px; 641 × 421 a 1280); en
+//     tableta, la altura del marco es clamp(200px, 34vw, 300px) menos 40 de relleno (221 px a 768) y el ancho del
+//     contenido es el de la pantalla menos el relleno (670 a 768). En celular el marco de una foto es de 4:3 y de todo
+//     el ancho, con 20 px de relleno a los lados y 12 arriba y abajo: el contenido mide 100vw − 40 de ancho y
+//     75vw − 24 de alto (350 × 268.5 a 390, 320 × 246 a 360). Una foto de proporción 1.3 o más ancha ocupa todo el
+//     ancho (`calc(100vw - 40px)`); una más alta, el alto por su proporción (`calc(75·r vw - 24·r px)`). El cruce
+//     está entre 1.296 (320 px) y 1.317 (699 px): con 1.3 el error es de menos del 2 %.
+// Si cambian esos marcos en components.css, responsive.css o producto.css, se miden otra vez y se cambia esto.
+//
+// `photos` es la carpeta de fotos por nombre de archivo. Por omisión, src/assets/productos/ (el patrón va escrito tal
+// cual: tests/build-mode.test.mjs revisa los patrones de src/). La sonda de las pruebas (tests/build-probe) pasa la
+// suya, con una imagen sintética, para compilar este mismo dibujo.
+import type { ImageMetadata } from 'astro';
+import { Picture } from 'astro:assets';
+import type { PublicImage } from '../types/site.ts';
+
+interface Props {
+  image: PublicImage;
+  /** `card`: tarjeta de producto. `page`: ficha del producto. */
+  place: 'card' | 'page';
+  /** Clase del <img>. */
+  class: string;
+  /** Producto al que pertenece la foto: lo nombra el mensaje de error. */
+  productId: string;
+  /** Fotos por nombre de archivo; por omisión, las de src/assets/productos/. */
+  photos?: Readonly<Record<string, ImageMetadata>>;
+}
+
+const folder = import.meta.glob('../assets/productos/*.{jpg,jpeg,png,webp}', { eager: true, import: 'default' }) as Record<string, ImageMetadata>;
+const byName = Object.fromEntries(Object.entries(folder).map(([path, photo]) => [path.slice(path.lastIndexOf('/') + 1), photo]));
+
+/** Anchos que se generan en cada lugar. */
+const WIDTHS = { card: [160, 240, 320, 400, 480, 640], page: [160, 240, 320, 480, 640, 960, 1280, 1600] };
+/**
+ * `sizes` de una foto de proporción `ratio` (ancho / alto): el ancho que ocupa contenida en su marco, en celular
+ * (hasta 699 px), en tableta (hasta 1099 px) y en computadora.
+ */
+function sizesFor(place: 'card' | 'page', ratio: number) {
+  const px = (box: number, height: number) => `${Math.round(Math.min(box, height * ratio))}px`;
+  const vw = (share: number, frame: number) => `${Math.round(share * Math.min(1, ratio / frame) * 10) / 10}vw`;
+  const tenths = (value: number) => Math.round(value * 10) / 10;
+  const phone = ratio >= 1.3 ? 'calc(100vw - 40px)' : `calc(${tenths(75 * ratio)}vw - ${tenths(24 * ratio)}px)`;
+  return place === 'card'
+    ? `(max-width: 699px) ${vw(50, 4 / 3)}, (max-width: 1099px) ${vw(47, 16 / 10)}, ${px(323, 242)}`
+    : `(max-width: 699px) ${phone}, (max-width: 1099px) ${px(1049, 260)}, ${px(690, 470)}`;
+}
+
+const { image, place, class: className, productId, photos = byName } = Astro.props;
+const loading = place === 'page' ? { loading: 'eager', fetchpriority: 'high' } as const : { loading: 'lazy' } as const;
+
+let photo: ImageMetadata | undefined;
+if ('file' in image) {
+  photo = Object.hasOwn(photos, image.file) ? photos[image.file] : undefined;
+  if (!photo) throw new Error(`${productId}: la foto «${image.file}» no está en src/assets/productos/. Agrega el archivo con ese nombre exacto o corrige image.file en src/data/catalog.json.`);
+}
+// El formato para un navegador sin WebP: el de la foto, salvo WebP, que pasa a PNG.
+const fallbackFormat = photo ? (photo.format === 'jpg' || photo.format === 'jpeg' ? 'jpg' : 'png') : undefined;
+---
+{photo ? (
+  <Picture
+    src={photo}
+    alt={image.alt}
+    formats={['webp']}
+    fallbackFormat={fallbackFormat}
+    widths={[...WIDTHS[place]]}
+    sizes={sizesFor(place, photo.width / photo.height)}
+    class={className}
+    decoding="async"
+    {...loading}
+  />
+) : 'url' in image && (
+  <img class={className} src={image.url} alt={image.alt} width={image.width} height={image.height} decoding="async" referrerpolicy="no-referrer" {...loading} />
+)}

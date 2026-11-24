@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Comprobaciones del marcado de un sitio ya compilado: hechos de la cabecera, de la barra fija y del contenido
-// (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual y página
-// de un producto retirado), del aviso de arriba (que nada lo oculte), de los controles (que cada uno tenga una
-// función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de un <template>) y de la
-// página de cotizar (que lleve lo que su script necesita según las páginas de producto de la compilación), que se
-// leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
+// (celdas de relleno de las retículas, dirección de correo, ruta de navegación, marcas de la página actual, página
+// de un producto retirado y fotografías de producto), del aviso de arriba (que nada lo oculte), de los controles
+// (que cada uno tenga una función nativa o un script de su página que lo nombre, y que ningún script vaya dentro de
+// un <template>) y de la página de cotizar (que lleve lo que su script necesita según las páginas de producto de la
+// compilación), que se leen en el HTML, en las hojas de estilo y en el código de cada página, sin navegador.
 //
 // Uso:  node scripts/check-markup.mjs [carpeta] [--preview]
 //   carpeta     carpeta compilada; por omisión `dist`, o `dist-preview` con --preview
@@ -138,6 +138,71 @@ const isUnseen = element => hasClass(element, 'vh') || element.attributes.get('a
 /** El texto que se ve de un elemento, tal como está escrito (sin `.vh` ni aria-hidden="true", espacios intactos). */
 export const visibleText = element => element.content
   .map(part => (typeof part === 'string' ? part : isUnseen(part) ? '' : visibleText(part))).join('');
+// Lo que no se dibuja: espacios, controles, caracteres de formato (de ancho cero, guion suave, de dirección) y los que
+// Unicode marca para ignorar al dibujar.
+const NOT_DRAWN = /[\s\p{Cc}\p{Cf}\p{DI}]/gu;
+/**
+ * Las partes de una variante en el orden del documento (R-VARIANTE-01): `{ hidden }` con el texto de cada elemento
+ * `.vh`, y `{ shown }` con cada tramo de texto que se ve, sin los caracteres que no se dibujan (`NOT_DRAWN`). Lo marcado
+ * aria-hidden="true" o con el atributo `hidden` no cuenta. Un tramo que no dibuja nada no se guarda.
+ * @returns {({ hidden: string } | { shown: string })[]}
+ */
+function variantShown(element) {
+  const parts = [];
+  for (const part of element.content) {
+    if (typeof part === 'string') {
+      const drawn = part.replace(NOT_DRAWN, '');
+      if (drawn) parts.push({ shown: drawn });
+    } else if (hasClass(part, 'vh')) parts.push({ hidden: textOf(part) });
+    else if (part.attributes.get('aria-hidden') !== 'true' && !part.attributes.has('hidden')) parts.push(...variantShown(part));
+  }
+  return parts;
+}
+/**
+ * El nombre accesible de un enlace como lo calcula esta revisión: su `aria-label` o, sin él, su texto, también el oculto
+ * para la vista (`.vh`), sin lo marcado aria-hidden="true".
+ */
+const accessibleName = element => (element.attributes.get('aria-label') ?? element.content
+  .map(part => (typeof part === 'string' ? part : part.attributes.get('aria-hidden') === 'true' ? '' : accessibleName(part))).join(' ')).replace(/\s+/g, ' ').trim();
+/** Lo que dice, para los lectores de pantalla, un enlace que abre otra pestaña (MoreLink y ActionRow con `external`). */
+const NEW_TAB_TEXT = '(se abre en otra pestaña)';
+/** Los destinos (`target`) que no abren otra pestaña; cualquier otro nombre sí («_blank», «_new», «nueva»). */
+const SAME_TAB_TARGETS = ['', '_self', '_parent', '_top'];
+/**
+ * Un `<a>` o un `<area>` que abre otra pestaña: su `target`, en minúsculas y como está escrito (un espacio o un tabulador
+ * también cuentan: « _self» abre otra pestaña), no es uno de `SAME_TAB_TARGETS`.
+ */
+const opensAnotherTab = element => (element.name === 'a' || element.name === 'area')
+  && element.attributes.has('target') && !SAME_TAB_TARGETS.includes((element.attributes.get('target') ?? '').toLowerCase());
+/**
+ * Por qué el lector de pantalla no lee el texto oculto `notice` del enlace `link`, o null si lo lee. El navegador cierra
+ * un `<a>` donde empieza otro, y el árbol de `parseHtml` no: aquí se cuenta. El texto no se lee si él mismo es un `<a>`;
+ * si, subiendo desde él hasta el enlace (sin contarlo), hay otro `<a>`, un `<template>`, aria-hidden="true", el
+ * atributo hidden o inert, o un style en línea con display:none, visibility:hidden o collapse, o
+ * content-visibility:hidden; o si dentro del enlace empieza otro `<a>` antes que él. Una regla de una hoja de estilo
+ * que lo esconda no se ve aquí.
+ */
+const unreadBecause = (notice, link) => {
+  if (notice.name === 'a') return 'es él mismo un enlace (<a>), y el navegador cierra el primero donde empieza el segundo; escríbelo en un <span>';
+  for (let node = notice; node && node !== link; node = node.parent) {
+    if (node.name === 'a') return 'está dentro de otro enlace (<a>), y el navegador cierra el primero donde empieza el segundo; ponlo en el enlace mismo';
+    if (node.name === 'template') return 'está dentro de un <template>, que el navegador no muestra ni lee; ponlo fuera';
+    if ((node.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') return 'está dentro de aria-hidden="true" y no se lee; ponlo fuera';
+    if (node.attributes.has('hidden')) return 'está escondido con el atributo hidden y no se lee; ponlo fuera';
+    if (node.attributes.has('inert')) return 'está dentro de un elemento con el atributo inert y no se lee; ponlo fuera';
+    const hiding = declarationsOf(node.attributes.get('style') ?? '').find(hidesElement);
+    if (hiding) return `está escondido con style="${hiding.property}:${hiding.value.toLowerCase()}" y no se lee; ponlo fuera`;
+  }
+  if (allElements(link).some(element => element.name === 'a' && element.order < notice.order)) {
+    return 'va después de otro enlace (<a>) que empieza dentro de este, y el navegador cierra el primero donde empieza el segundo; ponlo antes de ese enlace';
+  }
+  return null;
+};
+/** Dos destinos de /marcas/ son el mismo lugar si difieren solo en las diagonales del final de la ruta. */
+const samePlace = (a, b) => {
+  const place = href => href.replace(/^([^?#]*?)\/+(?=$|[?#])/, '$1');
+  return place(a) === place(b);
+};
 /** Un texto para comparar: sin distinguir mayúsculas y con los espacios seguidos como uno. */
 const loose = text => text.replace(/\s+/g, ' ').trim().toLowerCase();
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
@@ -1439,6 +1504,122 @@ export const CHECKS = [
       for (const svg of page.elements.filter(element => element.name === 'svg' && hasClass(element, 'icon'))) {
         const missing = ['width', 'height'].filter(key => !numeric(svg.attributes.get(key)));
         if (missing.length) problems.push(`${describe(svg)}${svg.parent ? ` dentro de ${describe(svg.parent)}` : ''} no lleva ${missing.map(key => `${key} numérico`).join(' ni ')}: sin la hoja de estilo crece al ancho de la página`);
+      }
+      return problems;
+    },
+  },
+  // R-FOTO-01 · La fotografía de un producto (ProductPhoto.astro) es un <img> con la clase de su lugar: product__img en
+  // la tarjeta y producto__img en la ficha, también dentro de un <picture>. Las medidas son las del archivo o las
+  // declaradas en los datos: sin ellas, la página salta cuando la foto termina de cargar. La página de un retirado
+  // muestra el pictograma de su categoría, nunca su foto (R-STATE-04); las tarjetas de «Más productos…» sí llevan las
+  // suyas.
+  {
+    id: 'R-FOTO-01',
+    title: 'Cada fotografía de producto (img.product__img, img.producto__img) lleva un alt no vacío y width y height enteros positivos, y la página de un producto retirado no lleva su fotografía',
+    page(page) {
+      const problems = [];
+      const positive = value => value !== undefined && /^[1-9]\d*$/.test(value.trim());
+      for (const img of page.elements.filter(element => element.name === 'img' && (hasClass(element, 'product__img') || hasClass(element, 'producto__img')))) {
+        const missing = [];
+        if (!(img.attributes.get('alt') ?? '').trim()) missing.push('un alt no vacío');
+        for (const key of ['width', 'height']) if (!positive(img.attributes.get(key))) missing.push(`${key} entero positivo`);
+        if (missing.length) problems.push(`${describe(img)} (${img.attributes.get('src') ?? 'sin src'}) no lleva ${missing.join(' ni ')}`);
+      }
+      if (isRetiredPage(page)) {
+        const media = page.elements.filter(element => hasClass(element, 'producto__media')).flatMap(allElements);
+        const photos = new Set([
+          ...page.elements.filter(element => element.name === 'img' && hasClass(element, 'producto__img')),
+          ...media.filter(element => ['img', 'picture', 'source'].includes(element.name)),
+        ]);
+        for (const photo of photos) problems.push(`la página de un producto retirado lleva ${describe(photo)}: muestra el pictograma de su categoría, nunca una fotografía`);
+      }
+      return problems;
+    },
+  },
+  // R-VARIANTE-01 · Las variantes de una ficha (src/pages/productos/[id].astro): cada <li class="producto__chip"> lleva
+  // su etiqueta (.producto__chip-label) con texto que se ve. El código es opcional (muchas tallas no tienen uno propio):
+  // cuando está, .producto__chip-code lleva la palabra oculta «Código» (.vh) y, después, el código, con algo que se ve;
+  // un elemento de código sin código se leería «Código» y nada más. Lo que se ve es el texto sin lo oculto (.vh,
+  // aria-hidden="true", el atributo hidden) y sin los caracteres que no se dibujan (`variantShown`). Una página sin foto
+  // también se revisa (R-FOTO-01 solo mira las fotos que hay).
+  {
+    id: 'R-VARIANTE-01',
+    title: 'En la página de un producto, cada variante (li.producto__chip) lleva una etiqueta (.producto__chip-label) con texto que se ve, y su código (.producto__chip-code), cuando lo lleva, tiene un código que se ve después de la palabra oculta «Código»',
+    page(page) {
+      if (!isProductRoute(page.route)) return [];
+      const problems = [];
+      for (const [index, chip] of page.elements.filter(element => element.name === 'li' && hasClass(element, 'producto__chip')).entries()) {
+        const inside = allElements(chip);
+        const where = `la variante ${index + 1} (${describe(chip)})`;
+        const labels = inside.filter(element => hasClass(element, 'producto__chip-label'));
+        if (!labels.some(label => variantShown(label).some(part => part.shown))) problems.push(`${where} no lleva una etiqueta con texto (.producto__chip-label): el visitante no sabe qué variante es`);
+        for (const code of inside.filter(element => hasClass(element, 'producto__chip-code'))) {
+          const parts = variantShown(code);
+          const label = textOf(labels[0] ?? chip);
+          const word = parts.findIndex(part => part.hidden && /^código$/i.test(part.hidden));
+          const shown = parts.findIndex(part => part.shown);
+          if (word === -1 || (shown !== -1 && shown < word)) problems.push(`${where}, «${label}», lleva ${describe(code)} sin la palabra oculta «Código» (.vh) antes del código`);
+          if (shown === -1) problems.push(`${where}, «${label}», lleva ${describe(code)} sin código: si la variante no tiene código propio, la página no imprime ese elemento`);
+        }
+      }
+      return problems;
+    },
+  },
+  // R-ENLACE-01 · Los enlaces a otro sitio (los catálogos y el sitio de cada fabricante, el crédito de una foto): cada
+  // enlace que abre otra pestaña (un `<a>` o un `<area>` con un `target` que no es vacío, `_self`, `_parent` ni `_top`:
+  // `_blank`, `_new` o cualquier nombre) lleva `rel` con `noopener` y, para los lectores de pantalla, el texto oculto
+  // «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. El `target` se lee como está
+  // escrito, en minúsculas: « _self» o «_top » abren otra pestaña. El texto oculto cuenta si el lector lo lee: dentro
+  // del enlace, sin otro `<a>` que empiece antes que él dentro del enlace (el navegador cierra el primero donde empieza
+  // el segundo) y sin ser él mismo un `<a>`, fuera de un `<template>` y sin que él ni lo que lo contiene lleve
+  // aria-hidden="true", el atributo hidden o inert, o un style en línea que lo esconda (display:none, visibility:hidden
+  // o collapse, content-visibility:hidden); una regla de una hoja de estilo que lo esconda no se ve aquí, ni un style
+  // escrito con una entidad con nombre («display&colon;none»). Un `<base>` con un `target` que abre otra pestaña falla:
+  // se lo da a cada enlace sin target. Un `<form target>` no es materia de esta revisión. Con `aria-label`, el lector lee la etiqueta, así que
+  // ella debe decirlo; con `aria-labelledby` falla (el nombre viene de otro elemento: el texto oculto va en el enlace),
+  // y un `<area>` falla siempre (no puede llevar texto: va un enlace). Y en /marcas/,
+  // donde cada marca repite «Catálogo del fabricante (PDF)» o «Catálogo en línea del fabricante», dos enlaces con el
+  // mismo nombre accesible llevan al mismo lugar: si no, la lista de enlaces de un lector de pantalla los confunde (cada
+  // catálogo lleva la marca en su nombre, con texto oculto). Dos enlaces con el mismo nombre y el mismo destino (la
+  // celda de una marca y su nombre en la lista de catálogos) sí pueden ir; dos destinos que difieren solo en la diagonal
+  // final de la ruta son el mismo lugar, y uno con fragmento («/marcas/#catalogos») es otro que la página sola.
+  {
+    id: 'R-ENLACE-01',
+    title: 'Cada enlace que abre otra pestaña lleva rel con noopener y el texto oculto «(se abre en otra pestaña)», que el lector de pantalla lee, y en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo lugar',
+    page(page) {
+      const problems = [];
+      // Un <base> con target da ese destino a cada enlace que no trae el suyo.
+      for (const base of page.elements.filter(element => element.name === 'base' && element.attributes.has('target'))) {
+        const target = base.attributes.get('target') ?? '';
+        if (!SAME_TAB_TARGETS.includes(target.toLowerCase())) problems.push(`la página lleva <base target="${target}">: con él, cada enlace sin target abre otra pestaña sin decirlo; quítalo y pon el target en cada enlace que lo necesite, como MoreLink con external`);
+      }
+      for (const link of page.elements.filter(opensAnotherTab)) {
+        const href = link.attributes.get('href') ?? '';
+        if (link.name === 'area') {
+          problems.push(`el área «${link.attributes.get('alt') ?? ''}» (${href.slice(0, 80)}) abre otra pestaña: un <area> no puede llevar el texto oculto «${NEW_TAB_TEXT}»; usa un enlace (<a>), como MoreLink con external`);
+          continue;
+        }
+        const where = `el enlace «${accessibleName(link)}» (${href.slice(0, 80)})`;
+        if (!(link.attributes.get('rel') ?? '').toLowerCase().split(/\s+/).includes('noopener')) problems.push(`${where} abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external`);
+        const hidden = allElements(link).filter(element => hasClass(element, 'vh') && textOf(element).includes(NEW_TAB_TEXT));
+        // Se lee si, subiendo desde el texto oculto, se llega al enlace sin nada que lo esconda o lo saque de él.
+        const read = hidden.filter(element => unreadBecause(element, link) === null);
+        if (link.attributes.has('aria-labelledby')) problems.push(`${where} abre otra pestaña y toma su nombre de aria-labelledby: quítalo y deja el nombre y el texto oculto «${NEW_TAB_TEXT}» (.vh) dentro del enlace, como MoreLink con external`);
+        else if (link.attributes.has('aria-label')) {
+          if (!(link.attributes.get('aria-label') ?? '').includes(NEW_TAB_TEXT)) problems.push(`${where} abre otra pestaña y su aria-label no lo dice: el lector de pantalla lee la etiqueta y no el texto oculto; quita aria-label o termina la etiqueta con «${NEW_TAB_TEXT}»`);
+        } else if (!read.length && hidden.length) problems.push(`${where} abre otra pestaña sin decirlo: su texto oculto «${NEW_TAB_TEXT}» ${unreadBecause(hidden[0], link)}, como MoreLink con external`);
+        else if (!read.length) problems.push(`${where} abre otra pestaña sin decirlo: lleva el texto oculto «${NEW_TAB_TEXT}» (.vh), como MoreLink con external`);
+      }
+      if (page.route === routes.brands) {
+        /** @type {Map<string, string>} */
+        const seen = new Map();
+        for (const link of inMain(page).filter(element => element.name === 'a' && element.attributes.has('href'))) {
+          const name = loose(accessibleName(link));
+          const href = link.attributes.get('href') ?? '';
+          if (!name) continue;
+          if (seen.has(name) && !samePlace(seen.get(name), href)) problems.push(`dos enlaces se llaman «${accessibleName(link)}» y llevan a lugares distintos (${seen.get(name).slice(0, 60)} y ${href.slice(0, 60)}): agrega a cada uno, con texto oculto, lo que los distingue (la marca)`);
+          else if (!seen.has(name)) seen.set(name, href);
+        }
       }
       return problems;
     },

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { CHECKS, RULES, SOON_EXPRESSIONS, scanDist } from '../scripts/scan-dist.mjs';
+import { CHECKS, RULES, SOON_EXPRESSIONS, decodeEntities, scanDist } from '../scripts/scan-dist.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
-import { loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
 
 const data = await loadProjectData();
 const ROBOTS = 'User-agent: *\nDisallow: /\n';
@@ -482,6 +482,7 @@ const unshownNotices = notice => ({
   'content-visibility: hidden': `<aside style="content-visibility: hidden"><p>${notice}</p></aside>`,
   'display:none con un comentario de CSS': `<aside style="display:none/**/"><p>${notice}</p></aside>`,
   'display con un comentario de CSS antes del valor': `<aside style="display:/* oculto */ none"><p>${notice}</p></aside>`,
+  'display:none con su punto y coma escrito &semi;': `<aside style="display:none&semi;"><p>${notice}</p></aside>`,
   'visibility con un escape de CSS': `<aside style="visibility:\\68 idden"><p>${notice}</p></aside>`,
   '<iframe>': `<iframe>${notice}</iframe>`,
   '<noembed>': `<noembed>${notice}</noembed>`,
@@ -583,9 +584,9 @@ test('R-RULE-13: metadatos internos y registro de investigación', async () => {
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<a href="${privateResource.url.replaceAll('&', '&amp;')}">Catálogo</a>`) })), ['R-RULE-13']);
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<p>${data.registry.sources[0].next_action}</p>`) })), ['R-RULE-13']);
   assert.ok(failedIds(await scan({ '_astro/marcas.js': `var enlaces=["${privateResource.url}"];` })).includes('R-RULE-13'));
-  // Los catorce enlaces publicados no son una fuga.
+  // Los veintiún enlaces publicados no son una fuga.
   const links = data.brands.flatMap(brand => brand.manufacturerLinks.map(link => `<a href="${link.url}">${link.label}</a>`)).join(' ');
-  assert.equal(published.size, 14);
+  assert.equal(published.size, 21);
   assert.deepEqual(failures(await scan({ 'marcas/index.html': page(links) })), []);
   // Documentos sueltos: se listan para revisión.
   assert.deepEqual(warnedIds(await scan({ 'docs/plan.pdf': Buffer.from('%PDF-1.7') })), ['R-RULE-13']);
@@ -670,62 +671,67 @@ test('R-RULE-04 y R-RULE-06: normas y certificaciones son aviso en producción y
   assert.deepEqual(plain.findings, []);
 });
 
+// Las pruebas de R-RULE-14 tratan de la regla, no de los datos reales: parten del catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha), así dan lo mismo con cualquier catálogo válido.
+const emptiedData = { ...data, catalog: emptiedCatalog(data.catalog) };
+const scanEmptied = (files, options = {}) => scan(files, { data: emptiedData, ...options });
+
 test('R-RULE-14: solo se generan páginas de registros que pueden mostrarse', async () => {
   // Producción: las diez categorías están en borrador y no hay fichas aprobadas.
-  const draftCategory = await scan({ 'categorias/manos/index.html': page('<h1>Protección de manos</h1>') });
+  const draftCategory = await scanEmptied({ 'categorias/manos/index.html': page('<h1>Protección de manos</h1>') });
   assert.deepEqual(failures(draftCategory).map(finding => [finding.id, finding.file]), [['R-RULE-14', 'categorias/manos']]);
-  assert.deepEqual(failedIds(await scan({ 'productos/guante-x/index.html': page('<h1>Guante</h1>') })), ['R-RULE-14']);
-  assert.deepEqual(failedIds(await scan({ 'marcas/marca-desconocida/index.html': page('<h1>Marca</h1>') })), ['R-RULE-14']);
-  // Las diecinueve marcas pueden tener página, y la lista de marcas puede existir sin ellas.
+  assert.deepEqual(failedIds(await scanEmptied({ 'productos/guante-x/index.html': page('<h1>Guante</h1>') })), ['R-RULE-14']);
+  assert.deepEqual(failedIds(await scanEmptied({ 'marcas/marca-desconocida/index.html': page('<h1>Marca</h1>') })), ['R-RULE-14']);
+  // Cada marca de brands.json puede tener página, y la lista de marcas puede existir sin ellas.
   const brandPages = Object.fromEntries(data.brands.map(brand => [`marcas/${brand.id}/index.html`, page(`<h1>${brand.name}</h1>`)]));
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), ...brandPages })), []);
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>') })), []);
-  assert.deepEqual(failures(await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), 'marcas/ansell/index.html': page('<h1>Ansell</h1>') })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>'), ...brandPages })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>') })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>'), 'marcas/ansell/index.html': page('<h1>Ansell</h1>') })), []);
 
   // Vista previa: categorías en borrador y ejemplos sí; cualquier otra página no.
   const options = { preview: true };
   const home = { 'index.html': previewPage('<h1>Inicio</h1>') };
-  const categoryPages = Object.fromEntries(data.catalog.categories.map(category => [`categorias/${category.id}/index.html`, previewPage(`<h1>${category.name}</h1>`)]));
+  const categoryPages = Object.fromEntries(emptiedData.catalog.categories.map(category => [`categorias/${category.id}/index.html`, previewPage(`<h1>${category.name}</h1>`)]));
   const productPages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
-  assert.deepEqual(failures(await scan({ ...home, ...categoryPages, ...productPages }, options)), []);
-  assert.deepEqual(failedIds(await scan({ ...home, ...productPages, 'productos/otro/index.html': previewPage('<h1>Otro</h1>') }, options)), ['R-RULE-14']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...categoryPages, ...productPages }, options)), []);
+  assert.deepEqual(failedIds(await scanEmptied({ ...home, ...productPages, 'productos/otro/index.html': previewPage('<h1>Otro</h1>') }, options)), ['R-RULE-14']);
   // Si ya hay páginas de producto o de categoría, no puede faltar la de ningún registro visible.
   const { 'productos/ejemplo-orejera/index.html': _product, ...withoutProduct } = productPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutProduct }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-orejera»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutProduct }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-orejera»']);
   const { 'categorias/soldadura/index.html': _category, ...withoutCategory } = categoryPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutCategory }, options)).map(finding => finding.message), ['falta la página de categoría «soldadura»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutCategory }, options)).map(finding => finding.message), ['falta la página de categoría «soldadura»']);
   // Un sitio que todavía no genera esas páginas (solo las listas) no falla por eso.
-  assert.deepEqual(failures(await scan({ ...home, 'catalogo/index.html': previewPage('<h1>Catálogo</h1>'), 'categorias/index.html': previewPage('<h1>Categorías</h1>') }, options)), []);
+  assert.deepEqual(failures(await scanEmptied({ ...home, 'catalogo/index.html': previewPage('<h1>Catálogo</h1>'), 'categorias/index.html': previewPage('<h1>Categorías</h1>') }, options)), []);
 
   // Con una categoría y una ficha aprobadas, sus páginas son válidas en producción.
-  const approved = structuredClone(data.catalog);
+  const approved = structuredClone(emptiedData.catalog);
   approved.categories[0].status = 'approved';
   approved.products.push({ id: 'guante-aprobado', status: 'approved' }, { id: 'guante-borrador', status: 'draft' });
-  const withApproved = { ...data, catalog: approved };
-  assert.deepEqual(failures(await scan({ 'categorias/manos/index.html': page(), 'productos/guante-aprobado/index.html': page() }, { data: withApproved })), []);
-  assert.deepEqual(failedIds(await scan({ 'productos/guante-aprobado/index.html': page(), 'productos/guante-borrador/index.html': page() }, { data: withApproved })), ['R-RULE-14']);
+  const withApproved = { ...emptiedData, catalog: approved };
+  assert.deepEqual(failures(await scanEmptied({ 'categorias/manos/index.html': page(), 'productos/guante-aprobado/index.html': page() }, { data: withApproved })), []);
+  assert.deepEqual(failedIds(await scanEmptied({ 'productos/guante-aprobado/index.html': page(), 'productos/guante-borrador/index.html': page() }, { data: withApproved })), ['R-RULE-14']);
 });
 
 test('R-RULE-14: un producto retirado tiene página solo si fue público, y el ejemplo retirado solo en la vista previa', async () => {
   const approval = { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true };
-  const editorial = structuredClone(data.catalog);
+  const editorial = structuredClone(emptiedData.catalog);
   editorial.products.push(
     { id: 'guante-retirado', status: 'retired', approval },
     { id: 'guante-retirado-sin-aprobacion', status: 'retired' },
     { id: 'guante-retirado-sin-suministro', status: 'retired', approval: { ...approval, supplyConfirmed: false } },
   );
-  const withRetired = { ...data, catalog: editorial };
+  const withRetired = { ...emptiedData, catalog: editorial };
   // Producción: el retirado que fue público tiene su página; los que nunca lo fueron, no.
-  assert.deepEqual(failures(await scan({ 'productos/guante-retirado/index.html': page() }, { data: withRetired })), []);
+  assert.deepEqual(failures(await scanEmptied({ 'productos/guante-retirado/index.html': page() }, { data: withRetired })), []);
   for (const id of ['guante-retirado-sin-aprobacion', 'guante-retirado-sin-suministro']) {
-    const result = await scan({ 'productos/guante-retirado/index.html': page(), [`productos/${id}/index.html`]: page() }, { data: withRetired });
+    const result = await scanEmptied({ 'productos/guante-retirado/index.html': page(), [`productos/${id}/index.html`]: page() }, { data: withRetired });
     assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-14', `productos/${id}`]], id);
   }
   // Si ya hay páginas de producto, no puede faltar la del retirado público.
   const approved = structuredClone(editorial);
   approved.categories[0].status = 'approved';
   approved.products.push({ id: 'guante-aprobado', status: 'approved' });
-  const missing = await scan({ 'productos/guante-aprobado/index.html': page() }, { data: { ...data, catalog: approved } });
+  const missing = await scanEmptied({ 'productos/guante-aprobado/index.html': page() }, { data: { ...emptiedData, catalog: approved } });
   assert.deepEqual(failures(missing).map(finding => finding.message), ['falta la página de producto «guante-retirado»']);
 
   // Vista previa: el ejemplo retirado tiene su página, y no puede faltar.
@@ -734,19 +740,159 @@ test('R-RULE-14: un producto retirado tiene página solo si fue público, y el e
   const options = { preview: true };
   const home = { 'index.html': previewPage('<h1>Inicio</h1>') };
   const productPages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
-  assert.deepEqual(failures(await scan({ ...home, ...productPages }, options)), []);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...productPages }, options)), []);
   const { 'productos/ejemplo-producto-retirado/index.html': _retired, ...withoutRetired } = productPages;
-  assert.deepEqual(failures(await scan({ ...home, ...withoutRetired }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-producto-retirado»']);
+  assert.deepEqual(failures(await scanEmptied({ ...home, ...withoutRetired }, options)).map(finding => finding.message), ['falta la página de producto «ejemplo-producto-retirado»']);
   // Su página sin la etiqueta «Ejemplo» falla, como la de cualquier ejemplo.
-  const untagged = await scan({ ...home, ...productPages, 'productos/ejemplo-producto-retirado/index.html': previewPage(exampleCard(retiredExamples[0], false)) }, options);
+  const untagged = await scanEmptied({ ...home, ...productPages, 'productos/ejemplo-producto-retirado/index.html': previewPage(exampleCard(retiredExamples[0], false)) }, options);
   assert.deepEqual(failures(untagged).map(finding => [finding.id, finding.file]), [['R-RULE-03', 'productos/ejemplo-producto-retirado/index.html']]);
 
   // Producción: el ejemplo retirado no existe; su página falla por los datos y por las marcas de ejemplo.
-  const leaked = await scan({ 'productos/ejemplo-producto-retirado/index.html': page('<h1>Producto retirado</h1>') });
+  const leaked = await scanEmptied({ 'productos/ejemplo-producto-retirado/index.html': page('<h1>Producto retirado</h1>') });
   assert.deepEqual(failedIds(leaked), ['R-RULE-03', 'R-RULE-14']);
   for (const token of [retiredExamples[0].name, retiredExamples[0].code]) {
-    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(`<p>${token}</p>`) })), ['R-RULE-03'], token);
+    assert.deepEqual(failedIds(await scanEmptied({ 'pagina/index.html': page(`<p>${token}</p>`) })), ['R-RULE-03'], token);
   }
+});
+
+// Normas y códigos de las fichas: lo que los datos respaldan. Fichas sintéticas sobre el catálogo vaciado; las normas
+// tienen la forma de las que imprimen los fabricantes (año, enmienda y niveles), no son las de ningún producto.
+const STANDARD_SOURCE = 'https://fabricante.example/ficha-sintetica';
+const standardsOf = (...texts) => texts.map(text => ({ text, sourceUrl: STANDARD_SOURCE }));
+const SYNTHETIC_NORMS = ['EN 388:2016 +A1:2018 3121X', 'ANSI/ISEA 105-2016 A4', 'EN407:2004 X2XXXX', 'FDA 21 CFR 177.1520', 'Nivel de corte A2'];
+const APPROVAL = { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true };
+/** El catálogo vaciado con la primera categoría aprobada y estas fichas. */
+function catalogWith(...products) {
+  const catalog = structuredClone(emptiedData.catalog);
+  catalog.categories[0].status = 'approved';
+  catalog.products.push(...products);
+  return { ...emptiedData, catalog };
+}
+const normsList = norms => `<ul>${norms.map(norm => `<li>${norm}</li>`).join('')}</ul>`;
+// En la vista previa, con páginas de producto, deben estar también las de todos los ejemplos (R-RULE-14).
+const examplePages = Object.fromEntries(data.examples.map(example => [`productos/${example.id}/index.html`, previewPage(exampleCard(example))]));
+
+test('R-RULE-04: en la página de una ficha aprobada, sus propias normas no son aviso; la misma norma en otra página sí', async () => {
+  const withNorms = catalogWith(
+    { id: 'guante-con-normas', status: 'approved', standards: standardsOf(...SYNTHETIC_NORMS) },
+    { id: 'guante-sin-normas', status: 'approved' },
+  );
+  const own = `<h1>Guante sintético</h1><h2>Normas</h2>${normsList(SYNTHETIC_NORMS)}<p>Según la información publicada por el fabricante.</p>`;
+  const other = '<h1>Otro guante sintético</h1>';
+  // Producción, con --strict: la página de la ficha con sus normas queda limpia, sin un solo aviso.
+  const production = await scan({ 'productos/guante-con-normas/index.html': page(own), 'productos/guante-sin-normas/index.html': page(other) }, { data: withNorms });
+  assert.deepEqual(production.findings, []);
+  // También con la forma productos/<id>.html.
+  assert.deepEqual((await scan({ 'productos/guante-con-normas.html': page(own), 'productos/guante-sin-normas.html': page(other) }, { data: withNorms })).findings, []);
+  // Vista previa: una ficha aprobada también está en ella.
+  const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/guante-con-normas/index.html': previewPage(own), 'productos/guante-sin-normas/index.html': previewPage(other) }, { preview: true, data: withNorms });
+  assert.deepEqual(failures(preview), []);
+
+  // La misma norma en cualquier otra página sigue dando el aviso: la de otra ficha, el catálogo, la portada.
+  // (Una designación sin las siglas que busca la regla, como «FDA 21 CFR …», no da aviso en ninguna página.)
+  for (const path of ['productos/guante-sin-normas/index.html', 'catalogo/index.html', 'index.html']) {
+    for (const norm of SYNTHETIC_NORMS.filter(text => !text.startsWith('FDA'))) {
+      const result = await scan({ 'productos/guante-con-normas/index.html': page(own), 'productos/guante-sin-normas/index.html': page(other), [path]: page(`<h1>Página</h1><p>${norm}</p>`) }, { data: withNorms });
+      assert.deepEqual([failedIds(result), result.findings.map(finding => finding.file)], [[], [path]], `${path}: ${norm}`);
+      assert.deepEqual(warnedIds(result), ['R-RULE-04'], `${path}: ${norm}`);
+      const inPreview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/guante-con-normas/index.html': previewPage(own), 'productos/guante-sin-normas/index.html': previewPage(other), [path]: previewPage(`<h1>Página</h1><p>${norm}</p>`) }, { preview: true, data: withNorms });
+      assert.deepEqual(failures(inPreview).map(finding => [finding.id, finding.file]), [['R-RULE-04', path]], `vista previa, ${path}: ${norm}`);
+    }
+  }
+});
+
+test('R-RULE-04: otra norma en la página de la ficha, una norma en un ejemplo o en un retirado siguen dando el aviso', async () => {
+  const norms = SYNTHETIC_NORMS.slice(0, 2);
+  const withNorms = catalogWith(
+    { id: 'guante-con-normas', status: 'approved', standards: standardsOf(...norms) },
+    { id: 'guante-retirado', status: 'retired', approval: APPROVAL, standards: standardsOf(...norms) },
+  );
+  const files = (extra, make = page) => ({ 'productos/guante-retirado/index.html': make('<h1>Guante retirado</h1>'), 'productos/guante-con-normas/index.html': make(`<h1>Guante</h1>${normsList(norms)}${extra}`) });
+  assert.deepEqual((await scan(files(''), { data: withNorms })).findings, []);
+  // Otra norma u otra forma de la misma norma: aviso.
+  for (const extra of ['<p>EN 1149-5:2008</p>', '<p>Cumple ANSI Z87.1</p>', '<p>NOM-017-STPS</p>', '<p>Nivel de protección 3</p>', `<p>${norms[0].replace(' +', '+')}</p>`]) {
+    const result = await scan(files(extra), { data: withNorms });
+    assert.deepEqual([failedIds(result), warnedIds(result)], [[], ['R-RULE-04']], extra);
+  }
+  // Una norma que no es de la ficha, pegada a una de las suyas, también.
+  const glued = await scan(files(`<p>${norms[0]}/ISO 13997</p>`), { data: withNorms });
+  assert.deepEqual(warnedIds(glued), ['R-RULE-04']);
+  // Una norma de la ficha solo se descuenta entera: «EN 388» no se lleva el principio de «EN 3880», «EN 388-1» ni
+  // «EN 388:2016», que son otras normas.
+  const short = catalogWith({ id: 'guante-norma-corta', status: 'approved', standards: standardsOf('EN 388') });
+  assert.deepEqual((await scan({ 'productos/guante-norma-corta/index.html': page('<h1>Guante</h1><p>EN 388</p>') }, { data: short })).findings, []);
+  for (const body of ['<p>EN 3880</p>', '<p>EN 388-1</p>', '<p>EN 388:2016</p>']) {
+    const result = await scan({ 'productos/guante-norma-corta/index.html': page(`<h1>Guante</h1><p>EN 388</p>${body}`) }, { data: short });
+    assert.deepEqual(warnedIds(result), ['R-RULE-04'], body);
+  }
+  // La página de un retirado no muestra normas: si las muestra, aviso, aunque estén en sus datos.
+  const retired = await scan({ ...files(''), 'productos/guante-retirado/index.html': page(`<h1>Guante retirado</h1>${normsList(norms)}`) }, { data: withNorms });
+  assert.deepEqual([...new Set(retired.findings.map(finding => `${finding.level} ${finding.id} ${finding.file}`))], ['WARN R-RULE-04 productos/guante-retirado/index.html']);
+  // Un borrador con normas no tiene página, y sus normas no se descuentan en ninguna otra.
+  const draft = catalogWith({ id: 'guante-borrador', status: 'draft', standards: standardsOf(...norms) });
+  assert.deepEqual(warnedIds(await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${norms[0]}</p>`) }, { data: draft })), ['R-RULE-04']);
+  // Vista previa: la página de un ejemplo con una norma falla, también si es la norma de una ficha aprobada.
+  for (const norm of [norms[0], 'EN 1149-5:2008']) {
+    const [first] = data.examples;
+    const result = await scan({
+      'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, ...files('', previewPage),
+      [`productos/${first.id}/index.html`]: previewPage(`${exampleCard(first)}<p>${norm}</p>`),
+    }, { preview: true, data: withNorms });
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-04', `productos/${first.id}/index.html`]], norm);
+  }
+});
+
+test('R-RULE-04: varias fichas con la misma norma, cada una en su página, quedan limpias', async () => {
+  const norm = SYNTHETIC_NORMS[0];
+  const withNorms = catalogWith(
+    { id: 'guante-a', status: 'approved', standards: standardsOf(norm, SYNTHETIC_NORMS[1]) },
+    { id: 'guante-b', status: 'approved', standards: standardsOf(norm) },
+  );
+  const result = await scan({
+    'productos/guante-a/index.html': page(`<h1>Guante A</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+    'productos/guante-b/index.html': page(`<h1>Guante B</h1>${normsList([norm])}`),
+  }, { data: withNorms });
+  assert.deepEqual(result.findings, []);
+  // La segunda norma de A en la página de B no está en los datos de B.
+  const crossed = await scan({
+    'productos/guante-a/index.html': page(`<h1>Guante A</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+    'productos/guante-b/index.html': page(`<h1>Guante B</h1>${normsList([norm, SYNTHETIC_NORMS[1]])}`),
+  }, { data: withNorms });
+  assert.deepEqual(crossed.findings.map(finding => [finding.level, finding.id, finding.file]), [['WARN', 'R-RULE-04', 'productos/guante-b/index.html']]);
+});
+
+test('R-RULE-24: el código de una ficha pública no es un teléfono; otro número con forma de teléfono sí, también junto a un código', async () => {
+  const withCodes = catalogWith(
+    { id: 'guante-codigo-largo', status: 'approved', model: '7000123456', variants: [{ id: 'talla-8', label: 'Talla 8', manufacturerCode: '70009876543' }, { id: 'talla-9', label: 'Talla 9' }] },
+    { id: 'guante-retirado', status: 'retired', approval: APPROVAL, model: '7000555123' },
+    { id: 'guante-borrador', status: 'draft', model: '7000444321' },
+  );
+  const pages = body => ({
+    'productos/guante-codigo-largo/index.html': page('<h1>Guante</h1><p>Código 7000123456</p><p>Talla 8 <span>Código </span>70009876543</p>'),
+    'productos/guante-retirado/index.html': page('<h1>Guante retirado</h1><p>Código 7000555123</p>'),
+    'catalogo/index.html': page(`<h1>Catálogo</h1>${body}`),
+  });
+  // Los códigos públicos, en cualquier página: la ficha, el retirado que fue público y una lista.
+  assert.deepEqual((await scan(pages('<p>Marca · 7000123456</p><p>70009876543</p>'), { data: withCodes })).findings, []);
+  // Un número que no es uno de esos códigos: aviso, como hoy, también pegado a un código o en la misma página.
+  for (const body of ['<p>Llámanos al 55 1122 3344</p>', '<p>70009876543 5511223344</p>', '<p>Código 7000444321</p>', '<p>Código 7000123457</p>','<p>70009876543 y 55 1122 3344</p>']) {
+    const result = await scan(pages(body), { data: withCodes });
+    assert.deepEqual([failedIds(result), warnedIds(result), result.findings.map(finding => finding.file)], [[], ['R-RULE-24'], ['catalogo/index.html']], body);
+  }
+  // La revisión de los destinos de contacto no cambia: un código en un enlace de teléfono o de WhatsApp sigue fallando.
+  for (const body of ['<a href="tel:70009876543">Llamar</a>', '<a href="https://wa.me/70009876543">WhatsApp</a>']) {
+    assert.deepEqual(failedIds(await scan(pages(body), { data: withCodes })), ['R-RULE-24'], body);
+  }
+});
+
+test('--rules y el encabezado del escáner dicen qué normas y qué códigos deja pasar', async () => {
+  const doc = RULES.filter(rule => rule.id === 'R-RULE-04').map(rule => rule.doc).join('\n');
+  assert.match(doc, /standards/);
+  assert.match(doc, /página de su ficha aprobada/);
+  const phones = CHECKS.filter(([id]) => id === 'R-RULE-24').map(([, text]) => text).join('\n');
+  assert.match(phones, /códigos públicos/);
+  const header = (await readText('scripts/scan-dist.mjs')).split('\nimport ')[0];
+  assert.doesNotMatch(header, /la lista de normas y certificaciones debe estar vacía/);
 });
 
 test('R-RULE-24 y R-QUOTE-06: el contacto es el confirmado y el texto de WhatsApp va codificado', async () => {
@@ -1675,4 +1821,606 @@ test('línea de comandos: código 0 sin fallos, 1 con fallos y 2 cuando no hay n
   } finally {
     await Promise.all([clean, dirty, empty].map(removeTree));
   }
+});
+
+// R-FOTO-02: la compilación copia a _astro/ todo lo que hay en src/assets/productos/, también un archivo que ninguna
+// página dibuja (la foto de un borrador, uno suelto). Una imagen de _astro/ que ninguna página ni hoja de estilo nombra
+// es una copia de ese tipo y falla, en los dos modos.
+const pictureOf = name => `<picture><source srcset="/_astro/${name}_a1.webp 320w, /_astro/${name}_b2.webp 640w" type="image/webp" sizes="320px">`
+  + `<img src="/_astro/${name}_c3.jpg" srcset="/_astro/${name}_c3.jpg 320w" alt="Guante ficticio" width="1600" height="1200"></picture>`;
+const drawnFiles = name => Object.fromEntries(['_a1.webp', '_b2.webp', '_c3.jpg'].map(suffix => [`_astro/${name}${suffix}`, 'imagen']));
+
+test('R-FOTO-02: las imágenes de _astro/ que una página o una hoja de estilo nombra pasan, en los dos modos', async () => {
+  for (const preview of [false, true]) {
+    const notice = preview ? { notice: 'preview' } : {};
+    const result = await scan({
+      'pagina/index.html': page(`<h1>Guante ficticio</h1>${pictureOf('guante-ficticio.Ab12Cd')}<img src="/_astro/logo.B0A87QC4.svg" alt="Sercom Active">`, notice),
+      'index.html': page('<h1>Inicio</h1>', notice),
+      ...drawnFiles('guante-ficticio.Ab12Cd'),
+      '_astro/logo.B0A87QC4.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+      '_astro/sitio.Xy12.css': '.fondo{background:url(/_astro/trama.Zz99.png)}.otro{background-image:url("./rayas.Qq11.webp")}',
+      '_astro/trama.Zz99.png': 'imagen', '_astro/rayas.Qq11.webp': 'imagen',
+      // Fuera de _astro/ están los archivos propios del sitio (public/): no se revisan aquí.
+      'favicon.svg': '<svg xmlns="http://www.w3.org/2000/svg"></svg>', 'apple-touch-icon.png': 'imagen',
+    }, { preview });
+    assert.deepEqual(result.findings, [], `preview: ${preview}`);
+  }
+});
+
+test('R-FOTO-02: una imagen de _astro/ que nada nombra falla, en los dos modos, con un mensaje que dice qué hacer', async () => {
+  for (const preview of [false, true]) {
+    const notice = preview ? { notice: 'preview' } : {};
+    const result = await scan({
+      'pagina/index.html': page(`<h1>Guante ficticio</h1>${pictureOf('guante-ficticio.Ab12Cd')}`, notice),
+      'index.html': page('<h1>Inicio</h1>', notice),
+      ...drawnFiles('guante-ficticio.Ab12Cd'),
+      // Lo que deja Astro de la foto de un borrador y de un archivo suelto: el original, con su huella.
+      '_astro/guante-borrador.BoUPRLsZ.png': 'imagen', '_astro/foto-suelta.JlkVc0co.jpg': 'imagen',
+    }, { preview });
+    assert.deepEqual(failedIds(result), ['R-FOTO-02'], `preview: ${preview}`);
+    assert.deepEqual(failures(result).map(finding => [finding.file, finding.message]), ['_astro/foto-suelta.JlkVc0co.jpg', '_astro/guante-borrador.BoUPRLsZ.png'].map(file => [file,
+      'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta']), `preview: ${preview}`);
+  }
+});
+
+test('R-FOTO-02: cada formato de imagen cuenta; nombrarla en un script, o solo como parte de otro nombre, no la usa', async () => {
+  for (const name of ['suelta.A1.jpg', 'suelta.A1.jpeg', 'suelta.A1.png', 'suelta.A1.webp', 'suelta.A1.avif', 'suelta.A1.gif', 'suelta.A1.svg', 'SUELTA.A1.JPG']) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${name}`]: 'imagen' })), ['R-FOTO-02'], name);
+  }
+  // Un script no dibuja una foto de producto en este sitio: solo cuentan las páginas y las hojas de estilo.
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', '_astro/app.Zz.js': 'const f="/_astro/suelta.A1.png";' })), ['R-FOTO-02']);
+  // El nombre dentro de otro nombre más largo no cuenta.
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', 'pagina/index.html': page('<img src="/_astro/otra-suelta.A1.png" alt="Otra">'), '_astro/otra-suelta.A1.png': 'imagen' })), ['R-FOTO-02']);
+  assert.deepEqual(failedIds(await scan({ '_astro/suelta.A1.png': 'imagen', 'pagina/index.html': page('<img src="/_astro/suelta.A1.png.webp" alt="Otra">'), '_astro/suelta.A1.png.webp': 'imagen' })), ['R-FOTO-02']);
+  // Una fuente u otro archivo que no es imagen no se revisa aquí.
+  assert.deepEqual(failures(await scan({ '_astro/letra.A1.woff2': 'fuente' })), []);
+});
+
+test('R-FOTO-02 está documentada en --rules', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-FOTO-02').map(([, text]) => text).join('\n');
+  assert.match(doc, /_astro\//);
+  assert.match(doc, /src\/assets\/productos\//);
+});
+
+// Catálogos del fabricante y crédito de las fotos: los enlaces del fabricante publicados en brands.json (R-RULE-13).
+
+test('R-RULE-13: un catálogo del fabricante publicado pasa en la página de su marca y en /marcas/; un enlace del registro sin publicar sigue fallando', async () => {
+  const PDF = 'Catálogo del fabricante (PDF)';
+  const ONLINE = 'Catálogo en línea del fabricante';
+  const catalogLinks = data.brands.flatMap(brand => brand.manufacturerLinks.filter(link => link.label === PDF || link.label === ONLINE).map(link => ({ brand, link })));
+  assert.ok(catalogLinks.some(({ link }) => link.label === PDF) && catalogLinks.some(({ link }) => link.label === ONLINE));
+  const anchor = ({ brand, link }) => `<a href="${link.url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">${link.label}<span class="vh">, ${brand.name} (se abre en otra pestaña)</span></a>`;
+  for (const entry of catalogLinks) {
+    assert.deepEqual(failures(await scan({ [`marcas/${entry.brand.id}/index.html`]: page(`<h1>${entry.brand.name}</h1>${anchor(entry)}`) })), [], entry.link.url);
+  }
+  assert.deepEqual(failures(await scan({ 'marcas/index.html': page(`<h1>Marcas que manejamos</h1><ul>${catalogLinks.map(entry => `<li>${anchor(entry)}</li>`).join('')}</ul>`) })), []);
+  // Un catálogo del registro que no está publicado falla, en la página de su marca y en cualquier otra.
+  const published = new Set(data.brands.flatMap(brand => brand.manufacturerLinks.map(link => link.url)));
+  const unpublished = data.registry.sources.flatMap(source => source.resources.filter(resource => /pdf/.test(resource.type) && !published.has(resource.url)).map(resource => ({ id: source.entity_id, url: resource.url })));
+  assert.ok(unpublished.length >= 2, 'el registro tiene catálogos en PDF sin publicar');
+  for (const { id, url } of unpublished) {
+    // Una entidad retirada del portal no tiene página: su catálogo se prueba en la página de otra marca.
+    const brandPage = data.brands.some(brand => brand.id === id) ? `marcas/${id}/index.html` : 'marcas/ansell/index.html';
+    for (const path of [brandPage, 'marcas/index.html', 'catalogo/index.html']) {
+      const result = await scan({ [path]: page(`<a href="${url}" target="_blank" rel="noopener noreferrer">${PDF}<span class="vh"> (se abre en otra pestaña)</span></a>`) });
+      assert.deepEqual(failedIds(result), ['R-RULE-13'], `${path}: ${url}`);
+      assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+    }
+  }
+  // La lista de guías de MCR Safety, que nombra el catálogo de la marca excluida, nunca pasa.
+  const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url));
+  assert.deepEqual(failedIds(await scan({ 'marcas/mcr-safety/index.html': page(`<a href="${guides.url}">Guías</a>`) })), ['R-RULE-13']);
+});
+
+test('R-RULE-13 y R-RULE-14: una marca retirada del portal no tiene página, y la dirección que publicaba falla en cualquier página', async () => {
+  // Las direcciones que ALTO e INFRA publicaban como «Sitio del fabricante» siguen en el registro, pero ya no en
+  // brands.json: son enlaces del registro sin publicar.
+  for (const url of ['https://ecommerce.alturasegura.com.mx/', 'https://grupoinfra.com/librerias-y-descargas']) {
+    assert.ok(!data.brands.some(brand => brand.manufacturerLinks.some(link => link.url === url)), url);
+    for (const path of ['index.html', 'marcas/index.html', 'marcas/ansell/index.html', 'catalogo/index.html', 'contacto/index.html']) {
+      const result = await scan({ [path]: page(`<a href="${url}" target="_blank" rel="noopener noreferrer">Sitio del fabricante<span class="vh"> (se abre en otra pestaña)</span></a>`) });
+      assert.deepEqual(failedIds(result), ['R-RULE-13'], `${path}: ${url}`);
+      assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+    }
+  }
+  // Ninguna de las cuatro marcas retiradas puede tener página.
+  for (const [id, name] of [['alto', 'ALTO'], ['infra', 'INFRA'], ['dry-pro', 'Dry Pro'], ['hawk', 'HAWK']]) {
+    const result = await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), [`marcas/${id}/index.html`]: page(`<h1>${name}</h1>`) });
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-14', `marcas/${id}`]], id);
+  }
+});
+
+test('R-RULE-13 dice en --rules que pasan los enlaces del fabricante publicados en brands.json', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /salvo los enlaces del fabricante publicados en brands\.json/);
+  assert.doesNotMatch(doc, /salvo los «Sitio del fabricante»/);
+});
+
+test('R-RULE-13: la página de donde viene la foto de una ficha aprobada pasa en la página de esa ficha, aunque el registro la tenga, y en ninguna otra', async () => {
+  // Una marca cuyo único recurso del registro es la página de un producto: la foto de su ficha viene de ahí.
+  const productPage = data.registry.sources.flatMap(source => source.resources.filter(resource => resource.type === 'product_page').map(resource => ({ brandId: source.entity_id, url: resource.url })))[0];
+  assert.ok(productPage, 'el registro tiene la página de un producto');
+  const published = new Set(data.brands.flatMap(brand => brand.manufacturerLinks.map(link => link.url)));
+  assert.ok(!published.has(productPage.url));
+  const otherUrl = data.registry.sources.flatMap(source => source.resources.map(resource => resource.url)).find(url => url !== productPage.url && !published.has(url));
+  const approval = { by: 'Revisor de prueba', on: '2026-11-23', supplyConfirmed: true };
+  const image = { file: 'foto-de-prueba.jpg', alt: 'Foto de prueba', sourceUrl: productPage.url, usageConfirmed: true };
+  const catalog = structuredClone(emptiedData.catalog);
+  catalog.categories[0].status = 'approved';
+  catalog.products.push(
+    { id: 'ficha-con-foto', brandId: productPage.brandId, status: 'approved', approval, image },
+    { id: 'ficha-sin-foto', brandId: productPage.brandId, status: 'approved', approval },
+    { id: 'ficha-retirada', brandId: productPage.brandId, status: 'retired', approval, image },
+  );
+  const options = { data: { ...emptiedData, catalog } };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">Marca<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  const pages = (overrides = {}) => ({
+    'productos/ficha-con-foto/index.html': page(`<h1>Ficha con foto</h1>${credit(productPage.url)}`),
+    'productos/ficha-sin-foto/index.html': page('<h1>Ficha sin foto</h1>'),
+    'productos/ficha-retirada/index.html': page('<h1>Ficha retirada</h1>'),
+    ...overrides,
+  });
+  // En la página de su ficha, el crédito de la foto pasa.
+  assert.deepEqual(failures(await scan(pages(), options)), []);
+  // En cualquier otra página, la misma dirección es un enlace del registro: falla.
+  for (const [path, title] of [['productos/ficha-sin-foto/index.html', 'Ficha sin foto'], ['productos/ficha-retirada/index.html', 'Ficha retirada'], ['catalogo/index.html', 'Catálogo'], [`marcas/${productPage.brandId}/index.html`, 'Marca']]) {
+    const result = await scan(pages({ [path]: page(`<h1>${title}</h1>${credit(productPage.url)}`) }), options);
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-13', path]], path);
+    assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+  }
+  // En la página de la ficha con foto, otra dirección del registro sigue fallando.
+  const other = await scan(pages({ 'productos/ficha-con-foto/index.html': page(`<h1>Ficha con foto</h1>${credit(productPage.url)}${credit(otherUrl)}`) }), options);
+  assert.deepEqual(failures(other).map(finding => [finding.id, finding.file]), [['R-RULE-13', 'productos/ficha-con-foto/index.html']]);
+  assert.ok(failures(other)[0].message.endsWith(otherUrl.slice(0, 90)));
+  // Si la ficha vuelve a borrador, su página ya no existe y la dirección no pasa en ninguna parte.
+  const draft = structuredClone(catalog);
+  draft.products[0].status = 'draft';
+  const asDraft = await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1>${credit(productPage.url)}`), 'productos/ficha-sin-foto/index.html': page('<h1>Ficha sin foto</h1>'), 'productos/ficha-retirada/index.html': page('<h1>Ficha retirada</h1>') }, { data: { ...emptiedData, catalog: draft } });
+  assert.deepEqual(failedIds(asDraft), ['R-RULE-13']);
+});
+
+test('R-RULE-13 dice en --rules que el crédito de la foto pasa solo en la página de su ficha aprobada', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /la página de donde viene la foto de una ficha aprobada \(image\.sourceUrl\), solo en la página de esa ficha/);
+});
+
+// Revisión del texto y escáner listos para miles de fichas: lo que deja pasar cada excepción, fijado caso por caso.
+
+test('R-RULE-24: un número que solo toca un código público, o que lo contiene, sigue dando el aviso; el código entero no', async () => {
+  const code = '7000123456';
+  const withCode = catalogWith({ id: 'guante-codigo-largo', status: 'approved', model: code });
+  const pages = body => ({
+    'productos/guante-codigo-largo/index.html': page(`<h1>Guante</h1><p>Código ${code}</p>`),
+    'catalogo/index.html': page(`<h1>Catálogo</h1>${body}`),
+  });
+  // El código solo, y escrito dos veces, no es un teléfono.
+  for (const body of [`<p>${code}</p>`, `<p>${code} ${code}</p>`, `<p>Códigos ${code} y ${code}</p>`]) {
+    assert.deepEqual((await scan(pages(body), { data: withCode })).findings, [], body);
+  }
+  // Junto al código, un número que lo toca o que lo contiene es otro número.
+  for (const body of [`<p>+52 ${code}</p>`, `<p>1 ${code}</p>`, `<p>1${code}</p>`, `<p>${code}7</p>`, `<p>${code}-1</p>`, `<p>A-${code}</p>`]) {
+    const result = await scan(pages(body), { data: withCode });
+    assert.deepEqual([failedIds(result), warnedIds(result), result.findings.map(finding => finding.file)], [[], ['R-RULE-24'], ['catalogo/index.html']], body);
+  }
+});
+
+test('R-RULE-04: las normas de la ficha en su propia página solo se descuentan para R-RULE-04; una palabra de otra regla en ellas sigue contando', async () => {
+  const norms = ['Certificado EN 166', 'EN 388:2016 100 % probado'];
+  const withNorms = catalogWith({ id: 'lente-certificado', status: 'approved', standards: standardsOf(...norms) });
+  const body = `<h1>Lente sintético</h1>${normsList(norms)}`;
+  const production = await scan({ 'productos/lente-certificado/index.html': page(body) }, { data: withNorms });
+  assert.deepEqual([failedIds(production), warnedIds(production)], [[], ['R-RULE-06']]);
+  assert.deepEqual(production.findings.map(finding => finding.message.split(' … ')[0]).sort(), ['certificación o distintivo: «100 %»', 'certificación o distintivo: «Certificado»']);
+  const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/lente-certificado/index.html': previewPage(body) }, { preview: true, data: withNorms });
+  assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-06', 'productos/lente-certificado/index.html'], ['R-RULE-06', 'productos/lente-certificado/index.html']]);
+});
+
+// Las direcciones que publican los datos (el «Sitio del fabricante» de cada marca y, de cada ficha aprobada, sus
+// documentos, la foto por dirección y la página de donde viene la foto) no son frases del sitio: un atributo cuyo valor
+// es exactamente una de ellas no se lee en los ámbitos `words` y `prose`. Todo lo demás se lee como siempre.
+const WORDING_ADDRESSES = [
+  ['https://fabricante.example/distribuidores-autorizados/ficha-guante.pdf', 'R-RULE-07'],
+  ['https://fabricante.example/es/tienda-oficial/guante-100', 'R-RULE-07'],
+  ['https://fabricante.example/promociones/guante-100.pdf', 'R-RULE-01'],
+  ['https://fabricante.example/gratis/guante-100.pdf', 'R-RULE-02'],
+];
+/** Una ficha aprobada que publica `address` en el campo dado. */
+const publishing = (field, address) => {
+  const image = { url: 'https://fotos.fabricante.example/guante.jpg', width: 800, height: 800, alt: 'Guante', sourceUrl: 'https://fabricante.example/guante', usageConfirmed: true };
+  if (field === 'documents[].url') return { id: 'guante-enlaces', status: 'approved', documents: [{ label: 'Hoja de datos', url: address }], image };
+  if (field === 'image.url') return { id: 'guante-enlaces', status: 'approved', image: { ...image, url: address } };
+  return { id: 'guante-enlaces', status: 'approved', image: { ...image, sourceUrl: address } };
+};
+/** Cómo imprime la página cada campo: el documento y el origen de la foto como enlace, la foto como imagen. */
+const linking = (field, written) => (field === 'image.url'
+  ? `<img src="${written}" alt="Guante" width="800" height="800" referrerpolicy="no-referrer">`
+  : `<a href="${written}" target="_blank" rel="noopener noreferrer">${field === 'documents[].url' ? 'Hoja de datos' : 'Origen de la foto'}</a>`);
+const ADDRESS_FIELDS = ['documents[].url', 'image.url', 'image.sourceUrl'];
+
+test('una dirección que publican los datos no se lee como frase en el atributo que la lleva entera; sin publicarla, sí', async () => {
+  for (const field of ADDRESS_FIELDS) {
+    for (const [address, id] of WORDING_ADDRESSES) {
+      const files = { 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) };
+      assert.deepEqual((await scan(files, { data: catalogWith(publishing(field, address)) })).findings, [], `${field} ${address}`);
+      // En la vista previa también.
+      assert.deepEqual(failures(await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), 'pagina/index.html': previewPage(`<h1>Guante</h1>${linking(field, address)}`) }, { preview: true, data: catalogWith(publishing(field, address)) })), [], `vista previa ${field} ${address}`);
+      // La misma dirección sin estar en los datos, o en los de un borrador, se lee como hoy.
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith() })), [id], `sin publicar: ${field} ${address}`);
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith({ ...publishing(field, address), status: 'draft' }) })), [id], `borrador: ${field} ${address}`);
+    }
+  }
+  // El «Sitio del fabricante» de una marca también es una dirección publicada.
+  const brandAddress = 'https://fabricante.example/es/tienda-oficial/';
+  const brands = [{ ...data.brands[0], manufacturerLinks: [{ label: 'Sitio del fabricante', url: brandAddress }] }, ...data.brands.slice(1)];
+  const brandPage = { 'pagina/index.html': page(`<h1>Marca</h1><a href="${brandAddress}" rel="noopener">Sitio del fabricante</a>`) };
+  assert.deepEqual((await scan(brandPage, { data: { ...catalogWith(), brands } })).findings, []);
+  assert.deepEqual(failedIds(await scan(brandPage, { data: catalogWith() })), ['R-RULE-07']);
+});
+
+test('una dirección publicada se compara entera, con las entidades decodificadas y con su %XX decodificado de los dos lados', async () => {
+  const address = 'https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&idioma=es';
+  const data = catalogWith(publishing('documents[].url', address));
+  // Escrita como la escribe la compilación (con &amp;) o con sus caracteres codificados: es la misma dirección.
+  for (const written of ['https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&amp;idioma=es', 'https://fabricante.example/tienda-oficial/gu%C3%ADa.pdf?modelo=100&#38;idioma=es']) {
+    assert.deepEqual((await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })).findings, [], written);
+  }
+  // Lo que solo empieza como ella, la contiene o lleva algo más ya no es ella.
+  for (const written of [
+    'https://fabricante.example/tienda-oficial/', `${address}#ficha`, `${address}&amp;x=1`, ` ${address}`,
+    'https://fabricante.example/tienda-oficial/guía.pdf', `https://otro.example/?ir=${encodeURIComponent(address)}`,
+  ]) {
+    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })), ['R-RULE-07'], written);
+  }
+});
+
+test('una dirección publicada se sigue leyendo como texto visible, en un script, en un JSON, junto a otro texto en un atributo y en el borrador de un enlace', async () => {
+  const [address] = WORDING_ADDRESSES[1];
+  const data = catalogWith(publishing('documents[].url', address));
+  for (const files of [
+    { 'pagina/index.html': page(`<h1>Guante</h1><p>${address}</p>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${address}">${address}</a>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><script>const ficha = "${address}";</script>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><div data-ficha="Ficha: ${address}">Ficha</div>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${WHATSAPP}?text=${encodeURIComponent(`Hola, vi ${address}`)}">Cotizar</a>`) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), 'datos.json': JSON.stringify({ ficha: address }) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), '_astro/ficha.js': `const ficha="${address}";` },
+  ]) {
+    assert.deepEqual(failedIds(await scan(files, { data })), ['R-RULE-07'], JSON.stringify(files));
+  }
+  // Una dirección del propio sitio nunca es una dirección publicada por los datos.
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<h1>Guante</h1><a href="/catalogo/?q=tienda-oficial">Buscar</a>') }, { data })), ['R-RULE-07']);
+});
+
+test('una dirección publicada sigue revisándose con las reglas que leen el archivo tal cual o decodificado', async () => {
+  const [, shortName] = data.registry.scope.excluded_entities;
+  for (const [address, id] of [
+    [`https://fabricante.example/${shortName.toLowerCase()}/ficha.pdf`, 'R-RULE-08'],
+    ['https://fabricante.example/fichas/72090.pdf', 'R-RULE-11'],
+    ['https://fabricante.example/fichas/EJ-1001.pdf', 'R-RULE-03'],
+    ['https://fabricante.example/fichas/Solicitud%20enviada.pdf', 'R-RULE-10'],
+  ]) {
+    for (const field of ADDRESS_FIELDS) {
+      const result = await scan({ 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) }, { data: catalogWith(publishing(field, address)) });
+      assert.ok(failedIds(result).includes(id), `${field} ${address}: ${failedIds(result)}`);
+    }
+  }
+});
+
+test('--rules dice que una dirección publicada por los datos no se lee como frase, y que las reglas del archivo sí la leen', () => {
+  const words = RULES.filter(rule => rule.id === 'R-RULE-07').map(rule => rule.doc).join('\n');
+  assert.match(words, /direcci[oó]n que publican los datos/);
+  const prices = RULES.filter(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose').map(rule => rule.doc).join('\n');
+  assert.match(prices, /direcci[oó]n que publican los datos/);
+});
+
+// Las familias de normas que imprimen los fabricantes, con designaciones sintéticas: cada una da el aviso escrita
+// como la imprimen. Una sigla suelta dentro de un modelo, o un nombre de filtro o de clase, no es una norma.
+const NORM_FAMILIES = [
+  ['NFPA', 'Cumple NFPA 9999'], ['ISEA', 'Según ISEA 999'], ['CSA', 'Cumple CSA Z99.9'], ['CAN/CSA', 'Cumple CAN/CSA Z99.9-99'],
+  ['NMX', 'Cumple NMX-S-999-SCFI-2099'], ['AS/NZS', 'Cumple AS/NZS 9999:2099'], ['IEC', 'Cumple IEC 69999'], ['UL', 'Cumple UL 9999'],
+  ['NRF', 'Cumple NRF-999-PEMEX-2099'], ['CFR (FDA)', 'Cumple FDA 99 CFR 999.9999'], ['CFR', 'Aprobado según 99 CFR parte 99'], ['CFR pegado', 'Aprobado según 99CFR99'],
+  ['LAPEM', 'Aprobado por LAPEM K9999-999/2099'], ['SNR', 'SNR 99 dB'], ['NOM con espacio', 'Cumple NOM 999'], ['NOM sin guion', 'Cumple NOM999'],
+  ['marcado CE', 'Con marcado CE'], ['CE con norma', 'CE EN999'], ['CE con categoría', 'CE categoría III'], ['CE con categoría abreviada', 'CE Cat. II'],
+];
+const HONEST_NOT_NORMS = [
+  'Lente CE-200', 'Serie UL-100', 'Modelo IEC-200', 'Casco CSA-200', 'Kit NRF-100', 'Tela de Nomex', 'Línea CE', 'Azul UL', 'Modelo AS-100',
+  'Respirador N95', 'Mascarilla KN95', 'Filtro FFP2', 'Guante clase 0', 'Casco tipo I', 'Talla CE', 'Con 99 piezas', 'Marca registrada',
+];
+
+test('R-RULE-04: cada familia de normas da el aviso escrita como la imprime el fabricante; una sigla dentro de un modelo no', async () => {
+  for (const [family, phrase] of NORM_FAMILIES) {
+    const result = await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) });
+    assert.deepEqual([failedIds(result), warnedIds(result)], [[], ['R-RULE-04']], `${family}: ${phrase}`);
+  }
+  for (const phrase of HONEST_NOT_NORMS) {
+    assert.deepEqual((await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) })).findings, [], phrase);
+  }
+});
+
+test('R-RULE-04: una norma de una familia nueva en las normas de la ficha no da aviso en su propia página, y en otra página sí', async () => {
+  const norms = ['NFPA 9999', 'CAN/CSA Z99.9-99', 'FDA 99 CFR 999.9999', 'NOM 999', 'CE categoría III'];
+  const withNorms = catalogWith({ id: 'guante-familias', status: 'approved', standards: standardsOf(...norms) });
+  const own = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`) }, { data: withNorms });
+  assert.deepEqual(own.findings, []);
+  for (const norm of norms) {
+    const other = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`), 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${norm}</p>`) }, { data: withNorms });
+    assert.deepEqual(other.findings.map(finding => [finding.level, finding.id, finding.file]), [['WARN', 'R-RULE-04', 'catalogo/index.html']], norm);
+  }
+});
+
+test('--rules nombra las familias de normas que reconoce R-RULE-04 y dice que una familia que no nombra no da aviso', () => {
+  const doc = RULES.filter(rule => rule.id === 'R-RULE-04').map(rule => rule.doc).join('\n');
+  for (const family of ['ANSI', 'ISEA', 'NFPA', 'CSA', 'NMX', 'AS/NZS', 'IEC', 'UL', 'NRF', 'CFR', 'LAPEM', 'SNR', 'NOM', 'CE']) assert.match(doc, new RegExp(`«[^»]*${family.replace('/', '\\/')}`), family);
+  assert.match(doc, /no da aviso/);
+});
+
+test('R-FOTO-02: el nombre de una imagen cuenta solo entero, entre signos que no forman parte de un nombre de archivo', async () => {
+  const name = 'suelta.A1.png';
+  const named = async (body, extra = {}) => failedIds(await scan({ [`_astro/${name}`]: 'imagen', 'pagina/index.html': page(body), ...extra }));
+  // Entero, después de «/» y antes de comillas, un paréntesis, un espacio, una coma, «?» o «#»: la usa.
+  for (const body of [`<img src="/_astro/${name}" alt="A">`, `<img src='/_astro/${name}' alt="A">`, `<img srcset="/_astro/${name} 320w, /_astro/otra.B2.png 640w" alt="A">`,
+    `<div style="background:url(/_astro/${name})"></div>`, `<img src="/_astro/${name}?v=1" alt="A">`, `<img src="/_astro/${name}#x" alt="A">`, `<p>${name}</p>`]) {
+    assert.deepEqual(await named(body), [], body);
+  }
+  // Como final de otro nombre, como principio de otro, o seguido de «.bak»: no la usa.
+  for (const body of [`<img src="/_astro/x${name}" alt="A">`, `<img src="/_astro/x_${name}" alt="A">`, `<img src="/_astro/x.${name}" alt="A">`, `<img src="/_astro/x-${name}" alt="A">`,
+    `<img src="/_astro/${name}x" alt="A">`, `<img src="/_astro/${name}_2" alt="A">`, `<img src="/_astro/${name}-2" alt="A">`, `<p>/_astro/${name}.bak</p>`]) {
+    assert.deepEqual(await named(body), ['R-FOTO-02'], body);
+  }
+  // Un nombre con letras fuera del alfabeto inglés también cuenta entero.
+  const accented = 'guante-ñandú.A1.png';
+  assert.deepEqual(failures(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/${accented}" alt="A">`) })), []);
+  assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/x-${accented}" alt="A">`) })), ['R-FOTO-02']);
+  // Varias páginas y hojas de estilo: basta con que una la nombre.
+  assert.deepEqual(failures(await scan({ [`_astro/${name}`]: 'imagen', 'a/index.html': page('<p>Nada</p>'), 'b/index.html': page('<p>Nada</p>'), '_astro/sitio.C3.css': `.f{background:url(./${name})}` })), []);
+});
+
+test('R-FOTO-02: un punto antes del nombre lo hace otro nombre, con letras inglesas o sin ellas', async () => {
+  // Otro archivo cuyo nombre termina en el de la imagen y empieza con un punto, o con algo y un punto: no la usa.
+  const name = 'suelta.A1.png';
+  for (const body of [`<img src="/_astro/.${name}" alt="A">`, `<p>(.${name})</p>`]) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${name}`]: 'imagen', 'pagina/index.html': page(body) })), ['R-FOTO-02'], body);
+  }
+  const accented = 'guante-ñandú.A1.png';
+  for (const body of [`<img src="/_astro/x.${accented}" alt="A">`, `<img src="/_astro/.${accented}" alt="A">`]) {
+    assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(body) })), ['R-FOTO-02'], body);
+  }
+});
+
+// Una dirección del registro de investigación escrita de otra forma es la misma página (src/lib/address-match.mjs).
+
+test('R-RULE-13: una dirección del registro sin publicar falla escrita de cualquier forma de la misma página', async () => {
+  const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url)).url;
+  const anchor = href => `<a href="${href}" target="_blank" rel="noopener noreferrer">Guías<span class="vh"> (se abre en otra pestaña)</span></a>`;
+  for (const body of [
+    anchor(guides.slice(0, -1)), anchor(guides.replace('www.mcrsafety', 'WWW.MCRSAFETY')), anchor(guides.replace('https:', 'http:')), anchor(guides.replace('www.', '')),
+    anchor(`${guides}#catalogos`), anchor(`${guides}?utm_source=x`), anchor(guides.replace('guias', 'gu%69as')), anchor(`https://example.com/r?u=${encodeURIComponent(guides)}`),
+    `<script>const u="${guides.replaceAll('/', '\\/')}";</script>`, `<p>Ver www.mcrsafety.com.mx/recursos/guias-de-recursos.</p>`,
+  ]) {
+    const result = await scan({ 'marcas/mcr-safety/index.html': page(`<h1>MCR Safety</h1>${body}`) }, { data: emptiedData });
+    assert.deepEqual(failedIds(result), ['R-RULE-13'], body);
+    assert.equal(failures(result)[0].message, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${guides}`, body);
+  }
+});
+
+test('R-RULE-13: las páginas de producto de Golden Eagle pasan; su plantilla del registro con pares de una visita falla', async () => {
+  const template = data.registry.sources.find(source => source.entity_id === 'golden-eagle').resources.find(resource => /\/producto\/$/.test(resource.url)).url;
+  const anchors = ids => ids.map(id => `<a href="${template}?producto=${id}" target="_blank" rel="noopener noreferrer">Ficha ${id}<span class="vh"> (se abre en otra pestaña)</span></a>`).join('');
+  assert.deepEqual(failures(await scan({ 'marcas/golden-eagle/index.html': page(`<h1>Golden Eagle</h1>${anchors([1, 24, 162, 9300])}`) }, { data: emptiedData })), []);
+  for (const href of [`${template}?utm_source=x`, `${template}?`, `${template}#ficha`, template.slice(0, -1)]) {
+    const result = await scan({ 'marcas/golden-eagle/index.html': page(`<h1>Golden Eagle</h1><a href="${href}">Plantilla</a>`) }, { data: emptiedData });
+    assert.deepEqual(failedIds(result), ['R-RULE-13'], href);
+  }
+});
+
+test('R-RULE-13 dice en --rules qué cuenta como la misma página y que la consulta es parte de ella', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /cualquier otra forma de la misma página \(src\/lib\/address-match\.mjs\)/);
+  assert.match(doc, /La consulta sí es parte de la página/);
+  assert.match(doc, /utm_/);
+  // El valor de un atributo sin comillas, y lo que la revisión no ve.
+  assert.match(doc, /el de uno sin comillas, hasta el primer espacio o «>»/);
+  assert.match(doc, /tampoco ve una dirección cuyo usuario lleva un espacio/);
+  assert.match(doc, /un tabulador o un salto de línea escrito tal cual/);
+});
+
+// El crédito de la foto pasa en la página de su ficha solo si el registro tiene esa página como publicable.
+
+test('R-RULE-13: en la página de su ficha, la página de la foto pasa solo si el registro la tiene como publicable', async () => {
+  const approval = { by: 'Revisor de prueba', on: '2026-11-23', supplyConfirmed: true };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">Marca<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  const withPhoto = (brandId, sourceUrl) => {
+    const catalog = structuredClone(emptiedData.catalog);
+    catalog.categories[0].status = 'approved';
+    catalog.products.push({ id: 'ficha-con-foto', brandId, status: 'approved', approval, image: { file: 'foto-de-prueba.jpg', alt: 'Foto de prueba', sourceUrl, usageConfirmed: true } });
+    return { data: { ...emptiedData, catalog } };
+  };
+  const resources = entity => data.registry.sources.find(source => source.entity_id === entity).resources;
+  // La lista de guías de MCR («no enlazar»), su página vieja (deprecated, 404), su política de contenido (sin «accesible») y
+  // la página con formulario de HAWK (gated_landing): fallan también en la página de la ficha cuya foto dicen que viene de ahí.
+  const hidden = [
+    ...resources('mcr-safety').filter(resource => /guias-de-recursos\/$|catalogos\.php$|compartir-contenido\/$/.test(resource.url)).map(resource => ['mcr-safety', resource.url]),
+    ...resources('hawk').filter(resource => resource.type === 'gated_landing').map(resource => ['hawk', resource.url]),
+  ];
+  assert.equal(hidden.length, 4);
+  for (const [brandId, url] of hidden) {
+    for (const written of [url, `${url}#foto`]) {
+      const result = await scan({ 'productos/ficha-con-foto/index.html': page(`<h1>Ficha</h1>${credit(written)}`) }, withPhoto(brandId, url));
+      assert.deepEqual(failures(result).map(finding => [finding.id, finding.message]), [['R-RULE-13', `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`]], written);
+    }
+  }
+});
+
+test('R-RULE-13: con los datos reales, el crédito de la foto de UVEX Classic pasa en su página, escrito como sea, y falla en otra', async () => {
+  const uvex = data.catalog.products.find(product => product.id === 'uvex-classic-s360');
+  const catalog = structuredClone(emptiedData.catalog);
+  for (const category of catalog.categories) if (uvex.categoryIds.includes(category.id)) category.status = 'approved';
+  catalog.products.push(structuredClone(uvex));
+  const options = { data: { ...emptiedData, catalog } };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url}" target="_blank" rel="noopener noreferrer">UVEX<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  for (const written of [uvex.image.sourceUrl, `${uvex.image.sourceUrl}/`, uvex.image.sourceUrl.replace('https:', 'http:')]) {
+    assert.deepEqual(failures(await scan({ 'productos/uvex-classic-s360/index.html': page(`<h1>UVEX Classic</h1>${credit(written)}`) }, options)), [], written);
+  }
+  const elsewhere = await scan({ 'productos/uvex-classic-s360/index.html': page('<h1>UVEX Classic</h1>'), 'marcas/uvex/index.html': page(`<h1>UVEX</h1>${credit(uvex.image.sourceUrl)}`) }, options);
+  assert.deepEqual(failures(elsewhere).map(finding => [finding.id, finding.file]), [['R-RULE-13', 'marcas/uvex/index.html']]);
+});
+
+// El escáner entrega cada dirección como la recibe el navegador: las referencias de caracteres decodificadas como él
+// (una numérica con o sin «;»), y cada valor de un atributo leído entero. Un registro sintético con una sola página.
+const GUIDES_PAGE = 'https://www.fabricante.example/recursos/guias/';
+const syntheticLeakData = { ...emptiedData, registry: { sources: [{ entity_id: 'fabricante-sintetico', resources: [{ url: GUIDES_PAGE, type: 'landing', label: 'Guías', verification: 'no enlazar' }] }] } };
+const leakFindings = async body => failures(await scan({ 'marcas/fabricante/index.html': page(`<h1>Fabricante</h1>${body}`) }, { data: syntheticLeakData }))
+  .filter(finding => finding.id === 'R-RULE-13').map(finding => finding.message);
+const GUIDES_FOUND = [`enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${GUIDES_PAGE}`];
+
+test('R-RULE-13: cada grafía que el navegador abre como la página del registro falla en HTML escrito a mano; la misma página con una dirección vecina honesta pasa', async () => {
+  // [la página con la grafía, la misma página con una dirección vecina que es otra página]
+  for (const [written, neighbour] of [
+    // El puerto «:0443» y el puerto vacío son el de https.
+    ['<a href="https://www.fabricante.example:0443/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example:0443/recursos/guias/otra/">Guías</a>'],
+    ['<a href="https://www.fabricante.example:/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example:/recursos/otras/">Guías</a>'],
+    // Un usuario con dos «@», con una comilla o con un espacio: el valor del atributo se lee entero.
+    ['<a href="https://a@b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://a@b@www.fabricante.example/recursos/guias/otra/">Guías</a>'],
+    [`<a href="https://a'b@www.fabricante.example/recursos/guias/">Guías</a>`, `<a href="https://a'b@www.fabricante.example/recursos/guias/otra/">Guías</a>`],
+    ['<a href="https://a b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://a b@www.fabricante.example/recursos/guias/otra/">Guías</a>'],
+    // Lo que el navegador quita del servidor o lleva a otra letra.
+    ['<a href="https://www.fabri­cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri­cantes.example/recursos/guias/">Guías</a>'],
+    ['<a href="https://www.fabri​cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri​cante.example/recursos/guias-2/">Guías</a>'],
+    ['<a href="https://www.fabri͏cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri͏cante.example/recursos/guia/">Guías</a>'],
+    ['<a href="https://www.fabri️cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri️cante.example/recursos/">Guías</a>'],
+    ['<a href="https://www.ⓕabricante.example/recursos/guias/">Guías</a>', '<a href="https://www.ⓕabricantes.example/recursos/guias/">Guías</a>'],
+    // Una referencia numérica sin «;» toma todas las cifras que siguen: «&#x2Fa» es U+02FA, no «/a».
+    ['<a href="https:&#47&#47www.fabricante.example&#47recursos&#47guias&#47">Guías</a>', '<a href="https:&#47&#47www.fabricante.example&#47recursos&#47guias&#47otra&#47">Guías</a>'],
+    ['<a href="https://www.fabricante.example&#x2Frecursos&#x2fguias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#x2Fa">Guías</a>'],
+    // &Tab;, &NewLine; y &shy;: el navegador los decodifica y quita el tabulador, el salto de línea y el guion suave.
+    ['<a href="https://www.fabricante.example/recursos/gu&Tab;ias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu&Tab;ias/otra/">Guías</a>'],
+    ['<a href="https://www.fabricante.example/recursos/gu&NewLine;ias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu&NewLine;ia/">Guías</a>'],
+    ['<a href="https://www.fabri&shy;cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri&shy;cante.example/recursos/guias.html">Guías</a>'],
+    // Un salto de línea en un valor que también lleva «<» o «>».
+    ['<a href="https://www.fabricante.example/recursos/gu\nias/#>">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu\nias/otra/#>">Guías</a>'],
+    ['<a href="https://www.fabricante.example/recursos/gu\nias/#<">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu\nias/otra/#<">Guías</a>'],
+    // Diagonales invertidas en un JSON o en un script, que JSON.stringify escribe dobles.
+    [`<script type="application/json">${JSON.stringify({ url: 'https:\\\\www.fabricante.example\\recursos\\guias\\' })}</script>`, `<script type="application/json">${JSON.stringify({ url: 'https:\\\\www.fabricante.example\\recursos\\guias\\otra\\' })}</script>`],
+    [`<script>location.href = ${JSON.stringify('https:\\\\www.fabricante.example\\recursos\\guias')};</script>`, `<script>location.href = ${JSON.stringify('https:\\\\www.fabricante.example\\recursos\\guias\\otra')};</script>`],
+  ]) {
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});
+
+test('R-RULE-13: las referencias con nombre de los signos de una dirección se decodifican; una numérica toma todas sus cifras', async () => {
+  for (const written of [
+    '<a href="https&colon;&sol;&sol;www&period;fabricante&period;example&sol;recursos&sol;guias&sol;&quest;utm&lowbar;source&equals;x">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias/&quest;utm&UnderBar;source&equals;x&AMP;gclid&equals;1">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias/&num;catalogos">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&NonBreakingSpace;">Guías</a>',
+    '<a href="&#x68;ttps://www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#x2F">Guías</a>',
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+  for (const neighbour of [
+    '<a href="https://www.fabricante.example/recursos/guias/&quest;producto&equals;24">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#4709">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias&lpar;2&rpar;/">Guías</a>',
+  ]) assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+});
+
+test('R-RULE-13: el valor de un atributo se lee sin sus tabuladores aunque lleve «<» o «>», y sin los caracteres de control de sus orillas', async () => {
+  for (const [written, neighbour] of [
+    // Un refresco con un tabulador en la ruta y «>» en el fragmento: el navegador quita el tabulador y abre la página.
+    ['<meta http-equiv="refresh" content="0; url=https://www.fabricante.example/recursos/gu\tias/#a>b">', '<meta http-equiv="refresh" content="0; url=https://www.fabricante.example/recursos/gu\tias/otra/#a>b">'],
+    // Un carácter de control antes de la dirección: el navegador lo quita; con un usuario que lleva una comilla.
+    ['<a href="&#1;https://a\'b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="&#1;https://a\'b@www.fabricante.example/recursos/otras/">Guías</a>'],
+  ]) {
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});
+
+test('R-RULE-13: una dirección del registro escrita tal cual dentro de una lista separada por comas o por punto y coma falla (la comparación exacta)', async () => {
+  for (const written of [
+    '<p>Archivos: a.pdf,https://www.fabricante.example/recursos/guias/,b.pdf</p>',
+    '<p data-archivos="a.pdf;https://www.fabricante.example/recursos/guias/;b.pdf">Archivos</p>',
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+});
+
+// Las entidades con nombre que el escáner decodifica, con el carácter que el navegador recibe por cada una, escrito a
+// mano (los que no se ven, con su escape). La excepción es el espacio duro: el escáner compara textos, y para él
+// «&nbsp;» es un espacio normal. Una que falte aquí o en el escáner hace fallar la prueba.
+const NAMED_REFERENCES = {
+  nbsp: ' ', NonBreakingSpace: ' ', quot: '"', QUOT: '"', apos: "'", lt: '<', LT: '<', gt: '>', GT: '>',
+  shy: '\u00AD', zwnj: '\u200C', zwj: '\u200D', ZeroWidthSpace: '\u200B', NoBreak: '\u2060',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', iexcl: '¡', iquest: '¿', laquo: '«', raquo: '»', ndash: '–', mdash: '—', hellip: '…',
+  middot: '·', bull: '•', copy: '©', reg: '®', trade: '™', deg: '°', dollar: '$', euro: '€', cent: '¢', pound: '£', star: '☆', starf: '★',
+  commat: '@', period: '.', colon: ':', sol: '/', num: '#', percnt: '%', Tab: '\t', NewLine: '\n', quest: '?', equals: '=', lowbar: '_', UnderBar: '_',
+  bsol: '\\', plus: '+', semi: ';', comma: ',', excl: '!', ast: '*', midast: '*', lpar: '(', rpar: ')', lsqb: '[', lbrack: '[', rsqb: ']', rbrack: ']',
+  lcub: '{', lbrace: '{', rcub: '}', rbrace: '}', vert: '|', verbar: '|', VerticalLine: '|', grave: '`', DiacriticalGrave: '`', Hat: '^',
+};
+
+test('cada entidad con nombre que el escáner decodifica da el carácter que recibe el navegador (el espacio duro, un espacio normal); las demás quedan como están', () => {
+  for (const [name, character] of Object.entries(NAMED_REFERENCES)) assert.equal(decodeEntities(`a&${name};b`), `a${character}b`, name);
+  assert.equal(decodeEntities('a&amp;b&AMP;c'), 'a&b&c');
+  // «&amp;» se decodifica una sola vez: «&amp;lt;» es el texto «&lt;», no «<».
+  assert.equal(decodeEntities('&amp;lt; &amp;#47; &amp;semi;'), '&lt; &#47; &semi;');
+  // Una con nombre necesita su «;», distingue mayúsculas y, si no está en la lista, queda como está.
+  for (const text of ['a&bsol b', 'a&semi b', 'a&BSOL;b', 'a&Semi;b', 'a&mfr;b', 'a&centerdot;b', 'a&;b', 'a&#;b']) assert.equal(decodeEntities(text), text, text);
+});
+
+test('R-RULE-13: una dirección escrita con las entidades de sus signos se lee como la recibe el navegador, signo por signo', async () => {
+  // Diagonales invertidas escritas «&bsol;»: el navegador las lee como diagonales y abre la página.
+  assert.deepEqual(await leakFindings('<a href="https:&bsol;&bsol;www.fabricante.example&bsol;recursos&bsol;guias&bsol;">Guías</a>'), GUIDES_FOUND);
+  assert.deepEqual(await leakFindings('<a href="https:&bsol;&bsol;www.fabricante.example&bsol;recursos&bsol;otras&bsol;">Guías</a>'), []);
+  // En la consulta de una dirección escrita en una frase, cada entidad decodificada deja un par que solo cuenta una
+  // visita (o termina la dirección ahí), y la página es la del registro; sin decodificar, «&nombre;b» sería otro par y
+  // otra página. «&amp;» no entra: decodificada, empieza otro par.
+  for (const name of Object.keys(NAMED_REFERENCES)) {
+    assert.deepEqual(await leakFindings(`<p>Ver https://www.fabricante.example/recursos/guias/?utm_source=a&${name};b ahora</p>`), GUIDES_FOUND, name);
+  }
+  for (const name of ['mfr', 'centerdot', 'BSOL']) {
+    assert.deepEqual(await leakFindings(`<p>Ver https://www.fabricante.example/recursos/guias/?utm_source=a&${name};b ahora</p>`), [], name);
+  }
+});
+
+test('R-RULE-13: U+FEFF dentro del servidor no esconde la dirección en un srcset, un JSON, un refresco, una frase ni un atributo: el navegador lo quita', async () => {
+  for (const write of [
+    address => `<img srcset="${address} 1x, /foto.png 2x" alt="">`,
+    address => `<script type="application/json">${JSON.stringify({ url: address })}</script>`,
+    address => `<meta http-equiv="refresh" content="0; url=${address.replaceAll('\uFEFF', '&#xFEFF;')}">`,
+    address => `<p>Más información en ${address} hoy.</p>`,
+    address => `<p data-x="${address}">Guías</p>`,
+    address => `<a href="${address.replaceAll('\uFEFF', '&#65279;')}">Guías</a>`,
+  ]) {
+    const written = write('https://www.fabri\uFEFFcante.example/recursos/guias/');
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, JSON.stringify(written));
+    const neighbour = write('https://www.fabri\uFEFFcante.example/recursos/otras/');
+    assert.deepEqual(await leakFindings(neighbour), [], JSON.stringify(neighbour));
+  }
+});
+
+test('R-RULE-13: el valor de un atributo sin comillas se lee entero, hasta el primer espacio o «>», como lo corta el navegador', async () => {
+  // Una comilla, «<», «=» o «`» dentro de un valor sin comillas son un error de marcado, pero parte del valor.
+  for (const sign of ["'", '"', '<', '`', '=']) {
+    for (const written of [
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/guias/>Guías</a>`,
+      `<a class=enlace href = https://a${sign}b@www.fabricante.example/recursos/guias rel=noopener>Guías</a>`,
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/gu&Tab;ias/&num;x>Guías</a>`,
+    ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    for (const neighbour of [
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/otras/>Guías</a>`,
+      `<a class=enlace href = https://a${sign}b@www.fabricante.example/recursos/guias-2 rel=noopener>Guías</a>`,
+    ]) assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});
+
+test('R-RULE-13, los límites que dice --rules: fuera del valor entero de un atributo, un usuario con un espacio o una llave esconde la dirección, y un tabulador escrito tal cual en una frase o en un script con «>» también', async () => {
+  for (const written of [
+    '<meta http-equiv="refresh" content="0; url=https://a b@www.fabricante.example/recursos/guias/">',
+    `<script type="application/json">${JSON.stringify({ url: 'https://a b@www.fabricante.example/recursos/guias/' })}</script>`,
+    '<img srcset="https://a{b}@www.fabricante.example/recursos/guias/ 1x" alt="">',
+    '<p>Ver https://www.fabricante.example/recursos/gui\tas/ hoy</p>',
+    "<script>if (1 > 0) location.href = 'https://www.fabricante.example/recursos/gui\tas/#>';</script>",
+  ]) assert.deepEqual(await leakFindings(written), [], written);
+  // Las mismas direcciones sí se ven donde la revisión lee el valor entero o una cadena sin «<» ni «>».
+  for (const written of [
+    '<a href="https://a b@www.fabricante.example/recursos/guias/">Guías</a>',
+    '<a href="https://a{b}@www.fabricante.example/recursos/guias/">Guías</a>',
+    "<script>location.href = 'https://www.fabricante.example/recursos/gui\tas/';</script>",
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
 });

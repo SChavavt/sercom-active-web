@@ -37,6 +37,46 @@
 .producto__plate .icon { width: 58%; height: 58%; }
 /* la foto llena el marco sin deformarse ni recortarse, sea horizontal o vertical: el marco no crece con ella */
 .producto__img { position: absolute; inset: 0; width: 100%; height: 100%; padding: var(--s-9) var(--pad); object-fit: contain; }
+/* Con fotografía, el marco y su crédito («Foto: {marca}», con la página de donde viene la foto) van juntos en un
+   <figure>: es el <figure> el que se queda a la vista, así el crédito acompaña siempre a la foto y nunca queda debajo
+   de ella. El marco cede al crédito su alto para que los dos quepan en la pantalla. */
+.producto__figure {
+  --credit-h: max(44px, calc(2 * var(--s-1) + var(--small) * var(--type-small-leading)));
+  position: sticky;
+  top: calc(var(--masthead-shift, var(--masthead-h)) + var(--line));
+  margin: 0;
+}
+.producto__figure .producto__frame {
+  position: relative;
+  top: auto;
+  max-height: calc(100vh - var(--masthead-shift, var(--masthead-h)) - var(--line) - var(--credit-h));
+}
+.producto__credit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.3em;
+  min-height: var(--credit-h);
+  padding: var(--s-1) var(--pad);
+  color: var(--grey-700);
+}
+.producto__credit-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;                                         /* objetivo táctil mínimo */
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+.producto__credit-link:hover { text-decoration-thickness: 2px; }
+/* En computadora el marco deja var(--s-9) bajo la foto: el crédito sube hasta quedar a var(--s-5) de una foto que
+   llena el alto del marco, como en tableta. Solo cubre el relleno vacío del marco (la foto no se mueve ni cambia de
+   tamaño), y va encima de la imagen (position: relative) para que su enlace reciba el clic. */
+@media (min-width: 1100px) {
+  .producto__figure .producto__credit { position: relative; margin-top: calc(var(--s-5) - var(--s-9)); }
+}
 
 /* Datos: 5 columnas, una columna de celdas ---------------------------------- */
 .producto__body { display: flex; flex-direction: column; gap: var(--line); min-width: 0; }
@@ -63,7 +103,7 @@
 .producto__summary { padding: var(--s-6) var(--pad) var(--s-7); }
 .producto__summary p { max-width: 62ch; font-size: 1.0625rem; text-wrap: pretty; }
 
-/* Bloques con título: Características, Variantes, Documentación */
+/* Bloques con título: Características, Normas, Variantes, Documentación */
 .producto__part { display: grid; gap: var(--line); }
 .producto__part-title { padding: var(--s-7) var(--pad) var(--s-3); background: var(--surface); }
 
@@ -78,6 +118,11 @@
   text-wrap: pretty;
 }
 .producto__num { color: var(--grey-600); font-size: var(--label-sm); font-variant-numeric: tabular-nums; }
+
+/* Normas: una fila por norma, tal como la imprime el fabricante; una designación larga se parte dentro de su celda
+   (también una sin espacios) y nunca sale de ella. Debajo, la nota de dónde salen (.note) */
+.producto__norms { display: grid; gap: var(--line); }
+.producto__norm { padding: var(--s-4) var(--pad); background: var(--surface); overflow-wrap: anywhere; text-wrap: pretty; }
 
 /* Variantes: información, no controles (sin cursor ni cambio al pasar). En computadora, una fila por variante
    con su código a la derecha: en 5 columnas no cabe una división que caiga sobre la retícula. En tableta y
@@ -151,6 +196,8 @@
   .producto__title { margin-top: var(--s-1); }
   .producto__media, .producto__body { grid-column: span 12; }
   .producto__frame { position: relative; top: auto; aspect-ratio: auto; height: clamp(200px, 34vw, 300px); max-height: none; }
+  .producto__figure { position: static; }
+  .producto__figure .producto__frame { max-height: none; }
   .producto__plate { width: auto; height: 64%; }
   .producto__img { padding: var(--s-5) var(--pad); }
 
@@ -184,6 +231,10 @@
 
 @media (max-width: 699px) {
   .producto__frame { height: 200px; }
+  /* Una fotografía, en cambio, toma un marco de 4:3 de todo el ancho, con menos relleno: se dibuja casi del ancho de
+     la pantalla (ProductPhoto.astro calcula `sizes` con este marco). El pictograma no cambia. */
+  .producto__figure .producto__frame { height: auto; aspect-ratio: 4 / 3; }
+  .producto__figure .producto__img { padding: var(--s-3) var(--pad); }
   .producto__plate { height: 60%; }
   .producto__tag { top: var(--s-3); }
   .producto__head { padding: var(--s-6) var(--pad); }

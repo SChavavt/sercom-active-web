@@ -6,21 +6,24 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { getPublishedProducts, getRetiredProducts, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { addressError, BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, invisibleAt, isPublishableResource, isWithdrawn, mentionsExcludedBrand, placeIn, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
-import { normalizeText } from './text.mjs';
+import { cleanQuery, normalizeText } from './text.mjs';
 
 export { routes };
 
-/** Aviso que lleva cada página de una compilación de vista previa. */
-export const PREVIEW_NOTICE = 'Vista previa para revisión. Los productos que aparecen son ejemplos de diseño, no artículos reales.';
+/** Etiqueta visible de cada producto de ejemplo. */
+export const EXAMPLE_TAG = 'Ejemplo';
+/**
+ * Aviso que lleva cada página de una compilación de vista previa. La vista previa muestra las fichas reales junto a los
+ * ejemplos: el aviso dice que solo los que llevan la etiqueta `EXAMPLE_TAG` son ejemplos.
+ */
+export const PREVIEW_NOTICE = `Vista previa para revisión. Los productos marcados «${EXAMPLE_TAG}» son ejemplos de diseño, no artículos reales.`;
 /**
  * Aviso que lleva cada página de la compilación de producción hasta el lanzamiento (R-RULE-12, F.21). Se retira a
  * propósito al publicar, junto con `noindex` (BaseLayout.astro); el escáner lo exige antes y lo prohíbe con --launch.
  */
 export const DEVELOPMENT_NOTICE = 'Sitio en preparación · Versión inicial para revisión';
-/** Etiqueta visible de cada producto de ejemplo. */
-export const EXAMPLE_TAG = 'Ejemplo';
 /** Marca del primer producto de ejemplo. Nunca es una marca real. */
 export const EXAMPLE_BRAND_NAME = 'Marca de ejemplo';
 /**
@@ -30,8 +33,58 @@ export const EXAMPLE_BRAND_NAME = 'Marca de ejemplo';
  * con casi cualquier texto.
  */
 export const EXAMPLE_BRAND_NAMES = Object.freeze([EXAMPLE_BRAND_NAME, 'Marca de ejemplo Beta', 'Marca de ejemplo Gamma']);
-/** Única etiqueta permitida para el enlace de una marca. */
-export const MANUFACTURER_LINK_LABEL = 'Sitio del fabricante';
+/**
+ * Las tres etiquetas de los enlaces de una marca (`manufacturerLinks`), una por clase de enlace y en el orden en que se
+ * escriben y se muestran: el catálogo general del fabricante en PDF, la página donde se consulta o se descargan sus
+ * catálogos, y su sitio. Cada una va una vez por marca como máximo. Las páginas nunca escriben una etiqueta: imprimen
+ * la del dato.
+ */
+export const MANUFACTURER_LINK_LABELS = Object.freeze({
+  pdf: 'Catálogo del fabricante (PDF)',
+  online: 'Catálogo en línea del fabricante',
+  site: 'Sitio del fabricante',
+});
+/** @typedef {'pdf' | 'online' | 'site'} LinkKind */
+/** Las clases de enlace en su orden: `pdf`, `online`, `site`. */
+const LINK_KINDS = /** @type {LinkKind[]} */ (['pdf', 'online', 'site']);
+/** La clase de enlace de cada etiqueta. */
+const KIND_OF_LABEL = /** @type {Map<string, LinkKind>} */ (new Map(LINK_KINDS.map(kind => [MANUFACTURER_LINK_LABELS[kind], kind])));
+/**
+ * Los tipos de recurso del registro que admite cada etiqueta. «Sitio del fabricante» admite cualquiera que no esté
+ * bloqueado (`null`). Una política de uso, una documentación de exportación o la página de un solo producto nunca son
+ * un catálogo.
+ */
+const LINK_RESOURCE_TYPES = {
+  pdf: { types: ['pdf', 'pdf_viewer'], purpose: 'un PDF (tipo pdf o pdf_viewer)' },
+  online: { types: ['web', 'landing', 'catalog_platform'], purpose: 'la página donde se consulta o se descarga el catálogo (tipo web, landing o catalog_platform)' },
+  site: null,
+};
+/** Largo máximo de la edición de un catálogo en PDF («2026 v2»). */
+export const MAX_EDITION_LENGTH = 24;
+/** Tamaño máximo, en megabytes, que se escribe para un catálogo en PDF. */
+export const MAX_MEGABYTES = 999;
+/** Las etiquetas en su orden, para los mensajes: «A», «B» y «C». */
+const LABEL_LIST = `«${MANUFACTURER_LINK_LABELS.pdf}», «${MANUFACTURER_LINK_LABELS.online}» y «${MANUFACTURER_LINK_LABELS.site}»`;
+/** Un texto limpio de una línea: como lo deja `cleanQuery` y sin caracteres que no se ven. */
+/** @param {unknown} value @returns {value is string} */
+const isCleanLine = value => typeof value === 'string' && value.trim() !== '' && cleanQuery(value) === value && !/\p{DI}/u.test(value);
+
+/** Una edición que ya empieza con la palabra «edición» (en cualquier forma de mayúsculas) se escribe como está. */
+const NAMED_EDITION = /^edición(?![\p{L}\p{N}])/iu;
+
+/**
+ * Lo que la página imprime junto a un catálogo en PDF: la edición y el tamaño que se conocen, unidos con « · »
+ * («Edición 2026 v2 · 49 MB», «Edición 2026 v2», «49 MB»); `null` sin ninguno de los dos o en otro enlace. La edición
+ * lleva delante la palabra «Edición» para que se lea qué es el número, salvo si ya empieza con ella («Edición 2026
+ * versión 2.1» queda igual); el tamaño ya lo dice («MB»).
+ * @param {{ edition?: string, megabytes?: number }} link
+ * @returns {string | null}
+ */
+export function manufacturerLinkDetail(link) {
+  const edition = link.edition === undefined ? undefined : NAMED_EDITION.test(link.edition) ? link.edition : `Edición ${link.edition}`;
+  const parts = [edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(part => part !== undefined);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 /** @param {unknown} value @returns {value is string} */
 const isText = value => typeof value === 'string' && value.trim().length > 0;
@@ -39,15 +92,6 @@ const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
-/** @param {unknown} value */
-const isHttps = value => {
-  try {
-    const url = new URL(String(value));
-    return url.protocol === 'https:' && !url.username && !url.password;
-  } catch {
-    return false;
-  }
-};
 /** @param {Record<string, unknown>} record @param {string[]} allowed */
 const unknownKeys = (record, allowed) => Object.keys(record).filter(key => !allowed.includes(key));
 /** ¿Aparece `needle` como palabra completa dentro de `haystack`? Ambos ya normalizados. */
@@ -63,14 +107,12 @@ const hasWord = (/** @type {string} */ haystack, /** @type {string} */ needle) =
 };
 
 const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks'];
-const LINK_KEYS = ['label', 'url'];
+const LINK_KEYS = ['label', 'url', 'edition', 'megabytes'];
 // `retired: true` marca el ejemplo de producto retirado: tiene su página, pero no entra en ningún listado.
 const EXAMPLE_KEYS = ['id', 'name', 'brandName', 'code', 'categoryIds', 'saleUnit', 'summary', 'characteristics', 'variants', 'retired'];
 const VARIANT_KEYS = ['id', 'label', 'code'];
 /** «Marca de ejemplo», «Marca de ejemplo Beta» o «Marca de ejemplo Gamma»: las marcas que acepta un ejemplo, para los errores. */
 const BRAND_CHOICES = `${EXAMPLE_BRAND_NAMES.slice(0, -1).map(name => `«${name}»`).join(', ')} o «${EXAMPLE_BRAND_NAMES.at(-1)}»`;
-/** Tipos de recurso del registro que nunca se publican como enlace. */
-const BLOCKED_RESOURCE_TYPES = ['deprecated', 'unverified_current', 'gated_landing'];
 
 /**
  * Valida la estructura de `src/data/brands.json`.
@@ -94,23 +136,110 @@ export function validateBrands(brands) {
     if (!isText(brand.name)) errors.push(`${path}: falta nombre.`);
     if (brand.kind !== 'brand' && brand.kind !== 'supplier') errors.push(`${path}: kind debe ser "brand" o "supplier".`);
     if (mentionsExcludedBrand(String(brand.id).replaceAll('-', ' ')) || mentionsExcludedBrand(brand.name)) errors.push(`${path}: marca excluida.`);
-    const links = brand.manufacturerLinks;
-    if (!Array.isArray(links) || links.length > 1) {
-      errors.push(`${path}: manufacturerLinks debe ser una lista con un enlace como máximo.`);
-      return;
-    }
-    for (const link of links) {
-      if (!isRecord(link) || unknownKeys(link, LINK_KEYS).length || link.label !== MANUFACTURER_LINK_LABEL || !isHttps(link.url)) {
-        errors.push(`${path}: el enlace debe tener solo la etiqueta «${MANUFACTURER_LINK_LABEL}» y una URL https.`);
-      }
-    }
+    errors.push(...linkErrors(brand.manufacturerLinks, isId(brand.id) ? `${path} (${brand.id})` : path));
   });
   return errors;
 }
 
+/** Cómo se muestra cada salto de línea dentro de «…» en un mensaje. */
+const LINE_BREAK_NAMES = new Map([['\n', '\\n'], ['\r', '\\r'], ['\u2028', 'U+2028'], ['\u2029', 'U+2029']]);
+/**
+ * Un texto para citarlo entre «…» en una línea: cada salto de línea se muestra con su nombre (\n, \r, U+2028, U+2029).
+ * @param {string} text
+ */
+const inOneLine = text => text.replace(/[\n\r\u2028\u2029]/g, character => LINE_BREAK_NAMES.get(character) ?? character);
+
+/**
+ * Qué tiene mal la edición de un PDF, citándola en una línea (`inOneLine`): no es un texto, está vacía o solo lleva
+ * espacios, solo lleva caracteres que no se ven (con su código), lleva uno en medio (con las mismas palabras que el
+ * texto de una ficha: `invisibleAt`, `placeIn`), un espacio al principio o al final, dos seguidos, o es más larga que
+ * el máximo. `undefined` si no es ninguna de esas: queda la frase general.
+ * @param {unknown} edition
+ * @returns {string | undefined}
+ */
+function editionFault(edition) {
+  if (typeof edition !== 'string') return `no es un texto; escribe la edición entre comillas, como la imprime el fabricante («2026», «2026 v2»).`;
+  if (/^ *$/.test(edition)) return 'está vacío; si el fabricante no imprime una edición, quita la clave.';
+  const characters = [...edition];
+  if (characters.every(character => character === ' ' || invisibleAt(character))) {
+    const codes = [...new Set(characters.filter(character => character !== ' ').map(character => invisibleAt(character)?.code))];
+    return `${characters.length === 1 ? 'solo lleva un carácter que no se ve' : 'solo lleva caracteres que no se ven'} (${codes.join(', ')}); si el fabricante no imprime una edición, quita la clave.`;
+  }
+  const hidden = invisibleAt(edition);
+  if (hidden) {
+    const character = String.fromCodePoint(Number.parseInt(hidden.code.slice(2), 16));
+    const place = placeIn(edition, hidden.index);
+    if (/[\n\r\u2028\u2029]/.test(character)) return `«${inOneLine(edition)}» lleva un salto de línea ${inOneLine(place)}; escríbela en una sola línea.`;
+    return `«${inOneLine(edition)}» lleva un carácter invisible (${hidden.code}) ${inOneLine(place)}; ${/\s/.test(character) ? 'escríbelo con un espacio normal' : 'bórralo'}.`;
+  }
+  if (edition !== edition.trim()) return `«${inOneLine(edition)}» empieza o termina con un espacio.`;
+  if (edition.includes('  ')) return `«${inOneLine(edition)}» lleva dos espacios seguidos.`;
+  const length = characters.length;
+  if (length > MAX_EDITION_LENGTH) return `«${inOneLine(edition)}» mide ${length} caracteres; el máximo es ${MAX_EDITION_LENGTH}.`;
+  return undefined;
+}
+
+/**
+ * Revisa los enlaces de una marca (`manufacturerLinks`): una lista de 0 a 3 enlaces, cada uno con `label` y `url`; la
+ * etiqueta es una de `MANUFACTURER_LINK_LABELS`, cada una una vez y en su orden; la dirección es `https` escrita
+ * completa y no se repite; solo el PDF puede llevar `edition` (texto de una línea, de 1 a `MAX_EDITION_LENGTH`
+ * caracteres) y `megabytes` (entero de 1 a `MAX_MEGABYTES`). Que cada dirección sea un recurso verificado de la
+ * marca en el registro, con un tipo que su etiqueta admite, lo revisa `crossCheckBrands`.
+ * @param {unknown} links
+ * @param {string} path la marca, para los mensajes
+ * @returns {string[]}
+ */
+function linkErrors(links, path) {
+  if (!Array.isArray(links)) return [`${path}: manufacturerLinks debe ser una lista de enlaces; escribe [] si la marca no tiene ninguno.`];
+  /** @type {string[]} */
+  const errors = [];
+  if (links.length > LINK_KINDS.length) {
+    return [`${path}: manufacturerLinks admite como máximo tres enlaces, uno por etiqueta: ${LABEL_LIST}, en ese orden.`];
+  }
+  /** @type {LinkKind[]} */
+  const kinds = [];
+  const urls = new Set();
+  links.forEach((link, i) => {
+    const where = `${path}.manufacturerLinks[${i}]`;
+    if (!isRecord(link)) {
+      errors.push(`${where}: debe ser un objeto con label y url.`);
+      return;
+    }
+    for (const key of unknownKeys(link, LINK_KEYS)) errors.push(`${where}.${key}: campo no definido.`);
+    const kind = typeof link.label === 'string' ? KIND_OF_LABEL.get(link.label) : undefined;
+    const { edition, megabytes } = link;
+    if (!kind) errors.push(`${where}.label: ${typeof link.label === 'string' ? `«${link.label}» no es una etiqueta de enlace` : 'falta la etiqueta'}; usa una de estas tres: ${LABEL_LIST.replace(/ y «/, ' o «')}.`);
+    else if (kinds.includes(kind)) errors.push(`${where}.label: la etiqueta «${link.label}» ya está en otro enlace de la marca; cada etiqueta va una vez.`);
+    else kinds.push(kind);
+    const urlError = addressError(`${where}.url`, link.url, 'escribe la dirección https completa, como https://www.fabricante.com/catalogo/.');
+    if (urlError) errors.push(urlError);
+    else if (urls.has(link.url)) errors.push(`${where}.url: la dirección ${link.url} ya está en otro enlace de la marca; cada dirección va una vez.`);
+    else urls.add(link.url);
+    for (const [key, what] of /** @type {const} */ ([['edition', 'la edición'], ['megabytes', 'el tamaño en megabytes']])) {
+      if (Object.hasOwn(link, key) && kind && kind !== 'pdf') errors.push(`${where}.${key}: solo el enlace «${MANUFACTURER_LINK_LABELS.pdf}» lleva ${what}; quítalo de este.`);
+    }
+    if (Object.hasOwn(link, 'edition') && (!isCleanLine(edition) || [...edition].length > MAX_EDITION_LENGTH)) {
+      errors.push(`${where}.edition: ${editionFault(edition) ?? `debe ser un texto de una línea, de 1 a ${MAX_EDITION_LENGTH} caracteres, como lo imprime el fabricante («2026», «2026 v2»).`}`);
+    }
+    if (Object.hasOwn(link, 'megabytes') && (typeof megabytes !== 'number' || !Number.isInteger(megabytes) || megabytes < 1 || megabytes > MAX_MEGABYTES)) {
+      errors.push(`${where}.megabytes: debe ser un número entero de 1 a ${MAX_MEGABYTES}: lo que pesa el archivo en megabytes (de un millón de bytes), redondeado.`);
+    }
+  });
+  const ordered = [...kinds].sort((a, b) => LINK_KINDS.indexOf(a) - LINK_KINDS.indexOf(b));
+  if (ordered.join() !== kinds.join()) errors.push(`${path}: los enlaces van en este orden: ${LABEL_LIST}; ordénalos así.`);
+  return errors;
+}
+
+/** Un texto del registro cortado a 80 caracteres, con «…» si se cortó, para citarlo en un mensaje. */
+const cut80 = (/** @type {string} */ text) => ([...text].length > 80 ? `${[...text].slice(0, 80).join('')}…` : text);
+/** La verificación de un recurso sin lo que va hasta su fecha («accesible (2026-11-23); …»), que ya no dice nada. */
+const afterDate = (/** @type {string} */ text) => text.replace(/^[^;:()]*\(\d{4}-\d{2}-\d{2}\)[;:,]?\s*/, '') || text;
+
 /**
  * Compara la lista pública de marcas con el registro de investigación: mismos identificadores,
- * nombres y tipos, y cada enlace debe ser un recurso de esa entidad verificado como accesible.
+ * nombres y tipos, y cada enlace debe ser un recurso de esa entidad verificado como accesible, de un tipo que no está
+ * bloqueado y que su etiqueta admite (`LINK_RESOURCE_TYPES`). Una entidad retirada del portal (`portal.status`
+ * «retirada», `isWithdrawn`) no se espera en brands.json, y si está ahí es un error que dice qué hacer.
  * Solo la usan el validador (`npm run validate:catalog`) y las pruebas; el sitio nunca importa el registro.
  * @param {unknown} brands Contenido de `src/data/brands.json`.
  * @param {unknown} registry Contenido de `research/Sercom_Active_Fuentes_Catalogos.json`.
@@ -126,6 +255,7 @@ export function crossCheckBrands(brands, registry) {
   const byId = new Map(sources.map(source => [source.entity_id, source]));
 
   for (const source of sources) {
+    if (isWithdrawn(source)) continue;
     if (!records.some(brand => brand.id === source.entity_id)) errors.push(`registro: ${source.entity_id} falta en brands.json.`);
   }
   for (const brand of records) {
@@ -134,14 +264,23 @@ export function crossCheckBrands(brands, registry) {
       errors.push(`${brand.id}: no existe en el registro de investigación.`);
       continue;
     }
+    if (isWithdrawn(source)) {
+      errors.push(`${brand.id}: en el registro está retirada del portal (${source.portal.on}); quítala de brands.json o, si vuelve al portal, quita la clave portal de su entidad en el registro.`);
+      continue;
+    }
     if (brand.name !== source.name) errors.push(`${brand.id}: el nombre «${brand.name}» no coincide con el registro («${source.name}»).`);
     if (brand.kind !== source.entity_type) errors.push(`${brand.id}: kind «${brand.kind}» no coincide con el registro («${source.entity_type}»).`);
     for (const link of brand.manufacturerLinks) {
       const resources = Array.isArray(source.resources) ? source.resources : [];
       const resource = resources.find((/** @type {any} */ candidate) => candidate.url === link.url);
+      const admitted = LINK_RESOURCE_TYPES[/** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label))];
       if (!resource) errors.push(`${brand.id}: el enlace ${link.url} no es un recurso de esa entidad en el registro.`);
-      else if (!String(resource.verification ?? '').startsWith('accesible') || BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
-        errors.push(`${brand.id}: el enlace ${link.url} no está verificado como accesible (${resource.type}: ${resource.verification}).`);
+      else if (BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
+        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro es de tipo «${resource.type}», que nunca se enlaza (${cut80(afterDate(String(resource.verification ?? '')))}). Enlaza otro recurso de la marca.`);
+      } else if (!isPublishableResource(resource)) {
+        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas (${resource.type}: ${cut80(String(resource.verification ?? ''))}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`);
+      } else if (admitted && !admitted.types.includes(resource.type)) {
+        errors.push(`${brand.id}: el enlace ${link.url} lleva la etiqueta «${link.label}», pero en el registro es de tipo «${resource.type}»; esa etiqueta es solo para ${admitted.purpose}. Cambia la etiqueta o enlaza otro recurso de la marca.`);
       }
     }
   }
@@ -158,10 +297,47 @@ export function crossCheckBrands(brands, registry) {
   return errors;
 }
 
+const PORTAL_KEYS = ['status', 'on', 'reason'];
+
+/**
+ * Revisa la marca de retiro del portal de cada entidad del registro de investigación que la lleva (`portal`): un
+ * objeto con exactamente `status` (hoy solo «retirada»), `on` (el día en que salió, una fecha real AAAA-MM-DD) y
+ * `reason` (la decisión, en un texto limpio de una línea). Una entidad sin la clave está en el alcance del sitio. Cada
+ * mensaje nombra la entidad y el campo, y dice qué escribir.
+ * @param {unknown} registry Contenido de `research/Sercom_Active_Fuentes_Catalogos.json`.
+ * @returns {string[]} Errores; lista vacía si todo es correcto.
+ */
+export function registryPortalErrors(registry) {
+  const sources = isRecord(registry) && Array.isArray(registry.sources) ? registry.sources : [];
+  /** @type {string[]} */
+  const errors = [];
+  sources.forEach((source, index) => {
+    if (!isRecord(source) || !Object.hasOwn(source, 'portal')) return;
+    const where = `${isId(source.entity_id) ? source.entity_id : `sources[${index}]`}.portal`;
+    const { portal } = source;
+    if (!isRecord(portal)) {
+      errors.push(`${where}: debe ser un objeto con status, on y reason, como {"status": "${WITHDRAWN_STATUS}", "on": "2026-11-23", "reason": "…"}; si la marca vuelve al portal, quita la clave portal.`);
+      return;
+    }
+    for (const key of unknownKeys(portal, PORTAL_KEYS)) errors.push(`${where}.${key}: campo no definido; la marca de retiro lleva solo status, on y reason.`);
+    if (portal.status === undefined) errors.push(`${where}.status: falta; escribe «${WITHDRAWN_STATUS}».`);
+    else if (portal.status !== WITHDRAWN_STATUS) errors.push(`${where}.status: «${String(portal.status)}» no es un estado del portal; el único que existe es «${WITHDRAWN_STATUS}».`);
+    if (!validDate(portal.on)) {
+      errors.push(`${where}.on: ${portal.on === undefined ? 'falta' : `«${String(portal.on)}» no es una fecha real`}; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.`);
+    }
+    if (portal.reason === undefined) errors.push(`${where}.reason: falta; escribe en una línea la decisión por la que la marca salió del portal.`);
+    else if (typeof portal.reason !== 'string' || !portal.reason.trim()) errors.push(`${where}.reason: ${typeof portal.reason === 'string' ? 'está vacío' : 'debe ser un texto'}; escribe en una línea la decisión por la que la marca salió del portal.`);
+    else if (!isCleanLine(portal.reason)) errors.push(`${where}.reason: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.`);
+  });
+  return errors;
+}
+
 /**
  * Valida los productos de ejemplo de la vista previa. Deben ser inconfundibles con fichas reales:
  * identificador «ejemplo-…», código «EJ-0000», nombre con «de ejemplo», una de las marcas de `EXAMPLE_BRAND_NAMES`
- * y ninguna mención de una marca real. Las variantes pueden faltar (`variants: []`), como en una ficha real.
+ * y ninguna mención de una marca real. Las variantes pueden faltar (`variants: []`), como en una ficha real; si las
+ * hay, cada una lleva su código (a diferencia de una ficha real, donde es opcional). Dos ejemplos no tienen el mismo
+ * nombre ni dos variantes de un ejemplo la misma etiqueta (comparados con `normalizeText`), como en el catálogo.
  * `retired: true` marca un ejemplo retirado; sus demás reglas no cambian.
  * @param {unknown} examples Contenido de `src/data/preview/example-products.json`.
  * @param {{ categoryIds: readonly string[], brands: readonly Pick<BrandRecord, 'id' | 'name'>[] }} context
@@ -173,6 +349,11 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
   const errors = [];
   const ids = new Set();
   const codes = new Set();
+  // Nombre ya visto (con `normalizeText`) → el ejemplo que lo usa primero. Como en el catálogo (`validateCatalog`):
+  // «Cotizar mi lista» nombra los controles de cada renglón con el nombre y la etiqueta de la variante, y dos ejemplos o
+  // dos variantes con el mismo nombre darían a dos renglones los mismos nombres accesibles.
+  /** @type {Map<string, string>} */
+  const names = new Map();
   examples.forEach((example, index) => {
     const path = `ejemplos[${index}]`;
     if (!isRecord(example)) {
@@ -189,6 +370,9 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     codes.add(example.code);
     if (!isText(example.name) || !hasWord(normalizeText(example.name), 'de ejemplo')) errors.push(`${path}: el nombre debe contener «de ejemplo».`);
+    const nameKey = isText(example.name) ? normalizeText(example.name) : '';
+    if (nameKey && names.has(nameKey)) errors.push(`${path}.name: repite el nombre de ${names.get(nameKey)}; cada ejemplo necesita un nombre propio.`);
+    else if (nameKey) names.set(nameKey, path);
     if (typeof example.brandName !== 'string' || !EXAMPLE_BRAND_NAMES.includes(example.brandName)) errors.push(`${path}: la marca debe ser ${BRAND_CHOICES}.`);
     if ('retired' in example && typeof example.retired !== 'boolean') errors.push(`${path}: retired debe ser true o false.`);
     if (!Array.isArray(example.categoryIds) || example.categoryIds.length === 0 || example.categoryIds.some(id => !categoryIds.includes(id))) {
@@ -201,14 +385,19 @@ export function validateExampleProducts(examples, { categoryIds, brands }) {
     }
     const variants = example.variants;
     const variantIds = new Set();
+    /** @type {Map<string, number>} */
+    const labels = new Map();
     if (!Array.isArray(variants)) errors.push(`${path}: variants debe ser una lista (puede estar vacía).`);
-    else for (const variant of variants) {
+    else for (const [position, variant] of variants.entries()) {
       const valid = isRecord(variant) && unknownKeys(variant, VARIANT_KEYS).length === 0 && isId(variant.id) && !variantIds.has(variant.id)
         && isText(variant.label) && typeof variant.code === 'string' && variant.code.startsWith(`${example.code}-`) && !codes.has(variant.code);
       if (!valid) errors.push(`${path}: variante incompleta, duplicada o con un código que no empieza con el del ejemplo.`);
       if (isRecord(variant)) {
         variantIds.add(variant.id);
         codes.add(variant.code);
+        const labelKey = isText(variant.label) ? normalizeText(variant.label) : '';
+        if (labelKey && labels.has(labelKey)) errors.push(`${path}.variants[${position}].label: repite la etiqueta de variants[${labels.get(labelKey)}]; cada variante necesita una etiqueta propia.`);
+        else if (labelKey) labels.set(labelKey, position);
       }
     }
     // Ningún campo puede nombrar una marca real ni la marca excluida.
@@ -321,8 +510,15 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
         summary: product.description,
         characteristics: [...product.characteristics],
         saleUnit: product.saleUnit,
-        variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode })),
-        image: { url: product.image.url, alt: product.image.alt },
+        // Una variante sin código propio lleva `code: ''`: la ficha muestra solo su etiqueta y el mensaje no lleva código.
+        variants: product.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.manufacturerCode ?? '' })),
+        // Solo el texto de cada norma: la ficha las muestra en «Normas» y ninguna otra parte del sitio las usa.
+        standards: [...product.standards],
+        // Solo lo que muestra la página: el archivo o la dirección con sus medidas, el texto alternativo y la página de
+        // donde viene la foto (el crédito bajo la foto). Sin foto, `null`: la página muestra el pictograma de la categoría.
+        image: product.image === null ? null : 'file' in product.image
+          ? { file: product.image.file, alt: product.image.alt, sourceUrl: product.image.sourceUrl }
+          : { url: product.image.url, width: product.image.width, height: product.image.height, alt: product.image.alt, sourceUrl: product.image.sourceUrl },
         documents: product.documents.map(document => ({ label: document.label, url: document.url })),
         isExample: false,
       };
@@ -340,6 +536,7 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
       characteristics: [...example.characteristics],
       saleUnit: example.saleUnit,
       variants: example.variants.map(variant => ({ id: variant.id, label: variant.label, code: variant.code })),
+      standards: [],
       image: null,
       documents: [],
       isExample: true,
@@ -393,7 +590,13 @@ export function createSiteData({ mode, catalog, brands, exampleProducts = [] }) 
     id: brand.id,
     name: brand.name,
     kind: brand.kind,
-    manufacturerLinks: brand.manufacturerLinks.map(link => ({ label: link.label, url: link.url })),
+    // De cada enlace, lo que imprime la página: la etiqueta, la dirección, su clase y, en el PDF, la edición y el
+    // tamaño ya escritos en una línea (`detail`).
+    manufacturerLinks: brand.manufacturerLinks.map(link => {
+      const kind = /** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label));
+      return { label: link.label, url: link.url, kind, detail: kind === 'pdf' ? manufacturerLinkDetail(link) : null };
+    }),
+    hasCatalog: brand.manufacturerLinks.some(link => KIND_OF_LABEL.get(link.label) !== 'site'),
     productCount: productsByBrand(brand.id).length,
     url: routes.brand(brand.id),
   }));

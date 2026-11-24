@@ -117,6 +117,20 @@ test('las direcciones de image-set() también se revisan', async () => {
   await assertClean(['<style>.a{background-image:image-set("/logo.svg" 1x, "/fondo.svg" 2x)}</style>'], SITE);
 });
 
+test('el srcset de cada <source> de un <picture> también se revisa, como el de su <img>', async () => {
+  // Así imprime una fotografía de producto el componente Picture de Astro: WebP en <source> y el formato de la foto en <img>.
+  const files = { ...SITE, '_astro/foto.a1_b2.webp': 'w', '_astro/foto.a1_c3.webp': 'w', '_astro/foto.a1_d4.jpg': 'j', '_astro/foto.a1_e5.jpg': 'j' };
+  const photo = (sources, img = '/_astro/foto.a1_e5.jpg 320w') => `<picture><source srcset="${sources}" type="image/webp" sizes="(max-width: 699px) 50vw, 323px">`
+    + `<img src="/_astro/foto.a1_d4.jpg" srcset="${img}" sizes="323px" alt="Foto de prueba" width="1600" height="1200" class="product__img"></picture>`;
+  await assertClean([photo('/_astro/foto.a1_b2.webp 320w, /_astro/foto.a1_c3.webp 640w')], files);
+  await assertEach('roto', [
+    photo('/_astro/foto.a1_b2.webp 320w, /_astro/no-existe.webp 640w'), photo('/_astro/no-existe.webp 320w'),
+    photo('/_astro/foto.a1_b2.webp 320w', '/_astro/foto.a1_e5.jpg 320w, /_astro/no-existe.jpg 640w'),
+  ], files);
+  const result = await check({ ...files, 'pagina/index.html': page(photo('/_astro/foto.a1_b2.webp 320w, /_astro/no-existe.webp 640w')) });
+  assert.match(result.problems[0].message, /<source srcset>/);
+});
+
 test('una página se enlaza con su diagonal final', async () => {
   await assertEach('diagonal', ['<a href="/catalogo">Catálogo</a>', '<a href="/catalogo?q=guante">Buscar</a>', '<a href="/catalogo#filtros">Filtros</a>', '<a href="../marcas">Marcas</a>'], SITE);
   const result = await check({ ...SITE, 'pagina/index.html': page('<a href="/catalogo">Catálogo</a>') });

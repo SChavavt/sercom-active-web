@@ -55,8 +55,8 @@ const description = [category.name, category.summary, contactDetails.locationLab
   ) : (
     <EmptyState
       icon={categoryIcon(category.id)}
-      title="Estamos cargando los productos de esta categoría."
-      text="Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo."
+      title="Los productos de esta categoría no están en este catálogo."
+      text="Dinos qué necesitas y te ayudamos a cotizarlo."
       action={{ href: contactLinks.category(category.name).whatsapp, label: 'Contactar por WhatsApp', icon: 'whatsapp' }}
     />
   )}

@@ -10,19 +10,23 @@ El propietario aprobó cuatro pasos el 18 de noviembre de 2026, con la indicaci�
 
 **Estado.** Aprobado el 22 de noviembre de 2026, al integrar en `main` la solicitud de cambios n.º 1.
 
-## Paso 2. Buscador, filtros y «Mi cotización» — construido, en revisión
+## Paso 2. Buscador, filtros y «Mi cotización» — aprobado
 
 **Entrega.** Filtros combinables en el catálogo y regreso a los resultados conservando su estado; «Agregar a mi cotización» en la ficha; la lista que se arma en el sitio, guardada solo en el navegador del cliente, con cantidades, unidades y variantes; resumen para copiar, envío por WhatsApp o correo y manejo de mensajes largos; la solicitud especial guiada. Los adjuntos siguen enviándose por WhatsApp o correo.
 
 **Se acepta cuando** la búsqueda encuentra por código, marca y sin acentos; los filtros se combinan; la lista funciona con teclado, vacía y con muchos productos, con cantidades y unidades; ninguna página dice «recibimos tu solicitud» al abrir otra aplicación. Registrar la recepción en un sistema exigiría un servidor y un canal real, que no forman parte de este paso.
 
-**Estado.** Construido en la solicitud de cambios n.º 2, que espera la revisión de quien dirige el proyecto: nada de este paso está aprobado, integrado ni publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
+**Estado.** Aprobado el 23 de noviembre de 2026, al integrar en `main` la solicitud de cambios n.º 2. Nada está publicado. Cada criterio, con su evidencia, está en [`ESTADO.md`](ESTADO.md#45-criterios-de-aceptación-del-paso-2); lo que solo se puede probar en un teléfono real o en otro navegador queda para antes del lanzamiento ([`ESTADO.md`](ESTADO.md#46-lo-que-nadie-ha-verificado-todavía)). Los filtros por talla, material, recubrimiento o tipo esperan los datos reales del paso 3.
 
-## Paso 3. Catálogo piloto (30 a 50 productos reales) — pendiente
+## Paso 3. Catálogo con los productos de los proveedores — en curso
 
-**Entrega.** Con el contacto comercial, las categorías y modelos prioritarios que Sercom Active puede suministrar; de 30 a 50 fichas con fuente, código exacto, unidad, variantes aplicables, imagen con uso confirmado, resumen y características verificadas, aprobadas una por una. Antes de cargarlas: ampliar el esquema de imagen (archivo local o dirección, con ancho y alto) y decidir cómo se revisa el texto de los fabricantes frente a las reglas del sitio. Al haber productos aprobados, los ejemplos dejan de ser necesarios.
+**Meta.** El 18 de noviembre de 2026 este paso se aprobó como un catálogo piloto de 30 a 50 productos reales, aprobados uno por uno con el contacto comercial. El 23 de noviembre de 2026 quien dirige el proyecto cambió la meta: el catálogo muestra todos los productos que los proveedores de Sercom Active publican en Internet, ordenados por categorías, y deja a la vista el catálogo de cada fabricante. Ese día cambió también la forma de aprobar: un producto que está en el catálogo de un proveedor se puede conseguir, así que se aprueba; su foto es la que publica su fabricante, y sin foto se muestra con el pictograma de su categoría. Cuatro marcas (ALTO, INFRA, Dry Pro y HAWK) salieron del portal, que ahora lista quince nombres.
 
-**Se acepta cuando** cada ficha pasa el validador y las comprobaciones, el contacto comercial la aprobó y la compilación de producción muestra las categorías y los productos aprobados. El procedimiento está en [`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md).
+**Primera entrega (solicitud de cambios n.º 3, en revisión).** 46 fichas reales escritas a mano, de 14 marcas y repartidas en las diez categorías, con fuente, código exacto, unidad, variantes, normas con la dirección donde constan, resumen y características; 24 con la foto de su fabricante y su crédito, y 22 con pictograma. El catálogo que publica cada fabricante, en PDF o en línea, enlazado en la página de cada marca y reunido en «Marcas que manejamos». Antes de cargarlas se amplió el esquema de la foto (archivo o dirección, con ancho y alto) y se decidió cómo se revisa el texto de una ficha frente a las reglas del sitio. Los productos de ejemplo siguen en la vista previa; si se retiran se decide al cerrar el paso.
+
+**Segunda entrega (otra solicitud de cambios, después de integrar la primera).** Los cerca de 1,850 productos que publican en sus sitios ocho fabricantes (Derma Care, DuPont, Golden Eagle, JYRSA, MCR Safety, MR Seguridad, MSA y UVEX), cargados por un programa, marca por marca, cada marca con su auditoría antes de entrar. Y lo que el sitio necesita para mostrarlos: listados por páginas, la búsqueda sobre un índice y las fotos a esa escala. Las otras seis marcas (Ansell, 3M, Lakeland, Moldex, Herhild y Duramil) no dejan bajar sus productos con un programa: por decisión de quien dirige el proyecto del 23 de noviembre de 2026 muestran su catálogo y las fichas que ya tienen.
+
+**Se acepta cuando** cada ficha pasa el validador y las comprobaciones, la compilación de producción muestra las categorías y los productos aprobados, y quien dirige el proyecto revisa cada entrega y la integra o pide cambios. El procedimiento de una ficha está en [`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md); la evidencia de la primera entrega, en [`ESTADO.md`](ESTADO.md#47-criterios-de-aceptación-del-paso-3).
 
 ## Paso 4. Publicación y QR — pendiente
 
@@ -43,7 +47,7 @@ Notas anteriores usan las «entregas» 0 a 5 de la versión anterior de este doc
 | — | 0. Repositorio e infraestructura (hecho) | — |
 | 1. Diseño y navegación completa | 1. Navegación y propuesta visual (sin la búsqueda y los filtros) | 2, salvo el dibujo de la página de cotización, que pasa al paso 2 |
 | 2. Buscador, filtros y «Mi cotización» | 3. Cotización y solicitudes especiales, más la búsqueda y los filtros de la entrega 1 | 4 |
-| 3. Catálogo piloto | 2. Catálogo piloto | 3 |
+| 3. Catálogo con los productos de los proveedores (hasta el 23 de noviembre de 2026, catálogo piloto) | 2. Catálogo piloto | 3 |
 | 4. Publicación y QR | 4. Revisión y primera publicación | 5 y 6 |
 | Operación, después del paso 4 | 5. Operación | — |
 
@@ -51,9 +55,10 @@ Notas anteriores usan las «entregas» 0 a 5 de la versión anterior de este doc
 
 La lista al día, con quién responde y lo que bloquea cada punto, está en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio). En resumen:
 
-- La revisión del paso 2 y la aprobación de todos los textos del sitio por el contacto comercial, incluidos los nuevos del paso 2 y el aviso de privacidad, que la empresa revisa.
+- La aprobación de todos los textos del sitio por el contacto comercial, incluidos los del paso 2, los de las 46 fichas del paso 3 y el aviso de privacidad, que la empresa revisa.
 - La prueba del número de WhatsApp en un teléfono real.
-- Qué categorías se aprueban y qué modelos prioritarios se pueden conseguir, con sus fuentes e imágenes de uso permitido.
+- Si se muestran los productos de los proveedores que no son equipo de protección personal (186: 180 de MSA, entre detectores de gas, analizadores y otros equipos, y 6 de MR Seguridad) y, si se muestran, en qué categoría. Mientras no haya respuesta quedan fuera.
+- El material de las seis marcas que no dejan bajar sus productos con un programa (Ansell, 3M, Lakeland, Moldex, Herhild y Duramil): una lista de modelos o sus catálogos en archivo, y qué hacer con las fotos de sus 22 fichas.
 - «Derma Care» o «Safety Guardian» en la lista de marcas.
 - La dirección y los teléfonos de Puebla, y si se recibe a clientes en persona.
 - El logotipo vectorial original.

@@ -261,8 +261,17 @@
   .product__action { min-height: 48px; margin: 0; padding: 0 var(--s-4) 0 var(--pad); border-bottom: 0; }
   .product__action > span { white-space: normal; }
   .product__action--quote { padding-left: var(--pad); border-left: 0; border-top: var(--line) solid var(--rule-soft); }
-  .product__media { aspect-ratio: auto; padding: 46px 0 var(--s-5); }      /* fila de la etiqueta y luego la placa */
-  .product__plate { width: 76px; height: 76px; margin-top: 0; }
+  /* El marco de toda tarjeta, con foto o con pictograma, mide 4:3 del ancho y nunca menos que la fila de la etiqueta,
+     la placa, el aire de abajo y el filete: así las tarjetas de una fila empiezan su texto a la misma altura. La placa
+     queda centrada en lo que deja la fila de la etiqueta. */
+  .product__media {
+    --media-tag-row: 46px;
+    --media-plate: 76px;
+    aspect-ratio: 4 / 3;
+    min-height: calc(var(--media-tag-row) + var(--media-plate) + var(--s-5) + var(--line));
+    padding: var(--media-tag-row) 0 var(--s-5);
+  }
+  .product__plate { width: var(--media-plate); height: var(--media-plate); margin-top: 0; }
   .product__media .tag { top: var(--s-3); left: var(--pad); }
 
   .band__body { padding-top: var(--s-8); }
@@ -376,7 +385,7 @@
   .empty__icon { width: 48px; height: 48px; }
   .empty__title { font-size: 1.375rem; }
   .empty__action { grid-column: 1; width: 100%; }
-  .product__media--photo { aspect-ratio: 4 / 3; padding: 0; }
+  .product__media--photo { padding: 0; }      /* el mismo marco que el pictograma; la foto lo llena entero */
   .brands__fill--even { display: none; }        /* dos marcas por fila: con un número par no falta ninguna celda */
   .brands--lg .brand { min-height: 72px; padding-block: var(--s-3); }      /* página de marcas: dos por fila, diez filas */
   .grid12 > .grid-fill, .register > .grid-fill { grid-column: span var(--fill-sm); }
@@ -422,8 +431,8 @@
   /* celdas: todo hijo de una retícula de la lámina (contenedores con huecos de 1 px sobre el azul del filete) */
   :where(.sheet, .site-header, .masthead, .catpanel__list, .sheet > main, .section, .grid12, .site-footer, .dock,
     .page-head__side, .hero__side, .plate, .register, .brands, .products, .data, .steps, .faq, .item-register,
-    .catalog-nav__groups, .catalog-nav__folds, .catalog-grid__list, .catalog-search__form,
-    .producto__body, .producto__part, .producto__list, .producto__chips, .producto__docs, .producto__actions,
+    .catalog-nav__groups, .catalog-nav__folds, .catalog-grid__list, .catalog-search__form, .catalog-sources,
+    .producto__body, .producto__part, .producto__list, .producto__norms, .producto__chips, .producto__docs, .producto__actions,
     .atencion__col, .atencion__side, .privacidad, .nf__main) > :where(:not(.vh, script, style, template)) {
     outline: var(--line) solid CanvasText;
   }

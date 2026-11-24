@@ -2,11 +2,14 @@
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
 // vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
 // funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`), qué
-// productos van en el mensaje (`listMessageItems`), qué llevan los enlaces directos de la ficha (`directLinkValues`),
+// productos van en el mensaje (`listMessageItems`), qué variante llevan escrita los enlaces directos de un producto al
+// compilar (`onlyVariantText`) y qué llevan los de la ficha cuando el visitante elige (`directLinkValues`),
 // qué frase lleva la nota de lo que se guarda (`storageNoteText`) y cómo se nombra un renglón en los nombres de sus
 // controles (`rowLabelName`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
-// `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar; lo demás, en el navegador.
+// `quote-store.mjs`). `buildQuoteIndex`, `jsonForScript` y `onlyVariantText` se usan al compilar, y el validador del
+// catálogo (`catalog-policy.mjs`) usa `MAX_UNIT_LENGTH`, `unitKey`, `singularUnit` e `isUnitWord`; lo demás, en el
+// navegador.
 //
 // El modelo: la lista guardada es una lista simple de renglones, en el orden en que el visitante los agregó. Nada aquí la
 // «repara»: `parseList` solo descarta lo que este código nunca pudo haber escrito, y `reconcileList` es una VISTA para
@@ -43,7 +46,11 @@ export const DRAFT_LIMITS = Object.freeze({ note: 10000, delivery: 200, date: 20
 const VERSION = 1;
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_ID_LENGTH = 120;
-const MAX_UNIT_LENGTH = 60;
+/**
+ * Largo máximo (en caracteres completos) de una unidad: la lista recorta a este largo la unidad de venta en sus opciones,
+ * en lo que guarda y en el mensaje. El validador del catálogo rechaza una `saleUnit` más larga.
+ */
+export const MAX_UNIT_LENGTH = 60;
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -118,6 +125,17 @@ const UNIT_FORMS = new Map(UNIT_WORDS.flatMap(([singular, plural]) => [
 ]));
 
 /**
+ * Indica si un texto es, él solo, una palabra de unidad conocida, en singular o en plural y sin importar acentos ni
+ * mayúsculas: «par», «PARES», «galon». Con un signo pegado («pares,») o con más palabras no lo es, igual que para
+ * `quantityLabel`, que entonces deja la unidad como está. La usa el validador del catálogo.
+ * @param {unknown} word
+ * @returns {boolean}
+ */
+export function isUnitWord(word) {
+  return typeof word === 'string' && UNIT_FORMS.has(normalizeText(word));
+}
+
+/**
  * Clave para comparar dos unidades: sin acentos ni mayúsculas y con la primera palabra en singular cuando es una unidad
  * conocida. «Par», «PARES» y «pares» dan «par»; «Cajas con 100 piezas» da «caja con 100 piezas»; «galones» da «galon».
  * Dos unidades con la misma clave son la misma unidad: con la misma cantidad se leen igual (`quantityLabel`), salvo por
@@ -129,6 +147,20 @@ export function unitKey(unit) {
   const [first = '', ...rest] = normalizeText(cleanUnit(unit)).split(' ');
   const forms = UNIT_FORMS.get(first);
   return [forms ? normalizeText(forms[0]) : first, ...rest].join(' ');
+}
+
+/**
+ * La unidad con su primera palabra en singular cuando es una unidad conocida, con las mayúsculas que tenía: «pares» da
+ * «par», «Cajas con 100 piezas» da «Caja con 100 piezas». Con otra primera palabra, la unidad limpia tal cual. La usa
+ * el validador del catálogo para decir cómo se escribe una unidad de venta en plural.
+ * @param {unknown} unit
+ * @returns {string}
+ */
+export function singularUnit(unit) {
+  const written = cleanUnit(unit);
+  const [first = '', ...rest] = written.split(' ');
+  const forms = UNIT_FORMS.get(normalizeText(first));
+  return forms ? [sameCase(forms[0], first), ...rest].join(' ') : written;
 }
 
 /**
@@ -675,6 +707,19 @@ export function variantText(product, variant) {
 }
 
 /**
+ * La variante que el mensaje directo de un producto («Cotizar este producto», «Cotizar por correo» y «Cotizar» de su
+ * tarjeta) lleva escrita al compilar: la única, si el producto tiene exactamente una, escrita como la lista
+ * (`variantText`: «Talla mediana (6200/07025(AAD))»); cadena vacía si no tiene ninguna o tiene varias (el visitante
+ * la elige o la escribe).
+ * @param {{ variants: readonly { label: string, code?: string }[] } | null | undefined} product
+ * @returns {string}
+ */
+export function onlyVariantText(product) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  return variants.length === 1 ? variantText(product, variants[0]) : '';
+}
+
+/**
  * Para una línea de estado, desde un renglón 'ok': «12 pares, Talla 8», «3 cajas» (un producto sin variantes),
  * «2 pares, talla o color por definir». La cantidad con `quantityLabel`; la variante, solo por su etiqueta. Cadena
  * vacía para un renglón que no está en estado 'ok'.
@@ -897,7 +942,9 @@ export function rowLabelName(row) {
  * Cuando dos renglones se llamarían igual y tienen unidades distintas (`unitKey`: el mismo producto y la misma variante
  * en pares y en cajas), `row` y `variant` de cada uno añaden la unidad que el renglón muestra («Guante recubierto,
  * Talla 8, caja»). Dos renglones iguales también en la unidad se siguen llamando igual: son el mismo renglón dos veces,
- * y la página ofrece unirlos. Un renglón retirado lleva su nombre en las tres; uno que la página no ubica, tres cadenas
+ * y la página ofrece unirlos. Dos productos distintos nunca se llaman igual, ni dos variantes de un producto: el
+ * validador del catálogo rechaza dos productos con el mismo nombre y dos variantes con la misma etiqueta (comparados con
+ * `normalizeText`). Un renglón retirado lleva su nombre en las tres; uno que la página no ubica, tres cadenas
  * vacías.
  * @param {readonly QuoteRow[] | null | undefined} rows
  * @returns {{ row: string, unit: string, variant: string }[]}

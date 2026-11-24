@@ -1,24 +1,37 @@
 ---
 // Ficha de producto (/productos/{id}/): una hoja técnica sobre la retícula de doce columnas.
 //   1. Fila de ruta: Inicio / Catálogo / {categoría} / {producto} (sin categoría si el producto no tiene).
-//   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida o, sin ella, el pictograma de la
+//   2. La hoja en dos partes: imagen en 7 columnas (fotografía contenida, ProductPhoto, o, sin ella, el pictograma de la
 //      categoría sobre el rayado; etiqueta «Ejemplo» en los ejemplos) y, en 5 columnas, categoría, nombre (H1
 //      con el tamaño de título de las páginas interiores: 44 px en computadora, como el H2; 28 en celular; un nombre
 //      de más de 50 caracteres lleva data-long y en computadora baja al tamaño de los títulos de sección; la fila de
 //      ruta lleva la misma marca y en computadora se queda en un renglón, con el nombre cortado con «…»),
 //      filas de datos (marca, código, unidad de venta), resumen, las dos acciones de cotizar, el aviso de
-//      disponibilidad, «Características», «Variantes» y «Documentación»: las acciones quedan a la vista sin
-//      bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
+//      disponibilidad, «Características», «Normas» (solo con normas en los datos), «Variantes» y «Documentación»: las
+//      acciones quedan a la vista sin bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
 //      dos partes se apilan, la imagen primero y baja.
 //   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
-//   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
+//   4. Hasta cuatro productos: los que tienen la categoría de la página (la primera del producto), primero los que la
+//      tienen como primera (sameCategoryProducts de related-products.mjs), o, si no hay otros, del catálogo; sin
+//      ninguno, nada.
 //   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
 //   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
-//   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
-// La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización».
+//   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct). Con
+//   una sola variante, la línea «Variante (talla o color)» de esos mensajes ya va escrita al compilar, como la escribe
+//   la lista (onlyVariantText de quote-list.mjs), y funciona sin JavaScript.
+// «Normas»: una fila por norma, con el texto tal como lo imprime el fabricante y en el orden de los datos, y debajo de
+// dónde sale («Según la información publicada por el fabricante.»). Las normas solo se muestran aquí: ni en las
+// tarjetas, ni en la búsqueda, ni en los mensajes, ni en la descripción de la página.
+// La sección «Variantes» es información, no controles: la variante se elige en «Agregar a mi cotización». Cada variante
+// lleva su etiqueta y, si tiene código propio, el código.
 // Volver a los resultados: si la ficha se abrió desde el catálogo con una búsqueda o filtros (la dirección de la página
 // anterior es /catalogo/?…), el script de abajo hace que «Catálogo» de la fila de ruta lleve a esos mismos resultados.
 // No guarda nada; con cualquier otra página anterior el enlace queda como se imprimió.
+// Crédito de la foto: con fotografía, el marco y su pie («Foto: {marca}») van juntos en un <figure>, que en computadora
+// se queda a la vista mientras se leen los datos. La marca enlaza la página del fabricante de donde viene la foto
+// (image.sourceUrl, que el validador exige del sitio de la marca en el registro) y abre otra pestaña. Su nombre accesible
+// es «Foto de {marca}, página del fabricante (se abre en otra pestaña)», distinto del de la fila Marca, que lleva a la
+// página de la marca en este sitio. Sin foto (pictograma), en un retirado y en las tarjetas no hay crédito.
 // Producto retirado (R-STATE-04): la misma dirección conserva una página informativa. La ruta y «Más productos…»
 // son los de la ficha; la hoja y la banda de solicitud especial las imprime RetiredProduct (ver su comentario).
 // Textos: brief 6.4 y brief de la ficha. Estilos: src/styles/pages/producto.css.
@@ -32,14 +45,17 @@ import Note from '../../components/Note.astro';
 import PageLinkScript from '../../components/PageLinkScript.astro';
 import QuoteAdd from '../../components/QuoteAdd.astro';
 import ProductCard from '../../components/ProductCard.astro';
+import ProductPhoto from '../../components/ProductPhoto.astro';
 import RetiredProduct from '../../components/RetiredProduct.astro';
 import SectionHead from '../../components/SectionHead.astro';
 import StepperScript from '../../components/StepperScript.astro';
 import Tag from '../../components/Tag.astro';
 import { categoryIcon } from '../../lib/icons.ts';
 import { isLongProductName } from '../../lib/product-title.mjs';
+import { sameCategoryProducts } from '../../lib/related-products.mjs';
 import { absoluteUrl, contactDetails, contactLinks } from '../../lib/contact.mjs';
-import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, productsByCategory, products, retiredProducts, routes } from '../../lib/site-data.mjs';
+import { onlyVariantText } from '../../lib/quote-list.mjs';
+import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, products, retiredProducts, routes } from '../../lib/site-data.mjs';
 import type { PublicProduct } from '../../types/site.ts';
 // Después de la plantilla, para que la hoja de la página vaya detrás de la hoja global.
 import '../../styles/pages/producto.css';
@@ -63,7 +79,8 @@ const longName = product ? isLongProductName(product.name) : false;
 const pageUrl = absoluteUrl(item.url, Astro.site);
 const pageLink = pageUrl ? undefined : item.url;
 const reference = { brandName: item.brandName, code: item.code, name: item.name, url: pageUrl };
-const quote = contactLinks.product(reference);
+// Con una sola variante, el mensaje ya la nombra; «Solicitar ficha técnica» no lleva la línea.
+const quote = contactLinks.product({ ...reference, variant: product ? onlyVariantText(product) : '' });
 const datasheet = contactLinks.datasheet(reference);
 // Producto retirado: el mensaje pide una alternativa, con la misma regla para la línea «Enlace».
 const alternatives = contactLinks.retired(reference);
@@ -75,14 +92,16 @@ const description = product ? product.summary : `Este producto ya no forma parte
 const variantCount = product?.variants.length ?? 0;
 const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4': (4 - (variantCount % 4)) % 4 };
 // Un código largo no cabe en una celda de tableta o celular sin partirse: entonces las variantes siguen en filas.
+// Una variante sin código propio (`code: ''`) muestra solo su etiqueta, sin elemento de código.
 const CHIP_CODE_MAX = 14;
 const variantRows = product?.variants.some(variant => variant.code.length > CHIP_CODE_MAX) ?? false;
 
-// Más productos: primero los de sus categorías; si no hay otros, una selección variada del catálogo.
+// Más productos: los de la categoría de la página (la de la ruta y la que va sobre el título), primero los que la tienen
+// como primera; si no hay otros, una selección variada del catálogo.
 const MORE_LIMIT = 4;
-// En un retirado, «sus categorías» son las públicas en el modo; él nunca está en las listas.
+// En un retirado, su categoría es la primera de las públicas en el modo; él nunca está en las listas.
+const sameCategory = sameCategoryProducts(products, { productId: item.id, categoryId, limit: MORE_LIMIT });
 const unique = (list: readonly PublicProduct[]) => list.filter((entry, index) => entry.id !== item.id && list.findIndex(other => other.id === entry.id) === index);
-const sameCategory = unique(item.categoryIds.flatMap(id => productsByCategory(id))).slice(0, MORE_LIMIT);
 const fromCatalog = unique([...featuredProducts(MORE_LIMIT + 1), ...products]).slice(0, MORE_LIMIT);
 const more = sameCategory.length > 0
   ? { title: 'Más productos de esta categoría', items: sameCategory }
@@ -107,14 +126,22 @@ const moreOdd = more.items.length % 2 === 1;
   {product ? (<Fragment>
   <section class="producto grid12" aria-labelledby="titulo">
     <div class:list={['producto__media', 'span-7', 'span-md-12', { 'producto__media--photo': product.image }]}>
-      <div class="producto__frame">
-        {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
-        {product.image ? (
-          <img class="producto__img" src={product.image.url} alt={product.image.alt} width="800" height="600" decoding="async" />
-        ) : (
+      {product.image ? (
+        <figure class="producto__figure">
+          <div class="producto__frame">
+            {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
+            <ProductPhoto image={product.image} place="page" class="producto__img" productId={product.id} />
+          </div>
+          <figcaption class="producto__credit t-small">
+            <span aria-hidden="true">Foto: </span><a class="producto__credit-link" href={product.image.sourceUrl} target="_blank" rel="noopener noreferrer"><span class="vh">Foto de </span>{product.brandName}<span class="vh">, página del fabricante (se abre en otra pestaña)</span></a>
+          </figcaption>
+        </figure>
+      ) : (
+        <div class="producto__frame">
+          {product.isExample && <Tag class="producto__tag">{EXAMPLE_TAG}</Tag>}
           <span class="producto__plate"><Icon name={categoryIcon(categoryId ?? '')} class="icon--fine" /></span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
 
     <div class="producto__body span-5 span-md-12">
@@ -171,6 +198,16 @@ const moreOdd = more.items.length % 2 === 1;
         </section>
       )}
 
+      {product.standards.length > 0 && (
+        <section class="producto__part" aria-labelledby="normas-title">
+          <h2 class="producto__part-title t-h3" id="normas-title">Normas</h2>
+          <ul class="producto__norms">
+            {product.standards.map(standard => <li class="producto__norm">{standard}</li>)}
+          </ul>
+          <Note>Según la información publicada por el fabricante.</Note>
+        </section>
+      )}
+
       {variantCount > 0 && (
         <section class="producto__part" aria-labelledby="variantes-title">
           <h2 class="producto__part-title t-h3" id="variantes-title">Variantes</h2>
@@ -178,7 +215,7 @@ const moreOdd = more.items.length % 2 === 1;
             {product.variants.map(variant => (
               <li class="producto__chip">
                 <span class="producto__chip-label">{variant.label}</span>
-                <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>
+                {variant.code && <span class="producto__chip-code t-code"><span class="vh">Código </span>{variant.code}</span>}
               </li>
             ))}
             {!variantRows && <li class="producto__chip-fill" aria-hidden="true"></li>}

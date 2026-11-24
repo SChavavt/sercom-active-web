@@ -4,7 +4,7 @@ Qué se ejecuta antes de proponer un cambio, qué debe ejecutar un alojamiento, 
 
 ## 1. Repositorio y comprobaciones locales
 
-Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en la rama `claude/project-thread-xtacqo`, en la solicitud de cambios n.º 2, que espera revisión; `main` todavía no lo tiene.
+Repositorio: [SChavavt/sercom-active-web](https://github.com/SChavavt/sercom-active-web), público por decisión del propietario. El paso 1 está en `main` desde el 22 de noviembre de 2026 (solicitud de cambios, o pull request, n.º 1). El paso 2 está en `main` desde el 23 de noviembre de 2026 (solicitud de cambios n.º 2).
 
 ```bash
 git clone https://github.com/SChavavt/sercom-active-web.git
@@ -52,7 +52,7 @@ Propuesto el 18 de noviembre de 2026; **el propietario no ha respondido**. Los f
 
 Ningún punto se hace antes de que el propietario apruebe publicar.
 
-**Antes de tocar el código: confirmaciones del negocio.** Las que bloquean la publicación están en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio): textos, aviso de privacidad, prueba real de WhatsApp, categorías y productos aprobados, dirección y atención presencial, marca en la posición 17, logotipo vectorial y condiciones comerciales.
+**Antes de tocar el código: confirmaciones del negocio.** Las que bloquean la publicación están en [`ESTADO.md`](ESTADO.md#7-pendiente-del-negocio): textos (también los de las fichas de producto), aviso de privacidad, prueba real de WhatsApp, los tres enlaces de catálogo por confirmar, dirección y atención presencial, marca en la posición 17, logotipo vectorial y condiciones comerciales.
 
 **Pendiente de decidir antes de retirar nada: la vista previa.** El `<meta name="robots">` de `src/layouts/BaseLayout.astro` y `public/robots.txt` son **de las dos compilaciones**: `BaseLayout` imprime el mismo `meta` en producción y en la vista previa, y todo `public/` se copia a `dist/` y a `dist-preview/`. Si se retiran tal como están, la vista previa también deja de pedir que no la indexen, y `npm run verify` falla, porque el escáner de la vista previa (sin `--launch`) sigue exigiendo los dos: en una copia de prueba falló R-RULE-12 en cada página de la vista previa (sin `noindex`) y en su `robots.txt`. Hay que elegir en el mismo cambio del lanzamiento una de estas salidas; ninguna está hecha:
 
@@ -84,6 +84,8 @@ Ningún punto se hace antes de que el propietario apruebe publicar.
 5. Firefox y Safari, en computadora y en teléfono, un lector de pantalla real y los colores forzados de un Windows real, en las páginas del paso 2.
 6. En un navegador real, volver con Atrás a una página guardada en la caché de ida y vuelta (la ficha después de agregar un producto y «Cotizar mi lista» después de cambiar la lista en otra pestaña), y en Safari escribir rápido en la búsqueda del catálogo para ver si la dirección de la página se queda atrás.
 7. En un teléfono real, en «Cotizar mi lista»: escribir una cantidad no válida en un renglón y, sin salir del campo, tocar un control de más abajo («Quitar» de otro renglón, «Vaciar cotización», un envío). El control debe responder al primer toque, y «+» de otro renglón, a cada toque seguido; después, un toque en otro control de ese renglón o del siguiente debe caer donde se ve ([`diseno.md`](diseno.md#168-estados)). Y dos toques seguidos en «Quitar», «Unirlos», «Vaciar cotización», «Deshacer» y «Quitarlo de mi cotización»: el segundo no debe abrir otra página ni cambiar otro renglón ([`diseno.md`](diseno.md#164-cotizar-mi-lista)). En una computadora, lo mismo con el ratón, con el doble clic del sistema en su ajuste más lento y con el botón de en medio. Solo se probó en Chromium, con ratón y con el tacto emulado.
+
+**Abrir a mano los enlaces que salen del sitio.** Ninguna comprobación abre los enlaces externos (el verificador de enlaces dice cuántos no consultó): antes de publicar se abren los catálogos y los sitios de los fabricantes de cada marca, los documentos de cada ficha y la página del crédito de cada foto, y se corrige o se quita el que ya no responda ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#10-el-catálogo-del-fabricante-de-una-marca)).
 
 **La página de privacidad la revisa la empresa.** El texto de `/privacidad/` dice qué guarda el navegador y qué no sale de él, pero es un borrador y no es el aviso de privacidad de la empresa: la empresa lo revisa, y entrega su aviso, antes de publicar.
 

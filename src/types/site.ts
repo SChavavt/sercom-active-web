@@ -5,11 +5,17 @@
 /** `production`: solo lo aprobado. `preview`: además categorías en borrador y productos de ejemplo. */
 export type SiteMode = 'production' | 'preview';
 
-/** Enlace al sitio del fabricante de una marca. */
+/** Clase de un enlace de marca: el catálogo en PDF, el catálogo en línea o el sitio del fabricante. */
+export type ManufacturerLinkKind = 'pdf' | 'online' | 'site';
+
+/** Enlace de una marca al sitio de su fabricante: su catálogo en PDF, su catálogo en línea o su sitio. */
 export interface ManufacturerLink {
-  /** Siempre «Sitio del fabricante». */
+  /** Una de `MANUFACTURER_LINK_LABELS` (`site-data-core.mjs`), la que corresponde a `kind`. */
   readonly label: string;
   readonly url: string;
+  readonly kind: ManufacturerLinkKind;
+  /** Solo en el PDF: la edición y el tamaño que se conocen («Edición 2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
+  readonly detail: string | null;
 }
 
 export interface PublicCategory {
@@ -33,8 +39,10 @@ export interface PublicBrand {
   readonly name: string;
   /** `supplier`: proveedor (hoy Espomega); no tiene productos propios. */
   readonly kind: 'brand' | 'supplier';
-  /** Cero o un enlace. */
+  /** De cero a tres enlaces, en este orden: catálogo en PDF, catálogo en línea y sitio del fabricante. */
   readonly manufacturerLinks: readonly ManufacturerLink[];
+  /** `true` si la marca tiene un catálogo del fabricante (en PDF o en línea): sale en «Catálogos de los fabricantes». */
+  readonly hasCatalog: boolean;
   /** Productos públicos de la marca en el modo actual (los ejemplos no cuentan: no tienen marca real). */
   readonly productCount: number;
   /** `/marcas/{id}/` */
@@ -44,13 +52,34 @@ export interface PublicBrand {
 export interface PublicVariant {
   readonly id: string;
   readonly label: string;
-  /** Código del fabricante para la variante. */
+  /** Código del fabricante para la variante; cadena vacía si la variante no tiene código propio. */
   readonly code: string;
 }
 
-export interface PublicImage {
-  readonly url: string;
+/**
+ * Fotografía de un producto, en una de dos formas: un archivo de `src/assets/productos/` que la compilación optimiza
+ * (`file`; el ancho y el alto se leen del archivo) o una dirección que la página usa tal cual, con su ancho y alto
+ * (`url`). La dibuja `ProductPhoto.astro`.
+ */
+export type PublicImage = PublicFileImage | PublicUrlImage;
+
+export interface PublicFileImage {
+  /** Nombre del archivo en `src/assets/productos/`, sin carpeta. */
+  readonly file: string;
   readonly alt: string;
+  /** Página `https` del fabricante de donde viene la foto: la ficha la enlaza en el crédito bajo la foto. */
+  readonly sourceUrl: string;
+}
+
+export interface PublicUrlImage {
+  /** Dirección absoluta `https`. */
+  readonly url: string;
+  /** Ancho y alto de la foto en píxeles. */
+  readonly width: number;
+  readonly height: number;
+  readonly alt: string;
+  /** Página `https` del fabricante de donde viene la foto: la ficha la enlaza en el crédito bajo la foto. */
+  readonly sourceUrl: string;
 }
 
 export interface PublicDocument {
@@ -77,7 +106,9 @@ export interface PublicProduct {
   readonly characteristics: readonly string[];
   readonly saleUnit: string;
   readonly variants: readonly PublicVariant[];
-  /** `null` cuando no hay fotografía (todos los ejemplos): la página muestra el icono de la categoría. */
+  /** Normas del fabricante, solo su texto, en el orden de los datos; lista vacía sin normas y en todos los ejemplos. */
+  readonly standards: readonly string[];
+  /** `null` cuando no hay fotografía (una ficha aprobada sin foto y todos los ejemplos): la página muestra el icono de la categoría. */
   readonly image: PublicImage | null;
   readonly documents: readonly PublicDocument[];
   /** `true` solo en los ejemplos de la vista previa: la página debe mostrar la etiqueta «Ejemplo». */
@@ -148,7 +179,8 @@ export interface BrandRecord {
   id: string;
   name: string;
   kind: 'brand' | 'supplier';
-  manufacturerLinks: { label: string; url: string }[];
+  /** De cero a tres; solo el PDF lleva `edition` y `megabytes` (los valida `validateBrands`). */
+  manufacturerLinks: { label: string; url: string; edition?: string; megabytes?: number }[];
 }
 
 /** Registro de `src/data/preview/example-products.json`. No es una ficha del catálogo. */
@@ -170,7 +202,7 @@ export interface ExampleProductRecord {
 
 /** Campos de un producto que usa la búsqueda. */
 export type SearchableProduct = Pick<PublicProduct, 'name' | 'brandName' | 'code' | 'categoryNames'> & {
-  readonly variants: readonly Pick<PublicVariant, 'code'>[];
+  readonly variants: readonly Pick<PublicVariant, 'code' | 'label'>[];
 };
 
 /** Rutas del sitio. Todas terminan en diagonal. */
@@ -185,6 +217,8 @@ export interface SiteRoutes {
   category(id: string): string;
   brand(id: string): string;
   product(id: string): string;
+  /** `/marcas/#catalogos`: la sección «Catálogos de los fabricantes» de la lista de marcas. */
+  readonly brandCatalogs: string;
   /** `/catalogo/?q=...`; sin consulta devuelve `/catalogo/`. */
   search(query?: string | null): string;
 }

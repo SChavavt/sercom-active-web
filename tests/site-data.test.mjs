@@ -1,9 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createSiteData, DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE, routes } from '../src/lib/site-data-core.mjs';
-import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
+import { searchText } from '../src/lib/search.mjs';
+import { allKeys, allStrings, emptiedCatalog, loadProjectData, publicCatalog } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
+// Las pruebas de los ejemplos, de los modos y de una ficha sintética usan el catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha): dan lo mismo con cualquier catálogo válido. Las que tratan de los
+// datos reales comparan con lo que se deriva de ellos (`publicCatalog`), nunca con una cifra escrita a mano.
+const emptied = emptiedCatalog(catalog);
+const real = publicCatalog(catalog);
 const categoryIds = catalog.categories.map(category => category.id);
 const brandIds = brands.map(brand => brand.id);
 // Los dieciséis ejemplos de los listados; el último del archivo es el ejemplo de producto retirado (solo tiene su página).
@@ -13,26 +19,39 @@ const exampleIds = examples.filter(example => example.retired !== true).map(exam
 const RETIRED_EXAMPLE_ID = 'ejemplo-producto-retirado';
 
 const CATEGORY_KEYS = ['id', 'name', 'shortName', 'summary', 'isDraft', 'productCount', 'url'];
-const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'productCount', 'url'];
-const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'image', 'documents', 'isExample'];
+const BRAND_KEYS = ['id', 'name', 'kind', 'manufacturerLinks', 'hasCatalog', 'productCount', 'url'];
+const PRODUCT_KEYS = ['id', 'url', 'name', 'brandId', 'brandName', 'code', 'categoryIds', 'categoryNames', 'summary', 'characteristics', 'saleUnit', 'variants', 'standards', 'image', 'documents', 'isExample'];
+/** Las rutas de las claves `key` que no están dentro de un objeto `image` (por ejemplo, la fuente de una norma). */
+function keysOutsideImage(value, key, path = '') {
+  if (Array.isArray(value)) return value.flatMap((child, index) => keysOutsideImage(child, key, `${path}[${index}]`));
+  if (!value || typeof value !== 'object') return [];
+  return Object.entries(value).flatMap(([name, child]) => [
+    ...(name === key && !path.endsWith('.image') ? [`${path}.${name}`] : []),
+    ...keysOutsideImage(child, key, `${path}.${name}`),
+  ]);
+}
 // Nombres de campos internos que nunca deben verse en los datos públicos.
-const INTERNAL_KEYS = ['approval', 'source', 'status', 'sourceUrl', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
+// `sourceUrl` solo llega como la página de donde viene una foto (`image.sourceUrl`, el crédito bajo la foto): lo
+// revisa `keysOutsideImage`.
+const INTERNAL_KEYS = ['approval', 'source', 'status', 'usageConfirmed', 'supplyConfirmed', 'checkedOn', 'by', 'on', 'model', 'description', 'manufacturerCode', 'schemaVersion', 'entity_id', 'entity_type', 'resources', 'verification', 'next_action'];
 
 const production = () => createSiteData({ mode: 'production', catalog, brands, exampleProducts: examples });
 const preview = () => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+// Los mismos modos sobre el catálogo vaciado: solo los ejemplos y las diez categorías en borrador.
+const emptyPreview = () => createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts: examples });
 const printable = site => ({ mode: site.mode, isPreview: site.isPreview, categories: site.categories, brands: site.brands, products: site.products, paths: site.paths });
 
 // Catálogo sintético de prueba: la categoría «manos» aprobada y una ficha aprobada con todos sus datos internos.
 // Nunca se importa en el sitio.
 function syntheticCatalog(change = () => {}) {
-  const copy = structuredClone(catalog);
+  const copy = emptiedCatalog(catalog);
   copy.categories[0].status = 'approved';
   copy.products.push({
     id: 'test-001', brandId: 'ansell', model: 'TEST-001/A', name: 'Producto sintético de prueba', categoryIds: ['manos'], status: 'approved',
     description: 'No es un artículo comercial.', saleUnit: 'pieza',
     characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'],
     variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-001/A-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
     approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
@@ -41,32 +60,72 @@ function syntheticCatalog(change = () => {}) {
   return copy;
 }
 
-test('producción con los datos reales: ninguna categoría en borrador, ningún producto y las diecinueve marcas', () => {
+/**
+ * Lo que un sitio armado con el catálogo real muestra, comparado con lo que se deriva de los mismos datos: en
+ * producción, exactamente las categorías y las fichas aprobadas; en la vista previa, además las categorías en borrador
+ * y los ejemplos. Ninguna ficha en borrador, en revisión o retirada está en una lista, y un retirado que fue público
+ * solo tiene su registro (su página). Sirve para `createSiteData` y para el módulo `site-data.mjs`.
+ */
+function assertRealData(site) {
+  const isPreview = site.isPreview;
+  const categoryStatus = new Map(catalog.categories.map(category => [category.id, category.status]));
+  const visibleCategoryIds = isPreview ? categoryIds : real.approvedCategoryIds;
+  const listedIds = isPreview ? [...real.approvedProductIds, ...exampleIds] : real.approvedProductIds;
+  assert.deepEqual(site.paths, { categoryIds: visibleCategoryIds, brandIds, productIds: listedIds });
+  assert.deepEqual(site.categories.map(category => [category.id, category.isDraft]), visibleCategoryIds.map(id => [id, categoryStatus.get(id) !== 'approved']));
+  assert.deepEqual(site.products.map(product => product.id), listedIds);
+  assert.deepEqual(site.products.map(product => product.isExample), listedIds.map(id => exampleIds.includes(id)));
+  assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
+  assert.deepEqual(site.retiredProducts.map(product => product.id), isPreview ? [...real.publicRetiredIds, RETIRED_EXAMPLE_ID] : real.publicRetiredIds);
+  // Nada sin aprobar está en una lista; un retirado público solo tiene su registro.
+  for (const id of real.unlistedProductIds) assert.equal(site.getProduct(id), undefined, id);
+  for (const id of real.publicRetiredIds) assert.equal(site.getRetiredProduct(id)?.id, id);
+  if (!isPreview) for (const id of exampleIds) assert.equal(site.getProduct(id), undefined, id);
+  // Conteos y listados por categoría y por marca: solo lo listado (los ejemplos no tienen marca real).
+  for (const category of site.categories) {
+    const expected = site.products.filter(product => product.categoryIds.includes(category.id)).map(product => product.id);
+    assert.deepEqual(site.productsByCategory(category.id).map(product => product.id), expected, category.id);
+    assert.equal(category.productCount, expected.length, category.id);
+  }
+  for (const brand of site.brands) {
+    const expected = real.approvedProducts.filter(product => product.brandId === brand.id).map(product => product.id);
+    assert.deepEqual(site.productsByBrand(brand.id).map(product => product.id), expected, brand.id);
+    assert.equal(brand.productCount, expected.length, brand.id);
+  }
+  const featured = site.featuredProducts().map(product => product.id);
+  assert.equal(featured.length, Math.min(8, listedIds.length));
+  assert.ok(featured.every(id => listedIds.includes(id)));
+}
+
+test('producción con los datos reales: solo las categorías y las fichas aprobadas, y las quince marcas', () => {
   const site = production();
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
-  assert.deepEqual(site.categories, []);
-  assert.deepEqual(site.products, []);
-  assert.deepEqual(site.brands.map(brand => brand.id), brandIds);
-  assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
-  assert.deepEqual(site.featuredProducts(), []);
-  assert.equal(site.getCategory('manos'), undefined);
-  assert.equal(site.getProduct(exampleIds[0]), undefined);
-  assert.deepEqual(site.productsByCategory('manos'), []);
-  assert.deepEqual(site.productsByBrand('ansell'), []);
-  assert.ok(site.brands.every(brand => brand.productCount === 0));
+  assertRealData(site);
+  assert.ok(site.products.every(product => product.isExample === false));
+});
+
+test('vista previa con los datos reales: lo de producción, las categorías en borrador y los ejemplos', () => {
+  const site = preview();
+  assert.equal(site.mode, 'preview');
+  assert.equal(site.isPreview, true);
+  assertRealData(site);
+  // Las fichas reales van antes que los ejemplos.
+  assert.deepEqual(site.products.filter(product => !product.isExample).map(product => product.id), real.approvedProductIds);
 });
 
 test('producción ignora los ejemplos aunque se le entreguen, incluso si son inválidos', () => {
-  const text = JSON.stringify(printable(production()));
+  const text = JSON.stringify(printable(createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts: examples })));
   assert.doesNotMatch(text, /EJ-\d|ejemplo/i);
-  const site = createSiteData({ mode: 'production', catalog, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] });
+  const site = createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] });
   assert.deepEqual(site.products, []);
-  assert.deepEqual(createSiteData({ mode: 'production', catalog, brands }).products, []);
+  assert.deepEqual(createSiteData({ mode: 'production', catalog: emptied, brands }).products, []);
+  // Con el catálogo real, lo mismo con ejemplos que sin ellos.
+  assert.deepEqual(createSiteData({ mode: 'production', catalog, brands, exampleProducts: [{ id: 'no-es-un-ejemplo-valido' }] }).products, production().products);
 });
 
-test('vista previa con los datos reales: diez categorías en borrador y dieciséis ejemplos', () => {
-  const site = preview();
+test('vista previa sin fichas reales: diez categorías en borrador y dieciséis ejemplos', () => {
+  const site = emptyPreview();
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.deepEqual(site.categories.map(category => category.id), categoryIds);
@@ -98,11 +157,11 @@ test('vista previa con los datos reales: diez categorías en borrador y diecisé
 });
 
 test('las proyecciones tienen exactamente los campos públicos acordados', () => {
-  const site = preview();
+  const site = emptyPreview();
   for (const category of site.categories) assert.deepEqual(Object.keys(category), CATEGORY_KEYS);
   for (const brand of site.brands) {
     assert.deepEqual(Object.keys(brand), BRAND_KEYS);
-    for (const link of brand.manufacturerLinks) assert.deepEqual(Object.keys(link), ['label', 'url']);
+    for (const link of brand.manufacturerLinks) assert.deepEqual(Object.keys(link), ['label', 'url', 'kind', 'detail']);
   }
   for (const product of site.products) {
     assert.deepEqual(Object.keys(product), PRODUCT_KEYS);
@@ -116,10 +175,17 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
   });
   assert.deepEqual(site.getBrand('ansell'), {
     id: 'ansell', name: 'Ansell', kind: 'brand',
-    manufacturerLinks: [{ label: 'Sitio del fabricante', url: 'https://www.ansell.com/mx/es/industrial' }],
-    productCount: 0, url: '/marcas/ansell/',
+    manufacturerLinks: [
+      { label: 'Catálogo del fabricante (PDF)', url: 'https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0', kind: 'pdf', detail: 'Edición 2023' },
+      { label: 'Sitio del fabricante', url: 'https://www.ansell.com/mx/es/industrial', kind: 'site', detail: null },
+    ],
+    hasCatalog: true, productCount: 0, url: '/marcas/ansell/',
   });
-  assert.deepEqual(site.getBrand('espomega'), { id: 'espomega', name: 'Espomega', kind: 'supplier', manufacturerLinks: [], productCount: 0, url: '/marcas/espomega/' });
+  assert.deepEqual(site.getBrand('espomega'), { id: 'espomega', name: 'Espomega', kind: 'supplier', manufacturerLinks: [], hasCatalog: false, productCount: 0, url: '/marcas/espomega/' });
+  // Una marca con solo su sitio no tiene catálogo: Ansell sin su catálogo en PDF.
+  const siteOnly = structuredClone(brands);
+  siteOnly.find(brand => brand.id === 'ansell').manufacturerLinks.splice(0, 1);
+  assert.equal(createSiteData({ mode: 'preview', catalog: emptied, brands: siteOnly, exampleProducts: examples }).getBrand('ansell').hasCatalog, false);
   assert.deepEqual(site.getProduct('ejemplo-guante-recubierto'), {
     id: 'ejemplo-guante-recubierto', url: '/productos/ejemplo-guante-recubierto/', name: 'Guante de ejemplo recubierto',
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1001', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
@@ -130,12 +196,47 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
       { id: 'talla-7', label: 'Talla 7', code: 'EJ-1001-7' }, { id: 'talla-8', label: 'Talla 8', code: 'EJ-1001-8' },
       { id: 'talla-9', label: 'Talla 9', code: 'EJ-1001-9' }, { id: 'talla-10', label: 'Talla 10', code: 'EJ-1001-10' },
     ],
-    image: null, documents: [], isExample: true,
+    standards: [], image: null, documents: [], isExample: true,
   });
 });
 
+test('cada enlace de marca llega con su clase y, en el PDF, la edición y el tamaño en una línea', () => {
+  const PDF = 'Catálogo del fabricante (PDF)';
+  const ONLINE = 'Catálogo en línea del fabricante';
+  const SITE = 'Sitio del fabricante';
+  // Marcas ficticias de prueba sobre la lista real: los mismos ids, con otros enlaces.
+  const linksOf = links => {
+    const list = structuredClone(brands);
+    list[0].manufacturerLinks = links;
+    return createSiteData({ mode: 'production', catalog: emptied, brands: list }).brands[0];
+  };
+  const pdf = details => linksOf([{ label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', ...details }]).manufacturerLinks[0];
+  assert.deepEqual(pdf({ edition: '2026 v2', megabytes: 49 }), { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', kind: 'pdf', detail: 'Edición 2026 v2 · 49 MB' });
+  assert.equal(pdf({ edition: '2026 v2' }).detail, 'Edición 2026 v2');
+  assert.equal(pdf({ megabytes: 49 }).detail, '49 MB');
+  assert.equal(pdf({}).detail, null);
+  // Una edición que ya empieza con la palabra «edición», en cualquier forma de mayúsculas, se escribe como está.
+  assert.equal(pdf({ edition: 'Edición 2026 versión 2.1', megabytes: 12 }).detail, 'Edición 2026 versión 2.1 · 12 MB');
+  assert.equal(pdf({ edition: 'edición 3' }).detail, 'edición 3');
+  assert.equal(pdf({ edition: 'EDICIÓN 2025' }).detail, 'EDICIÓN 2025');
+  // Solo la palabra entera: «Ediciones» no es «edición».
+  assert.equal(pdf({ edition: 'Ediciones 2026' }).detail, 'Edición Ediciones 2026');
+  const all = linksOf([
+    { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', edition: '2026' },
+    { label: ONLINE, url: 'https://fabricante.invalid/catalogos/' },
+    { label: SITE, url: 'https://fabricante.invalid/' },
+  ]);
+  assert.deepEqual(all.manufacturerLinks.map(link => [link.kind, link.detail]), [['pdf', 'Edición 2026'], ['online', null], ['site', null]]);
+  assert.equal(all.hasCatalog, true);
+  assert.equal(linksOf([{ label: ONLINE, url: 'https://fabricante.invalid/catalogos/' }]).hasCatalog, true);
+  assert.equal(linksOf([{ label: SITE, url: 'https://fabricante.invalid/' }]).hasCatalog, false);
+  assert.equal(linksOf([]).hasCatalog, false);
+  // La edición y el tamaño no llegan a las páginas como campos: solo en `detail`.
+  assert.ok(!allKeys(all).includes('edition') && !allKeys(all).includes('megabytes'));
+});
+
 test('búsquedas por id, por categoría y por marca, y selección de destacados', () => {
-  const site = preview();
+  const site = emptyPreview();
   categoryIds.forEach((id, index) => {
     assert.equal(site.getCategory(id)?.id, id);
     assert.deepEqual(site.productsByCategory(id).map(product => product.categoryIds), Array(EXAMPLES_PER_CATEGORY[index]).fill([id]));
@@ -168,7 +269,8 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
     brandId: 'ansell', brandName: 'Ansell', code: 'TEST-001/A', categoryIds: ['manos'], categoryNames: ['Protección de manos'],
     summary: 'No es un artículo comercial.', characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'], saleUnit: 'pieza',
     variants: [{ id: 'talla-9', label: 'Talla 9', code: 'TEST-001/A-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba' },
+    standards: [],
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' },
     documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
     isExample: false,
   }]);
@@ -177,12 +279,15 @@ test('una ficha aprobada llega por getPublishedProducts con la forma pública y 
   assert.equal(site.getBrand('3m')?.productCount, 0);
   assert.deepEqual(site.featuredProducts().map(product => product.id), ['test-001']);
 
-  // Nada de lo que se puede imprimir lleva aprobación, fuente, estado ni datos del registro.
+  // Nada de lo que se puede imprimir lleva aprobación, fuente, estado ni datos del registro; de la foto, solo la página
+  // de donde viene, como image.sourceUrl.
   const data = JSON.parse(JSON.stringify(printable(site)));
   const keys = new Set(allKeys(data));
   for (const key of INTERNAL_KEYS) assert.ok(!keys.has(key), `campo interno publicado: ${key}`);
+  assert.deepEqual(keysOutsideImage(data, 'sourceUrl'), []);
   const text = allStrings(data).join(' | ');
-  assert.doesNotMatch(text, /Revisor de prueba|2026-11-18|example\.invalid\/source|example\.invalid\/test(?!\.png)|approved|draft/);
+  assert.equal(text.split('https://example.invalid/source').length - 1, 1, 'la página de donde viene la foto, una vez');
+  assert.doesNotMatch(text, /Revisor de prueba|2026-11-18|example\.invalid\/test(?!\.png)|approved|draft/);
 });
 
 test('vista previa con una ficha aprobada: la ficha real va primero y los ejemplos se suman', () => {
@@ -196,6 +301,61 @@ test('vista previa con una ficha aprobada: la ficha real va primero y los ejempl
   assert.deepEqual(site.featuredProducts(11).at(-1)?.code, 'EJ-1001');
 });
 
+test('la foto de una ficha llega a la forma pública como { file, alt } o { url, width, height, alt }, sin su fuente ni su uso', () => {
+  const fromFile = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.image = { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true };
+  }) });
+  assert.deepEqual(fromFile.getProduct('test-001')?.image, { file: 'producto-sintetico-de-prueba.jpg', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' });
+  const fromUrl = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.deepEqual(fromUrl.getProduct('test-001')?.image, { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source' });
+  // Los ejemplos de la vista previa siguen sin foto.
+  const preview = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.ok(preview.products.filter(product => product.isExample).every(product => product.image === null));
+});
+
+test('una ficha aprobada sin foto llega a la forma pública con image: null y sin datos internos', () => {
+  for (const mode of ['production', 'preview']) {
+    const site = createSiteData({ mode, brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => { delete product.image; }) });
+    const product = site.getProduct('test-001');
+    assert.equal(product?.image, null, mode);
+    assert.deepEqual(Object.keys(product ?? {}), PRODUCT_KEYS, mode);
+    assert.deepEqual(site.productsByCategory('manos').map(item => item.id)[0], 'test-001', mode);
+    const data = JSON.parse(JSON.stringify(printable(site)));
+    const keys = new Set(allKeys(data));
+    for (const key of INTERNAL_KEYS) assert.ok(!keys.has(key), `${mode}: campo interno publicado: ${key}`);
+    assert.doesNotMatch(allStrings(data).join(' | '), /Revisor de prueba|2026-11-18|example\.invalid\/(?:source|test)/, mode);
+  }
+});
+
+test('las normas de una ficha llegan a la forma pública como su texto, sin su fuente; un ejemplo no tiene normas', () => {
+  const site = createSiteData({ mode: 'preview', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.standards = [
+      { text: 'Norma sintética 100', sourceUrl: 'https://example.invalid/norma-a' },
+      { text: 'Norma sintética 200 nivel 3', sourceUrl: 'https://example.invalid/norma-b' },
+    ];
+  }) });
+  assert.deepEqual(site.getProduct('test-001')?.standards, ['Norma sintética 100', 'Norma sintética 200 nivel 3']);
+  assert.ok(Object.isFrozen(site.getProduct('test-001')?.standards));
+  // Las normas se muestran en la ficha; la búsqueda del catálogo no las lee.
+  assert.doesNotMatch(searchText(site.getProduct('test-001')), /norma/);
+  assert.ok(site.products.filter(product => product.isExample).every(product => product.standards.length === 0));
+  const data = JSON.parse(JSON.stringify(printable(site)));
+  assert.doesNotMatch(allStrings(data).join(' | '), /norma-a|norma-b/);
+  assert.deepEqual(keysOutsideImage(data, 'sourceUrl'), []);
+  // Sin normas, la lista está vacía.
+  const without = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog() });
+  assert.deepEqual(without.getProduct('test-001')?.standards, []);
+});
+
+test('una variante sin código propio llega a la forma pública con el código vacío', () => {
+  const site = createSiteData({ mode: 'production', brands, exampleProducts: examples, catalog: syntheticCatalog((_, product) => {
+    product.variants = [{ id: 'chica', label: 'Chica' }, { id: 'mediana', label: 'Mediana', manufacturerCode: 'TEST-001/A-M' }, { id: 'grande', label: 'Grande' }];
+  }) });
+  assert.deepEqual(site.getProduct('test-001')?.variants, [
+    { id: 'chica', label: 'Chica', code: '' }, { id: 'mediana', label: 'Mediana', code: 'TEST-001/A-M' }, { id: 'grande', label: 'Grande', code: '' },
+  ]);
+});
+
 test('lo que no está aprobado no se publica, y un catálogo inválido detiene la compilación', () => {
   const build = (change, mode = 'production') => createSiteData({ mode, catalog: syntheticCatalog(change), brands, exampleProducts: examples });
   for (const status of ['draft', 'in_review', 'retired']) {
@@ -207,7 +367,7 @@ test('lo que no está aprobado no se publica, y un catálogo inválido detiene l
   assert.throws(() => build((_, product) => { product.brandId = 'espomega'; }), /un proveedor no es una marca/);
   assert.throws(() => build((_, product) => { product.brandId = 'marca-desconocida'; }), /la marca no está en el alcance permitido/);
   assert.throws(() => build((_, product) => { product.approval.supplyConfirmed = false; }), /falta aprobación comercial/);
-  assert.throws(() => build((_, product) => { product.image.usageConfirmed = false; }), /imagen verificable/);
+  assert.throws(() => build((_, product) => { product.image.usageConfirmed = false; }), /image\.usageConfirmed: el uso de la foto no está confirmado/);
   assert.throws(() => build((_, product) => { product.precio = 10; }), /campo comercial no permitido/);
   assert.throws(() => build((_, product) => { product.id = 'ejemplo-guante-recubierto'; }), /reservado para los ejemplos/);
 });
@@ -221,14 +381,14 @@ test('createSiteData rechaza modos, marcas y ejemplos inválidos', () => {
   broken[0].brandName = 'Ansell';
   assert.throws(() => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: broken }), /la marca debe ser «Marca de ejemplo»/);
   assert.throws(() => createSiteData({ mode: 'preview', catalog, brands, exampleProducts: null }), /debe ser una lista/);
-  // Sin ejemplos, la vista previa solo muestra las categorías.
-  const empty = createSiteData({ mode: 'preview', catalog, brands });
+  // Sin ejemplos ni fichas reales, la vista previa solo muestra las categorías.
+  const empty = createSiteData({ mode: 'preview', catalog: emptied, brands });
   assert.equal(empty.categories.length, 10);
   assert.deepEqual(empty.products, []);
 });
 
 test('los datos devueltos están congelados y no comparten memoria con los archivos de origen', () => {
-  const site = preview();
+  const site = emptyPreview();
   assert.ok(Object.isFrozen(site) && Object.isFrozen(site.products) && Object.isFrozen(site.products[0]) && Object.isFrozen(site.products[0].variants[0]));
   assert.ok(Object.isFrozen(site.categories[0]) && Object.isFrozen(site.brands[0].manufacturerLinks) && Object.isFrozen(site.paths.productIds));
   assert.throws(() => { site.products.push(site.products[0]); }, TypeError);
@@ -250,6 +410,7 @@ test('rutas del sitio: todas con diagonal final y la consulta codificada', () =>
   assert.equal(routes.category('manos'), '/categorias/manos/');
   assert.equal(routes.brand('mcr-safety'), '/marcas/mcr-safety/');
   assert.equal(routes.product('ejemplo-orejera'), '/productos/ejemplo-orejera/');
+  assert.equal(routes.brandCatalogs, '/marcas/#catalogos');
   assert.equal(routes.search('guante 37-175 señalización'), '/catalogo/?q=guante%2037-175%20se%C3%B1alizaci%C3%B3n');
   assert.equal(routes.search('  '), '/catalogo/');
   assert.equal(routes.search(), '/catalogo/');
@@ -258,7 +419,7 @@ test('rutas del sitio: todas con diagonal final y la consulta codificada', () =>
 });
 
 test('textos fijos de la vista previa', () => {
-  assert.equal(PREVIEW_NOTICE, 'Vista previa para revisión. Los productos que aparecen son ejemplos de diseño, no artículos reales.');
+  assert.equal(PREVIEW_NOTICE, 'Vista previa para revisión. Los productos marcados «Ejemplo» son ejemplos de diseño, no artículos reales.');
   assert.equal(EXAMPLE_TAG, 'Ejemplo');
 });
 
@@ -272,41 +433,36 @@ test('aviso de sitio en preparación de la compilación de producción, hasta el
 // Astro define la constante __CATALOG_PREVIEW__ al compilar; aquí se define a mano antes de cargar el módulo.
 const EXPORTS = ['DEVELOPMENT_NOTICE', 'EXAMPLE_TAG', 'PREVIEW_NOTICE', 'brands', 'categories', 'featuredProducts', 'getBrand', 'getCategory', 'getProduct', 'getRetiredProduct', 'isPreview', 'mode', 'paths', 'products', 'productsByBrand', 'productsByCategory', 'retiredProducts', 'routes'];
 
-test('site-data.mjs en producción: sin ejemplos ni categorías en borrador', async () => {
+test('site-data.mjs en producción: solo las categorías y las fichas aprobadas, sin ejemplos', async () => {
   globalThis.__CATALOG_PREVIEW__ = false;
   const site = await import('../src/lib/site-data.mjs?produccion');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
   assert.equal(site.DEVELOPMENT_NOTICE, DEVELOPMENT_NOTICE);
   assert.equal(site.mode, 'production');
   assert.equal(site.isPreview, false);
-  assert.equal(site.categories.length, 0);
-  assert.equal(site.products.length, 0);
-  assert.equal(site.brands.length, 19);
-  assert.deepEqual(site.paths, { categoryIds: [], brandIds, productIds: [] });
-  assert.deepEqual(site.featuredProducts(), []);
+  assert.equal(site.brands.length, 15);
+  assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera'), undefined);
-  assert.deepEqual(site.retiredProducts, []);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID), undefined);
 });
 
-test('site-data.mjs en vista previa: diez categorías y dieciséis ejemplos', async () => {
+test('site-data.mjs en vista previa: lo de producción, las diez categorías y los dieciséis ejemplos', async () => {
   globalThis.__CATALOG_PREVIEW__ = true;
   const site = await import('../src/lib/site-data.mjs?vista-previa');
   assert.deepEqual(Object.keys(site).sort(), EXPORTS);
   assert.equal(site.mode, 'preview');
   assert.equal(site.isPreview, true);
   assert.equal(site.categories.length, 10);
-  assert.equal(site.products.length, 16);
-  assert.equal(site.brands.length, 19);
-  assert.deepEqual(site.paths, { categoryIds, brandIds, productIds: exampleIds });
+  assert.equal(site.products.filter(product => product.isExample).length, 16);
+  assert.equal(site.brands.length, 15);
+  assertRealData(site);
   assert.equal(site.getProduct('ejemplo-orejera')?.code, 'EJ-5001');
-  assert.equal(site.getCategory('auditiva')?.productCount, 1);
-  assert.deepEqual(site.productsByCategory('soldadura').map(product => product.code), ['EJ-1101']);
+  // Los ejemplos de cada categoría, en su orden, después de las fichas reales que haya.
+  assert.deepEqual(site.productsByCategory('soldadura').filter(product => product.isExample).map(product => product.code), ['EJ-1101']);
   assert.equal(site.featuredProducts(3).length, 3);
   assert.equal(site.routes.catalog, '/catalogo/');
-  assert.deepEqual(site.retiredProducts.map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
+  assert.deepEqual(site.retiredProducts.filter(product => product.isExample).map(product => [product.id, product.code, product.isExample]), [[RETIRED_EXAMPLE_ID, 'EJ-1002', true]]);
   assert.equal(site.getRetiredProduct(RETIRED_EXAMPLE_ID)?.categoryIds[0], 'manos');
-  assert.equal(site.getCategory('manos')?.productCount, 3);
   assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.brandName, 'Marca de ejemplo Beta');
 });
 

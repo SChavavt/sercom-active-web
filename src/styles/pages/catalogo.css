@@ -1,8 +1,9 @@
 /* ==========================================================================
-   Páginas de listado: /catalogo/, /categorias/{id}/ y /marcas/{id}/
+   Páginas de listado: /catalogo/, /categorias/{id}/ y /marcas/{id}/, y la lista de marcas, /marcas/
    Una sola hoja para las tres, que comparten piezas (CatalogSearch, CatalogListing, CatalogNav,
-   CatalogGrid), para que no se separen. La importan las tres páginas. Los filtros combinables (CatalogFilters) y
-   el estado sin resultados con dos acciones son solo del catálogo.
+   CatalogGrid), para que no se separen. La importan las tres páginas y /marcas/, que solo usa su lista de catálogos
+   de los fabricantes (3.2). Los filtros combinables (CatalogFilters) y el estado sin resultados con dos acciones son
+   solo del catálogo.
    Misma lámina que la portada: celdas blancas sobre el azul, filetes por huecos de 1 px, esquinas rectas,
    solo variables de tokens.css y fonts.css. Puntos de corte: 1359, 1099, 699 (docs/diseno.md).
 
@@ -256,7 +257,11 @@
 
 /* 3. Piezas propias de una página -------------------------------------------------------------------------- */
 
-/* 3.1 Marca: enlace «Sitio del fabricante» en la columna lateral del título (sobre la fila de WhatsApp si hay productos) */
+/* 3.1 Marca: los enlaces del fabricante en la columna lateral del título (sobre la fila de WhatsApp si hay productos).
+   El catálogo en PDF y el catálogo en línea son filas de acción (ActionRow); el PDF lleva su edición y su tamaño en una
+   segunda línea pequeña dentro de la fila. «Sitio del fabricante» es un enlace de texto en su propia celda. */
+.catalog-brand__detail { display: block; margin-top: var(--s-1); color: var(--grey-700); font-weight: 400; }
+.catalog-brand__catalog { padding-block: var(--s-3); }
 .catalog-brand__links {
   display: flex;
   flex-direction: column;
@@ -267,7 +272,19 @@
   background: var(--surface);
 }
 
-/* 3.2 Categoría: «Marcas en esta categoría» (solo con productos de marcas reales), sobre la división 3 + 9 */
+/* 3.2 Marcas (/marcas/): «Catálogos de los fabricantes». Una fila por marca con catálogo: el nombre en 4 columnas y sus
+   catálogos en 8, celdas blancas sobre el filete; en el celular el nombre va sobre sus enlaces. Un enlace que no cabe
+   en la fila (letra agrandada, celular angosto) pasa a otro renglón dentro de su enlace. */
+.catalog-sources { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--line); }
+.catalog-sources__brand { display: flex; align-items: center; padding: var(--s-4) var(--pad); }
+.catalog-sources__name { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); font-size: 1.125rem; font-weight: 700; line-height: 1.2; text-decoration: none; overflow-wrap: anywhere; }
+.catalog-sources__name:hover { color: var(--blue); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.catalog-sources__links { display: flex; flex-direction: column; justify-content: center; padding: var(--s-3) var(--pad); }
+.catalog-sources__link { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s-4); }
+.catalog-sources__link .more { max-width: 100%; white-space: normal; }
+.catalog-sources__detail { color: var(--grey-700); }
+
+/* 3.3 Categoría: «Marcas en esta categoría» (solo con productos de marcas reales), sobre la división 3 + 9 */
 .catalog-related__head { display: flex; align-items: center; padding: var(--s-5) var(--pad); background: var(--surface); }
 .catalog-related__title { color: var(--blue); }
 .catalog-related__list { display: flex; flex-wrap: wrap; align-items: center; column-gap: var(--s-7); padding: var(--s-2) var(--pad); background: var(--surface); }
@@ -327,6 +344,11 @@
 }
 
 @media (max-width: 699px) {
+  /* «Catálogos de los fabricantes»: el nombre va sobre sus enlaces, en la misma celda blanca (sin filete entre los dos),
+     y el filete separa una marca de la siguiente */
+  .catalog-sources__row { row-gap: 0; }
+  .catalog-sources__brand { padding-bottom: 0; }
+  .catalog-sources__links { padding-top: 0; padding-bottom: var(--s-4); }
   /* Con «Buscar» al lado, en los celulares angostos el campo mide menos que su texto de ayuda («Producto, marca
      o código») y lo corta. El campo toma la fila completa y «Buscar» va debajo, a todo lo ancho: el texto de
      ayuda se lee completo desde 320 px, también con el texto espaciado, y el botón queda grande para el pulgar. */

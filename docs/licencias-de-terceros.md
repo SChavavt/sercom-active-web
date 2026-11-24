@@ -8,16 +8,30 @@ Material de terceros incluido en el repositorio y en el sitio compilado. El logo
 | Iconos de Lucide (68, 23 de ellos heredados de Feather) | `src/assets/icons/icons.json` | ISC (Feather: MIT) |
 | Iconos de Tabler Icons (7) | `src/assets/icons/icons.json` | MIT |
 | Icono de WhatsApp de Simple Icons (1) | `src/assets/icons/icons.json` | CC0 1.0 |
+| Fotografías de producto (hoy, 24) | `src/assets/productos/` o una dirección `https`, según la ficha | La de cada foto, con su uso confirmado y su origen en la ficha (sección «Fotografías de producto») |
 
-Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias no exigen un crédito visible en el sitio.
+Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al compilar). Las licencias de la tipografía y de los iconos no exigen un crédito visible en el sitio; las fotografías de producto llevan uno (sección «Fotografías de producto»).
 
-Nada más de terceros llega al sitio compilado: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
+Nada más de terceros llega al sitio compilado, salvo las fotografías de producto cuando las haya: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
+
+Las dependencias de `package.json` son Astro (MIT), sharp, `@astrojs/check` (MIT) y TypeScript (Apache-2.0). sharp 0.35.5 (Apache-2.0) es la biblioteca con la que Astro optimiza las imágenes; sus paquetes binarios (`@img/sharp-*`) traen libvips (LGPL-3.0-or-later) sin cambios. Está declarada con la versión exacta del lockfile porque el validador la usa para revisar que la compilación pueda leer cada foto (`scripts/product-photos.mjs`). Ninguna de ellas se copia a la salida: lo que llega son las imágenes que sharp produce.
 
 ## Tipografía Archivo · SIL Open Font License 1.1
 
 Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). Sin nombre reservado.
 
 El texto completo de la licencia está en `src/assets/fonts/OFL-Archivo.txt` y debe quedarse junto a los archivos de la fuente. La OFL permite usar, incrustar y redistribuir la fuente con un sitio web; no permite venderla por sí sola, y una versión modificada no puede llevar el nombre original sin permiso. Los archivos se usan sin cambios.
+
+## Fotografías de producto
+
+Hoy 24 de las 46 fichas aprobadas llevan una fotografía, guardada en `src/assets/productos/`; las otras 22 se muestran con el pictograma de su categoría, porque el sitio de su fabricante no deja bajar sus fotos con un programa. Una ficha aprobada lleva una foto de su producto o ninguna. La foto es la que el fabricante publica en su sitio oficial, con la página de donde salió; no es de la empresa ni tiene una licencia común a todas:
+
+- La ficha registra de dónde viene (`image.sourceUrl`, la página `https` de origen) y `image.usageConfirmed: true`; el validador rechaza la foto de una ficha aprobada sin las dos cosas ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#3-flujo-para-agregar-un-producto-real), paso 4).
+- Una foto guardada como archivo está en `src/assets/productos/`, que solo guarda las de fichas aprobadas porque el repositorio es público; la compilación la copia a `dist/_astro/` convertida a WebP y en varios anchos. Una foto por dirección (`image.url`) no se copia: la página la pide a ese servidor.
+- Las fotografías son de sus fabricantes y vienen de sus propios sitios. La página de cada producto muestra bajo la foto el crédito «Foto: {marca}», que enlaza la página de donde viene (`image.sourceUrl`); el validador exige que esa página sea del sitio de la marca en el registro de investigación ([`catalogo-y-actualizaciones.md`](catalogo-y-actualizaciones.md#6-imágenes-documentos-y-variantes), «Crédito de la foto»).
+- Una foto se quita si su fabricante lo pide: se borra `image` de la ficha (y su archivo de `src/assets/productos/`) y el producto se muestra con el pictograma de su categoría.
+- MCR Safety publica sus condiciones para usar las imágenes de sus productos (https://www.mcrsafety.com.mx/politicas/compartir-contenido/, leída el 23 de noviembre de 2026): nombrarla como fuente, enlazar a donde está la imagen original y quitarla si lo solicita. El sitio hace eso mismo con todas las marcas: el crédito y el retiro de arriba.
+- Las condiciones de cada foto (crédito, plazo, dónde se puede usar) son las que dé su titular, y se cumplen ficha por ficha; este archivo no las lista una por una.
 
 ## Iconos
 

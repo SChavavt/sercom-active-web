@@ -1,0 +1,23 @@
+---
+// Sonda de compilación: dibuja una foto con el mismo componente que las tarjetas y la ficha (ProductPhoto.astro), con
+// una imagen sintética propia (un color liso), porque src/assets/productos/ solo guarda fotos de fichas aprobadas. La
+// revisa tests/build-output.test.mjs: el WebP, los anchos, `sizes`, el formato para un navegador sin WebP, las medidas
+// del archivo, el texto alternativo y la carga diferida o inmediata; y una foto por dirección, tal cual.
+import ProductPhoto from '../../../../src/components/ProductPhoto.astro';
+import foto from '../foto-sintetica.png';
+
+const image = { file: 'foto-sintetica.png', alt: 'Foto sintética de la sonda', sourceUrl: 'https://fotos.sonda.invalid/origen' };
+const photos = { 'foto-sintetica.png': foto };
+---
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sonda de compilación: foto</title>
+  </head>
+  <body>
+    <div id="tarjeta"><ProductPhoto image={image} place="card" class="product__img" productId="sonda-tarjeta" photos={photos} /></div>
+    <div id="ficha"><ProductPhoto image={image} place="page" class="producto__img" productId="sonda-ficha" photos={photos} /></div>
+    <div id="direccion"><ProductPhoto image={{ url: 'https://fotos.sonda.invalid/foto.jpg', width: 1600, height: 1200, alt: 'Foto de la sonda por dirección', sourceUrl: 'https://fotos.sonda.invalid/origen' }} place="card" class="product__img" productId="sonda-direccion" /></div>
+  </body>
+</html>

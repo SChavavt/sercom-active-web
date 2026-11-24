@@ -17,6 +17,6 @@
     "verify": "npm run build:preview && npm run build && node scripts/scan-dist.mjs dist --strict && node scripts/scan-dist.mjs dist-preview --preview && node scripts/check-links.mjs dist && node scripts/check-links.mjs dist-preview && node scripts/check-markup.mjs dist && node scripts/check-markup.mjs dist-preview --preview",
     "preview": "astro preview"
   },
-  "dependencies": { "astro": "7.4.13" },
+  "dependencies": { "astro": "7.4.13", "sharp": "0.35.5" },
   "devDependencies": { "@astrojs/check": "0.9.12", "typescript": "6.0.3" }
 }

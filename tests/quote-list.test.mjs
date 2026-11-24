@@ -4,11 +4,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addedMessage, addLine, addStatusStands, badgeText, buildQuoteIndex, canMerge, cleanUnit, directLinkValues, DRAFT_LIMITS, duplicateOf,
-  duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
-  listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
+  duplicateStates, formatQuantity, indexMaps, isNewerList, isRepeatedPress, isUnitWord, isValidLine, jsonForScript, lineKey, lineSummary, LIST_FULL_MESSAGE,
+  listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, MAX_UNIT_LENGTH, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
   QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, REPEATED_PRESS, restoredMessage,
-  restoreLines, rowControlNames, rowLabelName, serializeList, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
-  unknownLinesMessage, updateLine, variantText,
+  restoreLines, rowControlNames, rowLabelName, serializeList, singularUnit, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
+  unknownLinesMessage, updateLine, variantText, onlyVariantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -28,7 +28,7 @@ const publicProducts = [
     id: 'guante-sintetico', url: '/productos/guante-sintetico/', name: 'Guante sintético de prueba', brandId: 'marca-alfa', brandName: 'Marca Alfa', code: 'SP-100',
     categoryIds: ['manos'], categoryNames: ['Protección de manos'], summary: 'Resumen sintético.', characteristics: ['Dato sintético A'], saleUnit: 'par',
     variants: [{ id: 'talla-8', label: 'Talla 8', code: 'SP-100-8' }, { id: 'talla-9', label: 'Talla 9', code: 'SP-100-9' }],
-    image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba' }, documents: [{ label: 'Ficha', url: 'https://example.invalid/ficha.pdf' }], isExample: false,
+    image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba' }, documents: [{ label: 'Ficha', url: 'https://example.invalid/ficha.pdf' }], isExample: false,
   },
   {
     id: 'casco-sintetico', url: '/productos/casco-sintetico/', name: 'Casco sintético de prueba', brandId: null, brandName: 'Marca Beta', code: 'SP-200',
@@ -117,6 +117,25 @@ test('unitKey: la misma unidad en singular o plural, con o sin acentos y mayúsc
     assert.equal(unitKey(a), unitKey(b));
     for (const quantity of [1, 2, 12000]) assert.equal(quantityLabel(quantity, a), quantityLabel(quantity, b), `${quantity} ${a}`);
   }
+});
+
+test('isUnitWord: una palabra de unidad conocida, en singular o en plural, sola', () => {
+  for (const word of ['par', 'pares', 'PAR', 'Piezas', 'galón', 'galon', 'GALONES', 'kit', 'unidades', 'millar', 'docena']) assert.equal(isUnitWord(word), true, word);
+  // Solo la palabra sola: con un signo pegado o con más palabras no es una palabra de unidad, y la lista no la cambia.
+  for (const word of ['par,', 'pares.', '(caja)', 'caja con 100 piezas', 'tambo', 'tambos', 'mes', 'pza', '', ' ', null, undefined, 5]) assert.equal(isUnitWord(word), false, JSON.stringify(word));
+  // Es lo que `quantityLabel` reconoce: una palabra conocida cambia con la cantidad y otra lleva «×».
+  for (const word of ['par', 'cajas', 'tambo', 'par,']) assert.equal(quantityLabel(3, word).includes('×'), !isUnitWord(word), word);
+});
+
+test('singularUnit: la primera palabra en singular, con sus mayúsculas; MAX_UNIT_LENGTH es el largo que recorta cleanUnit', () => {
+  for (const [written, singular] of [
+    ['pares', 'par'], ['par', 'par'], ['Piezas', 'Pieza'], ['GALONES', 'GALÓN'], ['galones', 'galón'], ['Cajas con 100 piezas', 'Caja con 100 piezas'],
+    ['caja con 100 piezas', 'caja con 100 piezas'], ['  pares ', 'par'], ['tambos de 200 L', 'tambos de 200 L'], ['', ''], [null, ''],
+  ]) assert.equal(singularUnit(written), singular, JSON.stringify(written));
+  // Lo que da tiene la misma clave que lo escrito: es la misma unidad.
+  for (const written of ['pares', 'GALONES', 'Cajas con 100 piezas']) assert.equal(unitKey(singularUnit(written)), unitKey(written));
+  assert.equal(MAX_UNIT_LENGTH, 60);
+  assert.equal(cleanUnit('x'.repeat(MAX_UNIT_LENGTH + 1)).length, MAX_UNIT_LENGTH);
 });
 
 test('una unidad de venta escrita en plural no ofrece además su singular', () => {
@@ -462,6 +481,20 @@ test('la misma unidad en singular y en plural es un solo renglón: se suma al ag
   assert.equal(added.status, 'merged');
   assert.deepEqual(added.lines, [line('bota-sintetica', 5, 'pares')]);
   assert.equal(addLine([line('bota-sintetica', 2, 'caja')], line('bota-sintetica', 3, 'par')).status, 'added');
+});
+
+test('onlyVariantText: la única variante de un producto, escrita como la lista; nada con ninguna o con varias', () => {
+  const guante = maps.products.get('guante-sintetico');
+  const casco = maps.products.get('casco-sintetico');
+  const respirador = maps.products.get('respirador-sintetico');
+  assert.equal(onlyVariantText(casco), 'Única (SP-200-U)');
+  assert.equal(onlyVariantText(guante), '');
+  assert.equal(onlyVariantText(respirador), '');
+  assert.equal(onlyVariantText({ variants: [{ id: 'mediana', label: 'Talla mediana', code: '' }] }), 'Talla mediana');
+  assert.equal(onlyVariantText({ variants: [{ id: 'm', label: 'M', code: 'M' }] }), 'M');
+  assert.equal(onlyVariantText({ variants: [{ id: 'mediana', label: 'Talla mediana', code: '6200/07025(AAD)' }] }), 'Talla mediana (6200/07025(AAD))');
+  assert.equal(onlyVariantText(null), '');
+  assert.equal(onlyVariantText({ variants: [] }), '');
 });
 
 test('frases del mensaje y de las líneas de estado', () => {

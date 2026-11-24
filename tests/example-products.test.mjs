@@ -5,7 +5,7 @@ import { buildFacetGroups } from '../src/lib/catalog-filters.mjs';
 import { filterProducts } from '../src/lib/search.mjs';
 import { createSiteData, EXAMPLE_BRAND_NAME, EXAMPLE_BRAND_NAMES, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { normalizeText } from '../src/lib/text.mjs';
-import { allStrings, loadProjectData } from './helpers.mjs';
+import { allStrings, emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples, registry } = await loadProjectData();
 const categoryIds = catalog.categories.map(category => category.id);
@@ -126,7 +126,8 @@ test('las categorías de los ejemplos existen y cada categoría tiene un ejemplo
 });
 
 test('los filtros de la vista previa: un grupo «Marcas» con las tres marcas y «Categorías» con conteos que suman', () => {
-  const site = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+  // Sin fichas reales (catálogo vaciado): los filtros de los dieciséis ejemplos, con cualquier catálogo.
+  const site = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples });
   const groups = buildFacetGroups(site.products, { categories: site.categories, brands: site.brands });
   assert.deepEqual(groups.map(group => [group.param, group.label]), [['categoria', 'Categorías'], ['marca', 'Marcas']]);
   const [categoryGroup, brandGroup] = groups;
@@ -167,7 +168,7 @@ test('los ejemplos nunca están en catalog.json ni pueden pasar por getPublished
     products: [{
       id: example.id, brandId: 'ansell', model: example.code, name: example.name, categoryIds: ['manos'], status: 'approved',
       description: example.summary, saleUnit: example.saleUnit, characteristics: example.characteristics,
-      image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+      image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
       source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
       approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
     }],
@@ -188,7 +189,7 @@ test('validateExampleProducts acepta el archivo real', () => {
 test('un ejemplo sin variantes se acepta y llega a la vista previa con la lista vacía, y cada marca de ejemplo se proyecta tal cual', () => {
   assert.equal(mutated(example => { example.variants = []; }), '');
   for (const name of EXAMPLE_BRAND_NAMES) assert.equal(mutated(example => { example.brandName = name; }), '', name);
-  const site = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: examples });
+  const site = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: examples });
   assert.deepEqual(site.getProduct('ejemplo-respirador-desechable')?.variants, []);
   assert.equal(site.getProduct('ejemplo-respirador-desechable')?.saleUnit, 'caja');
   assert.equal(site.getProduct('ejemplo-guante-de-nitrilo')?.saleUnit, 'caja con 100 piezas');
@@ -196,7 +197,7 @@ test('un ejemplo sin variantes se acepta y llega a la vista previa con la lista 
   for (const example of listed) assert.equal(site.getProduct(example.id)?.brandName, example.brandName, example.id);
   const retiredCopy = structuredClone(examples);
   retiredCopy.at(-1).brandName = 'Marca de ejemplo Gamma';
-  const withRetired = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: retiredCopy });
+  const withRetired = createSiteData({ mode: 'preview', catalog: emptiedCatalog(catalog), brands, exampleProducts: retiredCopy });
   assert.equal(withRetired.getRetiredProduct('ejemplo-producto-retirado')?.brandName, 'Marca de ejemplo Gamma');
 });
 
@@ -222,6 +223,16 @@ test('validateExampleProducts rechaza un ejemplo que pueda confundirse con una f
   }
   assert.match(mutated(example => { example.variants[0].code = '11-800-7'; }), /código que no empieza con el del ejemplo/);
   assert.match(mutated(example => { example.variants[1].id = example.variants[0].id; }), /variante incompleta, duplicada/);
+  // Dos ejemplos con el mismo nombre, o dos variantes de un ejemplo con la misma etiqueta (sin distinguir acentos,
+  // mayúsculas ni espacios), como en el catálogo: darían los mismos nombres a dos renglones de «Cotizar mi lista».
+  assert.equal(mutated((example, list) => { example.name = list[1].name.toUpperCase(); }), 'ejemplos[1].name: repite el nombre de ejemplos[0]; cada ejemplo necesita un nombre propio.');
+  assert.equal(mutated((_, list) => { list[5].name = 'ARNES de ejemplo de cuerpo completo'; list[6].name = 'Arnés de ejemplo de cuerpo completo'; }),
+    'ejemplos[6].name: repite el nombre de ejemplos[5]; cada ejemplo necesita un nombre propio.');
+  assert.equal(mutated(example => { example.variants[2].label = 'TALLA 7'; }), 'ejemplos[0].variants[2].label: repite la etiqueta de variants[0]; cada variante necesita una etiqueta propia.');
+  // En ejemplos distintos, la misma etiqueta sí puede repetirse (el archivo real ya lo hace: «Única», «Mica clara»).
+  assert.ok(listed.filter(example => example.variants.some(variant => variant.label === 'Única')).length > 1);
+  // A diferencia de una ficha real, cada variante de un ejemplo lleva su código.
+  assert.match(mutated(example => { delete example.variants[0].code; }), /variante incompleta, duplicada o con un código que no empieza con el del ejemplo/);
   assert.match(mutated(example => { example.saleUnit = ''; }), /falta unidad de venta o resumen/);
   // Campos de una ficha real o comerciales: un ejemplo no los admite.
   for (const key of ['approval', 'source', 'status', 'brandId', 'model', 'image', 'documents', 'precio']) {

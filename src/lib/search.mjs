@@ -50,14 +50,17 @@ export function queryTokens(query) {
 }
 
 /**
- * Texto de búsqueda de un producto: nombre, marca, código, códigos de variantes y nombres de categoría,
- * normalizados, más las formas sin separadores de los códigos y de las palabras que los llevan.
+ * Texto de búsqueda de un producto: nombre, marca, código, códigos de variantes, nombres de categoría y etiquetas de
+ * las variantes (sus tallas y colores: «Talla XL», «Amarillo»), normalizados, más las formas sin separadores de los
+ * códigos y de las palabras que los llevan. Una etiqueta se lee como la escribe la ficha, igual que el nombre:
+ * «Talla mediana» se encuentra con «mediana» y no con «mediano».
  * @param {SearchableProduct} product
  * @returns {string}
  */
 export function searchText(product) {
   const codes = [product.code, ...product.variants.map(variant => variant.code)];
-  const text = normalizeText([product.name, product.brandName, ...codes, ...product.categoryNames].join(' '));
+  const labels = product.variants.map(variant => variant.label);
+  const text = normalizeText([product.name, product.brandName, ...codes, ...product.categoryNames, ...labels].join(' '));
   const compact = new Set(codes.map(normalizeCode));
   for (const word of text.split(' ')) compact.add(normalizeCode(word));
   const words = new Set(text.split(' '));
@@ -193,8 +196,8 @@ export function matchesSearchText(text, query) {
 
 /**
  * ¿El producto coincide con la consulta? Cada palabra (o una de sus formas: `tokenAlternatives`) debe aparecer en el
- * nombre, la marca, el código, el código de alguna variante o el nombre de una categoría. No distingue mayúsculas ni
- * acentos.
+ * nombre, la marca, el código, el código o la etiqueta de alguna variante o el nombre de una categoría. No distingue
+ * mayúsculas ni acentos.
  * @param {SearchableProduct} product
  * @param {unknown} query
  * @returns {boolean}

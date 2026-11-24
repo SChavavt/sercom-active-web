@@ -6,9 +6,12 @@ import assert from 'node:assert/strict';
 import { getPublishedProducts, getRetiredProducts, isPublicRetired, validateCatalog } from '../src/lib/catalog-policy.mjs';
 import { assertDistinctProductIds, createSiteData, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { matchesQuery } from '../src/lib/search.mjs';
-import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
+import { allKeys, allStrings, emptiedCatalog, loadProjectData } from './helpers.mjs';
 
 const { brands, catalog, examples } = await loadProjectData();
+// El tema de estas pruebas son los retirados, no los datos reales: parten del catálogo real vaciado (las mismas
+// categorías, todas en borrador, y ninguna ficha), así dan lo mismo con cualquier catálogo válido.
+const emptied = emptiedCatalog(catalog);
 const brandScope = { sources: brands.map(brand => ({ entity_id: brand.id, name: brand.name, entity_type: brand.kind })) };
 const listedExamples = examples.filter(example => example.retired !== true);
 
@@ -22,15 +25,15 @@ const record = (fields = {}) => ({
   description: 'No es un artículo comercial.', saleUnit: 'pieza',
   characteristics: ['Dato sintético A', 'Dato sintético B', 'Dato sintético C'],
   variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-001/A-9' }],
-  image: { url: 'https://example.invalid/test.png', alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
+  image: { url: 'https://example.invalid/test.png', width: 1600, height: 1200, alt: 'Imagen de prueba', sourceUrl: 'https://example.invalid/source', usageConfirmed: true },
   documents: [{ label: 'Ficha técnica de prueba', url: 'https://example.invalid/ficha.pdf' }],
   source: { url: 'https://example.invalid/test', checkedOn: '2026-11-18' },
   approval: { by: 'Revisor de prueba', on: '2026-11-18', supplyConfirmed: true },
   ...fields,
 });
-/** El catálogo real con la categoría «manos» aprobada y las fichas indicadas. */
+/** El catálogo real vaciado, con la categoría «manos» aprobada y las fichas indicadas. */
 function withProducts(...products) {
-  const copy = structuredClone(catalog);
+  const copy = structuredClone(emptied);
   copy.categories[0].status = 'approved';
   copy.products.push(...products);
   return copy;
@@ -61,7 +64,7 @@ test('una ficha retirada es pública solo si tiene una aprobación comercial com
 });
 
 test('getRetiredProducts entrega solo lo que identifica al producto y nunca los campos internos', () => {
-  const editorial = withProducts(record(), record({ id: 'test-002', model: 'TEST-002', approval: undefined }));
+  const editorial = withProducts(record(), record({ id: 'test-002', model: 'TEST-002', name: 'Producto sintético de prueba 2', approval: undefined }));
   const retired = getRetiredProducts(editorial, brandScope);
   assert.deepEqual(retired, [{ id: 'test-001', brandId: 'ansell', model: 'TEST-001/A', name: 'Producto sintético de prueba', categoryIds: ['manos'] }]);
   // La copia no comparte memoria con el catálogo.
@@ -93,7 +96,7 @@ test('la validación del catálogo no cambia: un retirado sin aprobación es un 
 
 test('un identificador nunca es a la vez un producto y un retirado, y las marcas de los ejemplos siguen reservadas', () => {
   const approved = record({ status: 'approved' });
-  assert.throws(() => build('production', [approved, record({ model: 'TEST-OTRO' })]), /id inválido o duplicado/);
+  assert.throws(() => build('production', [approved, record({ model: 'TEST-OTRO', name: 'Producto sintético de prueba 2' })]), /id inválido o duplicado/);
   for (const change of [{ id: 'ejemplo-producto-retirado' }, { model: 'EJ-1002' }, { name: 'Producto de ejemplo retirado' }, { variants: [{ id: 'u', label: 'Única', manufacturerCode: 'EJ-1002-U' }] }]) {
     assert.throws(() => build('production', [record(change)]), /reservado para los ejemplos de vista previa/, JSON.stringify(change));
   }
@@ -135,7 +138,7 @@ test('producción: el retirado con aprobación tiene registro propio y ningún l
 });
 
 test('con una ficha aprobada y una retirada, los conteos y listados solo cuentan la aprobada', () => {
-  const site = build('preview', [record({ status: 'approved', id: 'test-002', model: 'TEST-002', variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-002-9' }] }), record()]);
+  const site = build('preview', [record({ status: 'approved', id: 'test-002', model: 'TEST-002', name: 'Producto sintético de prueba 2', variants: [{ id: 'talla-9', label: 'Talla 9', manufacturerCode: 'TEST-002-9' }] }), record()]);
   assert.deepEqual(site.products.map(product => product.id), ['test-002', ...listedExamples.map(example => example.id)]);
   assert.deepEqual(site.retiredProducts.map(product => product.id), ['test-001']);
   assert.equal(site.getCategory('manos')?.productCount, 4);
@@ -181,13 +184,13 @@ test('los campos internos y los textos que ya nadie mantiene nunca llegan al reg
 
 test('producción ignora el ejemplo retirado; la vista previa le da su registro y nada más cambia', () => {
   const exampleProducts = [...listedExamples, retiredExample()];
-  const production = createSiteData({ mode: 'production', catalog, brands, exampleProducts });
+  const production = createSiteData({ mode: 'production', catalog: emptied, brands, exampleProducts });
   assert.deepEqual(production.retiredProducts, []);
   assert.equal(production.getRetiredProduct('ejemplo-producto-retirado'), undefined);
   assert.doesNotMatch(JSON.stringify(production.retiredProducts), /ejemplo/i);
 
-  const preview = createSiteData({ mode: 'preview', catalog, brands, exampleProducts });
-  const before = createSiteData({ mode: 'preview', catalog, brands, exampleProducts: listedExamples });
+  const preview = createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts });
+  const before = createSiteData({ mode: 'preview', catalog: emptied, brands, exampleProducts: listedExamples });
   assert.deepEqual(preview.retiredProducts, [{
     id: 'ejemplo-producto-retirado', url: '/productos/ejemplo-producto-retirado/', name: 'Producto de ejemplo retirado',
     brandId: null, brandName: 'Marca de ejemplo', code: 'EJ-1002', categoryIds: ['manos'], categoryNames: ['Protección de manos'], isExample: true,

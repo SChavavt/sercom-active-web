@@ -1,12 +1,15 @@
 ---
 // Página de marca (/marcas/{id}/): una por cada marca de «Marcas que manejamos», en los dos modos.
-// Bloque de título con el nombre como H1 (texto, nunca un logotipo) y, en la columna lateral, «Sitio del
-// fabricante» (si la marca lo tiene; abre otra pestaña) y, solo con productos, la fila sólida «Contactar por
-// WhatsApp». «Contactar por WhatsApp» aparece una sola vez en la página.
+// Bloque de título con el nombre como H1 (texto, nunca un logotipo) y, en la columna lateral, una fila por enlace del
+// fabricante, en el orden de los datos (todos abren otra pestaña): el catálogo en PDF y el catálogo en línea, cada uno
+// una fila de acción con el icono de enlace externo (el PDF con su edición y su tamaño en una segunda línea pequeña),
+// y «Sitio del fabricante» como enlace de texto; debajo, solo con productos, la fila sólida «Contactar por WhatsApp».
+// «Contactar por WhatsApp» aparece una sola vez en la página. La columna lleva hasta cuatro filas.
 //   - Con productos: la misma barra lateral y retícula del catálogo (CatalogListing), con la marca marcada.
-//   - Sin productos (hoy, todas): estado vacío con WhatsApp (la única acción de WhatsApp), «Marcas que
-//     manejamos» con la marca actual marcada para pasar a otra, y la nota de disponibilidad. Sin productos y
-//     sin sitio del fabricante el bloque de título no tiene celda lateral: el título ocupa la fila entera.
+//   - Sin productos: estado vacío con WhatsApp (la única acción de WhatsApp): dice que sus productos no están en este
+//     catálogo, sin prometer que vayan a estar, y si la marca tiene catálogo invita a consultarlo; «Marcas que manejamos» con la marca actual marcada para pasar a otra, y la nota de
+//     disponibilidad. Sin productos y sin enlaces el bloque de título no tiene celda lateral: el título ocupa la fila
+//     entera.
 // Ninguna frase sobre la disponibilidad del portafolio de la marca ni sobre una relación con ella (R-CAT-12);
 // un proveedor (`kind: supplier`) no recibe un texto distinto. Al final, la banda de solicitud especial.
 import type { GetStaticPaths } from 'astro';
@@ -39,11 +42,15 @@ const crumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href:
 <BaseLayout title={brand.name} description={description}>
   {hasLinks || hasProducts ? (
     <PageHeader title={brand.name} breadcrumbs={crumbs}>
-      {hasLinks && (
+      {brand.manufacturerLinks.map(link => link.kind === 'site' ? (
         <div class="catalog-brand__links">
-          {brand.manufacturerLinks.map(link => <MoreLink href={link.url} external>{link.label}</MoreLink>)}
+          <MoreLink href={link.url} external>{link.label}</MoreLink>
         </div>
-      )}
+      ) : (
+        <ActionRow href={link.url} external icon="external-link" class="catalog-brand__catalog">
+          {link.label}{link.detail && <span class="catalog-brand__detail t-small">{link.detail}</span>}
+        </ActionRow>
+      ))}
       {/* Sin productos, la única acción de WhatsApp es la del estado vacío de abajo. */}
       {hasProducts && <ActionRow href={whatsapp} primary icon="whatsapp">Contactar por WhatsApp</ActionRow>}
     </PageHeader>
@@ -57,8 +64,10 @@ const crumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href:
     <Fragment>
       <EmptyState
         icon="package"
-        title="Estamos cargando los productos de esta marca."
-        text="Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo."
+        title="Los productos de esta marca no están en este catálogo."
+        text={brand.hasCatalog
+          ? 'Consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.'
+          : 'Dinos qué necesitas y te ayudamos a cotizarlo.'}
         action={{ href: whatsapp, label: 'Contactar por WhatsApp', icon: 'whatsapp' }}
       />
       <section class="section" aria-labelledby="marcas-title">

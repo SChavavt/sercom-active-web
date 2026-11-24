@@ -1,10 +1,14 @@
 ---
 // Estado vacío (`.empty`): una celda de ancho completo con un pictograma de línea, dos frases y una
-// acción. Para una búsqueda sin resultados o una categoría sin productos todavía (textos del brief, 6.3):
+// acción. Para una búsqueda sin resultados y para una categoría o una marca sin productos:
 //   «No encontramos productos con esa búsqueda.» / «Puedes pedirnos este producto y lo buscamos por ti.»
 //     → Solicitar este producto
-//   «Estamos cargando los productos de esta categoría.» / «Mientras tanto, dinos qué necesitas y te
+//   «Los productos de esta categoría no están en este catálogo.» / «Dinos qué necesitas y te ayudamos a
+//     cotizarlo.» → botón de WhatsApp
+//   «Los productos de esta marca no están en este catálogo.» / «Consulta el catálogo del fabricante y dinos qué
+//     modelo necesitas: te ayudamos a cotizarlo.» (si la marca publica su catálogo) o «Dinos qué necesitas y te
 //     ayudamos a cotizarlo.» → botón de WhatsApp
+// Una categoría o una marca sin productos no promete que vayan a llegar.
 // Slot `extra` (opcional): una segunda acción, después de la principal (el catálogo pone ahí «Limpiar filtros»).
 // Con él, las dos acciones van juntas en `.empty__actions` (catalogo.css): una sobre otra en computadora, lado a
 // lado si caben en tableta y a todo lo ancho en el celular. Sin él, el marcado es el de siempre.
