@@ -78,7 +78,7 @@ export function addressProblem(value) {
 /**
  * El primer carácter de un servidor que el navegador lee como otro, salvo una mayúscula como su minúscula: el que su
  * forma de compatibilidad de Unicode (NFKC), leído solo, cambia («𝐦», «ſ», «ª», «¹», «ﬁ», una letra de ancho completo,
- * el signo de kelvin «K» o el de ángstrom «Å»). Las letras con acentos («ñ», «é», «ü», «ß», también escritas con el
+ * el signo de kelvin «K» o el de ángstrom «Å»). Las letras con acentos («ñ», «é», «ü», «ß», también escritas con el
  * acento aparte) no cambian. `null` si no hay ninguno.
  * @param {string} host
  */
@@ -566,8 +566,8 @@ const hostOf = value => {
 
 /**
  * La foto de una ficha aprobada viene del sitio de su fabricante: la ficha muestra bajo la foto un crédito que enlaza
- * `image.sourceUrl`. Esa página no puede ser, escrita como sea (`samePage`), una del registro de investigación que no se
- * publica (`isPublishableResource`). Su servidor (sin `www.`) debe ser el de algún recurso publicable de la entidad de
+ * `image.sourceUrl`. Esa página no puede ser, escrita de cualquier forma de la misma página (`samePage`), una del registro de
+ * investigación que no se publica (`isPublishableResource`), de cualquier entidad. Su servidor (sin `www.`) debe ser el de algún recurso publicable de la entidad de
  * la marca en el registro que no viva en el sitio de otro (`HOSTED_ELSEWHERE_TYPES`). Un borrador, una ficha en revisión o un
  * retirado no publican foto y no se revisan. Se llama aparte de `validateCatalog` (desde `validateProject`, en
  * `scripts/validate-catalog.mjs`) porque la compilación valida el catálogo con las marcas, sin los recursos del registro.

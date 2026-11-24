@@ -4,7 +4,7 @@
 // importa nada: recibe textos y devuelve textos. Lee cada dirección con el analizador de direcciones de la plataforma
 // (`URL`, el mismo del navegador) y compara lo que él devuelve.
 //
-// Antes de leerla: «\/», «/», «\x2f» y cualquier otra «\» se leen como «/» (una dirección dentro de un script o de
+// Antes de leerla: «\/», «\u002f», «\x2f» y cualquier otra «\» se leen como «/» (una dirección dentro de un script o de
 // un JSON), y una dirección que empieza con «//» se lee como «https://…». Solo es una dirección lo que empieza con
 // «http:», «https:» o «//» y el analizador acepta. Dos direcciones son la misma página cuando coinciden en todo esto:
 //   1. el esquema: «http://», «https://» y «//» cuentan igual;
@@ -33,16 +33,17 @@
 // esquema («https:», con o sin diagonales), con «//» o con «www.» donde no la precede una letra, una cifra, «@» ni otro
 // signo de una dirección: un servidor escrito sin «//» ni «www.» («más información en goldeneagle.com.mx») es una
 // frase, y una dirección de correo («ventas@servidor.mx») nunca es una página. Termina donde termina la dirección
-// escrita: en un espacio, unas comillas, «<» o «>», y sin los signos de puntuación del final («.», «,», «;», «:», «!»,
-// «?», «)», «]»). Si lo que sigue a la ruta la continúa («…/guias-de-recursos/09-catalogo…», «…/producto.html»), es
-// otra página. «&» en la ruta también la termina: es el final de una dirección que va como valor dentro de la consulta
-// de otra. El texto se lee tal cual y con su %XX decodificado, otra vez mientras cambie (una dirección codificada entera
-// dentro de otra), y el valor de un atributo entre comillas, además, sin sus tabuladores ni saltos de línea.
+// escrita: en un espacio, unas comillas, «<», «>», «`», «{», «}», «|», «^» o unas comillas angulares o tipográficas; se lee sin los
+// signos de puntuación del final («.», «,», «;», «:», «!», «?», «)», «]») y también con ellos («…/x/..» al final es un
+// segmento). Si lo que sigue a la ruta la continúa («…/guias-de-recursos/09-catalogo…», «…/producto.html»), es otra
+// página. «&» en la ruta también la termina: es el final de una dirección que va como valor dentro de la consulta de
+// otra. El texto se lee tal cual y con su %XX decodificado, otra vez mientras cambie (una dirección codificada entera
+// dentro de otra); con un tabulador o un salto de línea escrito con escape («\t», «\n», «\u000A»…), además sin él y con
+// un espacio en su lugar; y el valor de un atributo entre comillas, además, sin sus tabuladores ni saltos de línea.
 //
-// Lo que no ve: una dirección que un script arma con pedazos o escribe con escapes de sus letras («\x6d», «m») o
-// con un salto de línea escrito «\n»; un par de la consulta que el servidor no lee y que `TRACKING_PARAMETERS` no tiene
-// («?lang=es», «?=»), «index.html» o «index.php» después de una carpeta, un parámetro de la ruta («;x=1») y otro puerto:
-// cada uno hace otra página.
+// Lo que no ve: una dirección que un script arma con pedazos o escribe con escapes de sus letras («\x6d», «\u006d»); un
+// par de la consulta que el servidor no lee y que `TRACKING_PARAMETERS` no tiene («?lang=es», «?=»), «index.html» o
+// «index.php» después de una carpeta, un parámetro de la ruta («;x=1») y otro puerto: cada uno hace otra página.
 
 /**
  * Pares de una consulta que solo cuentan una visita: no cambian la página. Además, cualquier nombre que empieza con
@@ -68,7 +69,7 @@ function decodedRepeatedly(text) {
   }
   return current;
 }
-// «\/», «/» y «\x2F» (una diagonal escapada en un script o un JSON) y cualquier otra «\» se leen como «/».
+// «\/», «\u002F» y «\x2F» (una diagonal escapada en un script o un JSON) y cualquier otra «\» se leen como «/».
 const withSlashes = text => (text.includes('\\') ? text.replace(/\\(?:\/|u002f|x2f)/gi, '/').replace(/\\/g, '/') : text);
 
 const isTracking = name => /^utm_/i.test(name) || TRACKING_PARAMETERS.includes(name.toLowerCase());
