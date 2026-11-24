@@ -31,11 +31,14 @@ function catalogOf(...products) {
   return copy;
 }
 
-/** Corre el validador sobre una carpeta temporal con ese catálogo y esas fotos (nombre → contenido). */
-async function validate(catalogData, photos = {}) {
+/**
+ * Corre el validador sobre una carpeta temporal con ese catálogo y esas fotos (nombre → contenido) y, si se dan, ese
+ * registro y esa lista de marcas en lugar de los del repositorio.
+ */
+async function validate(catalogData, photos = {}, { registry, brands } = {}) {
   const files = {
-    [DATA_FILES.catalog]: JSON.stringify(catalogData), [DATA_FILES.registry]: registryText,
-    [DATA_FILES.brands]: brandsText, [DATA_FILES.examples]: examplesText,
+    [DATA_FILES.catalog]: JSON.stringify(catalogData), [DATA_FILES.registry]: registry === undefined ? registryText : JSON.stringify(registry),
+    [DATA_FILES.brands]: brands === undefined ? brandsText : JSON.stringify(brands), [DATA_FILES.examples]: examplesText,
   };
   for (const [name, content] of Object.entries(photos)) files[`src/assets/productos/${name}`] = content;
   const root = await makeTree(files);
@@ -151,4 +154,34 @@ test('el servidor de la foto debe ser el de un recurso de la marca verificado co
   assert.deepEqual(errorsOf(photo('marca-b', 'https://marca-b.example/x')), ['products[0] (ficha-marca-b).image.sourceUrl: la foto viene de marca-b.example, pero Marca B no tiene en el registro ningún sitio verificado como accesible. La ficha muestra bajo la foto un crédito que enlaza esa página: escribe la página del sitio del fabricante de donde viene la foto, o agrega ese sitio a la marca en el registro de investigación, con su verificación.']);
   // Solo las fichas aprobadas; un retirado no muestra su foto.
   assert.deepEqual(errorsOf(photo('marca-b', 'https://marca-b.example/x', 'draft'), photo('marca-b', 'https://marca-b.example/x', 'retired')), []);
+});
+
+// --- Marcas retiradas del portal --------------------------------------------------------------------------------------
+// Una copia del registro del repositorio en la que una marca que sigue en el portal (JYRSA) lleva la marca de retiro.
+const PORTAL = { status: 'retirada', on: '2026-11-23', reason: 'Decisión sintética de prueba.' };
+const withPortal = (id, portal = PORTAL) => {
+  const registry = JSON.parse(registryText);
+  registry.sources.find(source => source.entity_id === id).portal = portal;
+  return registry;
+};
+const brandsWithout = id => JSON.parse(brandsText).filter(brand => brand.id !== id);
+
+test('el validador revisa la marca de retiro del registro y dice en qué entidad y en qué campo está el problema', async () => {
+  assert.deepEqual((await validate(catalogOf(), {}, { registry: withPortal('jyrsa'), brands: brandsWithout('jyrsa') })).errors, []);
+  assert.deepEqual((await validate(catalogOf(), {}, { registry: withPortal('jyrsa', { ...PORTAL, on: '2026-11-31' }), brands: brandsWithout('jyrsa') })).errors,
+    ['Registro de investigación: jyrsa.portal.on: «2026-11-31» no es una fecha real; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.']);
+  assert.deepEqual((await validate(catalogOf(), {}, { registry: withPortal('jyrsa', null), brands: brandsWithout('jyrsa') })).errors, [
+    'Registro de investigación: jyrsa.portal: debe ser un objeto con status, on y reason, como {"status": "retirada", "on": "2026-11-23", "reason": "…"}; si la marca vuelve al portal, quita la clave portal.',
+    'Marcas: registro: jyrsa falta en brands.json.',
+  ]);
+});
+
+test('una marca retirada que sigue en brands.json, o un producto suyo, detienen la validación con el mensaje que dice qué hacer', async () => {
+  assert.deepEqual((await validate(catalogOf(), {}, { registry: withPortal('jyrsa') })).errors,
+    ['Marcas: jyrsa: en el registro está retirada del portal (2026-11-23); quítala de brands.json o, si vuelve al portal, quita la clave portal de su entidad en el registro.']);
+  const ofWithdrawn = status => product(1, { brandId: 'jyrsa', status });
+  for (const status of ['draft', 'approved']) {
+    assert.deepEqual((await validate(catalogOf(ofWithdrawn(status)), {}, { registry: withPortal('jyrsa'), brands: brandsWithout('jyrsa') })).errors,
+      ['products[0]: la marca jyrsa está retirada del portal; un producto suyo no se carga.'], status);
+  }
 });

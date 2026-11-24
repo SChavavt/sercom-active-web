@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { crossCheckBrands, MANUFACTURER_LINK_LABELS, validateBrands } from '../src/lib/site-data-core.mjs';
+import { crossCheckBrands, MANUFACTURER_LINK_LABELS, registryPortalErrors, validateBrands } from '../src/lib/site-data-core.mjs';
 import { normalizeText } from '../src/lib/text.mjs';
 import { allKeys, allStrings, loadProjectData } from './helpers.mjs';
 
@@ -269,4 +269,59 @@ test('una entidad excluida no puede entrar aunque alguien la agregue a los dos a
     assert.match(validateBrands(list).join('\n'), /marca excluida/);
     assert.match(crossCheckBrands(list, tampered).join('\n'), /marca excluida/);
   }
+});
+
+// --- Marcas retiradas del portal: la entidad se queda en el registro con la marca `portal` y sale de brands.json ------
+// Registros sintéticos: una copia del registro real en la que una marca que sigue en el portal (JYRSA) lleva la marca.
+const PORTAL = { status: 'retirada', on: '2026-11-23', reason: 'Decisión sintética de prueba.' };
+const markedRegistry = (id, portal = PORTAL) => ({ ...registry, sources: registry.sources.map(source => (source.entity_id === id ? { ...source, portal } : source)) });
+
+test('una entidad retirada del portal no se espera en brands.json; si está, el error dice qué hacer', () => {
+  const marked = markedRegistry('jyrsa');
+  // Retirada y fuera de brands.json: correcto.
+  assert.deepEqual(crossCheckBrands(copy().filter(brand => brand.id !== 'jyrsa'), marked), []);
+  // Retirada y todavía en brands.json: un solo error, con la fecha y los dos caminos.
+  assert.deepEqual(crossCheckBrands(copy(), marked), [
+    'jyrsa: en el registro está retirada del portal (2026-11-23); quítala de brands.json o, si vuelve al portal, quita la clave portal de su entidad en el registro.',
+  ]);
+  // Sin la marca y fuera de brands.json: el error de siempre.
+  assert.deepEqual(crossCheckBrands(copy().filter(brand => brand.id !== 'jyrsa'), registry), ['registro: jyrsa falta en brands.json.']);
+  // Una marca con otro estado no la retira: la entidad sigue esperándose en brands.json (y el validador del registro
+  // rechaza ese estado aparte).
+  assert.deepEqual(crossCheckBrands(copy().filter(brand => brand.id !== 'jyrsa'), markedRegistry('jyrsa', { ...PORTAL, status: 'pausada' })), ['registro: jyrsa falta en brands.json.']);
+});
+
+test('registryPortalErrors acepta la marca de retiro bien escrita y la ausencia de la marca', () => {
+  assert.deepEqual(registryPortalErrors(registry), []);
+  assert.deepEqual(registryPortalErrors(markedRegistry('jyrsa')), []);
+  assert.deepEqual(registryPortalErrors(markedRegistry('jyrsa', { ...PORTAL, on: '2024-02-29' })), []);
+  assert.deepEqual(registryPortalErrors({}), []);
+});
+
+test('registryPortalErrors rechaza la marca de retiro mal escrita y nombra la entidad y el campo', () => {
+  const errorsWith = portal => registryPortalErrors(markedRegistry('jyrsa', portal));
+  assert.deepEqual(errorsWith({ ...PORTAL, by: 'alguien' }), ['jyrsa.portal.by: campo no definido; la marca de retiro lleva solo status, on y reason.']);
+  assert.deepEqual(errorsWith({ ...PORTAL, status: 'retirado' }), ['jyrsa.portal.status: «retirado» no es un estado del portal; el único que existe es «retirada».']);
+  assert.deepEqual(errorsWith({ on: PORTAL.on, reason: PORTAL.reason }), ['jyrsa.portal.status: falta; escribe «retirada».']);
+  for (const on of ['2026-02-30', '2026-13-01', '23/11/2026', '2026-11-23T10:00', 20261123]) {
+    assert.deepEqual(errorsWith({ ...PORTAL, on }), [`jyrsa.portal.on: «${on}» no es una fecha real; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.`], String(on));
+  }
+  assert.deepEqual(errorsWith({ status: PORTAL.status, reason: PORTAL.reason }), ['jyrsa.portal.on: falta; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.']);
+  for (const reason of ['', '   ']) {
+    assert.deepEqual(errorsWith({ ...PORTAL, reason }), ['jyrsa.portal.reason: está vacío; escribe en una línea la decisión por la que la marca salió del portal.'], JSON.stringify(reason));
+  }
+  assert.deepEqual(errorsWith({ status: PORTAL.status, on: PORTAL.on }), ['jyrsa.portal.reason: falta; escribe en una línea la decisión por la que la marca salió del portal.']);
+  assert.deepEqual(errorsWith({ ...PORTAL, reason: 7 }), ['jyrsa.portal.reason: debe ser un texto; escribe en una línea la decisión por la que la marca salió del portal.']);
+  for (const reason of ['Decisión sintética\nde prueba.', 'Decisión  sintética de prueba.', ' Decisión sintética de prueba.', 'Decisión sintética​ de prueba.', 'Decisión sintética‍ de prueba.']) {
+    assert.deepEqual(errorsWith({ ...PORTAL, reason }), ['jyrsa.portal.reason: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.'], JSON.stringify(reason));
+  }
+  const notAnObject = 'jyrsa.portal: debe ser un objeto con status, on y reason, como {"status": "retirada", "on": "2026-11-23", "reason": "…"}; si la marca vuelve al portal, quita la clave portal.';
+  for (const portal of [null, 'retirada', [], true]) assert.deepEqual(errorsWith(portal), [notAnObject], JSON.stringify(portal));
+  // Varios problemas a la vez: uno por campo.
+  assert.deepEqual(errorsWith({ status: 'activa', on: '', reason: '', nota: 'x' }), [
+    'jyrsa.portal.nota: campo no definido; la marca de retiro lleva solo status, on y reason.',
+    'jyrsa.portal.status: «activa» no es un estado del portal; el único que existe es «retirada».',
+    'jyrsa.portal.on: «» no es una fecha real; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.',
+    'jyrsa.portal.reason: está vacío; escribe en una línea la decisión por la que la marca salió del portal.',
+  ]);
 });

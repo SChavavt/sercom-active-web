@@ -2,10 +2,22 @@
 // Node, Vite y node:test ignoran este archivo: la lógica vive en el `.mjs`.
 import type { PublishedProduct, PublishedRetiredProduct } from '../types/catalog.ts';
 
-/** Alcance de marcas: basta con identificador, nombre y tipo de cada entidad. */
+/**
+ * Alcance de marcas: basta con identificador, nombre y tipo de cada entidad. Una entidad con `portal.status`
+ * «retirada» salió del portal: no está en el alcance y una ficha suya se rechaza con su propio mensaje.
+ */
 export interface BrandScope {
-  sources: { entity_id: string; name: string; entity_type: string }[];
+  sources: { entity_id: string; name: string; entity_type: string; portal?: unknown }[];
 }
+
+/** Una fecha real escrita como AAAA-MM-DD. */
+export function validDate(value: unknown): value is string;
+
+/** El único estado de la marca `portal` de una entidad del registro: «retirada». */
+export const WITHDRAWN_STATUS: 'retirada';
+
+/** ¿La entidad del registro salió del portal? Solo con `portal.status` igual a «retirada». */
+export function isWithdrawn(source: unknown): boolean;
 
 /** Indica si un texto menciona la marca excluida del alcance. */
 export function mentionsExcludedBrand(value: unknown): boolean;

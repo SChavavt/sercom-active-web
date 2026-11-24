@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCatalog, getPublishedProducts, getRetiredProducts, photoSourceErrors } from '../src/lib/catalog-policy.mjs';
-import { crossCheckBrands, MANUFACTURER_LINK_LABELS, validateExampleProducts } from '../src/lib/site-data-core.mjs';
+import { crossCheckBrands, MANUFACTURER_LINK_LABELS, registryPortalErrors, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { reviewCatalogText } from './catalog-text.mjs';
 import { checkProductPhotos, PHOTO_FOLDER } from './product-photos.mjs';
 
@@ -79,7 +79,10 @@ export async function validateProject(root) {
       catch { errors.push(`URL inválida en ${source.entity_id}`); }
     }
   }
-  // La lista pública de marcas debe coincidir con el registro; el sitio solo lee brands.json.
+  // La marca de retiro del portal de cada entidad que la lleva: su forma, con la entidad y el campo en cada mensaje.
+  errors.push(...registryPortalErrors(registry).map(error => `Registro de investigación: ${error}`));
+  // La lista pública de marcas debe coincidir con el registro, salvo las entidades retiradas del portal, que no
+  // pueden estar en ella; el sitio solo lee brands.json.
   errors.push(...crossCheckBrands(brands, registry).map(error => `Marcas: ${error}`));
   // Los ejemplos de vista previa se revisan siempre, aunque solo se usen con CATALOG_PREVIEW.
   const categoryIds = Array.isArray(catalog?.categories) ? catalog.categories.map(category => category?.id) : [];
