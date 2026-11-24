@@ -171,3 +171,137 @@ test('una dirección del registro que es la misma página que un enlace publicad
   // Y ningún enlace publicado contiene una dirección del registro sin publicar.
   for (const entry of published) assert.deepEqual(registryFindings(link(entry), leaks).urls, [], entry);
 });
+
+// Una dirección se lee como la lee el navegador: con el analizador de direcciones de la plataforma. Cada punto de la
+// cabecera de src/lib/address-match.mjs con direcciones que son la misma página y otras que no, escritas a mano con
+// servidores «.example»; entre ellas, las grafías que la revisión probó y que el navegador abre como la página.
+const PAGE = 'https://www.fabricante.example/recursos/guias/';
+const READ_AS_PAGE = {
+  // 1. Antes de leerla: «\/», «\x2f» y «/» de un script o un JSON son «/», «\» es «/» y «//» es https.
+  antes: [
+    'https:\\x2f\\x2fwww.fabricante.example\\x2frecursos\\x2fguias\\x2f', 'https:\\u002F\\u002Fwww.fabricante.example\\u002Frecursos\\u002Fguias',
+    'https:\\\\www.fabricante.example\\recursos\\guias\\', '//fabricante.example/recursos/guias', 'http://fabricante.example/recursos/guias/',
+  ],
+  // 2. El servidor como lo deja el analizador: letras que el navegador lleva a otras, caracteres que quita, %XX, el
+  //    punto ideográfico y el punto final.
+  servidor: [
+    'https://www.\u{1D41F}abricante.example/recursos/guias/', 'https://www.\u{1D523}abricante.example/recursos/guias/', 'https://www.fabricantᵉ.example/recursos/guias/',
+    'https://www.ⓕabricante.example/recursos/guias/', 'https://ｗｗｗ．ｆａｂｒｉｃａｎｔｅ．example/recursos/guias/', 'https://www。fabricante。example/recursos/guias/',
+    'https://www.fabri­cante.example/recursos/guias/', 'https://www.fabri​cante.example/recursos/guias/', 'https://www.fabri͏cante.example/recursos/guias/',
+    'https://www.fabri️cante.example/recursos/guias/', 'https://www%2Efabricante.example/recursos/guias/', 'https://www.FABRICANTE.example./recursos/guias/',
+  ],
+  // 3. El puerto: 443 y 80 no cuentan, tampoco «:0443» ni un puerto vacío.
+  puerto: [
+    'https://www.fabricante.example:443/recursos/guias/', 'https://www.fabricante.example:0443/recursos/guias/', 'https://www.fabricante.example:/recursos/guias/',
+    'http://www.fabricante.example:80/recursos/guias/', 'https://www.fabricante.example:80/recursos/guias/', 'http://www.fabricante.example:443/recursos/guias/',
+  ],
+  // 4. El usuario antes del servidor no cuenta, con cuantas «@» lleve.
+  usuario: [
+    'https://a@b@www.fabricante.example/recursos/guias/', 'https://usuario:clave@www.fabricante.example/recursos/guias/', "https://a'b@www.fabricante.example/recursos/guias/",
+    'https://@www.fabricante.example/recursos/guias/',
+  ],
+  // 5. La ruta: los segmentos «.» y «..» (también %2e, y los que aparecen al decodificar) y las diagonales repetidas.
+  ruta: [
+    'https://www.fabricante.example/recursos/./guias/', 'https://www.fabricante.example/recursos/x/../guias/', 'https://www.fabricante.example/recursos/%2e/guias/',
+    'https://www.fabricante.example/x/%2E%2E/recursos/guias/', 'https://www.fabricante.example/recursos/x/.%2e/guias/', 'https://www.fabricante.example/recursos/guias/.',
+    'https://www.fabricante.example/recursos/guias/x/..', 'https://www.fabricante.example/./recursos/guias/', 'https://www.fabricante.example/recursos//guias/',
+    'https://www.fabricante.example//recursos/guias/', 'https://www.fabricante.example/recursos///guias//', 'https://www.fabricante.example/recursos/%252e/guias/',
+    'https://www.fabricante.example/x/%252e%252e/recursos/guias/', 'https://www.fabricante.example/recursos/%2F/guias/',
+  ],
+  // 6. La consulta: los pares que solo cuentan una visita, también los que agrega la lista.
+  consulta: [
+    'srsltid=AfmBOo', '_gl=1*abc', '_ga=2.1', 'gclsrc=aw.ds', 'dclid=x', 'gbraid=x', 'wbraid=x', 'gad_source=1', 'gad_campaignid=2', 'yclid=3',
+    'twclid=4', 'ttclid=5', 'li_fat_id=6', '_hsenc=7', '_hsmi=8', 'mkt_tok=9', 'SRSLTID=x&_GL=y',
+  ].map(pair => `${PAGE}?${pair}`),
+  // 7. El fragmento no cuenta, diga lo que diga.
+  fragmento: [`${PAGE}#x`, `${PAGE}#/../../otra/`, `${PAGE}#?producto=24`],
+};
+const NOT_READ_AS_PAGE = {
+  antes: ['https://www.fabricante.example:99999/recursos/guias/', 'https://www.fabri cante.example/recursos/guias/', 'ftp://www.fabricante.example/recursos/guias/', 'https://', '///recursos/guias/'],
+  servidor: ['https://www.ƒabricante.example/recursos/guias/', 'https://www.fabricantes.example/recursos/guias/', 'https://www.fabricante.example.otro.example/recursos/guias/'],
+  puerto: ['https://www.fabricante.example:8443/recursos/guias/', 'https://www.fabricante.example:8080/recursos/guias/', 'http://www.fabricante.example:1/recursos/guias/'],
+  usuario: ['https://www.fabricante.example@otro.example/recursos/guias/', 'https://www.fabricante.example:clave@otro.example/recursos/guias/'],
+  ruta: [
+    'https://www.fabricante.example/recursos/guias/..', 'https://www.fabricante.example/recursos/guias/../otra/', 'https://www.fabricante.example/recursos/.guias/',
+    'https://www.fabricante.example/recursos/guias/.../', 'https://www.fabricante.example/recursos/guias/%2e%2e%2e/', 'https://www.fabricante.example/recursos/guias/%23x',
+  ],
+  consulta: ['lang=es', '=', 'srsltid2=x', '_gl_x=1', 'gad=1'].map(pair => `${PAGE}?${pair}`),
+  fragmento: ['https://www.fabricante.example/recursos/guias/%23x', 'https://www.fabricante.example/recursos/guias/x#'],
+};
+
+test('cada punto de la lectura: direcciones que el navegador abre como la misma página y otras que no', () => {
+  for (const [point, list] of Object.entries(READ_AS_PAGE)) {
+    for (const address of list) {
+      assert.ok(samePage(PAGE, address), `${point}: ${JSON.stringify(address)}`);
+      assert.ok(samePage(address, PAGE), `${point}: ${JSON.stringify(address)}`);
+    }
+  }
+  for (const [point, list] of Object.entries(NOT_READ_AS_PAGE)) for (const address of list) assert.ok(!samePage(PAGE, address), `${point}: ${JSON.stringify(address)}`);
+});
+
+test('el servidor: «ſ» es «s», un nombre con acentos es el mismo servidor que su forma xn--, y un servidor con puerto propio se compara con él', () => {
+  assert.ok(samePage('https://www.casco.example/', 'https://www.caſco.example/'));
+  for (const written of ['https://xn--sealizacin-u9a5a.example/gu%C3%ADas/', 'https://SEÑALIZACIÓN.example/guías', 'https://www.señalización.example/gu%C3%ADas/']) {
+    assert.ok(samePage('https://señalización.example/guías/', written), written);
+  }
+  assert.ok(!samePage('https://señalización.example/guías/', 'https://senalizacion.example/guías/'));
+  assert.ok(samePage('https://www.fabricante.example:8443/x', 'http://fabricante.example:8443/x/'));
+  assert.ok(!samePage('https://www.fabricante.example:8443/x', 'https://www.fabricante.example/x'));
+  // La plantilla de un sitio que sirve «//producto/» como «/producto/»: con dos diagonales es la misma página; con su
+  // consulta, otra.
+  assert.ok(samePage('https://www.plantilla.example/producto/', 'https://www.plantilla.example//producto/'));
+  assert.ok(!samePage('https://www.plantilla.example/producto/', 'https://www.plantilla.example//producto/?producto=1'));
+});
+
+// En un texto: las mismas grafías dentro de un href, una frase, una cadena de JSON y un srcset.
+const WRITTEN_IN = {
+  href: address => `<p>Antes</p><a href="${address}">Enlace</a><p>Después</p>`,
+  frase: address => `<p>Más información en ${address} hoy.</p>`,
+  json: address => `<script type="application/json">${JSON.stringify({ url: address })}</script>`,
+  srcset: address => `<img srcset="${address} 1x, /foto.png 2x" alt="">`,
+};
+// Lo que termina una dirección escrita en un texto (una comilla, un espacio) no puede ir en ella: esa grafía la lee el
+// escáner en el valor entero de un atributo.
+const writable = address => !/[\s'"]/.test(address);
+
+test('en un texto, cada grafía que el navegador abre como la página se encuentra en un href, una frase, un JSON y un srcset', () => {
+  const findPage = addressFinder([PAGE, 'https://www.otra.example/']);
+  for (const [point, list] of Object.entries(READ_AS_PAGE)) {
+    for (const address of list.filter(writable)) {
+      for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findPage(write(address)), [PAGE], `${point}, ${where}: ${JSON.stringify(address)}`);
+    }
+  }
+  // «ftp://» lleva «//», y en un texto «//» empieza una dirección; un texto también se lee con su %XX decodificado, así
+  // que «%23» ahí es un «#»; los signos del final, abajo.
+  for (const [point, list] of Object.entries(NOT_READ_AS_PAGE)) {
+    for (const address of list.filter(address => writable(address) && !address.startsWith('ftp:') && !address.includes('%23') && !/[.,;:!?)\]]$/.test(address))) {
+      for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findPage(write(address)), [], `${point}, ${where}: ${JSON.stringify(address)}`);
+    }
+  }
+  // Los signos al final de una dirección escrita pueden ser la puntuación de la frase: se lee sin ellos y con ellos. Así
+  // «…/guias/x/..» es la página (con ellos), y «…/guias/..», que el navegador abre como «…/recursos/», también se toma
+  // por ella (sin ellos): una falsa alarma posible, en el lado seguro.
+  for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findPage(write('https://www.fabricante.example/recursos/guias/..')), [PAGE], where);
+});
+
+test('en un texto, una dirección de la lista con puerto propio, la plantilla con dos diagonales y «ſ» en el servidor se encuentran', () => {
+  const findList = addressFinder(['https://www.fabricante.example:8443/x', 'https://www.plantilla.example/producto/', 'https://www.casco.example/']);
+  for (const [address, expected] of [
+    ['http://fabricante.example:8443/x/', ['https://www.fabricante.example:8443/x']], ['https://www.fabricante.example/x', []], ['https://www.fabricante.example:8080/x', []],
+    ['https://www.plantilla.example//producto/', ['https://www.plantilla.example/producto/']], ['https://www.plantilla.example//producto/?producto=1', []],
+    ['https://www.caſco.example/', ['https://www.casco.example/']],
+  ]) {
+    for (const [where, write] of Object.entries(WRITTEN_IN)) assert.deepEqual(findList(write(address)), expected, `${where}: ${address}`);
+  }
+});
+
+test('en un texto, «&» justo después de la ruta termina la dirección, también una que el navegador limpia; lo que continúa la ruta es otra', () => {
+  const findPage = addressFinder([PAGE]);
+  for (const text of [
+    'https://otro.example/ir?u=https://www.fabricante.example/recursos/./guias/&x=1', 'https://otro.example/ir?u=https://www.fabricante.example:0443/recursos/guias&x=1',
+    `https://otro.example/ir?u=${encodeURIComponent('https://www.fabricante.example//recursos/guias/')}&x=1`, 'https://www.fabricante.example/recursos/guias&x=1',
+  ]) assert.deepEqual(findPage(text), [PAGE], text);
+  for (const text of ['https://www.fabricante.example/recursos/guias-&x=1', 'https://www.fabricante.example/recursos/guias/x&y', 'https://www.fabricante.example/recursos/./guias/09-catalogo/']) {
+    assert.deepEqual(findPage(text), [], text);
+  }
+});
