@@ -616,3 +616,45 @@ test('una norma es una designación: una sola palabra sin número se rechaza; va
     for (const text of ['Aprobado por NIOSH', 'Norma sintética', 'Z87', 'EN388', 'Categoría III', 'Clase E']) assert.deepEqual(errorsOf({ status, standards: [norm(text)] }), [], `${status} ${text}`);
   }
 });
+
+test('addressProblem rechaza un segmento «.» o «..» en la ruta, escrito tal cual o con %2e, porque el navegador lo resuelve y abre otra dirección', () => {
+  // Lo esperado está escrito a mano, caso por caso: el segmento como está escrito y lo que va antes de él.
+  const resolves = (segment, before) => `lleva el segmento «${segment}» en la ruta, después de «${before}», y el navegador lo resuelve y abre otra dirección`;
+  for (const [value, problem] of [
+    ['https://f.example/a/../b', resolves('..', 'https://f.example/a')], ['https://f.example/a/./b', resolves('.', 'https://f.example/a')],
+    ['https://f.example/./a', resolves('.', 'https://f.example')], ['https://f.example/a/%2e%2e/b', resolves('%2e%2e', 'https://f.example/a')],
+    ['https://f.example/a/%2E/b', resolves('%2E', 'https://f.example/a')], ['https://f.example/a/.%2e/b', resolves('.%2e', 'https://f.example/a')],
+    ['https://f.example/a/%2E./b', resolves('%2E.', 'https://f.example/a')], ['https://f.example/a/b/..', resolves('..', 'https://f.example/a/b')],
+    ['https://f.example/a/.', resolves('.', 'https://f.example/a')], ['https://f.example/a/..?x=1', resolves('..', 'https://f.example/a')],
+    ['https://www.fabricante.example/recursos/guias/./ficha/', resolves('.', '…/recursos/guias')],
+  ]) {
+    assert.equal(addressProblem(value), problem, value);
+    assert.equal(isHttpsAddress(value), false, value);
+  }
+  // Un punto que no es un segmento entero, o que va en la consulta o en el fragmento, no se resuelve.
+  for (const value of ['https://f.example/a/.b', 'https://f.example/a/b.', 'https://f.example/a/...', 'https://f.example/a/..b', 'https://f.example/a/%2e%2e%2e/b',
+    'https://f.example/a?x=/../b', 'https://f.example/a#/../b', 'https://f.example/a/%252e%252e/b', 'https://f.example/.well-known/x']) {
+    assert.equal(addressProblem(value), null, value);
+  }
+});
+
+test('addressProblem rechaza un servidor con un carácter que el navegador lee como otro; un nombre con acentos, su forma xn-- y las mayúsculas pasan', () => {
+  // Cada carácter con su código y lo que lee el navegador, escritos a mano.
+  for (const [value, server, character, code, read] of [
+    ['https://www.\u{1D426}arca.example/x', 'www.\u{1D426}arca.example', '\u{1D426}', 'U+1D426', 'm'],
+    ['https://www.\u{1D52A}arca.example/x', 'www.\u{1D52A}arca.example', '\u{1D52A}', 'U+1D52A', 'm'],
+    ['https://ſitio.example/x', 'ſitio.example', 'ſ', 'U+017F', 's'],
+    ['https://www.ᵐarca.example/x', 'www.ᵐarca.example', 'ᵐ', 'U+1D50', 'm'],
+    ['https://cªsa.example/x', 'cªsa.example', 'ª', 'U+00AA', 'a'],
+    ['https://sitio¹.example/x', 'sitio¹.example', '¹', 'U+00B9', '1'],
+    ['https://ﬁbra.example/x', 'ﬁbra.example', 'ﬁ', 'U+FB01', 'fi'],
+    ['https://www.ｍarca.example/x', 'www.ｍarca.example', 'ｍ', 'U+FF4D', 'm'],
+    ['https://www.Ｍarca.example/x', 'www.Ｍarca.example', 'Ｍ', 'U+FF2D', 'm'],
+  ]) {
+    assert.equal(addressProblem(value), `el servidor «${server}» lleva «${character}» (${code}), que el navegador lee como «${read}»`, value);
+  }
+  for (const value of ['https://diseño.example/x', 'https://café.example/x', 'https://pingüino.example/x', 'https://straße.example/x', 'https://xn--fabricacin-9db.mx/ficha',
+    'https://WWW.MARCA.EXAMPLE/X', 'https://DISEÑO.example/x', 'https://diseño.example/x']) {
+    assert.equal(addressProblem(value), null, value);
+  }
+});

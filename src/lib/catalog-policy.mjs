@@ -31,8 +31,10 @@ const SITE_HOSTNAME = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
  * texto, mide más de `MAX_ADDRESS_LENGTH` caracteres, no empieza con «https://», tiene un espacio o un salto de línea o
  * un carácter que no se ve (los mismos que no puede llevar el texto de una ficha, `invisibleAt`), lleva una diagonal
  * invertida, no se puede leer como dirección, lleva usuario o contraseña (también vacíos: «https://@sitio.mx»), lleva un
- * puerto, o su servidor no es el nombre de un sitio: al menos un punto, cada parte de letras, cifras y guiones (un
- * nombre con acentos se escribe con sus letras o en su forma xn--), sin punto al final y sin ser una dirección IP. Un
+ * puerto, su servidor lleva un carácter que el navegador lee como otro («𝐦», «ſ», una letra de ancho completo:
+ * `mappedCharacter`), su servidor no es el nombre de un sitio: al menos un punto, cada parte de letras, cifras y guiones
+ * (un nombre con acentos se escribe con sus letras o en su forma xn--), sin punto al final y sin ser una dirección IP,
+ * o su ruta lleva un segmento «.» o «..» (también escrito «%2e»), que el navegador resuelve y abre otra dirección. Un
  * navegador lee «https:/servidor/x» o «https:servidor/x» como una dirección dentro del propio sitio. No se exige que
  * la dirección esté escrita como la reescribe el navegador: una con acentos o sin la diagonal final es correcta. Las
  * frases que dicen algo de la dirección («tiene…», «lleva…», «no empieza…», «mide…») se leen después de «la dirección»
@@ -57,10 +59,34 @@ export function addressProblem(value) {
   const bracket = authority.startsWith('[') ? authority.indexOf(']') : -1;
   const host = bracket === -1 ? authority.split(':', 1)[0] : authority.slice(0, bracket + 1);
   if (bracket === -1 && host !== authority) return `lleva un puerto («${authority.slice(host.length)}»)`;
+  const mapped = mappedCharacter(host);
+  if (mapped) return `el servidor «${host}» lleva «${mapped.character}» (${mapped.code}), que el navegador lee como «${mapped.read}»`;
   let url;
   try { url = new URL(value); } catch { return 'no se puede leer como dirección'; }
   if (bracket !== -1 || !host.split('.').every(label => SITE_LABEL.test(label)) || !host.includes('.')
     || !SITE_HOSTNAME.test(url.hostname) || IP_ADDRESS.test(url.hostname)) return `el servidor «${host}» no es el nombre de un sitio`;
+  // Un segmento «.» o «..» de la ruta, también escrito con %2e: el navegador lo resuelve antes de abrir la dirección.
+  const pathStart = 'https://'.length + authority.length;
+  const path = value.slice(pathStart).split(/[?#]/, 1)[0];
+  let slash = 0;
+  for (const segment of path.split('/').slice(1)) {
+    if (/^(?:\.|%2e){1,2}$/i.test(segment)) return `lleva el segmento «${segment}» en la ruta, ${placeIn(value, pathStart + slash, addressTail)}, y el navegador lo resuelve y abre otra dirección`;
+    slash += segment.length + 1;
+  }
+  return null;
+}
+/**
+ * El primer carácter de un servidor que el navegador lee como otro, salvo una mayúscula como su minúscula: el que su
+ * forma de compatibilidad de Unicode (NFKC) cambia («𝐦», «ſ», «ª», «¹», «ﬁ», una letra de ancho completo). Las letras
+ * con acentos («ñ», «é», «ü», «ß», también escritas con el acento aparte) no cambian. `null` si no hay ninguno.
+ * @param {string} host
+ */
+function mappedCharacter(host) {
+  if (PLAIN_TEXT.test(host)) return null;
+  for (const character of host.normalize('NFC')) {
+    const read = character.normalize('NFKC');
+    if (read !== character) return { character, code: `U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`, read: read.toLowerCase() };
+  }
   return null;
 }
 /** Una dirección `https` escrita completa: sin nada de lo que dice `addressProblem`. */

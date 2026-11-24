@@ -321,3 +321,12 @@ test('el visor de Google Drive donde está el catálogo de MR Seguridad no es el
   ] }] };
   assert.match(photoSourceErrors({ products: [withPhotoFrom('marca-a', 'https://plataforma.example/catalogos/marca-a/foto')] }, registry)[0], /la foto viene de plataforma\.example, pero el sitio de Marca A en el registro es marca-a\.example\./);
 });
+
+test('el validador rechaza una dirección con un segmento «..» en la ruta y la página de una foto con un servidor que el navegador lee como otro, con el mensaje entero', async () => {
+  const dots = product(1, { image: urlImage, documents: [{ label: 'Ficha técnica', url: 'https://www.ansell.com/mx/es/x/../ficha.pdf' }] });
+  const letter = product(2, { image: { ...urlImage, sourceUrl: 'https://www.\u{1D41A}nsell.com/mx/es/ficha' } });
+  assert.deepEqual((await validate(catalogOf(dots, letter))).errors, [
+    'products[0].documents[0].url: la dirección lleva el segmento «..» en la ruta, después de «…/www.ansell.com/mx/es/x», y el navegador lo resuelve y abre otra dirección; escribe la dirección completa de la página o del documento del fabricante.',
+    'products[1].image.sourceUrl: el servidor «www.\u{1D41A}nsell.com» lleva «\u{1D41A}» (U+1D41A), que el navegador lee como «a»; escribe la página de donde viene la foto.',
+  ]);
+});
