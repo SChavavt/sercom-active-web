@@ -330,3 +330,18 @@ test('el validador rechaza una dirección con un segmento «..» en la ruta y la
     'products[1].image.sourceUrl: el servidor «www.\u{1D41A}nsell.com» lleva «\u{1D41A}» (U+1D41A), que el navegador lee como «a»; escribe la página de donde viene la foto.',
   ]);
 });
+
+test('la página de una foto que el registro tiene como recurso que no se publica de otra entidad tampoco se publica', () => {
+  // Registro sintético: la página está en el servidor de Marca A, pero el registro la anota en Marca B, sin publicarse.
+  const registry = { sources: [
+    { entity_id: 'marca-a', name: 'Marca A', entity_type: 'brand', resources: [{ type: 'web', url: 'https://www.marca-a.example/', verification: 'accesible (2026-11-23)' }] },
+    { entity_id: 'marca-b', name: 'Marca B', entity_type: 'brand', resources: [{ type: 'landing', url: 'https://www.marca-a.example/recursos-compartidos/', verification: 'no enlazar: página sintética' }] },
+  ] };
+  for (const sourceUrl of ['https://www.marca-a.example/recursos-compartidos/', 'https://marca-a.example/recursos-compartidos']) {
+    assert.deepEqual(photoSourceErrors({ products: [withPhotoFrom('marca-a', sourceUrl)] }, registry), [
+      'products[0] (ficha-marca-a).image.sourceUrl: esa página está en el registro de investigación como «landing: no enlazar: página sintética» y no se publica, así que no puede ser la página de una foto: la ficha la enlazaría en el crédito. Escribe la página del producto en el sitio del fabricante de donde viene la foto.',
+    ], sourceUrl);
+  }
+  // Otra página del mismo servidor pasa.
+  assert.deepEqual(photoSourceErrors({ products: [withPhotoFrom('marca-a', 'https://www.marca-a.example/producto/1')] }, registry), []);
+});
