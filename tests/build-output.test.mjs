@@ -431,6 +431,9 @@ test('/marcas/#catalogos lista exactamente las marcas con un catálogo en PDF o 
       detail: unescape(paragraph.match(/<span class="catalog-sources__detail t-small">([^<]*)<\/span>/)?.[1] ?? '') || null,
     }));
     assert.deepEqual(found.map(link => [link.label, link.href]), links.map(link => [link.label, link.url]), brand.id);
+    // Su nombre accesible, entero en aria-label: la etiqueta, la marca y que abre otra pestaña.
+    const labels = row.split('<p class="catalog-sources__link">').slice(1).map(paragraph => unescape(paragraph.match(/<a [^>]*\baria-label="([^"]*)"/)?.[1] ?? ''));
+    assert.deepEqual(labels, links.map(link => `${link.label}, ${brand.name} (se abre en otra pestaña)`), brand.id);
     links.forEach((link, position) => assertDetail(found[position], link, `/marcas/ ${brand.id} ${link.label}`));
   });
   assert.ok(!section.includes(SITE_LABEL), 'la sección no lista el sitio del fabricante');
