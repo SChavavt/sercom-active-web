@@ -305,3 +305,21 @@ test('en un texto, «&» justo después de la ruta termina la dirección, tambi�
     assert.deepEqual(findPage(text), [], text);
   }
 });
+
+test('en un JSON o un script, un tabulador o un salto de línea escrito con escape dentro de la dirección se quita, y uno al final la termina', () => {
+  const findPage = addressFinder([PAGE]);
+  // Dentro de la ruta: el script recibe el tabulador o el salto de línea, y el navegador lo quita de la dirección.
+  for (const text of [
+    '{"u":"https://www.fabricante.example/recursos/gui\\tas/"}', '{"u":"https://www.fabricante.example/recursos/gui\\nas/"}',
+    '{"u":"https:\\/\\/www.fabricante.example\\/recursos\\/gui\\r\\nas\\/"}', '<script>location.href = "https://www.fabri\\u0009cante.example/recursos/guias/";</script>',
+    "<script>location.href = 'https://www.fabricante.example/recursos/gui\\x0Aas/';</script>", '{"u":"https://www.fabricante.example/recursos/gui\\u000Das/"}',
+  ]) assert.deepEqual(findPage(text), [PAGE], text);
+  // Al final de la dirección, el escape la termina: lo que sigue es otro texto.
+  for (const text of ['{"t":"Ver https://www.fabricante.example/recursos/guias/\\nOtra línea"}', '{"t":"https://www.fabricante.example/recursos/guias\\tsiguiente"}']) {
+    assert.deepEqual(findPage(text), [PAGE], text);
+  }
+  // Otra página escrita con escapes sigue siendo otra página.
+  for (const text of ['{"u":"https://www.fabricante.example/recursos/gui\\tas/09-catalogo/"}', '{"u":"https://www.fabricante.example/recursos/guias\\\\nuevo"}']) {
+    assert.deepEqual(findPage(text), [], text);
+  }
+});

@@ -184,6 +184,9 @@ const NOT_BEFORE_WWW = /[\p{L}\p{N}@._%+/:-]/u;
 // Lo que termina una dirección escrita en un texto, y los signos que no son parte de ella cuando van al final.
 const ADDRESS_END = /[\s"'<>`{}|^«»“”‘’]/gu;
 const TRAILING_SIGNS = /[.,;:!?)\]]+$/;
+// Un tabulador o un salto de línea escrito con escape de JavaScript o de JSON, y una diagonal invertida escrita («\\»).
+const ESCAPED_BREAK = /\\\\|\\(?:[tnr]|u000[9ad]|x0[9ad])/gi;
+const ESCAPED_BREAK_TEST = /\\(?:[tnr]|u000[9ad]|x0[9ad])/i;
 
 /**
  * Prepara la búsqueda de unas direcciones dentro de textos. Devuelve una función que recibe un texto y devuelve las
@@ -232,6 +235,12 @@ export function addressFinder(addresses) {
       }
     };
     scanDecoded(text);
+    // Un tabulador o un salto de línea escrito con escape en un JSON o un script («\t», «\n», «\r», «\u0009», «\x0A»…):
+    // el script recibe el carácter. Dos lecturas más: sin él, como lo quita el navegador de una dirección, y con un
+    // espacio en su lugar, donde termina la dirección. «\\» es una diagonal invertida escrita, no un escape.
+    if (ESCAPED_BREAK_TEST.test(text)) {
+      for (const by of ['', ' ']) scanDecoded(text.replace(ESCAPED_BREAK, escape => (escape === '\\\\' ? escape : by)));
+    }
     // El valor de un atributo entre comillas con tabuladores o saltos de línea: el navegador los quita de la dirección.
     if (/[\t\n\r]/.test(text)) {
       for (const quoted of text.matchAll(/"([^"<>]*[\t\n\r][^"<>]*)"|'([^'<>]*[\t\n\r][^'<>]*)'/g)) {
