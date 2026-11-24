@@ -106,7 +106,7 @@ test('se revisa todo <a> o <area> que abre otra pestaña, con cualquier nombre d
     assert.deepEqual(await check(page(`<a href="https://fabricante.invalid/" target="${target}" rel="noopener">Sitio del fabricante${NEW_TAB}</a>`)), [], target);
   }
   // No abren otra pestaña: sin target, vacío, _self, _parent o _top.
-  for (const target of ['', ' ', '_self', '_PARENT', '_top']) assert.deepEqual(await check(page(bare(target))), [], JSON.stringify(target));
+  for (const target of ['', '_self', '_PARENT', '_top']) assert.deepEqual(await check(page(bare(target))), [], JSON.stringify(target));
   assert.deepEqual(await check(page('<a href="https://fabricante.invalid/">Sitio del fabricante</a>')), []);
 });
 
@@ -143,4 +143,43 @@ test('en /marcas/ dos destinos que difieren solo en la diagonal final son el mis
     'dos enlaces se llaman «Catálogos» y llevan a lugares distintos (/marcas/#catalogos y /marcas/): agrega a cada uno, con texto oculto, lo que los distingue (la marca)',
   ]);
   assert.equal((await check(list('<a href="/marcas/alfa/">Alfa</a><a href="/marcas/beta/">Alfa</a>'))).length, 1);
+});
+
+test('el target se lee como está escrito: con un espacio o un tabulador, abre otra pestaña', async () => {
+  const page = body => ({ 'marcas/marca-ficticia/index.html': doc('Marca ficticia', `<h1>Marca ficticia</h1>${body}`) });
+  const bare = target => `<a href="https://fabricante.invalid/" target="${target}">Sitio del fabricante</a>`;
+  for (const target of [' _self', '_self ', '_top ', '\t_parent', ' ', '\t']) {
+    assert.deepEqual((await check(page(bare(target)))).map(problem => problem.message), [
+      'el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external',
+      'el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin decirlo: lleva el texto oculto «(se abre en otra pestaña)» (.vh), como MoreLink con external',
+    ], JSON.stringify(target));
+  }
+  // Siguen en la misma pestaña: vacío y _self, _parent o _top con cualquier mayúscula.
+  for (const target of ['', '_SELF', '_Self', '_Parent', '_TOP']) assert.deepEqual(await check(page(bare(target))), [], JSON.stringify(target));
+});
+
+test('el texto oculto no cuenta si algo entre él y el enlace lo esconde o lo saca del enlace, y dice qué', async () => {
+  const page = body => ({ 'marcas/marca-ficticia/index.html': doc('Marca ficticia', `<h1>Marca ficticia</h1>${body}`) });
+  const messages = async body => (await check(page(body))).map(problem => problem.message);
+  const link = inner => `<a href="https://fabricante.invalid/" target="_blank" rel="noopener">Sitio del fabricante${inner}</a>`;
+  // El nombre del enlace en el mensaje es el que calcula la revisión (accessibleName): lleva el texto oculto.
+  const start = (name = 'Sitio del fabricante (se abre en otra pestaña)') => `el enlace «${name}» (https://fabricante.invalid/) abre otra pestaña sin decirlo: su texto oculto «(se abre en otra pestaña)» `;
+  const cases = [
+    ['<span class="vh" hidden> (se abre en otra pestaña)</span>', 'está escondido con el atributo hidden y no se lee; ponlo fuera, como MoreLink con external'],
+    [`<span hidden="">${NEW_TAB}</span>`, 'está escondido con el atributo hidden y no se lee; ponlo fuera, como MoreLink con external'],
+    ['<span class="vh" style="display:none"> (se abre en otra pestaña)</span>', 'está escondido con style="display:none" y no se lee; ponlo fuera, como MoreLink con external'],
+    [`<span style="color: red; DISPLAY: None !important">${NEW_TAB}</span>`, 'está escondido con style="display:none" y no se lee; ponlo fuera, como MoreLink con external'],
+    [`<span style="visibility:hidden">${NEW_TAB}</span>`, 'está escondido con style="visibility:hidden" y no se lee; ponlo fuera, como MoreLink con external'],
+    [`<span><span style="visibility: collapse">${NEW_TAB}</span></span>`, 'está escondido con style="visibility:collapse" y no se lee; ponlo fuera, como MoreLink con external'],
+    [`<template>${NEW_TAB}</template>`, 'está dentro de un <template>, que el navegador no muestra ni lee; ponlo fuera, como MoreLink con external'],
+    [`<a href="/marcas/">otra${NEW_TAB}</a>`, 'está dentro de otro enlace (<a>), y el navegador cierra el primero donde empieza el segundo; ponlo en el enlace mismo, como MoreLink con external', 'Sitio del fabricante otra (se abre en otra pestaña)'],
+  ];
+  for (const [inner, reason, name] of cases) assert.deepEqual(await messages(link(inner)), [start(name) + reason], inner);
+  // Siguen pasando: el texto oculto visible en un <span> dentro de un <span>, y con atributos que no lo esconden.
+  for (const inner of [`<span><span>${NEW_TAB}</span></span>`, `<span style="display:inline" aria-hidden="false">${NEW_TAB}</span>`,
+    `<span style="visibility:visible">${NEW_TAB}</span>`, `<span data-hidden="true">${NEW_TAB}</span>`]) {
+    assert.deepEqual(await messages(link(inner)), [], inner);
+  }
+  // Con un aviso que se lee y otro que no, pasa.
+  assert.deepEqual(await messages(link(`${NEW_TAB}<span hidden>${NEW_TAB}</span>`)), []);
 });

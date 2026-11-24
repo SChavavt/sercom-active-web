@@ -168,9 +168,29 @@ const accessibleName = element => (element.attributes.get('aria-label') ?? eleme
 const NEW_TAB_TEXT = '(se abre en otra pestaña)';
 /** Los destinos (`target`) que no abren otra pestaña; cualquier otro nombre sí («_blank», «_new», «nueva»). */
 const SAME_TAB_TARGETS = ['', '_self', '_parent', '_top'];
-/** Un `<a>` o un `<area>` que abre otra pestaña: su `target`, sin espacios y en minúsculas, no es uno de `SAME_TAB_TARGETS`. */
+/**
+ * Un `<a>` o un `<area>` que abre otra pestaña: su `target`, en minúsculas y como está escrito (un espacio o un tabulador
+ * también cuentan: « _self» abre otra pestaña), no es uno de `SAME_TAB_TARGETS`.
+ */
 const opensAnotherTab = element => (element.name === 'a' || element.name === 'area')
-  && element.attributes.has('target') && !SAME_TAB_TARGETS.includes((element.attributes.get('target') ?? '').trim().toLowerCase());
+  && element.attributes.has('target') && !SAME_TAB_TARGETS.includes((element.attributes.get('target') ?? '').toLowerCase());
+/**
+ * Por qué el lector de pantalla no lee el texto oculto `notice` del enlace `link`, o null si lo lee: sube desde el
+ * texto hasta el enlace (sin contarlo) y da el primer motivo que encuentra: otro `<a>` en medio, un `<template>`,
+ * aria-hidden="true", el atributo hidden o un style en línea con display:none, visibility:hidden o collapse, o
+ * content-visibility:hidden. Una regla de una hoja de estilo que lo esconda no se ve aquí.
+ */
+const unreadBecause = (notice, link) => {
+  for (let node = notice; node && node !== link; node = node.parent) {
+    if (node.name === 'a' && node !== notice) return 'está dentro de otro enlace (<a>), y el navegador cierra el primero donde empieza el segundo; ponlo en el enlace mismo';
+    if (node.name === 'template') return 'está dentro de un <template>, que el navegador no muestra ni lee; ponlo fuera';
+    if ((node.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') return 'está dentro de aria-hidden="true" y no se lee; ponlo fuera';
+    if (node.attributes.has('hidden')) return 'está escondido con el atributo hidden y no se lee; ponlo fuera';
+    const hiding = declarationsOf(node.attributes.get('style') ?? '').find(hidesElement);
+    if (hiding) return `está escondido con style="${hiding.property}:${hiding.value.toLowerCase()}" y no se lee; ponlo fuera`;
+  }
+  return null;
+};
 /** Dos destinos de /marcas/ son el mismo lugar si difieren solo en las diagonales del final de la ruta. */
 const samePlace = (a, b) => {
   const place = href => href.replace(/^([^?#]*?)\/+(?=$|[?#])/, '$1');
@@ -1541,8 +1561,11 @@ export const CHECKS = [
   // R-ENLACE-01 · Los enlaces a otro sitio (los catálogos y el sitio de cada fabricante, el crédito de una foto): cada
   // enlace que abre otra pestaña (un `<a>` o un `<area>` con un `target` que no es vacío, `_self`, `_parent` ni `_top`:
   // `_blank`, `_new` o cualquier nombre) lleva `rel` con `noopener` y, para los lectores de pantalla, el texto oculto
-  // «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. El texto oculto cuenta si el
-  // lector lo lee: dentro del enlace y fuera de aria-hidden="true"; con `aria-label`, el lector lee la etiqueta, así que
+  // «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. El `target` se lee como está
+  // escrito, en minúsculas: « _self» o «_top » abren otra pestaña. El texto oculto cuenta si el lector lo lee: dentro
+  // del enlace, sin otro `<a>` en medio, fuera de un `<template>` y sin que él ni lo que lo contiene lleve
+  // aria-hidden="true", el atributo hidden o un style en línea que lo esconda (display:none, visibility:hidden o
+  // collapse, content-visibility:hidden); una regla de una hoja de estilo que lo esconda no se ve aquí. Con `aria-label`, el lector lee la etiqueta, así que
   // ella debe decirlo; con `aria-labelledby` falla (el nombre viene de otro elemento: el texto oculto va en el enlace),
   // y un `<area>` falla siempre (no puede llevar texto: va un enlace). Y en /marcas/,
   // donde cada marca repite «Catálogo del fabricante (PDF)» o «Catálogo en línea del fabricante», dos enlaces con el
@@ -1564,12 +1587,12 @@ export const CHECKS = [
         const where = `el enlace «${accessibleName(link)}» (${href.slice(0, 80)})`;
         if (!(link.attributes.get('rel') ?? '').toLowerCase().split(/\s+/).includes('noopener')) problems.push(`${where} abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external`);
         const hidden = allElements(link).filter(element => hasClass(element, 'vh') && textOf(element).includes(NEW_TAB_TEXT));
-        // Se lee si, subiendo desde el texto oculto, se llega al enlace antes que a un aria-hidden="true".
-        const read = hidden.filter(element => closest(element, node => node === link || (node.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') === link);
+        // Se lee si, subiendo desde el texto oculto, se llega al enlace sin nada que lo esconda o lo saque de él.
+        const read = hidden.filter(element => unreadBecause(element, link) === null);
         if (link.attributes.has('aria-labelledby')) problems.push(`${where} abre otra pestaña y toma su nombre de aria-labelledby: quítalo y deja el nombre y el texto oculto «${NEW_TAB_TEXT}» (.vh) dentro del enlace, como MoreLink con external`);
         else if (link.attributes.has('aria-label')) {
           if (!(link.attributes.get('aria-label') ?? '').includes(NEW_TAB_TEXT)) problems.push(`${where} abre otra pestaña y su aria-label no lo dice: el lector de pantalla lee la etiqueta y no el texto oculto; quita aria-label o termina la etiqueta con «${NEW_TAB_TEXT}»`);
-        } else if (!read.length && hidden.length) problems.push(`${where} abre otra pestaña sin decirlo: su texto oculto «${NEW_TAB_TEXT}» está dentro de aria-hidden="true" y no se lee; ponlo fuera, como MoreLink con external`);
+        } else if (!read.length && hidden.length) problems.push(`${where} abre otra pestaña sin decirlo: su texto oculto «${NEW_TAB_TEXT}» ${unreadBecause(hidden[0], link)}, como MoreLink con external`);
         else if (!read.length) problems.push(`${where} abre otra pestaña sin decirlo: lleva el texto oculto «${NEW_TAB_TEXT}» (.vh), como MoreLink con external`);
       }
       if (page.route === routes.brands) {
