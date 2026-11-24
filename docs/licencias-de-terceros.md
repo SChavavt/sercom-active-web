@@ -14,6 +14,8 @@ Solo los iconos que una página usa llegan a su HTML (se imprimen en línea al c
 
 Nada más de terceros llega al sitio compilado, salvo las fotografías de producto cuando las haya: los scripts y las hojas de estilo de `dist/_astro/` salen del código del proyecto (`src/`), y Astro y las demás dependencias de `package.json` se usan para compilar y revisar, sin copiarse a la salida.
 
+Las dependencias de `package.json` son Astro (MIT), sharp, `@astrojs/check` (MIT) y TypeScript (Apache-2.0). sharp 0.35.5 (Apache-2.0) es la biblioteca con la que Astro optimiza las imágenes; sus paquetes binarios (`@img/sharp-*`) traen libvips (LGPL-3.0-or-later) sin cambios. Está declarada con la versión exacta del lockfile porque el validador la usa para revisar que la compilación pueda leer cada foto (`scripts/product-photos.mjs`). Ninguna de ellas se copia a la salida: lo que llega son las imágenes que sharp produce.
+
 ## Tipografía Archivo · SIL Open Font License 1.1
 
 Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo). Sin nombre reservado.

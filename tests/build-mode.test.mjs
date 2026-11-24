@@ -78,7 +78,9 @@ test('«npm run verify» compila los dos modos y revisa las dos salidas', () => 
 });
 
 test('no se agregaron dependencias', () => {
-  assert.deepEqual(packageJson.dependencies, { astro: '7.4.13' });
+  // sharp es la biblioteca con la que Astro optimiza las imágenes; el validador la usa para revisar que la compilación
+  // pueda leer cada foto (scripts/product-photos.mjs), con la versión exacta del lockfile.
+  assert.deepEqual(packageJson.dependencies, { astro: '7.4.13', sharp: '0.35.5' });
   assert.deepEqual(packageJson.devDependencies, { '@astrojs/check': '0.9.12', typescript: '6.0.3' });
 });
 
