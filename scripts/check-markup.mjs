@@ -175,19 +175,26 @@ const SAME_TAB_TARGETS = ['', '_self', '_parent', '_top'];
 const opensAnotherTab = element => (element.name === 'a' || element.name === 'area')
   && element.attributes.has('target') && !SAME_TAB_TARGETS.includes((element.attributes.get('target') ?? '').toLowerCase());
 /**
- * Por qué el lector de pantalla no lee el texto oculto `notice` del enlace `link`, o null si lo lee: sube desde el
- * texto hasta el enlace (sin contarlo) y da el primer motivo que encuentra: otro `<a>` en medio, un `<template>`,
- * aria-hidden="true", el atributo hidden o un style en línea con display:none, visibility:hidden o collapse, o
- * content-visibility:hidden. Una regla de una hoja de estilo que lo esconda no se ve aquí.
+ * Por qué el lector de pantalla no lee el texto oculto `notice` del enlace `link`, o null si lo lee. El navegador cierra
+ * un `<a>` donde empieza otro, y el árbol de `parseHtml` no: aquí se cuenta. El texto no se lee si él mismo es un `<a>`;
+ * si, subiendo desde él hasta el enlace (sin contarlo), hay otro `<a>`, un `<template>`, aria-hidden="true", el
+ * atributo hidden o inert, o un style en línea con display:none, visibility:hidden o collapse, o
+ * content-visibility:hidden; o si dentro del enlace empieza otro `<a>` antes que él. Una regla de una hoja de estilo
+ * que lo esconda no se ve aquí.
  */
 const unreadBecause = (notice, link) => {
+  if (notice.name === 'a') return 'es él mismo un enlace (<a>), y el navegador cierra el primero donde empieza el segundo; escríbelo en un <span>';
   for (let node = notice; node && node !== link; node = node.parent) {
-    if (node.name === 'a' && node !== notice) return 'está dentro de otro enlace (<a>), y el navegador cierra el primero donde empieza el segundo; ponlo en el enlace mismo';
+    if (node.name === 'a') return 'está dentro de otro enlace (<a>), y el navegador cierra el primero donde empieza el segundo; ponlo en el enlace mismo';
     if (node.name === 'template') return 'está dentro de un <template>, que el navegador no muestra ni lee; ponlo fuera';
     if ((node.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') return 'está dentro de aria-hidden="true" y no se lee; ponlo fuera';
     if (node.attributes.has('hidden')) return 'está escondido con el atributo hidden y no se lee; ponlo fuera';
+    if (node.attributes.has('inert')) return 'está dentro de un elemento con el atributo inert y no se lee; ponlo fuera';
     const hiding = declarationsOf(node.attributes.get('style') ?? '').find(hidesElement);
     if (hiding) return `está escondido con style="${hiding.property}:${hiding.value.toLowerCase()}" y no se lee; ponlo fuera`;
+  }
+  if (allElements(link).some(element => element.name === 'a' && element.order < notice.order)) {
+    return 'va después de otro enlace (<a>) que empieza dentro de este, y el navegador cierra el primero donde empieza el segundo; ponlo antes de ese enlace';
   }
   return null;
 };
@@ -1563,9 +1570,12 @@ export const CHECKS = [
   // `_blank`, `_new` o cualquier nombre) lleva `rel` con `noopener` y, para los lectores de pantalla, el texto oculto
   // «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. El `target` se lee como está
   // escrito, en minúsculas: « _self» o «_top » abren otra pestaña. El texto oculto cuenta si el lector lo lee: dentro
-  // del enlace, sin otro `<a>` en medio, fuera de un `<template>` y sin que él ni lo que lo contiene lleve
-  // aria-hidden="true", el atributo hidden o un style en línea que lo esconda (display:none, visibility:hidden o
-  // collapse, content-visibility:hidden); una regla de una hoja de estilo que lo esconda no se ve aquí. Con `aria-label`, el lector lee la etiqueta, así que
+  // del enlace, sin otro `<a>` que empiece antes que él dentro del enlace (el navegador cierra el primero donde empieza
+  // el segundo) y sin ser él mismo un `<a>`, fuera de un `<template>` y sin que él ni lo que lo contiene lleve
+  // aria-hidden="true", el atributo hidden o inert, o un style en línea que lo esconda (display:none, visibility:hidden
+  // o collapse, content-visibility:hidden); una regla de una hoja de estilo que lo esconda no se ve aquí, ni un style
+  // escrito con una entidad con nombre («display&colon;none»). Un `<base>` con un `target` que abre otra pestaña falla:
+  // se lo da a cada enlace sin target. Un `<form target>` no es materia de esta revisión. Con `aria-label`, el lector lee la etiqueta, así que
   // ella debe decirlo; con `aria-labelledby` falla (el nombre viene de otro elemento: el texto oculto va en el enlace),
   // y un `<area>` falla siempre (no puede llevar texto: va un enlace). Y en /marcas/,
   // donde cada marca repite «Catálogo del fabricante (PDF)» o «Catálogo en línea del fabricante», dos enlaces con el
@@ -1578,6 +1588,11 @@ export const CHECKS = [
     title: 'Cada enlace que abre otra pestaña lleva rel con noopener y el texto oculto «(se abre en otra pestaña)», que el lector de pantalla lee, y en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo lugar',
     page(page) {
       const problems = [];
+      // Un <base> con target da ese destino a cada enlace que no trae el suyo.
+      for (const base of page.elements.filter(element => element.name === 'base' && element.attributes.has('target'))) {
+        const target = base.attributes.get('target') ?? '';
+        if (!SAME_TAB_TARGETS.includes(target.toLowerCase())) problems.push(`la página lleva <base target="${target}">: con él, cada enlace sin target abre otra pestaña sin decirlo; quítalo y pon el target en cada enlace que lo necesite, como MoreLink con external`);
+      }
       for (const link of page.elements.filter(opensAnotherTab)) {
         const href = link.attributes.get('href') ?? '';
         if (link.name === 'area') {
