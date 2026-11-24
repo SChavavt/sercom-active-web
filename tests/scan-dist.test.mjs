@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { CHECKS, RULES, SOON_EXPRESSIONS, scanDist } from '../scripts/scan-dist.mjs';
+import { CHECKS, RULES, SOON_EXPRESSIONS, decodeEntities, scanDist } from '../scripts/scan-dist.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 import { emptiedCatalog, loadProjectData, makeTree, readText, removeTree, ROOT } from './helpers.mjs';
 
@@ -482,6 +482,7 @@ const unshownNotices = notice => ({
   'content-visibility: hidden': `<aside style="content-visibility: hidden"><p>${notice}</p></aside>`,
   'display:none con un comentario de CSS': `<aside style="display:none/**/"><p>${notice}</p></aside>`,
   'display con un comentario de CSS antes del valor': `<aside style="display:/* oculto */ none"><p>${notice}</p></aside>`,
+  'display:none con su punto y coma escrito &semi;': `<aside style="display:none&semi;"><p>${notice}</p></aside>`,
   'visibility con un escape de CSS': `<aside style="visibility:\\68 idden"><p>${notice}</p></aside>`,
   '<iframe>': `<iframe>${notice}</iframe>`,
   '<noembed>': `<noembed>${notice}</noembed>`,
@@ -2217,6 +2218,10 @@ test('R-RULE-13 dice en --rules qué cuenta como la misma página y que la consu
   assert.match(doc, /cualquier otra forma de la misma página \(src\/lib\/address-match\.mjs\)/);
   assert.match(doc, /La consulta sí es parte de la página/);
   assert.match(doc, /utm_/);
+  // El valor de un atributo sin comillas, y lo que la revisión no ve.
+  assert.match(doc, /el de uno sin comillas, hasta el primer espacio o «>»/);
+  assert.match(doc, /tampoco ve una dirección cuyo usuario lleva un espacio/);
+  assert.match(doc, /un tabulador o un salto de línea escrito tal cual/);
 });
 
 // El crédito de la foto pasa en la página de su ficha solo si el registro tiene esa página como publicable.
@@ -2332,5 +2337,90 @@ test('R-RULE-13: una dirección del registro escrita tal cual dentro de una list
   for (const written of [
     '<p>Archivos: a.pdf,https://www.fabricante.example/recursos/guias/,b.pdf</p>',
     '<p data-archivos="a.pdf;https://www.fabricante.example/recursos/guias/;b.pdf">Archivos</p>',
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+});
+
+// Las entidades con nombre que el escáner decodifica, con el carácter que el navegador recibe por cada una, escrito a
+// mano (los que no se ven, con su escape). La excepción es el espacio duro: el escáner compara textos, y para él
+// «&nbsp;» es un espacio normal. Una que falte aquí o en el escáner hace fallar la prueba.
+const NAMED_REFERENCES = {
+  nbsp: ' ', NonBreakingSpace: ' ', quot: '"', QUOT: '"', apos: "'", lt: '<', LT: '<', gt: '>', GT: '>',
+  shy: '\u00AD', zwnj: '\u200C', zwj: '\u200D', ZeroWidthSpace: '\u200B', NoBreak: '\u2060',
+  aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
+  ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', iexcl: '¡', iquest: '¿', laquo: '«', raquo: '»', ndash: '–', mdash: '—', hellip: '…',
+  middot: '·', bull: '•', copy: '©', reg: '®', trade: '™', deg: '°', dollar: '$', euro: '€', cent: '¢', pound: '£', star: '☆', starf: '★',
+  commat: '@', period: '.', colon: ':', sol: '/', num: '#', percnt: '%', Tab: '\t', NewLine: '\n', quest: '?', equals: '=', lowbar: '_', UnderBar: '_',
+  bsol: '\\', plus: '+', semi: ';', comma: ',', excl: '!', ast: '*', midast: '*', lpar: '(', rpar: ')', lsqb: '[', lbrack: '[', rsqb: ']', rbrack: ']',
+  lcub: '{', lbrace: '{', rcub: '}', rbrace: '}', vert: '|', verbar: '|', VerticalLine: '|', grave: '`', DiacriticalGrave: '`', Hat: '^',
+};
+
+test('cada entidad con nombre que el escáner decodifica da el carácter que recibe el navegador (el espacio duro, un espacio normal); las demás quedan como están', () => {
+  for (const [name, character] of Object.entries(NAMED_REFERENCES)) assert.equal(decodeEntities(`a&${name};b`), `a${character}b`, name);
+  assert.equal(decodeEntities('a&amp;b&AMP;c'), 'a&b&c');
+  // «&amp;» se decodifica una sola vez: «&amp;lt;» es el texto «&lt;», no «<».
+  assert.equal(decodeEntities('&amp;lt; &amp;#47; &amp;semi;'), '&lt; &#47; &semi;');
+  // Una con nombre necesita su «;», distingue mayúsculas y, si no está en la lista, queda como está.
+  for (const text of ['a&bsol b', 'a&semi b', 'a&BSOL;b', 'a&Semi;b', 'a&mfr;b', 'a&centerdot;b', 'a&;b', 'a&#;b']) assert.equal(decodeEntities(text), text, text);
+});
+
+test('R-RULE-13: una dirección escrita con las entidades de sus signos se lee como la recibe el navegador, signo por signo', async () => {
+  // Diagonales invertidas escritas «&bsol;»: el navegador las lee como diagonales y abre la página.
+  assert.deepEqual(await leakFindings('<a href="https:&bsol;&bsol;www.fabricante.example&bsol;recursos&bsol;guias&bsol;">Guías</a>'), GUIDES_FOUND);
+  assert.deepEqual(await leakFindings('<a href="https:&bsol;&bsol;www.fabricante.example&bsol;recursos&bsol;otras&bsol;">Guías</a>'), []);
+  // En la consulta de una dirección escrita en una frase, cada entidad decodificada deja un par que solo cuenta una
+  // visita (o termina la dirección ahí), y la página es la del registro; sin decodificar, «&nombre;b» sería otro par y
+  // otra página. «&amp;» no entra: decodificada, empieza otro par.
+  for (const name of Object.keys(NAMED_REFERENCES)) {
+    assert.deepEqual(await leakFindings(`<p>Ver https://www.fabricante.example/recursos/guias/?utm_source=a&${name};b ahora</p>`), GUIDES_FOUND, name);
+  }
+  for (const name of ['mfr', 'centerdot', 'BSOL']) {
+    assert.deepEqual(await leakFindings(`<p>Ver https://www.fabricante.example/recursos/guias/?utm_source=a&${name};b ahora</p>`), [], name);
+  }
+});
+
+test('R-RULE-13: U+FEFF dentro del servidor no esconde la dirección en un srcset, un JSON, un refresco, una frase ni un atributo: el navegador lo quita', async () => {
+  for (const write of [
+    address => `<img srcset="${address} 1x, /foto.png 2x" alt="">`,
+    address => `<script type="application/json">${JSON.stringify({ url: address })}</script>`,
+    address => `<meta http-equiv="refresh" content="0; url=${address.replaceAll('\uFEFF', '&#xFEFF;')}">`,
+    address => `<p>Más información en ${address} hoy.</p>`,
+    address => `<p data-x="${address}">Guías</p>`,
+    address => `<a href="${address.replaceAll('\uFEFF', '&#65279;')}">Guías</a>`,
+  ]) {
+    const written = write('https://www.fabri\uFEFFcante.example/recursos/guias/');
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, JSON.stringify(written));
+    const neighbour = write('https://www.fabri\uFEFFcante.example/recursos/otras/');
+    assert.deepEqual(await leakFindings(neighbour), [], JSON.stringify(neighbour));
+  }
+});
+
+test('R-RULE-13: el valor de un atributo sin comillas se lee entero, hasta el primer espacio o «>», como lo corta el navegador', async () => {
+  // Una comilla, «<», «=» o «`» dentro de un valor sin comillas son un error de marcado, pero parte del valor.
+  for (const sign of ["'", '"', '<', '`', '=']) {
+    for (const written of [
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/guias/>Guías</a>`,
+      `<a class=enlace href = https://a${sign}b@www.fabricante.example/recursos/guias rel=noopener>Guías</a>`,
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/gu&Tab;ias/&num;x>Guías</a>`,
+    ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    for (const neighbour of [
+      `<a href=https://a${sign}b@www.fabricante.example/recursos/otras/>Guías</a>`,
+      `<a class=enlace href = https://a${sign}b@www.fabricante.example/recursos/guias-2 rel=noopener>Guías</a>`,
+    ]) assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});
+
+test('R-RULE-13, los límites que dice --rules: fuera del valor entero de un atributo, un usuario con un espacio o una llave esconde la dirección, y un tabulador escrito tal cual en una frase o en un script con «>» también', async () => {
+  for (const written of [
+    '<meta http-equiv="refresh" content="0; url=https://a b@www.fabricante.example/recursos/guias/">',
+    `<script type="application/json">${JSON.stringify({ url: 'https://a b@www.fabricante.example/recursos/guias/' })}</script>`,
+    '<img srcset="https://a{b}@www.fabricante.example/recursos/guias/ 1x" alt="">',
+    '<p>Ver https://www.fabricante.example/recursos/gui\tas/ hoy</p>',
+    "<script>if (1 > 0) location.href = 'https://www.fabricante.example/recursos/gui\tas/#>';</script>",
+  ]) assert.deepEqual(await leakFindings(written), [], written);
+  // Las mismas direcciones sí se ven donde la revisión lee el valor entero o una cadena sin «<» ni «>».
+  for (const written of [
+    '<a href="https://a b@www.fabricante.example/recursos/guias/">Guías</a>',
+    '<a href="https://a{b}@www.fabricante.example/recursos/guias/">Guías</a>',
+    "<script>location.href = 'https://www.fabricante.example/recursos/gui\tas/';</script>",
   ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
 });
