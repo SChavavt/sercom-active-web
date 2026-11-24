@@ -123,7 +123,7 @@ Props: `title?` (nombre de la página), `description?`, `canonical?` (`false` en
 
 Una sola banda de tinta con texto blanco, antes de la lámina y con sus mismos márgenes; la primera parte va en negritas. Cada compilación lleva un solo aviso:
 
-- Vista previa (`kind="preview"`): `PREVIEW_NOTICE`, «**Vista previa para revisión.** Los productos que aparecen son ejemplos de diseño, no artículos reales.», con nombre accesible «Aviso de vista previa».
+- Vista previa (`kind="preview"`): `PREVIEW_NOTICE`, «**Vista previa para revisión.** Los productos marcados «Ejemplo» son ejemplos de diseño, no artículos reales.» (la palabra es la de la etiqueta de los ejemplos, `EXAMPLE_TAG`: la vista previa muestra las fichas reales junto a los ejemplos), con nombre accesible «Aviso de vista previa».
 - Producción hasta el lanzamiento (`kind="development"`): `DEVELOPMENT_NOTICE`, «**Sitio en preparación** · Versión inicial para revisión», con nombre accesible «Aviso de sitio en preparación».
 
 Los dos se dibujan igual (`components.css`, 4.1) y no se imprimen en papel. El escáner exige el que corresponde a cada modo (R-RULE-03 y R-RULE-12); cómo se retira el de producción al lanzar está en [`publicacion.md`](publicacion.md).
@@ -461,7 +461,7 @@ Desde el paso 3 producción tiene categorías y productos aprobados, así que la
 
 | | Producción (`npm run build`) | Vista previa (`npm run build:preview`) |
 | --- | --- | --- |
-| Aviso arriba | «Sitio en preparación · Versión inicial para revisión» en todas las páginas | `PREVIEW_NOTICE` en todas las páginas |
+| Aviso arriba | «Sitio en preparación · Versión inicial para revisión» en todas las páginas | `PREVIEW_NOTICE` en todas las páginas: «Vista previa para revisión. Los productos marcados «Ejemplo» son ejemplos de diseño, no artículos reales.» |
 | Navegación | Catálogo, «Categorías» con su panel, Marcas, Contacto y el bloque «Cotizar mi lista» | la misma |
 | Búsqueda en el encabezado | campo en computadora, botón Buscar en tableta y celular | la misma |
 | Portada | todas las secciones, con las categorías y los productos aprobados | además, los ejemplos entre los productos |

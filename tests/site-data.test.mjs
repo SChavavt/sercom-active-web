@@ -413,7 +413,7 @@ test('rutas del sitio: todas con diagonal final y la consulta codificada', () =>
 });
 
 test('textos fijos de la vista previa', () => {
-  assert.equal(PREVIEW_NOTICE, 'Vista previa para revisión. Los productos que aparecen son ejemplos de diseño, no artículos reales.');
+  assert.equal(PREVIEW_NOTICE, 'Vista previa para revisión. Los productos marcados «Ejemplo» son ejemplos de diseño, no artículos reales.');
   assert.equal(EXAMPLE_TAG, 'Ejemplo');
 });
 
