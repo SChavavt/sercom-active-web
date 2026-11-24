@@ -658,3 +658,15 @@ test('addressProblem rechaza un servidor con un carácter que el navegador lee c
     assert.equal(addressProblem(value), null, value);
   }
 });
+
+test('addressProblem rechaza un servidor con un signo que tiene una sola forma canónica, como el kelvin o el ángstrom, y acepta el acento escrito aparte', () => {
+  for (const [value, server, character, code, read] of [
+    ['https://www.Karca.example/x', 'www.Karca.example', 'K', 'U+212A', 'k'],
+    ['https://Ångel.example/x', 'Ångel.example', 'Å', 'U+212B', 'å'],
+    ['https://Ωmega.example/x', 'Ωmega.example', 'Ω', 'U+2126', 'ω'],
+  ]) {
+    assert.equal(addressProblem(value), `el servidor «${server}» lleva «${character}» (${code}), que el navegador lee como «${read}»`, value);
+  }
+  // La «ñ» escrita como «n» y la tilde aparte: el navegador la junta, y es el mismo servidor que con la «ñ».
+  assert.equal(addressProblem('https://diseño.example/x'), null);
+});

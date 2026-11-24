@@ -77,13 +77,14 @@ export function addressProblem(value) {
 }
 /**
  * El primer carácter de un servidor que el navegador lee como otro, salvo una mayúscula como su minúscula: el que su
- * forma de compatibilidad de Unicode (NFKC) cambia («𝐦», «ſ», «ª», «¹», «ﬁ», una letra de ancho completo). Las letras
- * con acentos («ñ», «é», «ü», «ß», también escritas con el acento aparte) no cambian. `null` si no hay ninguno.
+ * forma de compatibilidad de Unicode (NFKC), leído solo, cambia («𝐦», «ſ», «ª», «¹», «ﬁ», una letra de ancho completo,
+ * el signo de kelvin «K» o el de ángstrom «Å»). Las letras con acentos («ñ», «é», «ü», «ß», también escritas con el
+ * acento aparte) no cambian. `null` si no hay ninguno.
  * @param {string} host
  */
 function mappedCharacter(host) {
   if (PLAIN_TEXT.test(host)) return null;
-  for (const character of host.normalize('NFC')) {
+  for (const character of host) {
     const read = character.normalize('NFKC');
     if (read !== character) return { character, code: `U+${(character.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, '0')}`, read: read.toLowerCase() };
   }
