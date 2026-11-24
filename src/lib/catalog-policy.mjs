@@ -3,6 +3,7 @@
 // ninguno de ellos puede importar este.
 import { cleanQuery, normalizeText } from './text.mjs';
 import { isUnitWord, MAX_UNIT_LENGTH, singularUnit, unitKey } from './quote-list.mjs';
+import { samePage } from './address-match.mjs';
 
 const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 const isText = value => typeof value === 'string' && value.trim().length > 0;
@@ -169,8 +170,13 @@ function addressTail(text) {
   const slash = cut.search(/\/(?!\/)/);
   return `…${slash === -1 ? cut : cut.slice(slash)}`;
 }
-/** Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio». */
-function placeIn(text, index, tail = tailOf) {
+/**
+ * Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio».
+ * @param {string} text
+ * @param {number} index
+ * @param {(text: string) => string} [tail]
+ */
+export function placeIn(text, index, tail = tailOf) {
   const before = tail(text.slice(0, index));
   return before ? `después de «${before}»` : 'al principio';
 }
@@ -187,7 +193,7 @@ const PLAIN_TEXT = /^[\x20-\x7e]*$/;
  * @param {string} text
  * @returns {{ code: string, index: number } | null}
  */
-function invisibleAt(text) {
+export function invisibleAt(text) {
   if (PLAIN_TEXT.test(text)) return null;
   let index = 0;
   for (const character of text) {
@@ -510,6 +516,21 @@ export function getRetiredProducts(catalog, registry) {
 
 /** Tipos de recurso del registro que nunca se publican como enlace ni respaldan la fuente de una foto. */
 export const BLOCKED_RESOURCE_TYPES = Object.freeze(['deprecated', 'unverified_current', 'gated_landing']);
+/**
+ * Un recurso del registro que se puede publicar: su verificación empieza con «accesible» y su tipo no está bloqueado
+ * (`BLOCKED_RESOURCE_TYPES`). La única prueba: la usan los enlaces de las marcas, la página de la foto y el escáner.
+ * @param {unknown} resource
+ */
+export const isPublishableResource = resource => String(/** @type {any} */ (resource)?.verification ?? '').startsWith('accesible')
+  && !BLOCKED_RESOURCE_TYPES.includes(/** @type {any} */ (resource)?.type);
+/**
+ * Tipos de recurso que viven en el sitio de otro: un visor de archivos (Google Drive) o una plataforma de catálogos
+ * (Salsify) guardan el catálogo de la marca, pero su servidor no es el de la marca, así que no respaldan la fuente de
+ * una foto: con ellos, cualquier archivo de ese servicio pasaría por una foto del fabricante.
+ */
+export const HOSTED_ELSEWHERE_TYPES = Object.freeze(['pdf_viewer', 'catalog_platform']);
+/** Un texto cortado a 80 caracteres, con «…» si se cortó. */
+const cutAt80 = text => ([...text].length > 80 ? `${[...text].slice(0, 80).join('')}…` : text);
 
 /** El servidor de una dirección, en minúsculas y sin `www.` al principio; `null` si no es una dirección. */
 const hostOf = value => {
@@ -518,8 +539,9 @@ const hostOf = value => {
 
 /**
  * La foto de una ficha aprobada viene del sitio de su fabricante: la ficha muestra bajo la foto un crédito que enlaza
- * `image.sourceUrl`. Su servidor (sin `www.`) debe ser el de algún recurso de la entidad de la marca en el registro de
- * investigación verificado como accesible y de un tipo que no está bloqueado. Un borrador, una ficha en revisión o un
+ * `image.sourceUrl`. Esa página no puede ser, escrita como sea (`samePage`), una del registro de investigación que no se
+ * publica (`isPublishableResource`). Su servidor (sin `www.`) debe ser el de algún recurso publicable de la entidad de
+ * la marca en el registro que no viva en el sitio de otro (`HOSTED_ELSEWHERE_TYPES`). Un borrador, una ficha en revisión o un
  * retirado no publican foto y no se revisan. Se llama aparte de `validateCatalog` (desde `validateProject`, en
  * `scripts/validate-catalog.mjs`) porque la compilación valida el catálogo con las marcas, sin los recursos del registro.
  * @param {unknown} catalog
@@ -529,15 +551,22 @@ const hostOf = value => {
 export function photoSourceErrors(catalog, registry) {
   const products = Array.isArray(/** @type {any} */ (catalog)?.products) ? /** @type {any} */ (catalog).products : [];
   const sources = Array.isArray(/** @type {any} */ (registry)?.sources) ? /** @type {any} */ (registry).sources : [];
+  const allResources = sources.flatMap(entry => (Array.isArray(entry?.resources) ? entry.resources : []));
   const errors = [];
   for (const [index, product] of products.entries()) {
     if (product?.status !== 'approved' || !isRecord(product.image)) continue;
     const found = hostOf(product.image.sourceUrl);
     if (!found || !isHttps(product.image.sourceUrl)) continue;
+    // Si alguna entrada del registro con esa misma página dice que no se publica, no se publica.
+    const hidden = allResources.find(resource => typeof resource?.url === 'string' && !isPublishableResource(resource) && samePage(resource.url, product.image.sourceUrl));
+    if (hidden) {
+      errors.push(`products[${index}] (${product.id}).image.sourceUrl: esa página está en el registro de investigación como «${hidden.type}: ${cutAt80(String(hidden.verification ?? ''))}» y no se publica, así que no puede ser la página de una foto: la ficha la enlazaría en el crédito. Escribe la página del producto en el sitio del fabricante de donde viene la foto.`);
+      continue;
+    }
     const source = sources.find(entry => entry?.entity_id === product.brandId);
     if (!source) continue;
     const hosts = [...new Set((Array.isArray(source.resources) ? source.resources : [])
-      .filter(resource => String(resource?.verification ?? '').startsWith('accesible') && !BLOCKED_RESOURCE_TYPES.includes(resource?.type))
+      .filter(resource => isPublishableResource(resource) && !HOSTED_ELSEWHERE_TYPES.includes(resource?.type))
       .map(resource => hostOf(resource.url)).filter(Boolean))];
     if (hosts.includes(found)) continue;
     const known = hosts.length

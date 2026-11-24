@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { addressError, BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isWithdrawn, mentionsExcludedBrand, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
+import { addressError, BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, invisibleAt, isPublishableResource, isWithdrawn, mentionsExcludedBrand, placeIn, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -133,6 +133,30 @@ export function validateBrands(brands) {
 }
 
 /**
+ * Qué tiene mal la edición de un PDF, citándola: no es un texto, está vacía, lleva un carácter que no se ve (con las
+ * mismas palabras que el texto de una ficha: `invisibleAt`, `placeIn`), un espacio al principio o al final, dos
+ * seguidos, o es más larga que el máximo. `undefined` si no es ninguna de esas: queda la frase general.
+ * @param {unknown} edition
+ * @returns {string | undefined}
+ */
+function editionFault(edition) {
+  if (typeof edition !== 'string') return `no es un texto; escribe la edición entre comillas, como la imprime el fabricante («2026», «2026 v2»).`;
+  if (edition.trim() === '') return 'está vacío; si el fabricante no imprime una edición, quita la clave.';
+  const hidden = invisibleAt(edition);
+  if (hidden) {
+    const character = String.fromCodePoint(Number.parseInt(hidden.code.slice(2), 16));
+    const place = placeIn(edition, hidden.index);
+    if (/[\n\r\u2028\u2029]/.test(character)) return `«${edition}» lleva un salto de línea ${place}; escríbela en una sola línea.`;
+    return `«${edition}» lleva un carácter invisible (${hidden.code}) ${place}; ${/\s/.test(character) ? 'escríbelo con un espacio normal' : 'bórralo'}.`;
+  }
+  if (edition !== edition.trim()) return `«${edition}» empieza o termina con un espacio.`;
+  if (edition.includes('  ')) return `«${edition}» lleva dos espacios seguidos.`;
+  const length = [...edition].length;
+  if (length > MAX_EDITION_LENGTH) return `«${edition}» mide ${length} caracteres; el máximo es ${MAX_EDITION_LENGTH}.`;
+  return undefined;
+}
+
+/**
  * Revisa los enlaces de una marca (`manufacturerLinks`): una lista de 0 a 3 enlaces, cada uno con `label` y `url`; la
  * etiqueta es una de `MANUFACTURER_LINK_LABELS`, cada una una vez y en su orden; la dirección es `https` escrita
  * completa y no se repite; solo el PDF puede llevar `edition` (texto de una línea, de 1 a `MAX_EDITION_LENGTH`
@@ -172,7 +196,7 @@ function linkErrors(links, path) {
       if (Object.hasOwn(link, key) && kind && kind !== 'pdf') errors.push(`${where}.${key}: solo el enlace «${MANUFACTURER_LINK_LABELS.pdf}» lleva ${what}; quítalo de este.`);
     }
     if (Object.hasOwn(link, 'edition') && (!isCleanLine(edition) || [...edition].length > MAX_EDITION_LENGTH)) {
-      errors.push(`${where}.edition: debe ser un texto de una línea, de 1 a ${MAX_EDITION_LENGTH} caracteres, como lo imprime el fabricante («2026», «2026 v2»).`);
+      errors.push(`${where}.edition: ${editionFault(edition) ?? `debe ser un texto de una línea, de 1 a ${MAX_EDITION_LENGTH} caracteres, como lo imprime el fabricante («2026», «2026 v2»).`}`);
     }
     if (Object.hasOwn(link, 'megabytes') && (typeof megabytes !== 'number' || !Number.isInteger(megabytes) || megabytes < 1 || megabytes > MAX_MEGABYTES)) {
       errors.push(`${where}.megabytes: debe ser un número entero de 1 a ${MAX_MEGABYTES}: lo que pesa el archivo en megabytes (de un millón de bytes), redondeado.`);
@@ -182,6 +206,11 @@ function linkErrors(links, path) {
   if (ordered.join() !== kinds.join()) errors.push(`${path}: los enlaces van en este orden: ${LABEL_LIST}; ordénalos así.`);
   return errors;
 }
+
+/** Un texto del registro cortado a 80 caracteres, con «…» si se cortó, para citarlo en un mensaje. */
+const cut80 = (/** @type {string} */ text) => ([...text].length > 80 ? `${[...text].slice(0, 80).join('')}…` : text);
+/** La verificación de un recurso sin lo que va hasta su fecha («accesible (2026-11-23); …»), que ya no dice nada. */
+const afterDate = (/** @type {string} */ text) => text.replace(/^[^;:()]*\(\d{4}-\d{2}-\d{2}\)[;:,]?\s*/, '') || text;
 
 /**
  * Compara la lista pública de marcas con el registro de investigación: mismos identificadores,
@@ -223,8 +252,10 @@ export function crossCheckBrands(brands, registry) {
       const resource = resources.find((/** @type {any} */ candidate) => candidate.url === link.url);
       const admitted = LINK_RESOURCE_TYPES[/** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label))];
       if (!resource) errors.push(`${brand.id}: el enlace ${link.url} no es un recurso de esa entidad en el registro.`);
-      else if (!String(resource.verification ?? '').startsWith('accesible') || BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
-        errors.push(`${brand.id}: el enlace ${link.url} no está verificado como accesible (${resource.type}: ${resource.verification}).`);
+      else if (BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
+        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro es de tipo «${resource.type}», que nunca se enlaza (${cut80(afterDate(String(resource.verification ?? '')))}). Enlaza otro recurso de la marca.`);
+      } else if (!isPublishableResource(resource)) {
+        errors.push(`${brand.id}: el enlace ${link.url} no se publica: en el registro su verificación no dice «accesible» (${resource.type}: ${cut80(String(resource.verification ?? ''))}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`);
       } else if (admitted && !admitted.types.includes(resource.type)) {
         errors.push(`${brand.id}: el enlace ${link.url} lleva la etiqueta «${link.label}», pero en el registro es de tipo «${resource.type}»; esa etiqueta es solo para ${admitted.purpose}. Cambia la etiqueta o enlaza otro recurso de la marca.`);
       }

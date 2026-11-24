@@ -166,6 +166,16 @@ const accessibleName = element => (element.attributes.get('aria-label') ?? eleme
   .map(part => (typeof part === 'string' ? part : part.attributes.get('aria-hidden') === 'true' ? '' : accessibleName(part))).join(' ')).replace(/\s+/g, ' ').trim();
 /** Lo que dice, para los lectores de pantalla, un enlace que abre otra pestaña (MoreLink y ActionRow con `external`). */
 const NEW_TAB_TEXT = '(se abre en otra pestaña)';
+/** Los destinos (`target`) que no abren otra pestaña; cualquier otro nombre sí («_blank», «_new», «nueva»). */
+const SAME_TAB_TARGETS = ['', '_self', '_parent', '_top'];
+/** Un `<a>` o un `<area>` que abre otra pestaña: su `target`, sin espacios y en minúsculas, no es uno de `SAME_TAB_TARGETS`. */
+const opensAnotherTab = element => (element.name === 'a' || element.name === 'area')
+  && element.attributes.has('target') && !SAME_TAB_TARGETS.includes((element.attributes.get('target') ?? '').trim().toLowerCase());
+/** Dos destinos de /marcas/ son el mismo lugar si difieren solo en las diagonales del final de la ruta. */
+const samePlace = (a, b) => {
+  const place = href => href.replace(/^([^?#]*?)\/+(?=$|[?#])/, '$1');
+  return place(a) === place(b);
+};
 /** Un texto para comparar: sin distinguir mayúsculas y con los espacios seguidos como uno. */
 const loose = text => text.replace(/\s+/g, ' ').trim().toLowerCase();
 /** El primer elemento de `node` (incluido) hacia arriba que cumple `test`. */
@@ -1529,23 +1539,38 @@ export const CHECKS = [
     },
   },
   // R-ENLACE-01 · Los enlaces a otro sitio (los catálogos y el sitio de cada fabricante, el crédito de una foto): cada
-  // enlace que abre otra pestaña (`target="_blank"`) lleva `rel` con `noopener` y, para los lectores de pantalla, el
-  // texto oculto «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. Y en /marcas/,
+  // enlace que abre otra pestaña (un `<a>` o un `<area>` con un `target` que no es vacío, `_self`, `_parent` ni `_top`:
+  // `_blank`, `_new` o cualquier nombre) lleva `rel` con `noopener` y, para los lectores de pantalla, el texto oculto
+  // «(se abre en otra pestaña)» (`.vh`), como hacen MoreLink y ActionRow con `external`. El texto oculto cuenta si el
+  // lector lo lee: dentro del enlace y fuera de aria-hidden="true"; con `aria-label`, el lector lee la etiqueta, así que
+  // ella debe decirlo; con `aria-labelledby` falla (el nombre viene de otro elemento: el texto oculto va en el enlace),
+  // y un `<area>` falla siempre (no puede llevar texto: va un enlace). Y en /marcas/,
   // donde cada marca repite «Catálogo del fabricante (PDF)» o «Catálogo en línea del fabricante», dos enlaces con el
   // mismo nombre accesible llevan al mismo lugar: si no, la lista de enlaces de un lector de pantalla los confunde (cada
   // catálogo lleva la marca en su nombre, con texto oculto). Dos enlaces con el mismo nombre y el mismo destino (la
-  // celda de una marca y su nombre en la lista de catálogos) sí pueden ir.
+  // celda de una marca y su nombre en la lista de catálogos) sí pueden ir; dos destinos que difieren solo en la diagonal
+  // final de la ruta son el mismo lugar, y uno con fragmento («/marcas/#catalogos») es otro que la página sola.
   {
     id: 'R-ENLACE-01',
-    title: 'Cada enlace que abre otra pestaña lleva rel con noopener y el texto oculto «(se abre en otra pestaña)», y en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo lugar',
+    title: 'Cada enlace que abre otra pestaña lleva rel con noopener y el texto oculto «(se abre en otra pestaña)», que el lector de pantalla lee, y en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo lugar',
     page(page) {
       const problems = [];
-      for (const link of page.elements.filter(element => element.name === 'a' && (element.attributes.get('target') ?? '').trim().toLowerCase() === '_blank')) {
+      for (const link of page.elements.filter(opensAnotherTab)) {
         const href = link.attributes.get('href') ?? '';
+        if (link.name === 'area') {
+          problems.push(`el área «${link.attributes.get('alt') ?? ''}» (${href.slice(0, 80)}) abre otra pestaña: un <area> no puede llevar el texto oculto «${NEW_TAB_TEXT}»; usa un enlace (<a>), como MoreLink con external`);
+          continue;
+        }
         const where = `el enlace «${accessibleName(link)}» (${href.slice(0, 80)})`;
         if (!(link.attributes.get('rel') ?? '').toLowerCase().split(/\s+/).includes('noopener')) problems.push(`${where} abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external`);
-        const hidden = allElements(link).filter(element => hasClass(element, 'vh'));
-        if (!hidden.some(element => textOf(element).includes(NEW_TAB_TEXT))) problems.push(`${where} abre otra pestaña sin decirlo: lleva el texto oculto «${NEW_TAB_TEXT}» (.vh), como MoreLink con external`);
+        const hidden = allElements(link).filter(element => hasClass(element, 'vh') && textOf(element).includes(NEW_TAB_TEXT));
+        // Se lee si, subiendo desde el texto oculto, se llega al enlace antes que a un aria-hidden="true".
+        const read = hidden.filter(element => closest(element, node => node === link || (node.attributes.get('aria-hidden') ?? '').trim().toLowerCase() === 'true') === link);
+        if (link.attributes.has('aria-labelledby')) problems.push(`${where} abre otra pestaña y toma su nombre de aria-labelledby: quítalo y deja el nombre y el texto oculto «${NEW_TAB_TEXT}» (.vh) dentro del enlace, como MoreLink con external`);
+        else if (link.attributes.has('aria-label')) {
+          if (!(link.attributes.get('aria-label') ?? '').includes(NEW_TAB_TEXT)) problems.push(`${where} abre otra pestaña y su aria-label no lo dice: el lector de pantalla lee la etiqueta y no el texto oculto; quita aria-label o termina la etiqueta con «${NEW_TAB_TEXT}»`);
+        } else if (!read.length && hidden.length) problems.push(`${where} abre otra pestaña sin decirlo: su texto oculto «${NEW_TAB_TEXT}» está dentro de aria-hidden="true" y no se lee; ponlo fuera, como MoreLink con external`);
+        else if (!read.length) problems.push(`${where} abre otra pestaña sin decirlo: lleva el texto oculto «${NEW_TAB_TEXT}» (.vh), como MoreLink con external`);
       }
       if (page.route === routes.brands) {
         /** @type {Map<string, string>} */
@@ -1554,7 +1579,7 @@ export const CHECKS = [
           const name = loose(accessibleName(link));
           const href = link.attributes.get('href') ?? '';
           if (!name) continue;
-          if (seen.has(name) && seen.get(name) !== href) problems.push(`dos enlaces se llaman «${accessibleName(link)}» y llevan a lugares distintos (${seen.get(name).slice(0, 60)} y ${href.slice(0, 60)}): agrega a cada uno, con texto oculto, lo que los distingue (la marca)`);
+          if (seen.has(name) && !samePlace(seen.get(name), href)) problems.push(`dos enlaces se llaman «${accessibleName(link)}» y llevan a lugares distintos (${seen.get(name).slice(0, 60)} y ${href.slice(0, 60)}): agrega a cada uno, con texto oculto, lo que los distingue (la marca)`);
           else if (!seen.has(name)) seen.set(name, href);
         }
       }

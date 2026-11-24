@@ -50,7 +50,23 @@ export function getRetiredProducts(catalog: unknown, registry: BrandScope): Publ
 export const BLOCKED_RESOURCE_TYPES: readonly string[];
 
 /**
- * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) es del sitio de su marca en el registro:
- * un recurso accesible y de un tipo no bloqueado con el mismo servidor (sin `www.`). Devuelve los errores.
+ * El primer carácter de un texto que no se ve (los que no puede llevar el texto de una ficha), con su código («U+200B»)
+ * y su posición; `null` si no hay.
+ */
+export function invisibleAt(text: string): { code: string; index: number } | null;
+
+/** Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio». */
+export function placeIn(text: string, index: number, tail?: (text: string) => string): string;
+
+/** Un recurso del registro que se puede publicar: verificación que empieza con «accesible» y tipo no bloqueado. */
+export function isPublishableResource(resource: unknown): boolean;
+
+/** Tipos de recurso que viven en el sitio de otro (un visor, una plataforma): no son el sitio de la marca. */
+export const HOSTED_ELSEWHERE_TYPES: readonly string[];
+
+/**
+ * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) no es una página del registro que no se
+ * publica, y es del sitio de su marca en el registro: un recurso publicable, que no vive en el sitio de otro, con el
+ * mismo servidor (sin `www.`). Devuelve los errores.
  */
 export function photoSourceErrors(catalog: unknown, registry: unknown): string[];

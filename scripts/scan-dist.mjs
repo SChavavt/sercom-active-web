@@ -25,7 +25,8 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isPublicRetired } from '../src/lib/catalog-policy.mjs';
+import { addressFinder, samePage } from '../src/lib/address-match.mjs';
+import { isPublicRetired, isPublishableResource } from '../src/lib/catalog-policy.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -988,7 +989,7 @@ export const CHECKS = [
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
   ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra a todos el aviso «${DEVELOPMENT_NOTICE}», buscado en el texto que se muestra (${SHOWN_TEXT_DOC}). La vista previa lleva solo su propio aviso: una página suya que lleva el de sitio en preparación falla, también oculto (${ALL_TEXT_DOC}).`],
   ['R-PUB-03', `Con --launch se exige lo contrario de R-RULE-12: ningún grupo de robots.txt bloquea el sitio entero, ninguna página lleva noindex y ninguna lleva el aviso «${DEVELOPMENT_NOTICE}», tampoco oculto: al lanzar el aviso se quita de la página, no se esconde (${ALL_TEXT_DOC}).`],
-  ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los enlaces del fabricante publicados en brands.json (el catálogo en PDF, el catálogo en línea y el sitio de cada marca) y la página de donde viene la foto de una ficha aprobada (image.sourceUrl), solo en la página de esa ficha (productos/<id>/index.html o productos/<id>.html), donde es el crédito de la foto: la misma dirección en otra página, o en la de un retirado, falla. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
+  ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los enlaces del fabricante publicados en brands.json (el catálogo en PDF, el catálogo en línea y el sitio de cada marca) y la página de donde viene la foto de una ficha aprobada (image.sourceUrl), solo en la página de esa ficha (productos/<id>/index.html o productos/<id>.html), donde es el crédito de la foto, y solo si el registro la tiene como publicable (su verificación empieza con «accesible» y su tipo no está bloqueado): la misma dirección en otra página, o en la de un retirado, falla, y una página del registro que no se publica («no enlazar», deprecated, gated_landing) falla también en la de su ficha. Un enlace cuenta escrito como esté en el registro o de cualquier otra forma de la misma página (src/lib/address-match.mjs): con http, https o «//»; el servidor con otras mayúsculas, con www. o sin él; la ruta sin las diagonales del final, con otras mayúsculas, con su %XX o con «\\/» (en un script o un JSON); con un fragmento; con pares de la consulta que solo cuentan una visita (utm_…, fbclid, gclid, msclkid, mc_cid, mc_eid, igshid) o con la consulta en otro orden; y codificado entero dentro de otra dirección. La consulta sí es parte de la página: …/producto/?producto=24 es otra página que …/producto/. Lo que continúa la ruta («…/guias/09-catalogo/», «…/producto.html») es otra página, y un servidor escrito sin «//» ni «www.» o una dirección de correo no son una dirección. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. En el código de un script, «mailto:», «tel:» o «sms:» como clave de un objeto («{whatsapp:e,mailto:t}») o como propiedad leída en una condición («a?t.mailto:t.whatsapp») no es un destino; con una «@» detrás, o con siete cifras o más bajo «tel:» o «sms:», sí falla. Los números con forma de teléfono del texto visible que no son el confirmado se listan (WARN), salvo una aparición de uno de los códigos públicos de las fichas, exacto y entero (el model y cada manufacturerCode de variante de una ficha aprobada, y el model de un retirado que fue público), en cualquier página: un código no es un teléfono. Un número que no es uno de esos códigos se lista igual, también junto a un código. La revisión de los destinos (tel:, wa.me, mailto: en enlaces, scripts y JSON) no tiene esa excepción.'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
@@ -1020,12 +1021,14 @@ export async function loadProjectData(root = ROOT) {
 
 /**
  * Enlaces y notas del registro de investigación que nunca deben publicarse (R-RULE-13): todos sus enlaces, salvo los
- * enlaces del fabricante publicados en brands.json (`manufacturerLinks`: catálogo en PDF, catálogo en línea y sitio). El
- * validador de fichas usa la misma lista (scripts/catalog-text.mjs).
+ * enlaces del fabricante publicados en brands.json (`manufacturerLinks`: catálogo en PDF, catálogo en línea y sitio). Un
+ * enlace del registro que es la misma página que uno publicado (`samePage`, src/lib/address-match.mjs) está publicado,
+ * escrito como sea. El validador de fichas usa la misma lista (scripts/catalog-text.mjs).
  * @returns {{ urls: string[], notes: string[] }}
  */
 export function registryLeaks(registry, brands) {
-  const allowed = new Set((brands ?? []).flatMap(brand => (brand.manufacturerLinks ?? []).map(link => link.url)));
+  const published = (brands ?? []).flatMap(brand => (brand.manufacturerLinks ?? []).map(link => link.url)).filter(url => typeof url === 'string');
+  const allowed = { has: url => published.some(link => link === url || samePage(link, url)) };
   const urls = new Set();
   const notes = new Set();
   const note = (value, minimum = 20) => {
@@ -1048,16 +1051,40 @@ export function registryLeaks(registry, brands) {
   return { urls: [...urls], notes: [...notes] };
 }
 
+// La búsqueda de cada lista de enlaces de `registryLeaks`, preparada una vez y no en cada página.
+const leakFinders = new WeakMap();
+/**
+ * Los enlaces de una lista que aparecen en un texto, de dos formas que se suman: escrito tal cual, seguido de algo que
+ * no continúa la dirección (la comparación de siempre, que sigue encontrando todo lo que encontraba), y escrito de
+ * cualquier forma de la misma página (`addressFinder`, src/lib/address-match.mjs: sin la diagonal final, con otras
+ * mayúsculas, con http, sin www, con un fragmento, con pares de una visita, con su %XX, codificado dentro de otra
+ * dirección, con «\/»…).
+ * @param {string[]} urls
+ * @returns {(text: string) => string[]}
+ */
+function leakFinder(urls) {
+  if (!leakFinders.has(urls)) {
+    const exact = urls.map(url => [url, new RegExp(`${escapeRegExp(url)}(?![A-Za-z0-9/_%?#=&-])`)]);
+    const samePageIn = addressFinder(urls);
+    leakFinders.set(urls, text => {
+      const found = new Set(samePageIn(text));
+      for (const [url, pattern] of exact) if (!found.has(url) && pattern.test(text)) found.add(url);
+      return urls.filter(url => found.has(url));
+    });
+  }
+  return leakFinders.get(urls);
+}
+
 /**
  * Los enlaces y las notas de `registryLeaks` que aparecen en un texto (con sus entidades ya decodificadas): un enlace,
- * seguido de algo que no continúa la dirección; una nota, en el texto leído en una línea.
+ * escrito tal cual o de cualquier forma de la misma página (`leakFinder`); una nota, en el texto leído en una línea.
  * @param {string} text
  * @param {{ urls: string[], notes: string[] }} leaks
  */
 export function registryFindings(text, leaks) {
   const line = oneLine(text);
   return {
-    urls: leaks.urls.filter(url => new RegExp(`${escapeRegExp(url)}(?![A-Za-z0-9/_%?#=&-])`).test(text)),
+    urls: leakFinder(leaks.urls)(text),
     notes: leaks.notes.filter(note => line.includes(note)),
   };
 }
@@ -1637,6 +1664,12 @@ export async function scanDist(directory, options = {}) {
   const catalogProducts = Array.isArray(data.catalog?.products) ? data.catalog.products : [];
   const ownStandards = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, standardTexts(product)]));
   const publicCodes = publicProductCodes(catalogProducts);
+  // R-RULE-13: las fichas aprobadas por id, y las entradas del registro, para el crédito de la foto en su página.
+  const approvedById = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, product]));
+  const registryResources = (data.registry?.sources ?? []).flatMap(source => source?.resources ?? []).filter(resource => typeof resource?.url === 'string');
+  // Una página del registro se publica si todas sus entradas con esa misma página son publicables (`isPublishableResource`).
+  const publishablePage = url => registryResources.some(resource => samePage(resource.url, url))
+    && registryResources.every(resource => isPublishableResource(resource) || !samePage(resource.url, url));
   // Un número con forma de teléfono termina en cuatro cifras que no sigue una letra, una cifra ni «_»: si está dentro de
   // un código, el código tiene esas cuatro cifras así. Los códigos se agrupan por esas terminaciones, y para cada número
   // escrito solo se miran los de su grupo.
@@ -1744,13 +1777,13 @@ export async function scanDist(directory, options = {}) {
     }
 
     // R-RULE-13: enlaces y notas del registro de investigación.
-    // En la página de una ficha aprobada pasa además la página de donde viene su foto (`image.sourceUrl`): es el crédito
-    // de la foto, aunque el registro tenga esa misma dirección. En cualquier otra página sigue fallando.
+    // En la página de una ficha aprobada pasa además la página de donde viene su foto (`image.sourceUrl`), escrita como
+    // sea, si el registro la tiene como publicable: es el crédito de la foto. En cualquier otra página sigue fallando.
     const decoded = decodeEntities(raw);
-    const photoSource = pageId === undefined ? undefined
-      : catalogProducts.find(product => product?.id === pageId && product.status === 'approved')?.image?.sourceUrl;
+    const photoSource = pageId === undefined ? undefined : approvedById.get(pageId)?.image?.sourceUrl;
+    const isPhotoCredit = url => typeof photoSource === 'string' && samePage(url, photoSource) && publishablePage(url);
     const registryFound = registryFindings(decoded, leaks);
-    for (const url of registryFound.urls.filter(url => url !== photoSource)) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
+    for (const url of registryFound.urls.filter(url => !isPhotoCredit(url))) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
     for (const note of registryFound.notes) add('FAIL', 'R-RULE-13', file, `nota interna del registro de investigación: «${note.slice(0, 60)}»`);
     // R-RULE-11: la dirección exacta de business.json.
     if (!inPerson && addressNeedle && oneLine(norm).toLowerCase().includes(addressNeedle)) add('FAIL', 'R-RULE-11', file, 'dirección del negocio publicada sin atención presencial confirmada');

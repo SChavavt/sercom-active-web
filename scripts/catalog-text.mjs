@@ -17,7 +17,8 @@
 //   - un número con forma de teléfono (la expresión de R-RULE-24 para el texto visible) solo puede ir en `model` y en
 //     `manufacturerCode`: un número largo es un código, no va en el texto;
 //   - una dirección de correo no va en ninguna ficha (R-RULE-24), ni un enlace o una nota del registro de investigación
-//     (R-RULE-13, la misma lista que usa el escáner); un documento o una foto por dirección que enlazan el registro
+//     (R-RULE-13, la misma lista y la misma comparación que usa el escáner: un enlace del registro escrito de otra forma
+//     de la misma página también cuenta, src/lib/address-match.mjs); un documento o una foto por dirección que enlazan el registro
 //     tampoco, salvo un enlace del fabricante publicado en brands.json: un documento puede enlazar el catálogo de su
 //     marca (en PDF o en línea) o su sitio;
 //   - las direcciones que publica la ficha (cada documento, la foto por dirección y la página de donde viene la foto) no
