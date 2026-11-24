@@ -566,7 +566,7 @@ const hostOf = value => {
 
 /**
  * La foto de una ficha aprobada viene del sitio de su fabricante: la ficha muestra bajo la foto un crédito que enlaza
- * `image.sourceUrl`. Esa página no puede ser, escrita de cualquier forma de la misma página (`samePage`), una del registro de
+ * `image.sourceUrl`. Esa página no puede ser, escrita en una de las formas de la misma página que lee el módulo de direcciones (`samePage`), una del registro de
  * investigación que no se publica (`isPublishableResource`), de cualquier entidad. Su servidor (sin `www.`) debe ser el de algún recurso publicable de la entidad de
  * la marca en el registro que no viva en el sitio de otro (`HOSTED_ELSEWHERE_TYPES`). Un borrador, una ficha en revisión o un
  * retirado no publican foto y no se revisan. Se llama aparte de `validateCatalog` (desde `validateProject`, en
