@@ -106,6 +106,24 @@ const fileImageKeys = new Set(['file', 'alt', 'sourceUrl', 'usageConfirmed']);
 const urlImageKeys = new Set(['url', 'width', 'height', 'alt', 'sourceUrl', 'usageConfirmed']);
 // Lo reservado a los ejemplos tampoco puede ir en el nombre de un archivo publicado (el escáner lo busca en producción).
 const reservedFileName = value => /ejemplo|ej-\d/.test(value);
+// En una dirección, «ej-» con una cifra es lo reservado solo donde empieza una palabra, como lo lee el escáner (\bEJ-\d):
+// «ref-ej-2024» lo lleva; «reej-2» o «x2ej-5», no.
+const reservedAddress = value => /ejemplo|(?<![\p{L}\p{N}_])ej-\d/u.test(value);
+/** Veces que se decodifica el %XX de una dirección como máximo: las mismas que el escáner (PERCENT_PASSES). */
+const ADDRESS_DECODE_PASSES = 8;
+/**
+ * Una dirección como la lee el escáner: con su %XX decodificado (cada tramo válido; uno mal formado queda como está),
+ * otra vez mientras cambie, hasta `ADDRESS_DECODE_PASSES` veces. «%47» es una letra y «%20», un espacio.
+ */
+function decodedAddress(value) {
+  let text = value;
+  for (let pass = 0; pass < ADDRESS_DECODE_PASSES; pass += 1) {
+    const next = text.replace(/(?:%[0-9a-f]{2})+/gi, run => { try { return decodeURIComponent(run); } catch { return run; } });
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 const unknownKeys = (value, allowed, path, errors) => {
   if (isRecord(value)) for (const key of Object.keys(value)) if (!allowed.has(key)) errors.push(`${path}.${key}: campo no definido.`);
@@ -215,10 +233,12 @@ function inspectImage(image, productPath, errors, line) {
     for (const key of Object.keys(image)) if (!urlImageKeys.has(key)) errors.push(`${path}.${key}: campo no definido.`);
     const urlError = addressError(`${path}.url`, image.url, 'escribe la dirección https completa de la foto, sin usuario ni contraseña.');
     if (urlError) errors.push(urlError);
-    // La dirección se publica tal cual: las mismas dos revisiones que el nombre de un archivo.
+    // La dirección se publica tal cual: las mismas dos revisiones que el nombre de un archivo, sobre la dirección
+    // decodificada, como la lee el escáner, y con «+» como separador.
     if (typeof image.url === 'string') {
-      if (reservedFileName(image.url.toLowerCase())) errors.push(`${path}.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.`);
-      if (excluded(image.url.replace(/[-._/:?=&]/g, ' '))) errors.push(`${path}.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.`);
+      const decoded = decodedAddress(image.url);
+      if (reservedAddress(decoded.toLowerCase())) errors.push(`${path}.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.`);
+      if (excluded(decoded.replace(/[-._/:?=&+]/g, ' '))) errors.push(`${path}.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.`);
     }
     for (const [key, side] of [['width', 'ancho'], ['height', 'alto']]) {
       const value = image[key];

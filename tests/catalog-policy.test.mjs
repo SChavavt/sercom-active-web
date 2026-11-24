@@ -428,6 +428,28 @@ test('la dirección de la foto no lleva lo reservado a los ejemplos ni la marca 
   }
 });
 
+test('la dirección de la foto se lee decodificada, como la lee el escáner: la marca excluida escrita con %XX o con «+» tampoco pasa', () => {
+  const reserved = 'products[0].image.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.';
+  const brand = 'products[0].image.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.';
+  const [longName, shortName] = EXCLUDED;
+  const words = longName.toLowerCase().split(' ');
+  const hex = character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`;
+  for (const status of STATUSES) {
+    for (const url of [`https://fabricante.invalid/${hex(shortName[0])}${shortName.slice(1)}/foto.jpg`, `https://fabricante.invalid/${hex(shortName[0]).replace('%', '%25')}${shortName.slice(1)}/foto.jpg`,
+      `https://fabricante.invalid/${words.join('+')}/foto.jpg`, `https://fabricante.invalid/${words.join('%20')}/foto.jpg`, `https://fabricante.invalid/fotos?marca=${words.join('+')}`]) {
+      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), [brand], `${status} ${url}`);
+    }
+    // «ej-» con una cifra donde empieza una palabra, también escrito con %XX.
+    for (const url of ['https://fabricante.invalid/fotos/%45J-1001.jpg', 'https://fabricante.invalid/fotos/ej%2D1001.jpg', 'https://fabricante.invalid/ref-ej-2024.jpg', 'https://fabricante.invalid/a.jpg?id=ej-2']) {
+      assert.deepEqual(imageErrors({ ...URL_IMAGE, url }, status), [reserved], `${status} ${url}`);
+    }
+  }
+  // «ej-» con una cifra pegado a una letra o a una cifra no empieza una palabra: no es lo reservado.
+  for (const url of ['https://fabricante.invalid/reej-2.jpg', 'https://fabricante.invalid/modelo-tej-5.jpg', 'https://fabricante.invalid/x2ej-5.jpg', 'https://fabricante.invalid/guante%2Dnitrilo.jpg']) {
+    assert.deepEqual(imageErrors({ ...URL_IMAGE, url }), [], url);
+  }
+});
+
 test('el texto alternativo va limpio, en una línea y con 160 caracteres como máximo; la fuente es https y el uso, un booleano', () => {
   for (const status of STATUSES) {
     for (const image of [FILE_IMAGE, URL_IMAGE]) {
