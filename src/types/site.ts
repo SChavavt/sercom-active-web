@@ -202,7 +202,7 @@ export interface ExampleProductRecord {
 
 /** Campos de un producto que usa la búsqueda. */
 export type SearchableProduct = Pick<PublicProduct, 'name' | 'brandName' | 'code' | 'categoryNames'> & {
-  readonly variants: readonly Pick<PublicVariant, 'code'>[];
+  readonly variants: readonly Pick<PublicVariant, 'code' | 'label'>[];
 };
 
 /** Rutas del sitio. Todas terminan en diagonal. */
