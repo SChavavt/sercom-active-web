@@ -2315,3 +2315,15 @@ test('R-RULE-13: las referencias con nombre de los signos de una dirección se d
     '<a href="https://www.fabricante.example/recursos/guias&lpar;2&rpar;/">Guías</a>',
   ]) assert.deepEqual(await leakFindings(neighbour), [], neighbour);
 });
+
+test('R-RULE-13: el valor de un atributo se lee sin sus tabuladores aunque lleve «<» o «>», y sin los caracteres de control de sus orillas', async () => {
+  for (const [written, neighbour] of [
+    // Un refresco con un tabulador en la ruta y «>» en el fragmento: el navegador quita el tabulador y abre la página.
+    ['<meta http-equiv="refresh" content="0; url=https://www.fabricante.example/recursos/gu\tias/#a>b">', '<meta http-equiv="refresh" content="0; url=https://www.fabricante.example/recursos/gu\tias/otra/#a>b">'],
+    // Un carácter de control antes de la dirección: el navegador lo quita; con un usuario que lleva una comilla.
+    ['<a href="&#1;https://a\'b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="&#1;https://a\'b@www.fabricante.example/recursos/otras/">Guías</a>'],
+  ]) {
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});

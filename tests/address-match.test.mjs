@@ -323,3 +323,10 @@ test('en un JSON o un script, un tabulador o un salto de línea escrito con esca
     assert.deepEqual(findPage(text), [], text);
   }
 });
+
+test('un tabulador o un salto de línea en el esquema o entre las dos diagonales se quita antes de leer la dirección, como lo hace el navegador', () => {
+  for (const written of ['ht\ttps://www.fabricante.example/recursos/guias/', 'https:/\n/www.fabricante.example/recursos/guias/', '/\r\n/www.fabricante.example/recursos/guias/']) {
+    assert.ok(samePage(written, PAGE), JSON.stringify(written));
+  }
+  assert.ok(!samePage('ht\ttps://www.fabricante.example/recursos/otras/', PAGE));
+});
