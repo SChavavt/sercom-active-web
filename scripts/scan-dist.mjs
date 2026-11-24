@@ -25,7 +25,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { addressFinder, samePage } from '../src/lib/address-match.mjs';
+import { addressFinder, addressMatcher, samePage } from '../src/lib/address-match.mjs';
 import { isPublicRetired, isPublishableResource } from '../src/lib/catalog-policy.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 
@@ -48,18 +48,25 @@ const codePoint = (value, radix) => {
   const number = parseInt(value, radix);
   return Number.isInteger(number) && number >= 0 && number <= 0x10ffff ? String.fromCodePoint(number) : undefined;
 };
-// Entidades con nombre que un texto en español puede llevar; las numéricas se decodifican todas.
+// Entidades con nombre que un texto en español puede llevar, y las de los signos con que se escribe una dirección; las
+// numéricas se decodifican todas. Es una lista corta a propósito: una entidad con nombre que no está aquí («&mfr;»,
+// «&centerdot;») queda como está.
 const NAMED_ENTITIES = {
   nbsp: ' ', quot: '"', apos: "'", lt: '<', gt: '>', shy: '­', zwnj: '‌', zwj: '‍', ZeroWidthSpace: '​', NoBreak: '⁠',
   aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
   ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', iexcl: '¡', iquest: '¿', laquo: '«', raquo: '»', ndash: '–', mdash: '—', hellip: '…',
   middot: '·', bull: '•', copy: '©', reg: '®', trade: '™', deg: '°', dollar: '$', euro: '€', cent: '¢', pound: '£', star: '☆', starf: '★', commat: '@', period: '.', colon: ':', sol: '/', num: '#', percnt: '%',
+  Tab: '\t', NewLine: '\n', NonBreakingSpace: ' ', QUOT: '"', LT: '<', GT: '>', quest: '?', equals: '=', lowbar: '_', UnderBar: '_', bsol: '\\', plus: '+',
+  semi: ';', comma: ',', excl: '!', ast: '*', midast: '*', lpar: '(', rpar: ')', lsqb: '[', lbrack: '[', rsqb: ']', rbrack: ']', lcub: '{', lbrace: '{',
+  rcub: '}', rbrace: '}', vert: '|', verbar: '|', VerticalLine: '|', grave: '`', DiacriticalGrave: '`', Hat: '^',
 };
+// Como el navegador, una referencia numérica se lee también sin su «;» y toma todas las cifras que siguen («&#47recursos»
+// es «/recursos»; «&#x2fa», U+02FA). Una con nombre necesita su «;». «&AMP;» es «&amp;».
 const decodeEntities = text => text
-  .replace(/&(?:#(\d+)|#x([0-9a-f]+)|([A-Za-z][A-Za-z0-9]*));/gi, (entity, decimal, hex, name) => {
+  .replace(/&(?:#(\d+);?|#x([0-9a-f]+);?|([A-Za-z][A-Za-z0-9]*);)/gi, (entity, decimal, hex, name) => {
     if (decimal) return codePoint(decimal, 10) ?? entity;
     if (hex) return codePoint(hex, 16) ?? entity;
-    return name === 'amp' ? entity : NAMED_ENTITIES[name] ?? entity;
+    return name === 'amp' || name === 'AMP' ? '&amp;' : NAMED_ENTITIES[name] ?? entity;
   })
   .replace(/&amp;/g, '&');
 const decodePercent = text => text.replace(/(?:%[0-9a-f]{2})+/gi, run => {
@@ -128,7 +135,7 @@ const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0
  * ¿Un atributo style esconde el contenido del elemento? display:none, visibility:hidden o collapse, content-visibility:hidden,
  * con o sin !important, en mayúsculas o minúsculas, con escapes de CSS, y leyendo cada declaración sin sus comentarios
  * (que separan como un espacio: «display:none» seguido de un comentario vacío sigue siendo «display:none»). No resuelve
- * variables de CSS («display:var(--x,none)») ni las entidades con nombre que `decodeEntities` no conoce («&semi;»).
+ * variables de CSS («display:var(--x,none)») ni las entidades con nombre que `decodeEntities` no conoce («&centerdot;»).
  */
 function hiddenByStyle(style) {
   const css = style.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, ' ');
@@ -285,8 +292,9 @@ const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).
  *     así una página con miles de ellos anidados se lee en un tiempo proporcional a su tamaño, sin agotar la pila;
  *   - ningún atributo cuenta, tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva. Se
  *     acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11);
- *   - de las entidades con nombre solo se decodifican las de NAMED_ENTITIES; un aviso cuyas propias palabras se
- *     escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce.
+ *   - de las entidades con nombre solo se decodifican las de NAMED_ENTITIES, y solo con su «;»; un aviso cuyas propias
+ *     palabras se escriben con otras («Sitio&centerdot;en preparación», «&mfr;») o con una sin su «;» no se reconoce.
+ *     «Sitio&Tab;en preparación» y «&NewLine;» sí.
  */
 function allElementText(html) {
   return comparableText(elementTextPieces(html, [], 0));
@@ -979,8 +987,8 @@ const PRODUCTION_RULES = [
 ];
 
 // Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
-const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS o una entidad con nombre poco común en el style («display:var(--x,none)», «display:none&semi;»), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
-const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta, hasta ocho niveles de esos elementos uno dentro de otro (ninguna envoltura real pasa de tres); más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado, y así una página con miles de ellos anidados se revisa sin detener el escáner; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan: tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva; se acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11). De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…): un aviso cuyas propias palabras se escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce; escribirlo así es ocultarlo a propósito';
+const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS en el style («display:var(--x,none)») o una entidad con nombre que el escáner no decodifica (decodifica las comunes en español y las de los signos, así que «display:none&semi;» sí esconde; «&centerdot;» o una escrita sin su «;» no se leen), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta, hasta ocho niveles de esos elementos uno dentro de otro (ninguna envoltura real pasa de tres); más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado, y así una página con miles de ellos anidados se revisa sin detener el escáner; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan: tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva; se acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11). De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…) y las de los signos con que se escribe una dirección (&Tab;, &NewLine;, &sol;, &quest;…), y solo con su «;»: «Sitio&Tab;en preparación» se reconoce, pero un aviso cuyas propias palabras se escriben con otras («Sitio&centerdot;en preparación», «&mfr;») o con una sin su «;» («preparaci&oacuten») no se reconoce; escribirlo así es ocultarlo a propósito';
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
@@ -1073,6 +1081,33 @@ function leakFinder(urls) {
     });
   }
   return leakFinders.get(urls);
+}
+
+// La comparación de una dirección entera con cada lista de enlaces de `registryLeaks`, preparada una vez.
+const leakMatchers = new WeakMap();
+/**
+ * Los enlaces de `registryLeaks` que lleva el valor de un atributo de una página, leído como lo recibe el navegador:
+ * entero (`attributesOf`, que respeta las comillas: el valor puede llevar «<», «>» o la otra comilla), con sus
+ * referencias decodificadas, sin sus tabuladores ni saltos de línea y sin los espacios de sus extremos. Si el valor
+ * entero es una dirección, se compara como una sola dirección, lleve los caracteres que lleve
+ * («https://a'b@servidor/…»); y se lee como un texto (una dirección dentro de un srcset, de un «content="0; url=…"», de
+ * un style o de un JSON en un atributo data-) cuando quitarle esos caracteres lo cambió: si no, ese texto ya se leyó
+ * en la página entera.
+ * @param {string} html
+ * @param {{ urls: string[] }} leaks
+ * @returns {Set<string>}
+ */
+function attributeLeaks(html, leaks) {
+  if (!leakMatchers.has(leaks.urls)) leakMatchers.set(leaks.urls, addressMatcher(leaks.urls));
+  const matcher = leakMatchers.get(leaks.urls);
+  const found = new Set();
+  for (const [, value] of attributesOf(withoutScripts(html))) {
+    const clean = value.replace(/[\t\n\r]/g, '').replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
+    if (!clean) continue;
+    for (const url of matcher(clean)) found.add(url);
+    if (clean !== value) for (const url of leakFinder(leaks.urls)(clean)) found.add(url);
+  }
+  return found;
 }
 
 /**
@@ -1783,7 +1818,9 @@ export async function scanDist(directory, options = {}) {
     const photoSource = pageId === undefined ? undefined : approvedById.get(pageId)?.image?.sourceUrl;
     const isPhotoCredit = url => typeof photoSource === 'string' && samePage(url, photoSource) && publishablePage(url);
     const registryFound = registryFindings(decoded, leaks);
-    for (const url of registryFound.urls.filter(url => !isPhotoCredit(url))) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
+    // En una página, además, cada valor de un atributo como lo recibe el navegador (`attributeLeaks`).
+    const registryUrls = new Set([...registryFound.urls, ...(isHtml ? attributeLeaks(raw, leaks) : [])]);
+    for (const url of leaks.urls.filter(url => registryUrls.has(url) && !isPhotoCredit(url))) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
     for (const note of registryFound.notes) add('FAIL', 'R-RULE-13', file, `nota interna del registro de investigación: «${note.slice(0, 60)}»`);
     // R-RULE-11: la dirección exacta de business.json.
     if (!inPerson && addressNeedle && oneLine(norm).toLowerCase().includes(addressNeedle)) add('FAIL', 'R-RULE-11', file, 'dirección del negocio publicada sin atención presencial confirmada');

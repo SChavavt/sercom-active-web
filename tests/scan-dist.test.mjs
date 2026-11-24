@@ -2259,3 +2259,59 @@ test('R-RULE-13: con los datos reales, el crédito de la foto de UVEX Classic pa
   const elsewhere = await scan({ 'productos/uvex-classic-s360/index.html': page('<h1>UVEX Classic</h1>'), 'marcas/uvex/index.html': page(`<h1>UVEX</h1>${credit(uvex.image.sourceUrl)}`) }, options);
   assert.deepEqual(failures(elsewhere).map(finding => [finding.id, finding.file]), [['R-RULE-13', 'marcas/uvex/index.html']]);
 });
+
+// El escáner entrega cada dirección como la recibe el navegador: las referencias de caracteres decodificadas como él
+// (una numérica con o sin «;»), y cada valor de un atributo leído entero. Un registro sintético con una sola página.
+const GUIDES_PAGE = 'https://www.fabricante.example/recursos/guias/';
+const syntheticLeakData = { ...emptiedData, registry: { sources: [{ entity_id: 'fabricante-sintetico', resources: [{ url: GUIDES_PAGE, type: 'landing', label: 'Guías', verification: 'no enlazar' }] }] } };
+const leakFindings = async body => failures(await scan({ 'marcas/fabricante/index.html': page(`<h1>Fabricante</h1>${body}`) }, { data: syntheticLeakData }))
+  .filter(finding => finding.id === 'R-RULE-13').map(finding => finding.message);
+const GUIDES_FOUND = [`enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${GUIDES_PAGE}`];
+
+test('R-RULE-13: cada grafía que el navegador abre como la página del registro falla en HTML escrito a mano; la misma página con una dirección vecina honesta pasa', async () => {
+  // [la página con la grafía, la misma página con una dirección vecina que es otra página]
+  for (const [written, neighbour] of [
+    // El puerto «:0443» y el puerto vacío son el de https.
+    ['<a href="https://www.fabricante.example:0443/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example:0443/recursos/guias/otra/">Guías</a>'],
+    ['<a href="https://www.fabricante.example:/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example:/recursos/otras/">Guías</a>'],
+    // Un usuario con dos «@», con una comilla o con un espacio: el valor del atributo se lee entero.
+    ['<a href="https://a@b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://a@b@www.fabricante.example/recursos/guias/otra/">Guías</a>'],
+    [`<a href="https://a'b@www.fabricante.example/recursos/guias/">Guías</a>`, `<a href="https://a'b@www.fabricante.example/recursos/guias/otra/">Guías</a>`],
+    ['<a href="https://a b@www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://a b@www.fabricante.example/recursos/guias/otra/">Guías</a>'],
+    // Lo que el navegador quita del servidor o lleva a otra letra.
+    ['<a href="https://www.fabri­cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri­cantes.example/recursos/guias/">Guías</a>'],
+    ['<a href="https://www.fabri​cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri​cante.example/recursos/guias-2/">Guías</a>'],
+    ['<a href="https://www.fabri͏cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri͏cante.example/recursos/guia/">Guías</a>'],
+    ['<a href="https://www.fabri️cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri️cante.example/recursos/">Guías</a>'],
+    ['<a href="https://www.ⓕabricante.example/recursos/guias/">Guías</a>', '<a href="https://www.ⓕabricantes.example/recursos/guias/">Guías</a>'],
+    // Una referencia numérica sin «;» toma todas las cifras que siguen: «&#x2Fa» es U+02FA, no «/a».
+    ['<a href="https:&#47&#47www.fabricante.example&#47recursos&#47guias&#47">Guías</a>', '<a href="https:&#47&#47www.fabricante.example&#47recursos&#47guias&#47otra&#47">Guías</a>'],
+    ['<a href="https://www.fabricante.example&#x2Frecursos&#x2fguias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#x2Fa">Guías</a>'],
+    // &Tab;, &NewLine; y &shy;: el navegador los decodifica y quita el tabulador, el salto de línea y el guion suave.
+    ['<a href="https://www.fabricante.example/recursos/gu&Tab;ias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu&Tab;ias/otra/">Guías</a>'],
+    ['<a href="https://www.fabricante.example/recursos/gu&NewLine;ias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu&NewLine;ia/">Guías</a>'],
+    ['<a href="https://www.fabri&shy;cante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabri&shy;cante.example/recursos/guias.html">Guías</a>'],
+    // Un salto de línea en un valor que también lleva «<» o «>».
+    ['<a href="https://www.fabricante.example/recursos/gu\nias/#>">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu\nias/otra/#>">Guías</a>'],
+    ['<a href="https://www.fabricante.example/recursos/gu\nias/#<">Guías</a>', '<a href="https://www.fabricante.example/recursos/gu\nias/otra/#<">Guías</a>'],
+    // Diagonales invertidas en un JSON o en un script, que JSON.stringify escribe dobles.
+    [`<script type="application/json">${JSON.stringify({ url: 'https:\\\\www.fabricante.example\\recursos\\guias\\' })}</script>`, `<script type="application/json">${JSON.stringify({ url: 'https:\\\\www.fabricante.example\\recursos\\guias\\otra\\' })}</script>`],
+    [`<script>location.href = ${JSON.stringify('https:\\\\www.fabricante.example\\recursos\\guias')};</script>`, `<script>location.href = ${JSON.stringify('https:\\\\www.fabricante.example\\recursos\\guias\\otra')};</script>`],
+  ]) {
+    assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+    assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+  }
+});
+
+test('R-RULE-13: las referencias con nombre de los signos de una dirección se decodifican; una numérica toma todas sus cifras', async () => {
+  for (const written of [
+    '<a href="https&colon;&sol;&sol;www&period;fabricante&period;example&sol;recursos&sol;guias&sol;&quest;utm&lowbar;source&equals;x">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias/&quest;utm&UnderBar;source&equals;x&AMP;gclid&equals;1">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias/&num;catalogos">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&NonBreakingSpace;">Guías</a>',
+    '<a href="&#x68;ttps://www.fabricante.example/recursos/guias/">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#x2F">Guías</a>',
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+  for (const neighbour of [
+    '<a href="https://www.fabricante.example/recursos/guias/&quest;producto&equals;24">Guías</a>', '<a href="https://www.fabricante.example/recursos/guias&#4709">Guías</a>',
+    '<a href="https://www.fabricante.example/recursos/guias&lpar;2&rpar;/">Guías</a>',
+  ]) assert.deepEqual(await leakFindings(neighbour), [], neighbour);
+});
