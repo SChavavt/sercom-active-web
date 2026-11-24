@@ -49,8 +49,11 @@ export function getRetiredProducts(catalog: unknown, registry: BrandScope): Publ
 /** Tipos de recurso del registro que nunca se publican como enlace ni respaldan la fuente de una foto. */
 export const BLOCKED_RESOURCE_TYPES: readonly string[];
 
+/** Un recurso del registro que se puede publicar: verificación que empieza con «accesible» y tipo no bloqueado. */
+export function isPublishableResource(resource: unknown): boolean;
+
 /**
- * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) es del sitio de su marca en el registro:
- * un recurso accesible y de un tipo no bloqueado con el mismo servidor (sin `www.`). Devuelve los errores.
+ * La página de donde viene la foto de cada ficha aprobada (`image.sourceUrl`) no es una página del registro que no se
+ * publica, y es del sitio de su marca en el registro: un recurso publicable con el mismo servidor (sin `www.`). Devuelve los errores.
  */
 export function photoSourceErrors(catalog: unknown, registry: unknown): string[];

@@ -263,3 +263,41 @@ test('la línea del registro dice cuántas entidades salieron del portal, solo s
   const references = registry.sources.reduce((count, source) => count + source.resources.length, 0);
   assert.equal(lines[0], `Registro: ${registry.sources.length} entidades (${withdrawn} ${withdrawn === 1 ? 'retirada' : 'retiradas'} del portal) / ${references} referencias.`);
 });
+
+// La página de la foto no es una página del registro que no se publica.
+const REGISTRY = JSON.parse(registryText);
+/** Lo que el mensaje cita de un recurso del registro: su tipo y su verificación, cortada a 80 caracteres con «…». */
+const cited = resource => `${resource.type}: ${[...resource.verification].length > 80 ? `${[...resource.verification].slice(0, 80).join('')}…` : resource.verification}`;
+const withPhotoFrom = (brandId, sourceUrl) => ({ id: `ficha-${brandId}`, brandId, status: 'approved', image: { ...urlImage, sourceUrl } });
+
+test('la foto de una ficha aprobada no puede venir de una página del registro que no se publica, escrita como sea', async () => {
+  const mcr = REGISTRY.sources.find(source => source.entity_id === 'mcr-safety');
+  // La lista de guías («no enlazar»), la página vieja (deprecated, 404) y la política de contenido (sin «accesible»).
+  const hidden = mcr.resources.filter(resource => /guias-de-recursos\/$|catalogos\.php$|compartir-contenido\/$/.test(resource.url));
+  assert.equal(hidden.length, 3);
+  for (const resource of hidden) {
+    for (const sourceUrl of [resource.url, resource.url.replace(/\/$/, ''), `${resource.url}#foto`, resource.url.replace('https://www.', 'https://')]) {
+      assert.deepEqual(photoSourceErrors({ products: [withPhotoFrom('mcr-safety', sourceUrl)] }, REGISTRY), [
+        `products[0] (ficha-mcr-safety).image.sourceUrl: esa página está en el registro de investigación como «${cited(resource)}» y no se publica, así que no puede ser la página de una foto: la ficha la enlazaría en el crédito. Escribe la página del producto en el sitio del fabricante de donde viene la foto.`,
+      ], sourceUrl);
+    }
+  }
+  // El mensaje del ejemplo, con la lista de guías.
+  const guides = hidden.find(resource => /guias-de-recursos/.test(resource.url));
+  assert.match(photoSourceErrors({ products: [withPhotoFrom('mcr-safety', guides.url)] }, REGISTRY)[0], /como «landing: no enlazar: la lista de 13 guías/);
+  // En el validador completo.
+  assert.deepEqual((await validate(catalogOf(product(1, { brandId: 'mcr-safety', image: { ...urlImage, sourceUrl: guides.url } })))).errors,
+    [`products[0] (guante-ficticio-1).image.sourceUrl: esa página está en el registro de investigación como «${cited(guides)}» y no se publica, así que no puede ser la página de una foto: la ficha la enlazaría en el crédito. Escribe la página del producto en el sitio del fabricante de donde viene la foto.`]);
+  // Una página del sitio de MCR que no está en el registro, o que está debajo de la lista de guías, sí.
+  for (const sourceUrl of ['https://www.mcrsafety.com.mx/productos/guante-ficticio/', `${guides.url}guia-ficticia/`]) {
+    assert.deepEqual(photoSourceErrors({ products: [withPhotoFrom('mcr-safety', sourceUrl)] }, REGISTRY), [], sourceUrl);
+  }
+});
+
+test('con los datos reales, la foto de UVEX Classic viene de una página del registro que se publica, y pasa', () => {
+  const uvex = catalog.products.find(entry => entry.id === 'uvex-classic-s360');
+  const resource = REGISTRY.sources.flatMap(source => source.resources).find(entry => entry.url === uvex.image.sourceUrl);
+  assert.equal(resource.type, 'product_page');
+  assert.match(resource.verification, /^accesible/);
+  assert.deepEqual(photoSourceErrors(catalog, REGISTRY), []);
+});

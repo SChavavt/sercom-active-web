@@ -2218,3 +2218,44 @@ test('R-RULE-13 dice en --rules qué cuenta como la misma página y que la consu
   assert.match(doc, /La consulta sí es parte de la página/);
   assert.match(doc, /utm_/);
 });
+
+// El crédito de la foto pasa en la página de su ficha solo si el registro tiene esa página como publicable.
+
+test('R-RULE-13: en la página de su ficha, la página de la foto pasa solo si el registro la tiene como publicable', async () => {
+  const approval = { by: 'Revisor de prueba', on: '2026-11-23', supplyConfirmed: true };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url.replaceAll('&', '&amp;')}" target="_blank" rel="noopener noreferrer">Marca<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  const withPhoto = (brandId, sourceUrl) => {
+    const catalog = structuredClone(emptiedData.catalog);
+    catalog.categories[0].status = 'approved';
+    catalog.products.push({ id: 'ficha-con-foto', brandId, status: 'approved', approval, image: { file: 'foto-de-prueba.jpg', alt: 'Foto de prueba', sourceUrl, usageConfirmed: true } });
+    return { data: { ...emptiedData, catalog } };
+  };
+  const resources = entity => data.registry.sources.find(source => source.entity_id === entity).resources;
+  // La lista de guías de MCR («no enlazar»), su página vieja (deprecated, 404), su política de contenido (sin «accesible») y
+  // la página con formulario de HAWK (gated_landing): fallan también en la página de la ficha cuya foto dicen que viene de ahí.
+  const hidden = [
+    ...resources('mcr-safety').filter(resource => /guias-de-recursos\/$|catalogos\.php$|compartir-contenido\/$/.test(resource.url)).map(resource => ['mcr-safety', resource.url]),
+    ...resources('hawk').filter(resource => resource.type === 'gated_landing').map(resource => ['hawk', resource.url]),
+  ];
+  assert.equal(hidden.length, 4);
+  for (const [brandId, url] of hidden) {
+    for (const written of [url, `${url}#foto`]) {
+      const result = await scan({ 'productos/ficha-con-foto/index.html': page(`<h1>Ficha</h1>${credit(written)}`) }, withPhoto(brandId, url));
+      assert.deepEqual(failures(result).map(finding => [finding.id, finding.message]), [['R-RULE-13', `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`]], written);
+    }
+  }
+});
+
+test('R-RULE-13: con los datos reales, el crédito de la foto de UVEX Classic pasa en su página, escrito como sea, y falla en otra', async () => {
+  const uvex = data.catalog.products.find(product => product.id === 'uvex-classic-s360');
+  const catalog = structuredClone(emptiedData.catalog);
+  for (const category of catalog.categories) if (uvex.categoryIds.includes(category.id)) category.status = 'approved';
+  catalog.products.push(structuredClone(uvex));
+  const options = { data: { ...emptiedData, catalog } };
+  const credit = url => `<p class="producto__credit">Foto: <a href="${url}" target="_blank" rel="noopener noreferrer">UVEX<span class="vh"> (se abre en otra pestaña)</span></a></p>`;
+  for (const written of [uvex.image.sourceUrl, `${uvex.image.sourceUrl}/`, uvex.image.sourceUrl.replace('https:', 'http:')]) {
+    assert.deepEqual(failures(await scan({ 'productos/uvex-classic-s360/index.html': page(`<h1>UVEX Classic</h1>${credit(written)}`) }, options)), [], written);
+  }
+  const elsewhere = await scan({ 'productos/uvex-classic-s360/index.html': page('<h1>UVEX Classic</h1>'), 'marcas/uvex/index.html': page(`<h1>UVEX</h1>${credit(uvex.image.sourceUrl)}`) }, options);
+  assert.deepEqual(failures(elsewhere).map(finding => [finding.id, finding.file]), [['R-RULE-13', 'marcas/uvex/index.html']]);
+});

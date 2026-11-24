@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { addressError, BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isWithdrawn, mentionsExcludedBrand, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
+import { addressError, getPublishedProducts, getRetiredProducts, isPublishableResource, isWithdrawn, mentionsExcludedBrand, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -223,7 +223,7 @@ export function crossCheckBrands(brands, registry) {
       const resource = resources.find((/** @type {any} */ candidate) => candidate.url === link.url);
       const admitted = LINK_RESOURCE_TYPES[/** @type {LinkKind} */ (KIND_OF_LABEL.get(link.label))];
       if (!resource) errors.push(`${brand.id}: el enlace ${link.url} no es un recurso de esa entidad en el registro.`);
-      else if (!String(resource.verification ?? '').startsWith('accesible') || BLOCKED_RESOURCE_TYPES.includes(resource.type)) {
+      else if (!isPublishableResource(resource)) {
         errors.push(`${brand.id}: el enlace ${link.url} no está verificado como accesible (${resource.type}: ${resource.verification}).`);
       } else if (admitted && !admitted.types.includes(resource.type)) {
         errors.push(`${brand.id}: el enlace ${link.url} lleva la etiqueta «${link.label}», pero en el registro es de tipo «${resource.type}»; esa etiqueta es solo para ${admitted.purpose}. Cambia la etiqueta o enlaza otro recurso de la marca.`);
