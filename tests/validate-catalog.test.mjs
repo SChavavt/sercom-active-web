@@ -1,8 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { brandSummary, photoSummary, registrySummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
 import { photoSourceErrors } from '../src/lib/catalog-policy.mjs';
-import { emptiedCatalog, loadProjectData, makeTree, png, readText, removeTree } from './helpers.mjs';
+import { emptiedCatalog, loadProjectData, makeTree, png, readText, removeTree, ROOT } from './helpers.mjs';
 
 // El validador (`npm run validate:catalog`) corrido sobre una carpeta temporal con los datos del repositorio y un
 // catálogo y unas fotos sintéticas. Datos exclusivamente de prueba.
@@ -33,9 +36,9 @@ function catalogOf(...products) {
 
 /**
  * Corre el validador sobre una carpeta temporal con ese catálogo y esas fotos (nombre → contenido) y, si se dan, ese
- * registro y esa lista de marcas en lugar de los del repositorio.
+ * registro y esa lista de marcas en lugar de los del repositorio; las demás opciones pasan al validador.
  */
-async function validate(catalogData, photos = {}, { registry, brands } = {}) {
+async function validate(catalogData, photos = {}, { registry, brands, ...options } = {}) {
   const files = {
     [DATA_FILES.catalog]: JSON.stringify(catalogData), [DATA_FILES.registry]: registry === undefined ? registryText : JSON.stringify(registry),
     [DATA_FILES.brands]: brands === undefined ? brandsText : JSON.stringify(brands), [DATA_FILES.examples]: examplesText,
@@ -43,7 +46,7 @@ async function validate(catalogData, photos = {}, { registry, brands } = {}) {
   for (const [name, content] of Object.entries(photos)) files[`src/assets/productos/${name}`] = content;
   const root = await makeTree(files);
   try {
-    return await validateProject(root);
+    return await validateProject(root, options);
   } finally {
     await removeTree(root);
   }
@@ -54,6 +57,9 @@ test('el resumen de fotos se lee como siempre sin fichas aprobadas, o con todas 
   assert.deepEqual(photoSummary(catalogOf()), [line]);
   // Los borradores no cuentan, con foto o sin ella.
   assert.deepEqual(photoSummary(catalogOf(product(1, { status: 'draft' }), product(2, { status: 'in_review', image: fileImage('casco-de-prueba.png') }))), [line]);
+  // Tampoco su foto por dirección.
+  assert.deepEqual(photoSummary(catalogOf(product(1, { status: 'draft', image: urlImage }), product(2, { status: 'in_review', image: urlImage }), product(3, { image: fileImage('guante-de-prueba.jpg') }))),
+    ['Fotos de producto: 1 archivo en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas.']);
   assert.deepEqual(photoSummary(catalogOf(product(1, { image: fileImage('guante-de-prueba.jpg') }))), ['Fotos de producto: 1 archivo en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas.']);
   assert.deepEqual(photoSummary(catalogOf(product(1, { image: fileImage('guante-de-prueba.jpg') }), product(2, { image: fileImage('casco-de-prueba.png') }), product(3, { image: urlImage }))),
     ['Fotos de producto: 2 archivos en src/assets/productos/ y 1 por dirección, todas de fichas aprobadas.']);
@@ -73,6 +79,64 @@ test('con fichas aprobadas sin foto, el resumen dice cuántas y otra línea dice
     'Fotos de producto: 0 archivos en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas; 2 fichas aprobadas sin foto.',
     'Sin foto (se muestran con el pictograma de su categoría): guante-ficticio-1, guante-ficticio-2.',
   ]);
+});
+
+test('con más de diez fichas aprobadas sin foto, el resumen dice cuántas, cuántas de cada marca y las diez primeras', () => {
+  // Las marcas en el orden de su lista; una que la lista no tiene va al final, con su identificador.
+  const brands = [{ id: 'marca-b', name: 'Marca B' }, { id: 'marca-a', name: 'Marca A' }];
+  const bare = (index, brandId) => ({ id: `ficha-${index}`, brandId, status: 'approved' });
+  const eleven = Array.from({ length: 11 }, (_, i) => bare(i + 1, i % 2 ? 'marca-b' : 'marca-a'));
+  assert.deepEqual(photoSummary({ products: eleven }, brands), [
+    'Fotos de producto: 0 archivos en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas; 11 fichas aprobadas sin foto.',
+    'Sin foto (se muestran con el pictograma de su categoría): 11 (Marca B 5, Marca A 6). Las primeras: ficha-1, ficha-2, ficha-3, ficha-4, ficha-5, ficha-6, ficha-7, ficha-8, ficha-9, ficha-10 y 1 más. La lista completa: npm run validate:catalog -- --sin-foto',
+  ]);
+  // Con diez, la línea de siempre.
+  assert.deepEqual(photoSummary({ products: eleven.slice(0, 10) }, brands)[1],
+    'Sin foto (se muestran con el pictograma de su categoría): ficha-1, ficha-2, ficha-3, ficha-4, ficha-5, ficha-6, ficha-7, ficha-8, ficha-9, ficha-10.');
+  // Con 1,400 sin foto, 1,100 archivos y 1,200 direcciones: cada cifra con la coma de los miles.
+  const many = [
+    ...Array.from({ length: 1000 }, (_, i) => bare(i + 1, 'marca-a')),
+    ...Array.from({ length: 399 }, (_, i) => bare(i + 1001, 'marca-b')),
+    bare(1400, 'marca-c'),
+    ...Array.from({ length: 1100 }, (_, i) => ({ ...bare(i + 2001, 'marca-a'), image: { file: `foto-${i}.jpg` } })),
+    ...Array.from({ length: 1200 }, (_, i) => ({ ...bare(i + 4001, 'marca-b'), image: { url: `https://fotos.sitio.mx/${i}.jpg` } })),
+    { ...bare(9001, 'marca-a'), status: 'draft' },
+  ];
+  assert.deepEqual(photoSummary({ products: many }, brands), [
+    'Fotos de producto: 1,100 archivos en src/assets/productos/ y 1,200 por dirección, todas de fichas aprobadas; 1,400 fichas aprobadas sin foto.',
+    'Sin foto (se muestran con el pictograma de su categoría): 1,400 (Marca B 399, Marca A 1,000, marca-c 1). Las primeras: ficha-1, ficha-2, ficha-3, ficha-4, ficha-5, ficha-6, ficha-7, ficha-8, ficha-9, ficha-10 y 1,390 más. La lista completa: npm run validate:catalog -- --sin-foto',
+  ]);
+});
+
+test('con --sin-foto el validador escribe, después del resumen, cada ficha aprobada sin foto en su línea', async () => {
+  const products = Array.from({ length: 12 }, (_, i) => product(i + 1));
+  const plain = await validate(catalogOf(...products, product(13, { image: urlImage })));
+  const full = await validate(catalogOf(...products, product(13, { image: urlImage })), {}, { listWithoutPhoto: true });
+  assert.deepEqual(plain.errors, []);
+  assert.deepEqual(full.lines.slice(0, plain.lines.length), plain.lines);
+  assert.deepEqual(full.lines.slice(plain.lines.length), products.map(entry => entry.id));
+  assert.ok(plain.lines.includes('Sin foto (se muestran con el pictograma de su categoría): 12 (Ansell 12). Las primeras: guante-ficticio-1, guante-ficticio-2, guante-ficticio-3, guante-ficticio-4, guante-ficticio-5, guante-ficticio-6, guante-ficticio-7, guante-ficticio-8, guante-ficticio-9, guante-ficticio-10 y 2 más. La lista completa: npm run validate:catalog -- --sin-foto'), plain.lines.join('\n'));
+});
+
+test('con los datos del repositorio, el resumen nombra las diez primeras fichas aprobadas sin foto, y --sin-foto las escribe todas', async () => {
+  // Lo esperado sale de los datos, contado aquí: las fichas aprobadas sin image, en el orden del catálogo.
+  const withoutPhoto = catalog.products.filter(entry => entry.status === 'approved' && !('image' in entry)).map(entry => entry.id);
+  const run = async (...args) => (await promisify(execFile)(process.execPath, [join(ROOT, 'scripts', 'validate-catalog.mjs'), ...args])).stdout.trimEnd().split('\n');
+  const [plain, full] = await Promise.all([run(), run('--sin-foto')]);
+  assert.deepEqual(full.slice(0, plain.length), plain);
+  assert.deepEqual(full.slice(plain.length), withoutPhoto);
+  const line = plain.find(entry => entry.startsWith('Sin foto'));
+  if (withoutPhoto.length > 10) {
+    assert.ok(line.includes(`. Las primeras: ${withoutPhoto.slice(0, 10).join(', ')} y ${(withoutPhoto.length - 10).toLocaleString('es-MX')} más. La lista completa: npm run validate:catalog -- --sin-foto`), line);
+  } else if (withoutPhoto.length) assert.equal(line, `Sin foto (se muestran con el pictograma de su categoría): ${withoutPhoto.join(', ')}.`);
+});
+
+test('las cifras del resumen llevan la coma de los miles', async () => {
+  const products = Array.from({ length: 1000 }, (_, i) => product(i + 1));
+  const { errors, lines } = await validate(catalogOf(...products));
+  assert.deepEqual(errors, []);
+  assert.ok(lines.includes('Catálogo: 1,000 productos / 1,000 aprobados / 0 retirados con página informativa.'), lines.join('\n'));
+  assert.ok(lines.includes('Fotos de producto: 0 archivos en src/assets/productos/ y 0 por dirección, todas de fichas aprobadas; 1,000 fichas aprobadas sin foto.'), lines.join('\n'));
 });
 
 test('el validador acepta fichas aprobadas sin foto y lo dice en el resumen, sin error', async () => {

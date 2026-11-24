@@ -63,3 +63,30 @@ test('una variante sin etiqueta, o con la etiqueta vacía, es un problema', asyn
   assert.deepEqual((await ficha(chips(chip('   ')))).map(problem => problem.message), [message]);
   assert.deepEqual((await ficha(chips('<li class="producto__chip"><span class="producto__chip-code t-code"><span class="vh">Código </span>FIC-100-8</span></li>'))).map(problem => problem.message), [message]);
 });
+
+test('la etiqueta cuenta solo con el texto que se ve: sin lo oculto (.vh, aria-hidden, hidden) ni los caracteres que no se ven', async () => {
+  const message = 'la variante 1 (<li.producto__chip>) no lleva una etiqueta con texto (.producto__chip-label): el visitante no sabe qué variante es';
+  for (const label of ['<span class="vh">Talla 8</span>', '<span aria-hidden="true">Talla 8</span>', '<span hidden>Talla 8</span>', '​', '­⁠', '&nbsp;​']) {
+    assert.deepEqual((await ficha(chips(chip(label, 'FIC-100-8')))).map(problem => problem.message), [message], JSON.stringify(label));
+  }
+  // Con algo que se ve junto a lo oculto, la etiqueta está.
+  assert.deepEqual(await ficha(chips(chip('Talla 8<span class="vh"> (mediana)</span>', 'FIC-100-8'))), []);
+});
+
+test('un código hecho solo de caracteres que no se ven, o escondido, es un problema', async () => {
+  const message = 'la variante 1 (<li.producto__chip>), «Talla 8», lleva <span.producto__chip-code.t-code> sin código: si la variante no tiene código propio, la página no imprime ese elemento';
+  for (const code of ['​', '­', '&nbsp;⁠', '<span hidden>FIC-100-8</span>']) {
+    assert.deepEqual((await ficha(chips(chip('Talla 8', code)))).map(problem => problem.message), [message], JSON.stringify(code));
+  }
+});
+
+test('la palabra oculta «Código» va antes del código, no después', async () => {
+  const message = 'la variante 1 (<li.producto__chip>), «Talla 8», lleva <span.producto__chip-code.t-code> sin la palabra oculta «Código» (.vh) antes del código';
+  const after = '<li class="producto__chip"><span class="producto__chip-label">Talla 8</span><span class="producto__chip-code t-code">FIC-100-8<span class="vh"> Código</span></span></li>';
+  assert.deepEqual((await ficha(chips(after))).map(problem => problem.message), [message]);
+  const between = '<li class="producto__chip"><span class="producto__chip-label">Talla 8</span><span class="producto__chip-code t-code">FIC-<span class="vh">Código </span>100-8</span></li>';
+  assert.deepEqual((await ficha(chips(between))).map(problem => problem.message), [message]);
+  // Antes, también dentro de otro elemento: pasa.
+  const nested = '<li class="producto__chip"><span class="producto__chip-label">Talla 8</span><span class="producto__chip-code t-code"><span><span class="vh">Código </span></span><b>FIC-100-8</b></span></li>';
+  assert.deepEqual(await ficha(chips(nested)), []);
+});

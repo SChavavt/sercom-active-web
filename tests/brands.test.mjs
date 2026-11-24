@@ -174,13 +174,19 @@ test('crossCheckBrands rechaza enlaces que no son un recurso accesible y publica
   assert.ok(registry.sources.some(source => source.resources.some(resource => resource.verification.startsWith('accesible') && BLOCKED_TYPES.includes(resource.type))));
 });
 
-test('el enlace de una marca es una dirección https escrita completa', () => {
+test('el enlace de una marca es una dirección https escrita completa, y el mensaje dice qué tiene de malo', () => {
   const invalid = url => validateBrands(withBrand('ansell', brand => { brand.manufacturerLinks[1].url = url; }));
-  for (const url of ['https:/www.ansell.com/mx/', 'https:www.ansell.com/mx/', ' https://www.ansell.com/mx/', 'https://www.ansell.com/mx/\n', 'https://www.an\nsell.com/mx/', 'https://www.ansell.com/mx es/', 'https:\\\\www.ansell.com\\mx', 'https://www.ansell.com\\mx', 'https:///mx/']) {
-    assert.match(invalid(url).join('\n'), /URL https/, JSON.stringify(url));
+  const message = problem => new RegExp(`manufacturerLinks\\[1\\]\\.url: ${problem}; escribe la dirección https completa, como https://www\\.fabricante\\.com/catalogo/\\.$`);
+  for (const [url, problem] of [['https:/www.ansell.com/mx/', 'la dirección no empieza con «https://»'], ['https:www.ansell.com/mx/', 'la dirección no empieza con «https://»'],
+    [' https://www.ansell.com/mx/', 'la dirección tiene un espacio o un salto de línea al principio'], ['https://www.ansell.com/mx/\n', 'la dirección tiene un espacio o un salto de línea después de «…/www.ansell.com/mx/»'],
+    ['https://www.an\nsell.com/mx/', 'la dirección tiene un espacio o un salto de línea después de «https://www.an»'], ['https://www.ansell.com/mx es/', 'la dirección tiene un espacio o un salto de línea después de «…/www.ansell.com/mx»'],
+    ['https:\\\\www.ansell.com\\mx', 'la dirección no empieza con «https://»'], ['https://www.ansell.com\\mx', 'la dirección lleva una diagonal invertida'], ['https:///mx/', 'no se puede leer como dirección'],
+    ['https://www.ansell.com:443/mx/', 'la dirección lleva un puerto \\(«:443»\\)'], ['https://www.ansell\u200b.com/mx/', 'la dirección tiene un carácter invisible \\(U\\+200B\\) después de «https://www.ansell»'],
+    [undefined, 'falta']]) {
+    assert.match(invalid(url).join('\n'), message(problem), JSON.stringify(url));
   }
   // Una dirección honesta pasa, también con acentos o sin diagonal final.
-  for (const url of ['https://www.ansell.com/mx/es/industrial', 'https://www.ansell.com', 'https://ejemplo.invalid/catálogo/protección', 'https://www.ansell.com:443/mx/?q=guante#ficha']) {
+  for (const url of ['https://www.ansell.com/mx/es/industrial', 'https://www.ansell.com', 'https://ejemplo.invalid/catálogo/protección', 'https://www.ansell.com/mx/?q=guante#ficha']) {
     assert.deepEqual(invalid(url), [], url);
   }
 });
@@ -189,7 +195,7 @@ test('validateBrands exige la estructura exacta: hasta tres enlaces, etiquetas c
   const invalid = change => validateBrands(withBrand('ansell', change));
   assert.match(invalid(brand => { brand.manufacturerLinks[0].label = 'Catálogo'; }).join('\n'), /«Catálogo» no es una etiqueta de enlace; usa una de estas tres/);
   assert.match(invalid(brand => { delete brand.manufacturerLinks[0].label; }).join('\n'), /falta la etiqueta/);
-  assert.match(invalid(brand => { brand.manufacturerLinks[0].url = 'http://www.ansell.com/mx/es/industrial'; }).join('\n'), /URL https/);
+  assert.match(invalid(brand => { brand.manufacturerLinks[0].url = 'http://www.ansell.com/mx/es/industrial'; }).join('\n'), /url: la dirección no empieza con «https:\/\/»; escribe la dirección https completa/);
   assert.match(invalid(brand => { brand.manufacturerLinks[1].verification = 'accesible'; }).join('\n'), /manufacturerLinks\[1\]\.verification: campo no definido/);
   assert.match(invalid(brand => { brand.manufacturerLinks[0] = 'https://www.ansell.com/'; }).join('\n'), /manufacturerLinks\[0\]: debe ser un objeto con label y url/);
   assert.match(invalid(brand => { brand.next_action = 'nota interna'; }).join('\n'), /next_action: campo no definido/);

@@ -18,17 +18,64 @@ export const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{
 export const WITHDRAWN_STATUS = 'retirada';
 /** ¿La entidad del registro salió del portal? Solo con `portal.status` igual a «retirada». */
 export const isWithdrawn = source => isRecord(source?.portal) && source.portal.status === WITHDRAWN_STATUS;
+/** Largo máximo de una dirección, en caracteres. */
+export const MAX_ADDRESS_LENGTH = 2000;
+// Un servidor escrito como el nombre de un sitio: partes de letras (de cualquier escritura, con sus acentos), cifras y
+// guiones, separadas por puntos.
+const SITE_LABEL = /^[\p{L}\p{M}\p{N}-]+$/u;
+const IP_ADDRESS = /^\d+\.\d+\.\d+\.\d+$/;
+const SITE_HOSTNAME = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/;
 /**
- * Una dirección `https` escrita completa: empieza con «https://» seguido de un servidor, no tiene espacios, saltos de
- * línea ni diagonales invertidas, se puede leer como dirección y no lleva usuario ni contraseña. Un navegador lee
- * «https:/servidor/x» o «https:servidor/x» como una dirección dentro del propio sitio. No se exige que la dirección esté
- * escrita como la reescribe el navegador: una con acentos o sin la diagonal final es correcta.
+ * Lo que tiene de malo una dirección `https` escrita completa, en una frase corta (`null` si nada): falta, no es un
+ * texto, mide más de `MAX_ADDRESS_LENGTH` caracteres, no empieza con «https://», tiene un espacio o un salto de línea o
+ * un carácter que no se ve (los mismos que no puede llevar el texto de una ficha, `invisibleAt`), lleva una diagonal
+ * invertida, no se puede leer como dirección, lleva usuario o contraseña (también vacíos: «https://@sitio.mx»), lleva un
+ * puerto, o su servidor no es el nombre de un sitio: al menos un punto, cada parte de letras, cifras y guiones (un
+ * nombre con acentos se escribe con sus letras o en su forma xn--), sin punto al final y sin ser una dirección IP. Un
+ * navegador lee «https:/servidor/x» o «https:servidor/x» como una dirección dentro del propio sitio. No se exige que
+ * la dirección esté escrita como la reescribe el navegador: una con acentos o sin la diagonal final es correcta. Las
+ * frases que dicen algo de la dirección («tiene…», «lleva…», «no empieza…», «mide…») se leen después de «la dirección»
+ * (`addressError`).
+ * @param {unknown} value
+ * @returns {string | null}
  */
-export const isHttpsAddress = value => {
-  if (typeof value !== 'string' || !/^https:\/\/[^\s\\/?#]/.test(value) || /[\s\\]/.test(value)) return false;
-  try { const url = new URL(value); return url.protocol === 'https:' && Boolean(url.hostname) && !url.username && !url.password; }
-  catch { return false; }
-};
+export function addressProblem(value) {
+  if (value === undefined || value === '') return 'falta';
+  if (typeof value !== 'string') return 'no es un texto';
+  if (value.length > MAX_ADDRESS_LENGTH) return `mide más de ${MAX_ADDRESS_LENGTH.toLocaleString('es-MX')} caracteres`;
+  // Lo que no empieza con «https://» se dice así, salvo que empiece con algo que no se ve: eso es lo que hay que borrar.
+  const space = /[^\S\uFEFF]/.exec(value);
+  const hidden = invisibleAt(value);
+  if (!value.startsWith('https://') && space?.index !== 0 && hidden?.index !== 0) return 'no empieza con «https://»';
+  if (space) return `tiene un espacio o un salto de línea ${placeIn(value, space.index, addressTail)}`;
+  if (hidden) return `tiene un carácter invisible (${hidden.code}) ${placeIn(value, hidden.index, addressTail)}`;
+  if (value.includes('\\')) return 'lleva una diagonal invertida';
+  const authority = value.slice('https://'.length).split(/[/?#]/, 1)[0];
+  if (!authority) return 'no se puede leer como dirección';
+  if (authority.includes('@')) return 'lleva usuario o contraseña antes del servidor';
+  const bracket = authority.startsWith('[') ? authority.indexOf(']') : -1;
+  const host = bracket === -1 ? authority.split(':', 1)[0] : authority.slice(0, bracket + 1);
+  if (bracket === -1 && host !== authority) return `lleva un puerto («${authority.slice(host.length)}»)`;
+  let url;
+  try { url = new URL(value); } catch { return 'no se puede leer como dirección'; }
+  if (bracket !== -1 || !host.split('.').every(label => SITE_LABEL.test(label)) || !host.includes('.')
+    || !SITE_HOSTNAME.test(url.hostname) || IP_ADDRESS.test(url.hostname)) return `el servidor «${host}» no es el nombre de un sitio`;
+  return null;
+}
+/** Una dirección `https` escrita completa: sin nada de lo que dice `addressProblem`. */
+export const isHttpsAddress = value => addressProblem(value) === null;
+/**
+ * El mensaje de una dirección con un problema, con el campo y su posición y qué hacer; `null` si está bien.
+ * @param {string} path el campo, como «products[3].documents[2].url»
+ * @param {unknown} value la dirección
+ * @param {string} todo qué hacer, una frase que termina en punto
+ * @returns {string | null}
+ */
+export function addressError(path, value, todo) {
+  const problem = addressProblem(value);
+  if (problem === null) return null;
+  return `${path}: ${/^(?:tiene|lleva|no empieza|mide)\b/.test(problem) ? `la dirección ${problem}` : problem}; ${todo}`;
+}
 const isHttps = isHttpsAddress;
 /** Indica si un texto menciona la marca excluida del alcance. */
 export const mentionsExcludedBrand = value => /\bgisa\b|guantes?\s+internacionales?/.test(normalize(value));
@@ -69,6 +116,24 @@ const fileImageKeys = new Set(['file', 'alt', 'sourceUrl', 'usageConfirmed']);
 const urlImageKeys = new Set(['url', 'width', 'height', 'alt', 'sourceUrl', 'usageConfirmed']);
 // Lo reservado a los ejemplos tampoco puede ir en el nombre de un archivo publicado (el escáner lo busca en producción).
 const reservedFileName = value => /ejemplo|ej-\d/.test(value);
+// En una dirección, «ej-» con una cifra es lo reservado solo donde empieza una palabra, como lo lee el escáner (\bEJ-\d):
+// «ref-ej-2024» lo lleva; «reej-2» o «x2ej-5», no.
+const reservedAddress = value => /ejemplo|(?<![\p{L}\p{N}_])ej-\d/u.test(value);
+/** Veces que se decodifica el %XX de una dirección como máximo: las mismas que el escáner (PERCENT_PASSES). */
+const ADDRESS_DECODE_PASSES = 8;
+/**
+ * Una dirección como la lee el escáner: con su %XX decodificado (cada tramo válido; uno mal formado queda como está),
+ * otra vez mientras cambie, hasta `ADDRESS_DECODE_PASSES` veces. «%47» es una letra y «%20», un espacio.
+ */
+function decodedAddress(value) {
+  let text = value;
+  for (let pass = 0; pass < ADDRESS_DECODE_PASSES; pass += 1) {
+    const next = text.replace(/(?:%[0-9a-f]{2})+/gi, run => { try { return decodeURIComponent(run); } catch { return run; } });
+    if (next === text) break;
+    text = next;
+  }
+  return text;
+}
 const isRecord = value => typeof value === 'object' && value !== null && !Array.isArray(value);
 const unknownKeys = (value, allowed, path, errors) => {
   if (isRecord(value)) for (const key of Object.keys(value)) if (!allowed.has(key)) errors.push(`${path}.${key}: campo no definido.`);
@@ -92,6 +157,45 @@ function tailOf(text) {
   const space = cut.indexOf(' ');
   const wholeWord = characters[characters.length - TAIL_LENGTH - 1] === ' ' || space === -1;
   return `…${wholeWord ? cut : cut.slice(space + 1)}`;
+}
+/**
+ * El final de una dirección para citarlo en un mensaje: hasta 24 caracteres, desde el principio de una parte de la ruta
+ * («…/productos/ficha»), o los últimos 24 si no hay una diagonal donde empezar.
+ */
+function addressTail(text) {
+  const characters = [...text];
+  if (characters.length <= TAIL_LENGTH) return text;
+  const cut = characters.slice(-TAIL_LENGTH).join('');
+  const slash = cut.search(/\/(?!\/)/);
+  return `…${slash === -1 ? cut : cut.slice(slash)}`;
+}
+/** Dónde está una posición de un texto, para un mensaje: «después de «…»» o «al principio». */
+function placeIn(text, index, tail = tailOf) {
+  const before = tail(text.slice(0, index));
+  return before ? `después de «${before}»` : 'al principio';
+}
+/**
+ * Un carácter que no se ve, o que el texto de un visitante no conservaría: lo que `cleanQuery` quita o cambia por un
+ * espacio (el guion suave, los de dirección, los de ancho cero, los controles, U+FFFD) y los demás que Unicode marca
+ * para ignorar al dibujar (`HIDDEN_CHARACTER`). Es la única lista: la usan el texto de una ficha y sus direcciones.
+ */
+const isInvisible = character => HIDDEN_CHARACTER.test(character) || cleanQuery(`a${character}a`) !== `a${character}a`;
+// Lo que no hay que revisar carácter por carácter: letras inglesas, cifras, signos y el espacio.
+const PLAIN_TEXT = /^[\x20-\x7e]*$/;
+/**
+ * El primer carácter de un texto que no se ve (`isInvisible`), con su código («U+200B») y su posición; `null` si no hay.
+ * @param {string} text
+ * @returns {{ code: string, index: number } | null}
+ */
+function invisibleAt(text) {
+  if (PLAIN_TEXT.test(text)) return null;
+  let index = 0;
+  for (const character of text) {
+    const point = character.codePointAt(0) ?? 0;
+    if ((point < 0x20 || point > 0x7e) && isInvisible(character)) return { code: `U+${point.toString(16).toUpperCase().padStart(4, '0')}`, index };
+    index += character.length;
+  }
+  return null;
 }
 // Los signos pegados al principio o al final de una palabra («pares,», «(caja)»): todo lo que no es letra ni cifra.
 const EDGE_SIGNS = /^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu;
@@ -137,11 +241,14 @@ function inspectImage(image, productPath, errors, line) {
     }
   } else {
     for (const key of Object.keys(image)) if (!urlImageKeys.has(key)) errors.push(`${path}.${key}: campo no definido.`);
-    if (!isHttps(image.url)) errors.push(`${path}.url: debe ser una dirección https completa, sin usuario ni contraseña.`);
-    // La dirección se publica tal cual: las mismas dos revisiones que el nombre de un archivo.
+    const urlError = addressError(`${path}.url`, image.url, 'escribe la dirección https completa de la foto, sin usuario ni contraseña.');
+    if (urlError) errors.push(urlError);
+    // La dirección se publica tal cual: las mismas dos revisiones que el nombre de un archivo, sobre la dirección
+    // decodificada, como la lee el escáner, y con «+» como separador.
     if (typeof image.url === 'string') {
-      if (reservedFileName(image.url.toLowerCase())) errors.push(`${path}.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.`);
-      if (excluded(image.url.replace(/[-._/:?=&]/g, ' '))) errors.push(`${path}.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.`);
+      const decoded = decodedAddress(image.url);
+      if (reservedAddress(decoded.toLowerCase())) errors.push(`${path}.url: la dirección lleva «ejemplo» o «ej-» con una cifra, que están reservados para los ejemplos de la vista previa; usa otra dirección.`);
+      if (excluded(decoded.replace(/[-._/:?=&+]/g, ' '))) errors.push(`${path}.url: la dirección lleva la marca excluida, que el sitio no publica; usa otra foto.`);
     }
     for (const [key, side] of [['width', 'ancho'], ['height', 'alto']]) {
       const value = image[key];
@@ -154,7 +261,8 @@ function inspectImage(image, productPath, errors, line) {
     line('image.alt', image.alt, false, 'está vacío; describe la foto en una línea.');
     if (typeof image.alt === 'string' && [...image.alt].length > MAX_IMAGE_ALT) errors.push(`${path}.alt: tiene ${[...image.alt].length} caracteres y el máximo es ${MAX_IMAGE_ALT}; describe la foto en una línea más corta.`);
   }
-  if (!isHttps(image.sourceUrl)) errors.push(`${path}.sourceUrl: ${image.sourceUrl === undefined ? 'falta' : 'debe ser una dirección https'}; escribe la página de donde viene la foto.`);
+  const sourceError = addressError(`${path}.sourceUrl`, image.sourceUrl, 'escribe la página de donde viene la foto.');
+  if (sourceError) errors.push(sourceError);
   if (typeof image.usageConfirmed !== 'boolean') errors.push(`${path}.usageConfirmed: debe ser true o false; true solo con el uso de la foto confirmado.`);
 }
 
@@ -198,7 +306,8 @@ function inspectStandards(standards, productPath, errors, line) {
       if (seen.has(key)) errors.push(`${entry}.text: repite la norma de standards[${seen.get(key)}]; escribe cada norma una vez.`);
       else seen.set(key, i);
     }
-    if (!isHttps(standard.sourceUrl)) errors.push(`${entry}.sourceUrl: ${standard.sourceUrl === undefined ? 'falta' : 'debe ser una dirección https'}; ${where}`);
+    const sourceError = addressError(`${entry}.sourceUrl`, standard.sourceUrl, where);
+    if (sourceError) errors.push(sourceError);
   });
 }
 
@@ -245,10 +354,17 @@ export function validateCatalog(catalog, registry) {
     if (!isText(p.name)) errors.push(`${path}: falta nombre.`);
     if (!['draft', 'in_review', 'approved', 'retired'].includes(p.status)) errors.push(`${path}: estado editorial inválido.`);
     if (!Array.isArray(p.categoryIds) || !p.categoryIds.length || p.categoryIds.some(id => !categories.has(id))) errors.push(`${path}: faltan categorías válidas.`);
-    if (p.source && (!isHttps(p.source.url) || !validDate(p.source.checkedOn))) errors.push(`${path}: fuente o fecha inválida.`);
+    // La fuente: la página del fabricante donde se revisaron los datos y el día de esa revisión, cada una con su mensaje.
+    if (p.source && !isRecord(p.source)) errors.push(`${path}.source: debe ser un objeto con url y checkedOn.`);
+    else if (p.source) {
+      const sourceError = addressError(`${path}.source.url`, p.source.url, 'escribe la página del fabricante donde revisaste los datos de la ficha.');
+      if (sourceError) errors.push(sourceError);
+      const { checkedOn } = p.source;
+      if (!validDate(checkedOn)) errors.push(`${path}.source.checkedOn: ${checkedOn === undefined ? 'falta' : typeof checkedOn === 'string' ? `«${checkedOn}» no es una fecha` : 'no es un texto'}; escribe el día en que revisaste la fuente como AAAA-MM-DD, por ejemplo 2026-11-18.`);
+    }
     unknownKeys(p.source, sourceKeys, `${path}.source`, errors);
     unknownKeys(p.approval, approvalKeys, `${path}.approval`, errors);
-    if (p.documents && (!Array.isArray(p.documents) || p.documents.some(d => !d || !isText(d.label) || !isHttps(d.url)))) errors.push(`${path}: documento inválido.`);
+    if (p.documents && !Array.isArray(p.documents)) errors.push(`${path}.documents: debe ser una lista de documentos, cada uno con label y url.`);
 
     // La forma del texto se revisa en cualquier estado: un borrador ya debe estar bien escrito. `covered`: otra regla ya
     // dice que el campo falta o está vacío, y aquí solo se revisa que esté limpio: igual a como lo deja `cleanQuery` y,
@@ -261,12 +377,8 @@ export function validateCatalog(catalog, registry) {
       } else if (cleanQuery(value) !== value) {
         errors.push(`${path}.${field}: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.`);
       } else {
-        const hidden = HIDDEN_CHARACTER.exec(value);
-        if (hidden) {
-          const code = `U+${hidden[0].codePointAt(0).toString(16).toUpperCase().padStart(4, '0')}`;
-          const before = tailOf(value.slice(0, hidden.index));
-          errors.push(`${path}.${field}: tiene un carácter invisible (${code}) ${before ? `después de «${before}»` : 'al principio'}; borra esa parte y escríbela de nuevo.`);
-        }
+        const hidden = invisibleAt(value);
+        if (hidden) errors.push(`${path}.${field}: tiene un carácter invisible (${hidden.code}) ${placeIn(value, hidden.index)}; borra esa parte y escríbela de nuevo.`);
       }
     };
     const approved = p.status === 'approved';
@@ -277,9 +389,18 @@ export function validateCatalog(catalog, registry) {
     if (p.characteristics !== undefined && !Array.isArray(p.characteristics)) {
       if (!approved) errors.push(`${path}.characteristics: debe ser una lista de textos.`);
     } else (p.characteristics ?? []).forEach((value, i) => line(`characteristics[${i}]`, value, approved));
+    // Cada documento, con su posición: su etiqueta y su dirección.
     if (Array.isArray(p.documents)) p.documents.forEach((d, i) => {
-      unknownKeys(d, documentKeys, `${path}.documents[${i}]`, errors);
-      if (isRecord(d)) line(`documents[${i}].label`, d.label, true);
+      const entry = `${path}.documents[${i}]`;
+      if (!isRecord(d)) {
+        errors.push(`${entry}: debe ser un objeto con label y url.`);
+        return;
+      }
+      unknownKeys(d, documentKeys, entry, errors);
+      if (!isText(d.label)) errors.push(`${entry}.label: ${d.label === undefined ? 'falta' : typeof d.label === 'string' ? 'está vacío' : 'debe ser un texto'}; escribe qué es el documento, como «Ficha técnica».`);
+      line(`documents[${i}].label`, d.label, true);
+      const urlError = addressError(`${entry}.url`, d.url, 'escribe la dirección completa de la página o del documento del fabricante.');
+      if (urlError) errors.push(urlError);
     });
     if (p.image !== undefined) inspectImage(p.image, path, errors, line);
     if (p.standards !== undefined) inspectStandards(p.standards, path, errors, line);

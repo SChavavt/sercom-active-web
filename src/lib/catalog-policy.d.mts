@@ -22,8 +22,17 @@ export function isWithdrawn(source: unknown): boolean;
 /** Indica si un texto menciona la marca excluida del alcance. */
 export function mentionsExcludedBrand(value: unknown): boolean;
 
-/** Una dirección `https` escrita completa: «https://», un servidor, sin espacios ni diagonales invertidas, sin usuario. */
+/** Largo máximo de una dirección, en caracteres. */
+export const MAX_ADDRESS_LENGTH: number;
+
+/** Lo que tiene de malo una dirección `https` escrita completa, en una frase corta; `null` si nada. */
+export function addressProblem(value: unknown): string | null;
+
+/** Una dirección `https` escrita completa: sin nada de lo que dice `addressProblem`. */
 export function isHttpsAddress(value: unknown): value is string;
+
+/** El mensaje de una dirección con un problema, con el campo, el problema y qué hacer; `null` si está bien. */
+export function addressError(path: string, value: unknown, todo: string): string | null;
 
 /** Valida el archivo editorial completo antes de producir una salida pública. Devuelve los errores. */
 export function validateCatalog(catalog: unknown, registry: BrandScope): string[];
