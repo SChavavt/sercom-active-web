@@ -5,7 +5,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateCatalog, getPublishedProducts, getRetiredProducts, photoSourceErrors } from '../src/lib/catalog-policy.mjs';
+import { validateCatalog, getPublishedProducts, getRetiredProducts, isWithdrawn, photoSourceErrors } from '../src/lib/catalog-policy.mjs';
 import { crossCheckBrands, MANUFACTURER_LINK_LABELS, registryPortalErrors, validateExampleProducts } from '../src/lib/site-data-core.mjs';
 import { reviewCatalogText } from './catalog-text.mjs';
 import { checkProductPhotos, PHOTO_FOLDER } from './product-photos.mjs';
@@ -17,6 +17,17 @@ export const DATA_FILES = {
 };
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+
+/**
+ * La línea del resumen sobre el registro de investigación, ya validado: cuántas entidades tiene, cuántas de ellas
+ * salieron del portal (solo si hay alguna) y cuántas referencias suman.
+ * @returns {string}
+ */
+export function registrySummary(registry) {
+  const withdrawn = registry.sources.filter(isWithdrawn).length;
+  const portal = withdrawn ? ` (${plural(withdrawn, 'retirada', 'retiradas')} del portal)` : '';
+  return `Registro: ${registry.sources.length} entidades${portal} / ${registry.sources.reduce((n, s) => n + s.resources.length, 0)} referencias.`;
+}
 
 /**
  * Las líneas del resumen sobre las fotos de las fichas aprobadas de un catálogo ya validado: cuántos archivos y cuántas
@@ -90,7 +101,7 @@ export async function validateProject(root) {
   if (errors.length) return { errors, lines: [] };
   const retiredExamples = Array.isArray(examples) ? examples.filter(example => example?.retired === true).length : 0;
   return { errors, lines: [
-    `Registro: ${registry.sources.length} entidades / ${registry.sources.reduce((n, s) => n + s.resources.length, 0)} referencias.`,
+    registrySummary(registry),
     `Catálogo: ${catalog.products.length} productos / ${getPublishedProducts(catalog, registry).length} aprobados / ${getRetiredProducts(catalog, registry).length} retirados con página informativa.`,
     ...photoSummary(catalog),
     brandSummary(brands),

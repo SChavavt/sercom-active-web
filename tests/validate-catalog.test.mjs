@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { brandSummary, photoSummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
+import { brandSummary, photoSummary, registrySummary, validateProject, DATA_FILES } from '../scripts/validate-catalog.mjs';
 import { photoSourceErrors } from '../src/lib/catalog-policy.mjs';
 import { emptiedCatalog, loadProjectData, makeTree, png, readText, removeTree } from './helpers.mjs';
 
@@ -184,4 +184,18 @@ test('una marca retirada que sigue en brands.json, o un producto suyo, detienen 
     assert.deepEqual((await validate(catalogOf(ofWithdrawn(status)), {}, { registry: withPortal('jyrsa'), brands: brandsWithout('jyrsa') })).errors,
       ['products[0]: la marca jyrsa está retirada del portal; un producto suyo no se carga.'], status);
   }
+});
+
+test('la línea del registro dice cuántas entidades salieron del portal, solo si hay alguna', async () => {
+  const entity = (id, portal) => ({ entity_id: id, resources: [{}, {}], ...(portal && { portal }) });
+  assert.equal(registrySummary({ sources: [entity('a'), entity('b')] }), 'Registro: 2 entidades / 4 referencias.');
+  assert.equal(registrySummary({ sources: [entity('a', PORTAL), entity('b')] }), 'Registro: 2 entidades (1 retirada del portal) / 4 referencias.');
+  assert.equal(registrySummary({ sources: [entity('a', PORTAL), entity('b', PORTAL), entity('c', PORTAL), entity('d', PORTAL), entity('e')] }),
+    'Registro: 5 entidades (4 retiradas del portal) / 10 referencias.');
+  // Con el registro del repositorio y una marca retirada, en la salida del validador.
+  const { lines } = await validate(catalogOf(), {}, { registry: withPortal('jyrsa'), brands: brandsWithout('jyrsa') });
+  const registry = JSON.parse(registryText);
+  const withdrawn = registry.sources.filter(source => source.portal !== undefined).length + 1;
+  const references = registry.sources.reduce((count, source) => count + source.resources.length, 0);
+  assert.equal(lines[0], `Registro: ${registry.sources.length} entidades (${withdrawn} ${withdrawn === 1 ? 'retirada' : 'retiradas'} del portal) / ${references} referencias.`);
 });
