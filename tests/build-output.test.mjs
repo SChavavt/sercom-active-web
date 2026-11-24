@@ -505,3 +505,37 @@ test('ninguna página de producción dice «Estamos cargando» ni «Mientras tan
     }, category.id);
   }
 });
+
+// «Más productos…» de cada ficha, en la compilación del sitio real (la 5), para las fichas que haya: lo esperado sale
+// de los datos y no nombra ninguna.
+const productsOf = page => [...(page.match(/<section class="section" aria-labelledby="mas-title">([\s\S]*?)<\/section>/)?.[1] ?? '')
+  .matchAll(/<article class="product\b[^"]*">[\s\S]*?href="\/productos\/([^/"]+)\/"/g)].map(match => match[1]);
+const moreTitle = page => page.match(/<h2 class="sec-head__title t-h2" id="mas-title">([^<]*)<\/h2>/)?.[1];
+
+test('«Más productos de esta categoría» lista solo productos de la categoría de la ficha, primero los que la tienen como primera', () => {
+  const { files } = builds.real;
+  const approved = new Set(real.approvedCategoryIds);
+  const firstPublic = product => product.categoryIds.find(id => approved.has(id));
+  const byId = new Map(real.approvedProducts.map(product => [product.id, product]));
+  let checked = 0;
+  for (const product of real.approvedProducts) {
+    const page = files.get(`productos/${product.id}/index.html`);
+    assert.ok(page, product.id);
+    const category = firstPublic(product);
+    const others = real.approvedProducts.filter(other => other.id !== product.id && other.categoryIds.includes(category));
+    const cards = productsOf(page);
+    if (others.length === 0) {
+      assert.equal(moreTitle(page), 'Más productos del catálogo', product.id);
+      continue;
+    }
+    checked += 1;
+    assert.equal(moreTitle(page), 'Más productos de esta categoría', product.id);
+    assert.equal(cards.length, Math.min(4, others.length), `${product.id}: número de tarjetas`);
+    assert.ok(!cards.includes(product.id), `${product.id}: la ficha no se lista a sí misma`);
+    assert.equal(new Set(cards).size, cards.length, `${product.id}: sin repetir`);
+    for (const id of cards) assert.ok(byId.get(id)?.categoryIds.includes(category), `${product.id}: ${id} no es de ${category}`);
+    const own = cards.map(id => byId.get(id).categoryIds[0] === category);
+    assert.ok(own.indexOf(false) === -1 || own.lastIndexOf(true) < own.indexOf(false), `${product.id}: los de primera categoría ${category} van primero (${cards.join(', ')})`);
+  }
+  assert.ok(checked > 0, 'alguna ficha debe compartir su categoría para que esta prueba tenga sentido');
+});

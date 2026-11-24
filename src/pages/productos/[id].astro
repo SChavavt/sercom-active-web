@@ -11,7 +11,9 @@
 //      acciones quedan a la vista sin bajar. El mismo orden en todos los anchos. Un bloque sin datos no se imprime. En tableta y celular las
 //      dos partes se apilan, la imagen primero y baja.
 //   3. Banda compacta de ayuda («¿Necesitas otra talla, color o presentación?»).
-//   4. Hasta cuatro productos: de la misma categoría o, si no hay otros, del catálogo; sin ninguno, nada.
+//   4. Hasta cuatro productos: los que tienen la categoría de la página (la primera del producto), primero los que la
+//      tienen como primera (sameCategoryProducts de related-products.mjs), o, si no hay otros, del catálogo; sin
+//      ninguno, nada.
 //   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
 //   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
 //   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
@@ -48,8 +50,9 @@ import StepperScript from '../../components/StepperScript.astro';
 import Tag from '../../components/Tag.astro';
 import { categoryIcon } from '../../lib/icons.ts';
 import { isLongProductName } from '../../lib/product-title.mjs';
+import { sameCategoryProducts } from '../../lib/related-products.mjs';
 import { absoluteUrl, contactDetails, contactLinks } from '../../lib/contact.mjs';
-import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, productsByCategory, products, retiredProducts, routes } from '../../lib/site-data.mjs';
+import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, products, retiredProducts, routes } from '../../lib/site-data.mjs';
 import type { PublicProduct } from '../../types/site.ts';
 // Después de la plantilla, para que la hoja de la página vaya detrás de la hoja global.
 import '../../styles/pages/producto.css';
@@ -89,11 +92,12 @@ const variantFill = { 'data-fill-2': (2 - (variantCount % 2)) % 2, 'data-fill-4'
 const CHIP_CODE_MAX = 14;
 const variantRows = product?.variants.some(variant => variant.code.length > CHIP_CODE_MAX) ?? false;
 
-// Más productos: primero los de sus categorías; si no hay otros, una selección variada del catálogo.
+// Más productos: los de la categoría de la página (la de la ruta y la que va sobre el título), primero los que la tienen
+// como primera; si no hay otros, una selección variada del catálogo.
 const MORE_LIMIT = 4;
-// En un retirado, «sus categorías» son las públicas en el modo; él nunca está en las listas.
+// En un retirado, su categoría es la primera de las públicas en el modo; él nunca está en las listas.
+const sameCategory = sameCategoryProducts(products, { productId: item.id, categoryId, limit: MORE_LIMIT });
 const unique = (list: readonly PublicProduct[]) => list.filter((entry, index) => entry.id !== item.id && list.findIndex(other => other.id === entry.id) === index);
-const sameCategory = unique(item.categoryIds.flatMap(id => productsByCategory(id))).slice(0, MORE_LIMIT);
 const fromCatalog = unique([...featuredProducts(MORE_LIMIT + 1), ...products]).slice(0, MORE_LIMIT);
 const more = sameCategory.length > 0
   ? { title: 'Más productos de esta categoría', items: sameCategory }
