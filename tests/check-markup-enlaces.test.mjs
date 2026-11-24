@@ -74,3 +74,20 @@ test('en /marcas/ dos enlaces con el mismo nombre accesible llevan al mismo luga
   assert.deepEqual(await check({ 'catalogo/index.html': doc('Catálogo', `<h1>Catálogo</h1><ul>${bad}</ul>`) }), []);
   assert.deepEqual(await check({ 'marcas/index.html': `<!doctype html><html lang="es-MX"><head><title>Marcas</title></head><body><header><a href="/a/">Ver</a></header><main id="contenido"><h1>Marcas</h1><a href="/b/">Ver</a></main></body></html>` }), []);
 });
+
+test('el texto oculto cuenta solo dentro del enlace que abre otra pestaña: fuera de él, ese enlace falla', async () => {
+  const page = body => ({ 'marcas/marca-ficticia/index.html': doc('Marca ficticia', `<h1>Marca ficticia</h1>${body}`) });
+  const bare = '<a href="https://fabricante.invalid/" target="_blank" rel="noopener noreferrer">Sitio del fabricante</a>';
+  for (const body of [
+    // En un hermano del enlace.
+    `${bare}${NEW_TAB}`,
+    `<p>${NEW_TAB}${bare}</p>`,
+    // Dentro de otro enlace, que sí lo dice.
+    `${external('https://fabricante.invalid/catalogo.pdf', 'Catálogo del fabricante (PDF)')}${bare}`,
+  ]) {
+    const problems = await check(page(body));
+    assert.deepEqual(problems.map(problem => problem.message), [
+      `el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin decirlo: lleva el texto oculto «(se abre en otra pestaña)» (.vh), como MoreLink con external`,
+    ], body);
+  }
+});

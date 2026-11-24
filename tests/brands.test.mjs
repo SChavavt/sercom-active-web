@@ -413,3 +413,19 @@ test('la edición de un PDF dice qué tiene mal', () => {
   assert.deepEqual(pdf('2026\nv2'), [`${where}: «2026\nv2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
   assert.deepEqual(pdf('\u00ad2026'), [`${where}: «\u00ad2026» lleva un carácter invisible (U+00AD) al principio; bórralo.`]);
 });
+
+test('una edición con un unidor de ancho cero (U+200D) o un selector de variante (U+FE0F) no pasa', () => {
+  const where = 'brands[0] (ansell).manufacturerLinks[0].edition';
+  const pdf = edition => withLinks([{ label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', edition }]);
+  assert.deepEqual(pdf('2026\u200dv2'), [`${where}: «2026\u200dv2» lleva un carácter invisible (U+200D) después de «2026»; bórralo.`]);
+  assert.deepEqual(pdf('2026 v2\ufe0f'), [`${where}: «2026 v2\ufe0f» lleva un carácter invisible (U+FE0F) después de «2026 v2»; bórralo.`]);
+});
+
+test('una plataforma de catálogos verificada como accesible se acepta como «Catálogo en línea del fabricante»', () => {
+  // La única del registro (la de MSA) no se pudo abrir: un registro sintético con una que sí.
+  const platform = { type: 'catalog_platform', url: 'https://plataforma.example/catalogos/jyrsa', verification: 'accesible (2026-11-23)' };
+  const synthetic = { ...registry, sources: registry.sources.map(source => (source.entity_id === 'jyrsa' ? { ...source, resources: [...source.resources, platform] } : source)) };
+  assert.deepEqual(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: ONLINE, url: platform.url }]; }), synthetic), []);
+  // En la etiqueta del PDF, no.
+  assert.match(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: PDF, url: platform.url }]; }), synthetic).join('\n'), /pero en el registro es de tipo «catalog_platform»/);
+});
