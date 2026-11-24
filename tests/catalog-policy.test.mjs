@@ -64,6 +64,23 @@ function catalogWith(...changes) {
 }
 const errorsOf = (...changes) => validateCatalog(catalogWith(...changes), registry);
 
+test('un producto de una marca retirada del portal se rechaza con su propio mensaje, en cualquier estado', () => {
+  const portal = { status: 'retirada', on: '2026-11-23', reason: 'Decisión sintética de prueba.' };
+  const withdrawnRegistry = { sources: [{ ...registry.sources[0], portal }, { entity_id: 'otra-marca', name: 'Otra marca sintética', entity_type: 'brand' }] };
+  const message = 'products[0]: la marca test-brand está retirada del portal; un producto suyo no se carga.';
+  for (const status of STATUSES) {
+    assert.deepEqual(validateCatalog(catalogWith({ status }), withdrawnRegistry), [message], status);
+  }
+  assert.throws(() => getPublishedProducts(fixture('draft'), withdrawnRegistry), /la marca test-brand está retirada del portal/);
+  // La misma ficha en otra marca del registro, que no salió del portal, se acepta.
+  assert.deepEqual(validateCatalog(catalogWith({ brandId: 'otra-marca' }), withdrawnRegistry), []);
+  // Sin la marca de retiro, la marca está en el alcance, como siempre; con otro estado, también (el validador del
+  // registro rechaza ese estado aparte).
+  assert.deepEqual(validateCatalog(catalogWith({}), registry), []);
+  const otherStatus = { sources: [{ ...registry.sources[0], portal: { ...portal, status: 'pausada' } }] };
+  assert.deepEqual(validateCatalog(catalogWith({}), otherStatus), []);
+});
+
 test('dos productos con el mismo nombre se rechazan, también con otros acentos, mayúsculas o espacios, en cualquier estado', () => {
   assert.deepEqual(errorsOf({}, {}), []);
   const repeated = 'products[1].name: repite el nombre de products[0]; cada producto necesita un nombre propio.';

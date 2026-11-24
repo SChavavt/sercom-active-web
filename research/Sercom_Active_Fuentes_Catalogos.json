@@ -123,6 +123,11 @@
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Usar portal de productos y pedir el catálogo vigente.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Catálogo web Altura Segura",
@@ -249,6 +254,11 @@
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Identificar archivo vigente y modelos de soldadura/EPP efectivamente ofrecidos.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Librerías y descargas",
@@ -390,6 +400,11 @@
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Pedir catálogo al proveedor; fichas de distribuidores no sustituyen confirmación primaria.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Dominio histórico de referencia",
@@ -471,6 +486,11 @@
       "monitoring_active": false,
       "publication_policy": "review_changes_before_publish_initially",
       "next_action": "Obtener archivo por el canal comercial autorizado; no automatizar envíos de formularios.",
+      "portal": {
+        "status": "retirada",
+        "on": "2026-11-23",
+        "reason": "Decisión de quien dirige el proyecto: la marca sale del portal y vuelve solo por otra decisión."
+      },
       "resources": [
         {
           "label": "Solicitud de catálogo",

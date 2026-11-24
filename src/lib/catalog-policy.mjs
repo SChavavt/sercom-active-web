@@ -7,7 +7,17 @@ import { isUnitWord, MAX_UNIT_LENGTH, singularUnit, unitKey } from './quote-list
 const normalize = value => String(value ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').trim().toLowerCase();
 const isText = value => typeof value === 'string' && value.trim().length > 0;
 const isId = value => typeof value === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value);
-const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+/** Una fecha real escrita como AAAA-MM-DD («2026-02-30» no lo es). */
+export const validDate = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+/**
+ * El único estado de la marca `portal` de una entidad del registro de investigación: la marca o el proveedor salió del
+ * portal por decisión de quien dirige el proyecto, y vuelve solo por otra decisión. La entidad se queda en el registro
+ * con la marca `portal: { status, on, reason }`; sin la clave está en el alcance del sitio. La forma de la marca la
+ * revisa `registryPortalErrors` (site-data-core.mjs).
+ */
+export const WITHDRAWN_STATUS = 'retirada';
+/** ¿La entidad del registro salió del portal? Solo con `portal.status` igual a «retirada». */
+export const isWithdrawn = source => isRecord(source?.portal) && source.portal.status === WITHDRAWN_STATUS;
 /**
  * Una dirección `https` escrita completa: empieza con «https://» seguido de un servidor, no tiene espacios, saltos de
  * línea ni diagonales invertidas, se puede leer como dirección y no lleva usuario ni contraseña. Un navegador lee
@@ -199,7 +209,11 @@ export function validateCatalog(catalog, registry) {
     return ['El catálogo debe tener schemaVersion 1, categories y products.'];
   }
   inspectFields(catalog, 'catalog', errors);
-  const brands = new Map((registry?.sources ?? []).filter(s => s.entity_type === 'brand').map(s => [s.entity_id, s]));
+  // El alcance de marcas sale del registro: las marcas (no los proveedores) que no salieron del portal. Una ficha de una
+  // marca retirada recibe su propio mensaje, en cualquier estado.
+  const sources = registry?.sources ?? [];
+  const brands = new Map(sources.filter(s => s.entity_type === 'brand' && !isWithdrawn(s)).map(s => [s.entity_id, s]));
+  const withdrawn = new Set(sources.filter(isWithdrawn).map(s => s.entity_id));
   const categories = new Map();
   for (const c of catalog.categories) {
     if (!c || !isId(c.id) || !isText(c.name) || !['draft', 'approved'].includes(c.status)) errors.push('Categoría inválida.');
@@ -221,7 +235,8 @@ export function validateCatalog(catalog, registry) {
     if (!isId(p.id) || ids.has(p.id)) errors.push(`${path}: id inválido o duplicado.`);
     ids.add(p.id);
     const brand = brands.get(p.brandId);
-    if (!brand) errors.push(`${path}: la marca no está en el alcance permitido; un proveedor no es una marca.`);
+    if (withdrawn.has(p.brandId)) errors.push(`${path}: la marca ${p.brandId} está retirada del portal; un producto suyo no se carga.`);
+    else if (!brand) errors.push(`${path}: la marca no está en el alcance permitido; un proveedor no es una marca.`);
     if ([p.id, p.brandId, p.model, p.name, brand?.name].some(excluded)) errors.push(`${path}: marca excluida.`);
     if (reservedForExamples(p)) errors.push(`${path}: identificador, código o nombre reservado para los ejemplos de vista previa.`);
     const modelKey = `${normalize(p.brandId)}:${normalize(p.model)}`;

@@ -583,9 +583,9 @@ test('R-RULE-13: metadatos internos y registro de investigación', async () => {
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<a href="${privateResource.url.replaceAll('&', '&amp;')}">Catálogo</a>`) })), ['R-RULE-13']);
   assert.deepEqual(failedIds(await scan({ 'marcas/index.html': page(`<p>${data.registry.sources[0].next_action}</p>`) })), ['R-RULE-13']);
   assert.ok(failedIds(await scan({ '_astro/marcas.js': `var enlaces=["${privateResource.url}"];` })).includes('R-RULE-13'));
-  // Los veintitrés enlaces publicados no son una fuga.
+  // Los veintiún enlaces publicados no son una fuga.
   const links = data.brands.flatMap(brand => brand.manufacturerLinks.map(link => `<a href="${link.url}">${link.label}</a>`)).join(' ');
-  assert.equal(published.size, 23);
+  assert.equal(published.size, 21);
   assert.deepEqual(failures(await scan({ 'marcas/index.html': page(links) })), []);
   // Documentos sueltos: se listan para revisión.
   assert.deepEqual(warnedIds(await scan({ 'docs/plan.pdf': Buffer.from('%PDF-1.7') })), ['R-RULE-13']);
@@ -681,7 +681,7 @@ test('R-RULE-14: solo se generan páginas de registros que pueden mostrarse', as
   assert.deepEqual(failures(draftCategory).map(finding => [finding.id, finding.file]), [['R-RULE-14', 'categorias/manos']]);
   assert.deepEqual(failedIds(await scanEmptied({ 'productos/guante-x/index.html': page('<h1>Guante</h1>') })), ['R-RULE-14']);
   assert.deepEqual(failedIds(await scanEmptied({ 'marcas/marca-desconocida/index.html': page('<h1>Marca</h1>') })), ['R-RULE-14']);
-  // Las diecinueve marcas pueden tener página, y la lista de marcas puede existir sin ellas.
+  // Cada marca de brands.json puede tener página, y la lista de marcas puede existir sin ellas.
   const brandPages = Object.fromEntries(data.brands.map(brand => [`marcas/${brand.id}/index.html`, page(`<h1>${brand.name}</h1>`)]));
   assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>'), ...brandPages })), []);
   assert.deepEqual(failures(await scanEmptied({ 'marcas/index.html': page('<h1>Marcas</h1>') })), []);
@@ -1898,7 +1898,9 @@ test('R-RULE-13: un catálogo del fabricante publicado pasa en la página de su 
   const unpublished = data.registry.sources.flatMap(source => source.resources.filter(resource => /pdf/.test(resource.type) && !published.has(resource.url)).map(resource => ({ id: source.entity_id, url: resource.url })));
   assert.ok(unpublished.length >= 2, 'el registro tiene catálogos en PDF sin publicar');
   for (const { id, url } of unpublished) {
-    for (const path of [`marcas/${id}/index.html`, 'marcas/index.html', 'catalogo/index.html']) {
+    // Una entidad retirada del portal no tiene página: su catálogo se prueba en la página de otra marca.
+    const brandPage = data.brands.some(brand => brand.id === id) ? `marcas/${id}/index.html` : 'marcas/ansell/index.html';
+    for (const path of [brandPage, 'marcas/index.html', 'catalogo/index.html']) {
       const result = await scan({ [path]: page(`<a href="${url}" target="_blank" rel="noopener noreferrer">${PDF}<span class="vh"> (se abre en otra pestaña)</span></a>`) });
       assert.deepEqual(failedIds(result), ['R-RULE-13'], `${path}: ${url}`);
       assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
@@ -1907,6 +1909,24 @@ test('R-RULE-13: un catálogo del fabricante publicado pasa en la página de su 
   // La lista de guías de MCR Safety, que nombra el catálogo de la marca excluida, nunca pasa.
   const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url));
   assert.deepEqual(failedIds(await scan({ 'marcas/mcr-safety/index.html': page(`<a href="${guides.url}">Guías</a>`) })), ['R-RULE-13']);
+});
+
+test('R-RULE-13 y R-RULE-14: una marca retirada del portal no tiene página, y la dirección que publicaba falla en cualquier página', async () => {
+  // Las direcciones que ALTO e INFRA publicaban como «Sitio del fabricante» siguen en el registro, pero ya no en
+  // brands.json: son enlaces del registro sin publicar.
+  for (const url of ['https://ecommerce.alturasegura.com.mx/', 'https://grupoinfra.com/librerias-y-descargas']) {
+    assert.ok(!data.brands.some(brand => brand.manufacturerLinks.some(link => link.url === url)), url);
+    for (const path of ['index.html', 'marcas/index.html', 'marcas/ansell/index.html', 'catalogo/index.html', 'contacto/index.html']) {
+      const result = await scan({ [path]: page(`<a href="${url}" target="_blank" rel="noopener noreferrer">Sitio del fabricante<span class="vh"> (se abre en otra pestaña)</span></a>`) });
+      assert.deepEqual(failedIds(result), ['R-RULE-13'], `${path}: ${url}`);
+      assert.match(failures(result)[0].message, /^enlace del registro de investigación que no es un enlace del fabricante publicado en brands\.json: /);
+    }
+  }
+  // Ninguna de las cuatro marcas retiradas puede tener página.
+  for (const [id, name] of [['alto', 'ALTO'], ['infra', 'INFRA'], ['dry-pro', 'Dry Pro'], ['hawk', 'HAWK']]) {
+    const result = await scan({ 'marcas/index.html': page('<h1>Marcas</h1>'), [`marcas/${id}/index.html`]: page(`<h1>${name}</h1>`) });
+    assert.deepEqual(failures(result).map(finding => [finding.id, finding.file]), [['R-RULE-14', `marcas/${id}`]], id);
+  }
 });
 
 test('R-RULE-13 dice en --rules que pasan los enlaces del fabricante publicados en brands.json', () => {

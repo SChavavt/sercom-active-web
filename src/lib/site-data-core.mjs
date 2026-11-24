@@ -6,7 +6,7 @@
  * @import { Catalog } from '../types/catalog.ts'
  * @import { BrandRecord, ExampleProductRecord, PublicBrand, PublicCategory, PublicProduct, PublicRetiredProduct, SiteData, SiteSources } from '../types/site.ts'
  */
-import { BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isHttpsAddress, mentionsExcludedBrand } from './catalog-policy.mjs';
+import { BLOCKED_RESOURCE_TYPES, getPublishedProducts, getRetiredProducts, isHttpsAddress, isWithdrawn, mentionsExcludedBrand, validDate, WITHDRAWN_STATUS } from './catalog-policy.mjs';
 import { routes } from './routes.mjs';
 import { cleanQuery, normalizeText } from './text.mjs';
 
@@ -187,7 +187,8 @@ function linkErrors(links, path) {
 /**
  * Compara la lista pública de marcas con el registro de investigación: mismos identificadores,
  * nombres y tipos, y cada enlace debe ser un recurso de esa entidad verificado como accesible, de un tipo que no está
- * bloqueado y que su etiqueta admite (`LINK_RESOURCE_TYPES`).
+ * bloqueado y que su etiqueta admite (`LINK_RESOURCE_TYPES`). Una entidad retirada del portal (`portal.status`
+ * «retirada», `isWithdrawn`) no se espera en brands.json, y si está ahí es un error que dice qué hacer.
  * Solo la usan el validador (`npm run validate:catalog`) y las pruebas; el sitio nunca importa el registro.
  * @param {unknown} brands Contenido de `src/data/brands.json`.
  * @param {unknown} registry Contenido de `research/Sercom_Active_Fuentes_Catalogos.json`.
@@ -203,12 +204,17 @@ export function crossCheckBrands(brands, registry) {
   const byId = new Map(sources.map(source => [source.entity_id, source]));
 
   for (const source of sources) {
+    if (isWithdrawn(source)) continue;
     if (!records.some(brand => brand.id === source.entity_id)) errors.push(`registro: ${source.entity_id} falta en brands.json.`);
   }
   for (const brand of records) {
     const source = byId.get(brand.id);
     if (!source) {
       errors.push(`${brand.id}: no existe en el registro de investigación.`);
+      continue;
+    }
+    if (isWithdrawn(source)) {
+      errors.push(`${brand.id}: en el registro está retirada del portal (${source.portal.on}); quítala de brands.json o, si vuelve al portal, quita la clave portal de su entidad en el registro.`);
       continue;
     }
     if (brand.name !== source.name) errors.push(`${brand.id}: el nombre «${brand.name}» no coincide con el registro («${source.name}»).`);
@@ -235,6 +241,41 @@ export function crossCheckBrands(brands, registry) {
       }
     }
   }
+  return errors;
+}
+
+const PORTAL_KEYS = ['status', 'on', 'reason'];
+
+/**
+ * Revisa la marca de retiro del portal de cada entidad del registro de investigación que la lleva (`portal`): un
+ * objeto con exactamente `status` (hoy solo «retirada»), `on` (el día en que salió, una fecha real AAAA-MM-DD) y
+ * `reason` (la decisión, en un texto limpio de una línea). Una entidad sin la clave está en el alcance del sitio. Cada
+ * mensaje nombra la entidad y el campo, y dice qué escribir.
+ * @param {unknown} registry Contenido de `research/Sercom_Active_Fuentes_Catalogos.json`.
+ * @returns {string[]} Errores; lista vacía si todo es correcto.
+ */
+export function registryPortalErrors(registry) {
+  const sources = isRecord(registry) && Array.isArray(registry.sources) ? registry.sources : [];
+  /** @type {string[]} */
+  const errors = [];
+  sources.forEach((source, index) => {
+    if (!isRecord(source) || !Object.hasOwn(source, 'portal')) return;
+    const where = `${isId(source.entity_id) ? source.entity_id : `sources[${index}]`}.portal`;
+    const { portal } = source;
+    if (!isRecord(portal)) {
+      errors.push(`${where}: debe ser un objeto con status, on y reason, como {"status": "${WITHDRAWN_STATUS}", "on": "2026-11-23", "reason": "…"}; si la marca vuelve al portal, quita la clave portal.`);
+      return;
+    }
+    for (const key of unknownKeys(portal, PORTAL_KEYS)) errors.push(`${where}.${key}: campo no definido; la marca de retiro lleva solo status, on y reason.`);
+    if (portal.status === undefined) errors.push(`${where}.status: falta; escribe «${WITHDRAWN_STATUS}».`);
+    else if (portal.status !== WITHDRAWN_STATUS) errors.push(`${where}.status: «${String(portal.status)}» no es un estado del portal; el único que existe es «${WITHDRAWN_STATUS}».`);
+    if (!validDate(portal.on)) {
+      errors.push(`${where}.on: ${portal.on === undefined ? 'falta' : `«${String(portal.on)}» no es una fecha real`}; escribe el día en que la marca salió del portal como AAAA-MM-DD, por ejemplo 2026-11-23.`);
+    }
+    if (portal.reason === undefined) errors.push(`${where}.reason: falta; escribe en una línea la decisión por la que la marca salió del portal.`);
+    else if (typeof portal.reason !== 'string' || !portal.reason.trim()) errors.push(`${where}.reason: ${typeof portal.reason === 'string' ? 'está vacío' : 'debe ser un texto'}; escribe en una línea la decisión por la que la marca salió del portal.`);
+    else if (!isCleanLine(portal.reason)) errors.push(`${where}.reason: tiene espacios de más, un salto de línea o un carácter invisible; escríbelo en una sola línea.`);
+  });
   return errors;
 }
 

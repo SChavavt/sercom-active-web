@@ -48,7 +48,7 @@ export const {
   isPreview,
   /** Categorías públicas en el orden del catálogo. Producción: solo aprobadas. */
   categories,
-  /** Las diecinueve «Marcas que manejamos», en el orden de la empresa. */
+  /** Las «Marcas que manejamos», en el orden de la empresa (las de brands.json). */
   brands,
   /** Productos públicos: fichas aprobadas y, solo en la vista previa, los ejemplos. */
   products,

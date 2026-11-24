@@ -156,7 +156,7 @@ test('producción: la sonda imprime exactamente las categorías y las fichas apr
   assert.ok(json.products.every(product => product.isExample === false));
   assert.deepEqual(json.retiredProducts.map(product => product.id), real.publicRetiredIds);
   assert.deepEqual(json.categories.map(category => category.id), real.approvedCategoryIds);
-  assert.equal(json.brands.length, 19);
+  assert.equal(json.brands.length, 15);
   // El script de la página trae la búsqueda y los enlaces, sin datos.
   const scripts = [...files.keys()].filter(path => path.endsWith('.js'));
   assert.ok(scripts.length >= 2, 'la sonda debe producir scripts de navegador');
