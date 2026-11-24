@@ -91,3 +91,56 @@ test('el texto oculto cuenta solo dentro del enlace que abre otra pestaña: fuer
     ], body);
   }
 });
+
+test('se revisa todo <a> o <area> que abre otra pestaña, con cualquier nombre de destino', async () => {
+  const page = body => ({ 'marcas/marca-ficticia/index.html': doc('Marca ficticia', `<h1>Marca ficticia</h1>${body}`) });
+  const bare = target => `<a href="https://fabricante.invalid/" target="${target}">Sitio del fabricante</a>`;
+  // Abren otra pestaña: _blank escrito como sea, _new, un nombre cualquiera.
+  for (const target of ['_blank', ' _BLANK ', '_new', 'nueva', 'catalogo']) {
+    const messages = (await check(page(bare(target)))).map(problem => problem.message);
+    assert.deepEqual(messages, [
+      'el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin rel="noopener": escribe rel="noopener noreferrer", como MoreLink con external',
+      'el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin decirlo: lleva el texto oculto «(se abre en otra pestaña)» (.vh), como MoreLink con external',
+    ], target);
+    // Con noopener y el texto oculto, pasa.
+    assert.deepEqual(await check(page(`<a href="https://fabricante.invalid/" target="${target}" rel="noopener">Sitio del fabricante${NEW_TAB}</a>`)), [], target);
+  }
+  // No abren otra pestaña: sin target, vacío, _self, _parent o _top.
+  for (const target of ['', ' ', '_self', '_PARENT', '_top']) assert.deepEqual(await check(page(bare(target))), [], JSON.stringify(target));
+  assert.deepEqual(await check(page('<a href="https://fabricante.invalid/">Sitio del fabricante</a>')), []);
+});
+
+test('el texto oculto cuenta solo si el lector de pantalla lo lee', async () => {
+  const page = body => ({ 'marcas/marca-ficticia/index.html': doc('Marca ficticia', `<h1>Marca ficticia</h1>${body}`) });
+  const messages = async body => (await check(page(body))).map(problem => problem.message);
+  // Dentro de aria-hidden="true", no se lee.
+  for (const inner of [`<span aria-hidden="true">${NEW_TAB}</span>`, '<span class="vh" aria-hidden="true"> (se abre en otra pestaña)</span>']) {
+    assert.deepEqual(await messages(`<a href="https://fabricante.invalid/" target="_blank" rel="noopener">Sitio del fabricante${inner}</a>`), [
+      'el enlace «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña sin decirlo: su texto oculto «(se abre en otra pestaña)» está dentro de aria-hidden="true" y no se lee; ponlo fuera, como MoreLink con external',
+    ], inner);
+  }
+  // Con aria-label, el lector lee la etiqueta: ella debe decirlo.
+  assert.deepEqual(await messages(`<a href="https://fabricante.invalid/" target="_blank" rel="noopener" aria-label="Sitio de Marca ficticia">Sitio del fabricante${NEW_TAB}</a>`), [
+    'el enlace «Sitio de Marca ficticia» (https://fabricante.invalid/) abre otra pestaña y su aria-label no lo dice: el lector de pantalla lee la etiqueta y no el texto oculto; quita aria-label o termina la etiqueta con «(se abre en otra pestaña)»',
+  ]);
+  assert.deepEqual(await messages('<a href="https://fabricante.invalid/" target="_blank" rel="noopener" aria-label="Sitio de Marca ficticia (se abre en otra pestaña)">Sitio del fabricante</a>'), []);
+  // aria-labelledby: falla, aunque el texto oculto esté.
+  assert.deepEqual(await messages(`<span id="nombre">Sitio de Marca ficticia</span><a href="https://fabricante.invalid/" target="_blank" rel="noopener" aria-labelledby="nombre">Sitio del fabricante${NEW_TAB}</a>`), [
+    'el enlace «Sitio del fabricante (se abre en otra pestaña)» (https://fabricante.invalid/) abre otra pestaña y toma su nombre de aria-labelledby: quítalo y deja el nombre y el texto oculto «(se abre en otra pestaña)» (.vh) dentro del enlace, como MoreLink con external',
+  ]);
+  // Un <area> no puede llevar el texto oculto.
+  assert.deepEqual(await messages('<map name="m"><area href="https://fabricante.invalid/" target="_blank" rel="noopener" alt="Sitio del fabricante" shape="rect" coords="0,0,10,10"></map>'), [
+    'el área «Sitio del fabricante» (https://fabricante.invalid/) abre otra pestaña: un <area> no puede llevar el texto oculto «(se abre en otra pestaña)»; usa un enlace (<a>), como MoreLink con external',
+  ]);
+  assert.deepEqual(await messages('<map name="m"><area href="https://fabricante.invalid/" alt="Sitio del fabricante" shape="rect" coords="0,0,10,10"></map>'), []);
+});
+
+test('en /marcas/ dos destinos que difieren solo en la diagonal final son el mismo lugar; con un fragmento, no', async () => {
+  const list = links => ({ 'marcas/index.html': doc('Marcas', `<h1>Marcas</h1>${links}`) });
+  assert.deepEqual(await check(list('<a href="/marcas/alfa/">Alfa</a><a href="/marcas/alfa">Alfa</a>')), []);
+  assert.deepEqual(await check(list('<a href="/marcas/alfa/?x=1">Alfa</a><a href="/marcas/alfa?x=1">Alfa</a>')), []);
+  assert.deepEqual((await check(list('<a href="/marcas/#catalogos">Catálogos</a><a href="/marcas/">Catálogos</a>'))).map(problem => problem.message), [
+    'dos enlaces se llaman «Catálogos» y llevan a lugares distintos (/marcas/#catalogos y /marcas/): agrega a cada uno, con texto oculto, lo que los distingue (la marca)',
+  ]);
+  assert.equal((await check(list('<a href="/marcas/alfa/">Alfa</a><a href="/marcas/beta/">Alfa</a>'))).length, 1);
+});
