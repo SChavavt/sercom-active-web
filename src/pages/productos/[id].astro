@@ -16,7 +16,9 @@
 //      ninguno, nada.
 //   «Agregar a mi cotización» (QuoteAdd, solo con JavaScript) va bajo las dos acciones de cotizar y antes del aviso
 //   de disponibilidad, en todos los anchos: variante (si hay más de una), cantidad y unidad, el botón y su línea de
-//   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct).
+//   estado. Lo que el visitante elige ahí completa también los mensajes de las dos acciones (data-quote-direct). Con
+//   una sola variante, la línea «Variante (talla o color)» de esos mensajes ya va escrita al compilar, como la escribe
+//   la lista (onlyVariantText de quote-list.mjs), y funciona sin JavaScript.
 // «Normas»: una fila por norma, con el texto tal como lo imprime el fabricante y en el orden de los datos, y debajo de
 // dónde sale («Según la información publicada por el fabricante.»). Las normas solo se muestran aquí: ni en las
 // tarjetas, ni en la búsqueda, ni en los mensajes, ni en la descripción de la página.
@@ -52,6 +54,7 @@ import { categoryIcon } from '../../lib/icons.ts';
 import { isLongProductName } from '../../lib/product-title.mjs';
 import { sameCategoryProducts } from '../../lib/related-products.mjs';
 import { absoluteUrl, contactDetails, contactLinks } from '../../lib/contact.mjs';
+import { onlyVariantText } from '../../lib/quote-list.mjs';
 import { EXAMPLE_TAG, featuredProducts, getBrand, getCategory, getProduct, getRetiredProduct, paths, products, retiredProducts, routes } from '../../lib/site-data.mjs';
 import type { PublicProduct } from '../../types/site.ts';
 // Después de la plantilla, para que la hoja de la página vaya detrás de la hoja global.
@@ -76,7 +79,8 @@ const longName = product ? isLongProductName(product.name) : false;
 const pageUrl = absoluteUrl(item.url, Astro.site);
 const pageLink = pageUrl ? undefined : item.url;
 const reference = { brandName: item.brandName, code: item.code, name: item.name, url: pageUrl };
-const quote = contactLinks.product(reference);
+// Con una sola variante, el mensaje ya la nombra; «Solicitar ficha técnica» no lleva la línea.
+const quote = contactLinks.product({ ...reference, variant: product ? onlyVariantText(product) : '' });
 const datasheet = contactLinks.datasheet(reference);
 // Producto retirado: el mensaje pide una alternativa, con la misma regla para la línea «Enlace».
 const alternatives = contactLinks.retired(reference);

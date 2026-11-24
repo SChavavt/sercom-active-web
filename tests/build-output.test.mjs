@@ -539,3 +539,35 @@ test('«Más productos de esta categoría» lista solo productos de la categorí
   }
   assert.ok(checked > 0, 'alguna ficha debe compartir su categoría para que esta prueba tenga sentido');
 });
+
+// La línea «Variante (talla o color)» de los mensajes directos de cada ficha (las dos acciones de la ficha y «Cotizar»
+// de su tarjeta), en la compilación del sitio real (la 5), para las fichas que haya.
+const VARIANT_LINE = 'Variante (talla o color): ';
+const variantLineOf = href => {
+  const text = href.startsWith('mailto:') ? decodeURIComponent(href.match(/[?&]body=([^&]*)/)?.[1] ?? '') : new URL(href).searchParams.get('text') ?? '';
+  return text.split(/\r?\n/).find(line => line.startsWith(VARIANT_LINE));
+};
+
+test('el mensaje directo de una ficha con una sola variante la nombra; con ninguna o con varias, la línea va vacía', () => {
+  const { files } = builds.real;
+  const catalogPage = files.get('catalogo/index.html');
+  const counts = { one: 0, other: 0 };
+  for (const product of real.approvedProducts) {
+    const page = files.get(`productos/${product.id}/index.html`);
+    const direct = [...page.matchAll(/<a [^>]*\bhref="([^"]*)"[^>]*\bdata-quote-direct\b/g)].map(match => unescape(match[1]));
+    assert.equal(direct.length, 2, `${product.id}: «Cotizar este producto» y «Cotizar por correo»`);
+    const card = catalogPage.match(new RegExp(`href="/productos/${product.id}/"[\\s\\S]*?<a class="product__action product__action--quote" href="([^"]*)"`))?.[1];
+    assert.ok(card, `${product.id}: su tarjeta en el catálogo`);
+    const variants = product.variants ?? [];
+    let expected = VARIANT_LINE;
+    if (variants.length === 1) {
+      const [{ label, manufacturerCode }] = variants;
+      expected += manufacturerCode && manufacturerCode !== label ? `${label} (${manufacturerCode})` : label;
+      counts.one += 1;
+    } else counts.other += 1;
+    for (const [where, href] of [['WhatsApp', direct[0]], ['correo', direct[1]], ['tarjeta', unescape(card)]]) {
+      assert.equal(variantLineOf(href), expected, `${product.id}, ${where}`);
+    }
+  }
+  assert.ok(counts.one > 0 && counts.other > 0, 'debe haber fichas con una variante y con otro número para que esta prueba tenga sentido');
+});

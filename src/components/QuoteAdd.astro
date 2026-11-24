@@ -34,7 +34,8 @@
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
 //     mientras la cantidad no es válida; lo decide `directLinkValues` de quote-list.mjs). Con `withFieldValues` sobre el
-//     `href` de cada enlace: no guarda una copia.
+//     `href` de cada enlace: no guarda una copia. Un producto con una sola variante no tiene ese campo: su línea
+//     «Variante» viene escrita al compilar (`onlyVariantText`) y cambiar la cantidad o la unidad no la toca.
 import { buildQuoteIndex, jsonForScript, LIST_FULL_MESSAGE, MAX_QUANTITY, QUANTITY_ERROR, unitOptions } from '../lib/quote-list.mjs';
 import { routes } from '../lib/site-data.mjs';
 import type { PublicProduct } from '../types/site.ts';

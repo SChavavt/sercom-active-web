@@ -469,10 +469,12 @@ export function createContact(settings) {
   /** @type {ContactMessages} */
   const messages = {
     general: () => quoteOpening,
+    // La línea «Variante» va vacía para que el cliente la complete, salvo con la variante ya escrita (`variant`: la de
+    // un producto con una sola variante, como la escribe la lista).
     product: product => addLinkLine(lines(
       quoteOpening,
       field('Producto', productLabel(product)),
-      field(MESSAGE_LABELS.variant),
+      field(MESSAGE_LABELS.variant, clean(product?.variant)),
       field(MESSAGE_LABELS.quantity),
       field(DELIVERY_LABEL),
       field(MESSAGE_LABELS.date),

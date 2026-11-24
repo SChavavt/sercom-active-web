@@ -105,6 +105,36 @@ test('mensaje de producto, con y sin enlace a la página', () => {
   ));
 });
 
+test('mensaje de producto con la variante ya escrita (un producto con una sola variante): la línea «Variante» la lleva', () => {
+  assert.equal(messages.product({ ...product, variant: 'Talla mediana (EJ-1001-M)' }), text(
+    'Hola, Yosmara. Quiero solicitar una cotización con Sercom Active.',
+    'Producto: Marca de ejemplo EJ-1001 (Guante de ejemplo recubierto)',
+    'Variante (talla o color): Talla mediana (EJ-1001-M)',
+    'Cantidad y unidad: ',
+    'Entrega en (ciudad o código postal): ',
+    'Fecha requerida: ',
+    'También necesito: ',
+  ));
+  assert.equal(messages.product({ ...product, url: pageUrl, variant: 'Única' }), text(
+    'Hola, Yosmara. Quiero solicitar una cotización con Sercom Active.',
+    'Producto: Marca de ejemplo EJ-1001 (Guante de ejemplo recubierto)',
+    'Variante (talla o color): Única',
+    'Cantidad y unidad: ',
+    `Enlace: ${pageUrl}`,
+    'Entrega en (ciudad o código postal): ',
+    'Fecha requerida: ',
+    'También necesito: ',
+  ));
+  // En una sola línea y sin espacios de más; vacía, ausente o nula, la línea queda vacía.
+  assert.ok(messages.product({ ...product, variant: '  Talla\nmediana ' }).includes('\nVariante (talla o color): Talla mediana\n'));
+  for (const variant of ['', '   ', undefined, null]) assert.equal(messages.product({ ...product, variant }), messages.product(product), String(variant));
+  // Los dos canales llevan el mismo mensaje, y el asunto no cambia.
+  const links = contactLinks.product({ ...product, variant: 'Única' });
+  assert.equal(whatsappText(links.whatsapp), links.text);
+  assert.equal(mailtoParts(links.mailto).body.replace(/\r\n/g, '\n'), links.text);
+  assert.equal(links.subject, 'Solicitud de cotización: Marca de ejemplo EJ-1001');
+});
+
 test('mensaje para cotizar una lista', () => {
   assert.equal(messages.list(), text(
     'Hola, Yosmara. Quiero cotizar esta lista con Sercom Active:',
