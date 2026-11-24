@@ -163,15 +163,20 @@ export function addressMatcher(addresses) {
     if (!byParts.has(key)) byParts.set(key, []);
     byParts.get(key)?.push(address);
   }
-  /** @type {Map<string, string | null>} */
+  /** @type {Map<string, string>} */
   const remembered = new Map();
   return value => {
     if (typeof value !== 'string' || byParts.size === 0) return [];
     let key = remembered.get(value);
     if (key === undefined) {
-      if (remembered.size >= REMEMBERED) remembered.clear();
       key = partsKey(value);
-      remembered.set(value, key);
+      // Solo se recuerda lo que sí es una dirección (lo que no lo es se descarta con una comparación), y con una copia
+      // de su texto: el que llega suele ser un pedazo del texto de una página, y guardarlo tal cual retiene en la
+      // memoria la página entera mientras dure la búsqueda (con 2,000 fichas, cientos de MB).
+      if (key !== null) {
+        if (remembered.size >= REMEMBERED) remembered.clear();
+        remembered.set(Array.from(value).join(''), key);
+      }
     }
     return key === null ? [] : byParts.get(key) ?? [];
   };
