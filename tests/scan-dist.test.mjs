@@ -2327,3 +2327,10 @@ test('R-RULE-13: el valor de un atributo se lee sin sus tabuladores aunque lleve
     assert.deepEqual(await leakFindings(neighbour), [], neighbour);
   }
 });
+
+test('R-RULE-13: una dirección del registro escrita tal cual dentro de una lista separada por comas o por punto y coma falla (la comparación exacta)', async () => {
+  for (const written of [
+    '<p>Archivos: a.pdf,https://www.fabricante.example/recursos/guias/,b.pdf</p>',
+    '<p data-archivos="a.pdf;https://www.fabricante.example/recursos/guias/;b.pdf">Archivos</p>',
+  ]) assert.deepEqual(await leakFindings(written), GUIDES_FOUND, written);
+});
