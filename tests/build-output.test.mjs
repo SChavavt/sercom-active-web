@@ -6,8 +6,10 @@
 //   2. producción, con un valor no reconocido en la bandera;
 //   3. vista previa, con el mismo lanzador que usa `npm run build:preview`;
 //   4. el sitio real, en producción, con un catálogo sintético en lugar de src/data/catalog.json (una configuración
-//      temporal que importa la del proyecto y solo cambia ese archivo): la única forma de compilar la ficha real
-//      (src/pages/productos/[id].astro) con normas mientras el catálogo del repositorio no tiene productos.
+//      temporal que importa la del proyecto y solo cambia ese archivo): fichas con normas, con foto y retiradas que se
+//      conocen de antemano, y marcas y categorías sin productos;
+//   5. el sitio real, en producción, con los datos del repositorio: las pruebas que lo leen valen para las fichas que
+//      haya, sin nombrar ninguna.
 // La vista previa sirve de control: los mismos archivos sí contienen los ejemplos cuando la bandera está activa.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -126,6 +128,8 @@ before(async () => {
   ].join('\n'));
   // --config se resuelve desde la carpeta del proyecto, también cuando es una ruta absoluta: va relativa.
   plan.push(['norms', [astroBin, 'build', '--config', relative(ROOT, config)], undefined]);
+  // 5: el sitio real con los datos del repositorio.
+  plan.push(['real', [astroBin, 'build'], undefined]);
   // Una tras otra: las tres primeras escriben en las mismas carpetas de trabajo de la sonda, y nunca dos a la vez.
   for (const [name, args, flag] of plan) {
     const directory = join(temporary, name);
@@ -464,4 +468,37 @@ test('una ficha aprobada con foto imprime el crédito hacia su página de origen
   }
   assert.ok(files.get('productos/guante-con-normas/index.html').includes('producto__plate'), 'la ficha sin foto muestra el pictograma');
   assert.ok(files.get('catalogo/index.html').includes('guante-con-foto'), 'el catálogo muestra la tarjeta de la ficha con foto');
+});
+
+// Una marca o una categoría sin productos no promete que lleguen: no dice que se están cargando ni «Mientras tanto».
+test('ninguna página de producción dice «Estamos cargando» ni «Mientras tanto»; una marca o una categoría sin productos dice que no están en este catálogo', () => {
+  for (const name of ['norms', 'real']) {
+    for (const [path, content] of builds[name].files) if (path.endsWith('.html')) assert.doesNotMatch(content, /Estamos cargando|Mientras tanto/, `${name}: ${path}`);
+  }
+  // En la compilación 4 solo la primera marca y la categoría «manos» tienen fichas aprobadas: las demás páginas
+  // muestran el estado vacío.
+  const { files } = builds.norms;
+  const empty = page => ({
+    title: page.match(/<h2 class="empty__title">([^<]*)<\/h2>/)?.[1],
+    text: page.match(/<p class="empty__text">([^<]*)<\/p>/)?.[1],
+  });
+  const brandsWithProducts = new Set(normsCatalog.products.filter(product => product.status === 'approved').map(product => product.brandId));
+  const emptyBrands = data.brands.filter(brand => !brandsWithProducts.has(brand.id));
+  assert.ok(emptyBrands.some(brand => brand.manufacturerLinks.some(link => link.label !== SITE_LABEL)) && emptyBrands.some(brand => brand.manufacturerLinks.every(link => link.label === SITE_LABEL)),
+    'debe haber marcas sin productos con catálogo y sin él para que esta prueba tenga sentido');
+  for (const brand of emptyBrands) {
+    const hasCatalog = brand.manufacturerLinks.some(link => link.label !== SITE_LABEL);
+    assert.deepEqual(empty(files.get(`marcas/${brand.id}/index.html`)), {
+      title: 'Los productos de esta marca no están en este catálogo.',
+      text: hasCatalog ? 'Consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.' : 'Dinos qué necesitas y te ayudamos a cotizarlo.',
+    }, brand.id);
+  }
+  const emptyCategories = normsCatalog.categories.filter(category => category.status === 'approved' && category.id !== 'manos');
+  assert.ok(emptyCategories.length > 0);
+  for (const category of emptyCategories) {
+    assert.deepEqual(empty(files.get(`categorias/${category.id}/index.html`)), {
+      title: 'Los productos de esta categoría no están en este catálogo.',
+      text: 'Dinos qué necesitas y te ayudamos a cotizarlo.',
+    }, category.id);
+  }
 });

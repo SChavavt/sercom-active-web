@@ -100,7 +100,7 @@ El sitio no envía nada: cada acción de contacto abre un borrador de WhatsApp (
 | «Venta, entrega y asesoría…» | `components/SiteFooter.astro` y la descripción por omisión de `layouts/BaseLayout.astro` |
 | «Disponibilidad por marca y modelo sujeta a confirmación al cotizar.» | `pages/index.astro`, `pages/catalogo/index.astro`, `pages/marcas/index.astro`, `pages/marcas/[id].astro` (citada en el comentario de `components/Note.astro`) |
 | «Disponibilidad y tiempo de entrega sujetos a confirmación al cotizar.» | `components/SiteFooter.astro`, `pages/productos/[id].astro` |
-| «Mientras tanto, dinos qué necesitas…» | `pages/catalogo/index.astro`, `pages/categorias/[id].astro`, `pages/marcas/[id].astro` (citada en el comentario de `components/EmptyState.astro`) |
+| «Dinos qué necesitas y te ayudamos a cotizarlo.» | `pages/categorias/[id].astro`, `pages/marcas/[id].astro` (citada en el comentario de `components/EmptyState.astro`) |
 | «Cuéntame qué necesita tu empresa…» | `pages/index.astro`, `pages/contacto/index.astro` |
 | «Conoce las categorías y las marcas que manejamos.» | `lib/ayuda.ts`, `pages/cotizar/index.astro`, `pages/solicitud-especial/index.astro` |
 | «Los botones abren tu aplicación…» | `pages/cotizar/index.astro` (dos veces: sin JavaScript y en «Revisa y envía»), `pages/solicitud-especial/index.astro` |
