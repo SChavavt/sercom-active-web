@@ -22,11 +22,14 @@
 //   - Agregar: con una cantidad no válida (`parseQuantity`) muestra el error del campo, lleva el foco al campo y no
 //     agrega nada (nada se valida mientras se escribe; el error se va en cuanto la cantidad es válida). Si no,
 //     `addLine` sobre la lista guardada y `quoteStore.write(result.lines)`; la frase (agregado, sumado, lista llena o
-//     el navegador no deja guardar) va en la línea de estado y en la región viva. El foco y los campos se quedan como
-//     estaban: se puede agregar otra talla enseguida. Nunca dice nada de enviar, recibir ni responder. El mismo
-//     renglón enviado otra vez a menos de medio segundo (un doble clic, Enter sostenido) no se agrega de nuevo. En una
-//     página que el navegador restaura de su caché de ida y vuelta la línea de estado no se muestra: habla de una
-//     lista que pudo cambiar mientras tanto. Cuando otra pestaña cambia o vacía la lista se va la frase que ya no es
+//     el navegador no deja guardar) va en la línea de estado y en la región viva. Si la línea no se ve entera, la página
+//     se desplaza lo menos que la muestra (`scrollIntoView` con `block: 'nearest'`, sin desplazamiento suave; el
+//     `scroll-padding` de la página guarda el encabezado y la barra fija); si ya se ve, nada se mueve. Durante el medio
+//     segundo que sigue (`REPEATED_PRESS.ms`) «Ver mi cotización» no hace nada: el segundo clic de un doble clic, o el
+//     segundo toque, caería en él. El foco y los campos se quedan como estaban: se puede agregar otra talla enseguida.
+//     Nunca dice nada de enviar, recibir ni responder. El mismo renglón enviado otra vez a menos de medio segundo (un
+//     doble clic, Enter sostenido) no se agrega de nuevo. En una página que el navegador restaura de su caché de ida y
+//     vuelta la línea de estado no se muestra: habla de una lista que pudo cambiar mientras tanto. Cuando otra pestaña cambia o vacía la lista se va la frase que ya no es
 //     cierta (`addStatusStands`): «Agregado…» siempre; la de la lista llena, solo si la lista dejó de estar llena; la
 //     de que el navegador no deja guardar se queda. Si el foco estaba en «Ver mi cotización», pasa al botón «Agregar a
 //     mi cotización».
@@ -34,7 +37,8 @@
 //     mensaje se completa solo después de que el visitante cambió SU campo: «Variante (talla o color)» al cambiar la
 //     variante (vacía con «Talla o color por definir»), «Cantidad y unidad» al cambiar la cantidad o la unidad (vacía
 //     mientras la cantidad no es válida; lo decide `directLinkValues` de quote-list.mjs). Con `withFieldValues` sobre el
-//     `href` de cada enlace: no guarda una copia.
+//     `href` de cada enlace: no guarda una copia. Un producto con una sola variante no tiene ese campo: su línea
+//     «Variante» viene escrita al compilar (`onlyVariantText`) y cambiar la cantidad o la unidad no la toca.
 import { buildQuoteIndex, jsonForScript, LIST_FULL_MESSAGE, MAX_QUANTITY, QUANTITY_ERROR, unitOptions } from '../lib/quote-list.mjs';
 import { routes } from '../lib/site-data.mjs';
 import type { PublicProduct } from '../types/site.ts';
@@ -95,7 +99,7 @@ const chooseVariant = product.variants.length > 1;
   import { MESSAGE_LABELS, withFieldValues } from '../lib/contact-core.mjs';
   import {
     addedMessage, addLine, addStatusStands, directLinkValues, indexMaps, lineSummary, parseQuantity, parseQuoteIndex, quantityLabel,
-    reconcileList,
+    reconcileList, REPEATED_PRESS,
   } from '../lib/quote-list.mjs';
   import { quoteStore } from '../lib/quote-store.mjs';
 
@@ -125,7 +129,8 @@ const chooseVariant = product.variants.length > 1;
   if (form && found) {
     const { index, product, input, unit, select, status, statusText, live, error, errorText } = found;
     const maps = indexMaps(index);
-    const view = form.querySelector('[data-quote-view]')?.closest<HTMLElement>('.status__action') ?? null;
+    const viewLink = form.querySelector<HTMLAnchorElement>('[data-quote-view]');
+    const view = viewLink?.closest<HTMLElement>('.status__action') ?? null;
     const messages = {
       quantity: form.dataset.quantityError ?? '',
       full: form.dataset.fullMessage ?? '',
@@ -161,13 +166,30 @@ const chooseVariant = product.variants.length > 1;
     let frame = 0;
     /** Lo que dice la línea de estado: agregado (con «Ver mi cotización»), lista llena o el navegador no deja guardar. */
     let said: 'added' | 'full' | 'storage' | null = null;
+    /** Cuándo una pulsación mostró la línea o cambió su frase (`performance.now()`). */
+    let saidAt = Number.NEGATIVE_INFINITY;
+    /**
+     * ¿Se ve entera la línea? Dentro de la ventana menos el `scroll-padding` de la página, que guarda el encabezado y,
+     * en el celular, la barra fija.
+     */
+    const statusInView = () => {
+      const rect = status.getBoundingClientRect();
+      const root = getComputedStyle(document.documentElement);
+      const top = Number.parseFloat(root.scrollPaddingTop) || 0;
+      const bottom = Number.parseFloat(root.scrollPaddingBottom) || 0;
+      return rect.top >= top && rect.bottom <= window.innerHeight - bottom;
+    };
     const say = (kind: 'added' | 'full' | 'storage', sentence: string) => {
       said = kind;
+      saidAt = performance.now();
       statusText.textContent = sentence;
       const icon = kind === 'added' ? 'check' : 'alert-circle';
       for (const mark of status.querySelectorAll<HTMLElement>('[data-status-icon]')) mark.hidden = mark.dataset.statusIcon !== icon;
       if (view) view.hidden = kind !== 'added';
       status.hidden = false;
+      // Si la línea no se ve entera (bajo la barra fija o bajo el borde de la ventana), la página se desplaza lo menos
+      // que la muestra; si ya se ve, nada se mueve. Sin desplazamiento suave: el sitio no lo usa. El foco no cambia.
+      if (!statusInView()) status.scrollIntoView({ block: 'nearest' });
       // La misma frase otra vez también se anuncia: se vacía la región y se escribe en el cuadro siguiente.
       live.textContent = '';
       cancelAnimationFrame(frame);
@@ -189,7 +211,7 @@ const chooseVariant = product.variants.length > 1;
     // Un doble clic en el botón (o Enter sostenido) envía el formulario varias veces seguidas. El mismo renglón enviado
     // otra vez a menos de REPEAT_MS del envío anterior no se agrega de nuevo: guardaría el doble de lo que muestra el
     // campo. Para agregar lo mismo dos veces a propósito basta esperar ese medio segundo.
-    const REPEAT_MS = 500;
+    const REPEAT_MS = REPEATED_PRESS.ms;
     let lastSent = '';
     let lastSentAt = Number.NEGATIVE_INFINITY;
 
@@ -225,6 +247,13 @@ const chooseVariant = product.variants.length > 1;
         ? addedMessage({ summary, total: quantityLabel(result.quantity, line.unit) })
         : addedMessage({ summary });
       say('added', sentence);
+    });
+
+    // Después de desplazarse, «Ver mi cotización» puede quedar justo donde estaba el botón: el segundo clic de un doble
+    // clic, o el segundo toque, lo abriría. Durante el medio segundo que sigue a la pulsación que mostró la línea
+    // (`REPEATED_PRESS.ms`, el mismo tiempo de `isRepeatedPress`) el enlace no hace nada; después funciona como siempre.
+    viewLink?.addEventListener('click', event => {
+      if (performance.now() - saidAt < REPEATED_PRESS.ms) event.preventDefault();
     });
 
     // El error se va en cuanto el campo tiene una cantidad válida (escrita o con los botones del selector).

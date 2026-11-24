@@ -83,6 +83,16 @@ test('un plural encuentra el singular con cada una de las tres reglas', () => {
   assert.deepEqual(filterProducts(previewProducts, 'cascos').map(item => item.code), ['EJ-3001', 'EJ-3002']);
 });
 
+test('las reglas de plurales y sinónimos valen igual para la etiqueta de una variante', () => {
+  const helmet = product('Casco sintético de prueba', ['Protección de cabeza'], { variants: [{ label: 'Amarillo', code: '' }, { label: 'Naranja alta visibilidad', code: '' }] });
+  assert.equal(finds(helmet, 'amarillos'), true);
+  assert.equal(finds(helmet, 'cascos naranjas'), true);
+  assert.equal(finds(helmet, 'verdes'), false);
+  // Un sinónimo de una palabra de la consulta también se busca en las etiquetas: «calzado» encuentra la etiqueta «Bota».
+  const kit = product('Kit sintético de prueba', ['Ropa'], { variants: [{ label: 'Con bota', code: '' }, { label: 'Sin bota', code: '' }] });
+  assert.equal(finds(kit, 'kit calzado'), true);
+});
+
 test('un singular sigue encontrando el plural (la palabra se busca en cualquier parte del texto)', () => {
   assert.equal(finds(product('Guantes sintéticos de prueba'), 'guante'), true);
   assert.equal(finds(product('Guantes sintéticos de prueba'), 'guant'), true);

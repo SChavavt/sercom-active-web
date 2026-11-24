@@ -6,8 +6,8 @@
 // y «Sitio del fabricante» como enlace de texto; debajo, solo con productos, la fila sólida «Contactar por WhatsApp».
 // «Contactar por WhatsApp» aparece una sola vez en la página. La columna lleva hasta cuatro filas.
 //   - Con productos: la misma barra lateral y retícula del catálogo (CatalogListing), con la marca marcada.
-//   - Sin productos: estado vacío con WhatsApp (la única acción de WhatsApp; si la marca tiene catálogo, su texto
-//     invita a consultarlo), «Marcas que manejamos» con la marca actual marcada para pasar a otra, y la nota de
+//   - Sin productos: estado vacío con WhatsApp (la única acción de WhatsApp): dice que sus productos no están en este
+//     catálogo, sin prometer que vayan a estar, y si la marca tiene catálogo invita a consultarlo; «Marcas que manejamos» con la marca actual marcada para pasar a otra, y la nota de
 //     disponibilidad. Sin productos y sin enlaces el bloque de título no tiene celda lateral: el título ocupa la fila
 //     entera.
 // Ninguna frase sobre la disponibilidad del portafolio de la marca ni sobre una relación con ella (R-CAT-12);
@@ -64,10 +64,10 @@ const crumbs = [{ label: 'Inicio', href: routes.home }, { label: 'Marcas', href:
     <Fragment>
       <EmptyState
         icon="package"
-        title="Estamos cargando los productos de esta marca."
+        title="Los productos de esta marca no están en este catálogo."
         text={brand.hasCatalog
-          ? 'Mientras tanto, consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.'
-          : 'Mientras tanto, dinos qué necesitas y te ayudamos a cotizarlo.'}
+          ? 'Consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.'
+          : 'Dinos qué necesitas y te ayudamos a cotizarlo.'}
         action={{ href: whatsapp, label: 'Contactar por WhatsApp', icon: 'whatsapp' }}
       />
       <section class="section" aria-labelledby="marcas-title">

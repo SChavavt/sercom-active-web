@@ -6,8 +6,10 @@
 //   2. producción, con un valor no reconocido en la bandera;
 //   3. vista previa, con el mismo lanzador que usa `npm run build:preview`;
 //   4. el sitio real, en producción, con un catálogo sintético en lugar de src/data/catalog.json (una configuración
-//      temporal que importa la del proyecto y solo cambia ese archivo): la única forma de compilar la ficha real
-//      (src/pages/productos/[id].astro) con normas mientras el catálogo del repositorio no tiene productos.
+//      temporal que importa la del proyecto y solo cambia ese archivo): fichas con normas, con foto y retiradas que se
+//      conocen de antemano, y marcas y categorías sin productos;
+//   5. el sitio real, en producción, con los datos del repositorio: las pruebas que lo leen valen para las fichas que
+//      haya, sin nombrar ninguna.
 // La vista previa sirve de control: los mismos archivos sí contienen los ejemplos cuando la bandera está activa.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
@@ -127,6 +129,8 @@ before(async () => {
   ].join('\n'));
   // --config se resuelve desde la carpeta del proyecto, también cuando es una ruta absoluta: va relativa.
   plan.push(['norms', [astroBin, 'build', '--config', relative(ROOT, config)], undefined]);
+  // 5: el sitio real con los datos del repositorio.
+  plan.push(['real', [astroBin, 'build'], undefined]);
   // Una tras otra: las tres primeras escriben en las mismas carpetas de trabajo de la sonda, y nunca dos a la vez.
   for (const [name, args, flag] of plan) {
     const directory = join(temporary, name);
@@ -381,16 +385,16 @@ const externalLinks = (html, detailClass) => [...html.matchAll(/<a ([^>]*\btarge
   detail: unescape(inner.match(new RegExp(`<span class="${detailClass} t-small">([^<]*)</span>`))?.[1] ?? '') || null,
   hidden: [...inner.matchAll(/<span class="vh">([^<]*)<\/span>/g)].map(match => unescape(match[1])).join(''),
 }));
-/** Lo que el detalle de un PDF debe decir, de los datos: la edición y el tamaño, si los tiene. */
+/**
+ * Lo que el detalle de un PDF debe decir, de los datos: «Edición {edición}» (la edición tal cual si ya empieza con la
+ * palabra «edición») y el tamaño, unidos con « · », o nada.
+ */
 const expectedDetail = link => {
-  const parts = [link.edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(Boolean);
-  return parts.length ? parts : null;
+  const edition = link.edition === undefined ? undefined : /^edición(?![\p{L}\p{N}])/iu.test(link.edition) ? link.edition : `Edición ${link.edition}`;
+  const parts = [edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 };
-const assertDetail = (row, link, where) => {
-  const parts = expectedDetail(link);
-  if (!parts) assert.equal(row.detail, null, `${where}: sin edición ni tamaño, no hay detalle`);
-  else for (const part of parts) assert.ok(row.detail?.includes(part), `${where}: el detalle «${row.detail}» debe decir «${part}»`);
-};
+const assertDetail = (row, link, where) => assert.equal(row.detail, expectedDetail(link), `${where}: el detalle`);
 
 test('la página de cada marca imprime una fila por enlace del fabricante, en el orden de los datos, con su dirección y el detalle del PDF', () => {
   const { files } = builds.norms;
@@ -428,6 +432,9 @@ test('/marcas/#catalogos lista exactamente las marcas con un catálogo en PDF o 
       detail: unescape(paragraph.match(/<span class="catalog-sources__detail t-small">([^<]*)<\/span>/)?.[1] ?? '') || null,
     }));
     assert.deepEqual(found.map(link => [link.label, link.href]), links.map(link => [link.label, link.url]), brand.id);
+    // Su nombre accesible, entero en aria-label: la etiqueta, la marca y que abre otra pestaña.
+    const labels = row.split('<p class="catalog-sources__link">').slice(1).map(paragraph => unescape(paragraph.match(/<a [^>]*\baria-label="([^"]*)"/)?.[1] ?? ''));
+    assert.deepEqual(labels, links.map(link => `${link.label}, ${brand.name} (se abre en otra pestaña)`), brand.id);
     links.forEach((link, position) => assertDetail(found[position], link, `/marcas/ ${brand.id} ${link.label}`));
   });
   assert.ok(!section.includes(SITE_LABEL), 'la sección no lista el sitio del fabricante');
@@ -465,4 +472,103 @@ test('una ficha aprobada con foto imprime el crédito hacia su página de origen
   }
   assert.ok(files.get('productos/guante-con-normas/index.html').includes('producto__plate'), 'la ficha sin foto muestra el pictograma');
   assert.ok(files.get('catalogo/index.html').includes('guante-con-foto'), 'el catálogo muestra la tarjeta de la ficha con foto');
+});
+
+// Una marca o una categoría sin productos no promete que lleguen: no dice que se están cargando ni «Mientras tanto».
+test('ninguna página de producción dice «Estamos cargando» ni «Mientras tanto»; una marca o una categoría sin productos dice que no están en este catálogo', () => {
+  for (const name of ['norms', 'real']) {
+    for (const [path, content] of builds[name].files) if (path.endsWith('.html')) assert.doesNotMatch(content, /Estamos cargando|Mientras tanto/, `${name}: ${path}`);
+  }
+  // En la compilación 4 solo la primera marca y la categoría «manos» tienen fichas aprobadas: las demás páginas
+  // muestran el estado vacío.
+  const { files } = builds.norms;
+  const empty = page => ({
+    title: page.match(/<h2 class="empty__title">([^<]*)<\/h2>/)?.[1],
+    text: page.match(/<p class="empty__text">([^<]*)<\/p>/)?.[1],
+  });
+  const brandsWithProducts = new Set(normsCatalog.products.filter(product => product.status === 'approved').map(product => product.brandId));
+  const emptyBrands = data.brands.filter(brand => !brandsWithProducts.has(brand.id));
+  assert.ok(emptyBrands.some(brand => brand.manufacturerLinks.some(link => link.label !== SITE_LABEL)) && emptyBrands.some(brand => brand.manufacturerLinks.every(link => link.label === SITE_LABEL)),
+    'debe haber marcas sin productos con catálogo y sin él para que esta prueba tenga sentido');
+  for (const brand of emptyBrands) {
+    const hasCatalog = brand.manufacturerLinks.some(link => link.label !== SITE_LABEL);
+    assert.deepEqual(empty(files.get(`marcas/${brand.id}/index.html`)), {
+      title: 'Los productos de esta marca no están en este catálogo.',
+      text: hasCatalog ? 'Consulta el catálogo del fabricante y dinos qué modelo necesitas: te ayudamos a cotizarlo.' : 'Dinos qué necesitas y te ayudamos a cotizarlo.',
+    }, brand.id);
+  }
+  const emptyCategories = normsCatalog.categories.filter(category => category.status === 'approved' && category.id !== 'manos');
+  assert.ok(emptyCategories.length > 0);
+  for (const category of emptyCategories) {
+    assert.deepEqual(empty(files.get(`categorias/${category.id}/index.html`)), {
+      title: 'Los productos de esta categoría no están en este catálogo.',
+      text: 'Dinos qué necesitas y te ayudamos a cotizarlo.',
+    }, category.id);
+  }
+});
+
+// «Más productos…» de cada ficha, en la compilación del sitio real (la 5), para las fichas que haya: lo esperado sale
+// de los datos y no nombra ninguna.
+const productsOf = page => [...(page.match(/<section class="section" aria-labelledby="mas-title">([\s\S]*?)<\/section>/)?.[1] ?? '')
+  .matchAll(/<article class="product\b[^"]*">[\s\S]*?href="\/productos\/([^/"]+)\/"/g)].map(match => match[1]);
+const moreTitle = page => page.match(/<h2 class="sec-head__title t-h2" id="mas-title">([^<]*)<\/h2>/)?.[1];
+
+test('«Más productos de esta categoría» lista solo productos de la categoría de la ficha, primero los que la tienen como primera', () => {
+  const { files } = builds.real;
+  const approved = new Set(real.approvedCategoryIds);
+  const firstPublic = product => product.categoryIds.find(id => approved.has(id));
+  const byId = new Map(real.approvedProducts.map(product => [product.id, product]));
+  let checked = 0;
+  for (const product of real.approvedProducts) {
+    const page = files.get(`productos/${product.id}/index.html`);
+    assert.ok(page, product.id);
+    const category = firstPublic(product);
+    const others = real.approvedProducts.filter(other => other.id !== product.id && other.categoryIds.includes(category));
+    const cards = productsOf(page);
+    if (others.length === 0) {
+      assert.equal(moreTitle(page), 'Más productos del catálogo', product.id);
+      continue;
+    }
+    checked += 1;
+    assert.equal(moreTitle(page), 'Más productos de esta categoría', product.id);
+    assert.equal(cards.length, Math.min(4, others.length), `${product.id}: número de tarjetas`);
+    assert.ok(!cards.includes(product.id), `${product.id}: la ficha no se lista a sí misma`);
+    assert.equal(new Set(cards).size, cards.length, `${product.id}: sin repetir`);
+    for (const id of cards) assert.ok(byId.get(id)?.categoryIds.includes(category), `${product.id}: ${id} no es de ${category}`);
+    const own = cards.map(id => byId.get(id).categoryIds[0] === category);
+    assert.ok(own.indexOf(false) === -1 || own.lastIndexOf(true) < own.indexOf(false), `${product.id}: los de primera categoría ${category} van primero (${cards.join(', ')})`);
+  }
+  assert.ok(checked > 0, 'alguna ficha debe compartir su categoría para que esta prueba tenga sentido');
+});
+
+// La línea «Variante (talla o color)» de los mensajes directos de cada ficha (las dos acciones de la ficha y «Cotizar»
+// de su tarjeta), en la compilación del sitio real (la 5), para las fichas que haya.
+const VARIANT_LINE = 'Variante (talla o color): ';
+const variantLineOf = href => {
+  const text = href.startsWith('mailto:') ? decodeURIComponent(href.match(/[?&]body=([^&]*)/)?.[1] ?? '') : new URL(href).searchParams.get('text') ?? '';
+  return text.split(/\r?\n/).find(line => line.startsWith(VARIANT_LINE));
+};
+
+test('el mensaje directo de una ficha con una sola variante la nombra; con ninguna o con varias, la línea va vacía', () => {
+  const { files } = builds.real;
+  const catalogPage = files.get('catalogo/index.html');
+  const counts = { one: 0, other: 0 };
+  for (const product of real.approvedProducts) {
+    const page = files.get(`productos/${product.id}/index.html`);
+    const direct = [...page.matchAll(/<a [^>]*\bhref="([^"]*)"[^>]*\bdata-quote-direct\b/g)].map(match => unescape(match[1]));
+    assert.equal(direct.length, 2, `${product.id}: «Cotizar este producto» y «Cotizar por correo»`);
+    const card = catalogPage.match(new RegExp(`href="/productos/${product.id}/"[\\s\\S]*?<a class="product__action product__action--quote" href="([^"]*)"`))?.[1];
+    assert.ok(card, `${product.id}: su tarjeta en el catálogo`);
+    const variants = product.variants ?? [];
+    let expected = VARIANT_LINE;
+    if (variants.length === 1) {
+      const [{ label, manufacturerCode }] = variants;
+      expected += manufacturerCode && manufacturerCode !== label ? `${label} (${manufacturerCode})` : label;
+      counts.one += 1;
+    } else counts.other += 1;
+    for (const [where, href] of [['WhatsApp', direct[0]], ['correo', direct[1]], ['tarjeta', unescape(card)]]) {
+      assert.equal(variantLineOf(href), expected, `${product.id}, ${where}`);
+    }
+  }
+  assert.ok(counts.one > 0 && counts.other > 0, 'debe haber fichas con una variante y con otro número para que esta prueba tenga sentido');
 });

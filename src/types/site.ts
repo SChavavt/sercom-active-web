@@ -14,7 +14,7 @@ export interface ManufacturerLink {
   readonly label: string;
   readonly url: string;
   readonly kind: ManufacturerLinkKind;
-  /** Solo en el PDF: la edición y el tamaño que se conocen («2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
+  /** Solo en el PDF: la edición y el tamaño que se conocen («Edición 2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
   readonly detail: string | null;
 }
 
@@ -202,7 +202,7 @@ export interface ExampleProductRecord {
 
 /** Campos de un producto que usa la búsqueda. */
 export type SearchableProduct = Pick<PublicProduct, 'name' | 'brandName' | 'code' | 'categoryNames'> & {
-  readonly variants: readonly Pick<PublicVariant, 'code'>[];
+  readonly variants: readonly Pick<PublicVariant, 'code' | 'label'>[];
 };
 
 /** Rutas del sitio. Todas terminan en diagonal. */

@@ -974,7 +974,8 @@
       "variants": [
         {
           "id": "amarillo-alta-visibilidad",
-          "label": "Amarillo alta visibilidad"
+          "label": "Amarillo alta visibilidad",
+          "manufacturerCode": "ECO-1020AMCR"
         },
         {
           "id": "naranja-alta-visibilidad",
@@ -995,16 +996,16 @@
       ],
       "documents": [
         {
+          "label": "Ficha técnica ECO-1020AMCR, amarillo (PDF)",
+          "url": "https://jyrsa.com/wp-content/uploads/ECO-1020AMCR.pdf"
+        },
+        {
           "label": "Ficha técnica ECO-1020ANCR, naranja (PDF)",
           "url": "https://jyrsa.com/wp-content/uploads/ECO-1020ANCR.pdf"
         },
         {
           "label": "Ficha técnica ECO-1020VCR, verde (PDF)",
           "url": "https://jyrsa.com/wp-content/uploads/ECO-1020VCR.pdf"
-        },
-        {
-          "label": "Ficha técnica ECO-1020AMCR (PDF)",
-          "url": "https://jyrsa.com/wp-content/uploads/ECO-1020AMCR.pdf"
         }
       ],
       "image": {
@@ -1198,7 +1199,7 @@
       ],
       "image": {
         "file": "derma-care-56-500.jpg",
-        "alt": "Par de guantes desechables de látex de color crema, extendidos con los dedos hacia arriba.",
+        "alt": "Par de guantes desechables de látex, extendidos con los dedos hacia arriba.",
         "sourceUrl": "https://dermacare.mx/guante-de-latex-desechable-bajo-en-polvo/",
         "usageConfirmed": true
       },
@@ -1261,7 +1262,7 @@
       ],
       "image": {
         "file": "derma-care-56-600.jpg",
-        "alt": "Par de guantes desechables de látex de color crema, extendidos con los dedos hacia arriba.",
+        "alt": "Par de guantes desechables de látex, extendidos con los dedos hacia arriba.",
         "sourceUrl": "https://dermacare.mx/guante-de-latex-desechable-libre-de-polvo-50-pares-talla-s/",
         "usageConfirmed": true
       },
@@ -1927,7 +1928,7 @@
       ],
       "standards": [
         {
-          "text": "EN ISO 374-1:2016 Type B JKPT",
+          "text": "EN ISO 374-1:2016 Tipo B JKPT",
           "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
         },
         {
@@ -1939,7 +1940,7 @@
           "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/gyBjUuw9V7zJoSvZDFXG9g"
         },
         {
-          "text": "FDA 21 CFR 177-2600",
+          "text": "FDA 21 CFR 177.2600",
           "sourceUrl": "https://www.ansell.com/mx/es/products/touchntuff-92-600/pds/l5N9zFNSBq7484FK2MtjKg"
         },
         {
@@ -2256,7 +2257,7 @@
       "saleUnit": "pieza",
       "standards": [
         {
-          "text": "ANSI/ISEA-2020 Z87.1",
+          "text": "ANSI/ISEA Z87.1-2020",
           "sourceUrl": "https://www.3m.com/3M/en_US/p/dc/v000255733/"
         }
       ],
@@ -2344,7 +2345,7 @@
           "sourceUrl": "https://www.moldex.com/wp-content/uploads/Disposable-Respirator-Combined-Espa%C3%B1ol.docx.pdf"
         },
         {
-          "text": "42CFR84",
+          "text": "42 CFR parte 84",
           "sourceUrl": "https://www.moldex.com/pdf/datasheets/2200n95.pdf"
         }
       ],
@@ -2450,7 +2451,7 @@
           "sourceUrl": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/reusable-respirators/facepieces/7002/"
         },
         {
-          "text": "42 CFR part 84",
+          "text": "42 CFR parte 84",
           "sourceUrl": "https://www.moldex.com/product/respiratory-protection/disposable-respirators/reusable-respirators/facepieces/7002/"
         }
       ],

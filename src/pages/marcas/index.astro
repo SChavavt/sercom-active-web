@@ -7,7 +7,9 @@
 // PDF con su edición y su tamaño al lado), y otra vez la nota. Sin ninguna marca con catálogo la sección no se
 // imprime. Al final, la banda de solicitud especial de la portada (sin el enlace a los catálogos: están justo
 // arriba). Cada enlace de catálogo se entiende solo: su nombre accesible lleva la marca («Catálogo del fabricante
-// (PDF), JYRSA (se abre en otra pestaña)»); se ve solo la etiqueta. Textos: brief de la página de marcas.
+// (PDF), JYRSA (se abre en otra pestaña)»); se ve solo la etiqueta. El nombre va entero en aria-label: leído de su
+// contenido, el navegador pone un espacio antes del texto oculto («… (PDF) , JYRSA …»). Los textos ocultos se quedan
+// para quien lea el texto de la página. Textos: brief de la página de marcas.
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Band from '../../components/Band.astro';
 import BrandCells from '../../components/BrandCells.astro';
@@ -44,7 +46,7 @@ const catalogBrands = brands.filter(brand => brand.hasCatalog);
             <div class="catalog-sources__links cell span-8 span-sm-12">
               {brand.manufacturerLinks.filter(link => link.kind !== 'site').map(link => (
                 <p class="catalog-sources__link">
-                  <MoreLink href={link.url} external>{link.label}<span class="vh">, {brand.name}</span></MoreLink>
+                  <MoreLink href={link.url} external aria-label={`${link.label}, ${brand.name} (se abre en otra pestaña)`}>{link.label}<span class="vh">, {brand.name}</span></MoreLink>
                   {link.detail && <span class="catalog-sources__detail t-small">{link.detail}</span>}
                 </p>
               ))}

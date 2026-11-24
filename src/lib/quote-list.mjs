@@ -2,12 +2,14 @@
 // La lista de «Mi cotización»: cantidades y unidades, la lista guardada, el índice público que imprime la página, la
 // vista de la lista para esa página y las frases que se muestran. También las decisiones de las páginas que la usan, como
 // funciones puras con pruebas: qué deja «Deshacer» (`undoLines`), qué renglones repiten a otro (`duplicateStates`), qué
-// productos van en el mensaje (`listMessageItems`), qué llevan los enlaces directos de la ficha (`directLinkValues`),
+// productos van en el mensaje (`listMessageItems`), qué variante llevan escrita los enlaces directos de un producto al
+// compilar (`onlyVariantText`) y qué llevan los de la ficha cuando el visitante elige (`directLinkValues`),
 // qué frase lleva la nota de lo que se guarda (`storageNoteText`) y cómo se nombra un renglón en los nombres de sus
 // controles (`rowLabelName`).
 // Apto para el navegador y para node:test: solo importa `text.mjs`; no lee datos ni toca el almacenamiento (eso es de
-// `quote-store.mjs`). `buildQuoteIndex` y `jsonForScript` se usan al compilar, y el validador del catálogo
-// (`catalog-policy.mjs`) usa `MAX_UNIT_LENGTH`, `unitKey`, `singularUnit` e `isUnitWord`; lo demás, en el navegador.
+// `quote-store.mjs`). `buildQuoteIndex`, `jsonForScript` y `onlyVariantText` se usan al compilar, y el validador del
+// catálogo (`catalog-policy.mjs`) usa `MAX_UNIT_LENGTH`, `unitKey`, `singularUnit` e `isUnitWord`; lo demás, en el
+// navegador.
 //
 // El modelo: la lista guardada es una lista simple de renglones, en el orden en que el visitante los agregó. Nada aquí la
 // «repara»: `parseList` solo descarta lo que este código nunca pudo haber escrito, y `reconcileList` es una VISTA para
@@ -702,6 +704,19 @@ export function variantText(product, variant) {
   const code = oneLine(variant.code);
   if (!label) return code || VARIANT_PENDING;
   return code && code !== label ? `${label} (${code})` : label;
+}
+
+/**
+ * La variante que el mensaje directo de un producto («Cotizar este producto», «Cotizar por correo» y «Cotizar» de su
+ * tarjeta) lleva escrita al compilar: la única, si el producto tiene exactamente una, escrita como la lista
+ * (`variantText`: «Talla mediana (6200/07025(AAD))»); cadena vacía si no tiene ninguna o tiene varias (el visitante
+ * la elige o la escribe).
+ * @param {{ variants: readonly { label: string, code?: string }[] } | null | undefined} product
+ * @returns {string}
+ */
+export function onlyVariantText(product) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  return variants.length === 1 ? variantText(product, variants[0]) : '';
 }
 
 /**

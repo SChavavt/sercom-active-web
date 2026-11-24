@@ -44,6 +44,11 @@ export interface ProductReference {
   name?: string | null;
   /** Dirección absoluta de la página del producto; si falta, el mensaje no lleva la línea «Enlace». */
   url?: string | null;
+  /**
+   * Solo el mensaje de cotizar un producto (`product`): la variante ya escrita para la línea «Variante (talla o
+   * color)», la de un producto con una sola variante (`onlyVariantText` de quote-list.mjs). Sin ella la línea va vacía.
+   */
+  variant?: string | null;
 }
 
 export interface EmailParts {

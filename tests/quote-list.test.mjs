@@ -8,7 +8,7 @@ import {
   listCountLabel, listMessageItems, MAX_LINES, MAX_QUANTITY, MAX_UNIT_LENGTH, mergedMessage, mergeLines, nameLabel, parseList, parseQuantity, parseQuoteIndex,
   QUANTITY_ERROR, quantityLabel, QUOTE_DRAFT_KEY, QUOTE_STORAGE_KEY, reconcileList, removedMessage, removeLines, REPEATED_PRESS, restoredMessage,
   restoreLines, rowControlNames, rowLabelName, serializeList, singularUnit, STANDARD_UNITS, storageNoteText, undoLines, unitKey, unitOptions,
-  unknownLinesMessage, updateLine, variantText,
+  unknownLinesMessage, updateLine, variantText, onlyVariantText,
 } from '../src/lib/quote-list.mjs';
 
 const line = (productId, quantity = 1, unit = 'par', variantId = '') => ({ productId, variantId, quantity, unit });
@@ -481,6 +481,20 @@ test('la misma unidad en singular y en plural es un solo renglón: se suma al ag
   assert.equal(added.status, 'merged');
   assert.deepEqual(added.lines, [line('bota-sintetica', 5, 'pares')]);
   assert.equal(addLine([line('bota-sintetica', 2, 'caja')], line('bota-sintetica', 3, 'par')).status, 'added');
+});
+
+test('onlyVariantText: la única variante de un producto, escrita como la lista; nada con ninguna o con varias', () => {
+  const guante = maps.products.get('guante-sintetico');
+  const casco = maps.products.get('casco-sintetico');
+  const respirador = maps.products.get('respirador-sintetico');
+  assert.equal(onlyVariantText(casco), 'Única (SP-200-U)');
+  assert.equal(onlyVariantText(guante), '');
+  assert.equal(onlyVariantText(respirador), '');
+  assert.equal(onlyVariantText({ variants: [{ id: 'mediana', label: 'Talla mediana', code: '' }] }), 'Talla mediana');
+  assert.equal(onlyVariantText({ variants: [{ id: 'm', label: 'M', code: 'M' }] }), 'M');
+  assert.equal(onlyVariantText({ variants: [{ id: 'mediana', label: 'Talla mediana', code: '6200/07025(AAD)' }] }), 'Talla mediana (6200/07025(AAD))');
+  assert.equal(onlyVariantText(null), '');
+  assert.equal(onlyVariantText({ variants: [] }), '');
 });
 
 test('frases del mensaje y de las líneas de estado', () => {
