@@ -14,7 +14,7 @@ export interface ManufacturerLink {
   readonly label: string;
   readonly url: string;
   readonly kind: ManufacturerLinkKind;
-  /** Solo en el PDF: la edición y el tamaño que se conocen («2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
+  /** Solo en el PDF: la edición y el tamaño que se conocen («Edición 2026 v2 · 49 MB»); `null` sin ellos y en los demás. */
   readonly detail: string | null;
 }
 

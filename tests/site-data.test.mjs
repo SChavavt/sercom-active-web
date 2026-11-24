@@ -176,7 +176,7 @@ test('las proyecciones tienen exactamente los campos públicos acordados', () =>
   assert.deepEqual(site.getBrand('ansell'), {
     id: 'ansell', name: 'Ansell', kind: 'brand',
     manufacturerLinks: [
-      { label: 'Catálogo del fabricante (PDF)', url: 'https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0', kind: 'pdf', detail: '2023' },
+      { label: 'Catálogo del fabricante (PDF)', url: 'https://www.ansell.com/-/media/projects/ansell/website/pdf/industrial/catalogo-general.ashx?hash=89416386AB73E1C18D8D4B0D69061569&rev=fe1daef904d74a5baabf722c6ac075e0', kind: 'pdf', detail: 'Edición 2023' },
       { label: 'Sitio del fabricante', url: 'https://www.ansell.com/mx/es/industrial', kind: 'site', detail: null },
     ],
     hasCatalog: true, productCount: 0, url: '/marcas/ansell/',
@@ -211,16 +211,22 @@ test('cada enlace de marca llega con su clase y, en el PDF, la edición y el tam
     return createSiteData({ mode: 'production', catalog: emptied, brands: list }).brands[0];
   };
   const pdf = details => linksOf([{ label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', ...details }]).manufacturerLinks[0];
-  assert.deepEqual(pdf({ edition: '2026 v2', megabytes: 49 }), { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', kind: 'pdf', detail: '2026 v2 · 49 MB' });
-  assert.equal(pdf({ edition: '2026 v2' }).detail, '2026 v2');
+  assert.deepEqual(pdf({ edition: '2026 v2', megabytes: 49 }), { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', kind: 'pdf', detail: 'Edición 2026 v2 · 49 MB' });
+  assert.equal(pdf({ edition: '2026 v2' }).detail, 'Edición 2026 v2');
   assert.equal(pdf({ megabytes: 49 }).detail, '49 MB');
   assert.equal(pdf({}).detail, null);
+  // Una edición que ya empieza con la palabra «edición», en cualquier forma de mayúsculas, se escribe como está.
+  assert.equal(pdf({ edition: 'Edición 2026 versión 2.1', megabytes: 12 }).detail, 'Edición 2026 versión 2.1 · 12 MB');
+  assert.equal(pdf({ edition: 'edición 3' }).detail, 'edición 3');
+  assert.equal(pdf({ edition: 'EDICIÓN 2025' }).detail, 'EDICIÓN 2025');
+  // Solo la palabra entera: «Ediciones» no es «edición».
+  assert.equal(pdf({ edition: 'Ediciones 2026' }).detail, 'Edición Ediciones 2026');
   const all = linksOf([
     { label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', edition: '2026' },
     { label: ONLINE, url: 'https://fabricante.invalid/catalogos/' },
     { label: SITE, url: 'https://fabricante.invalid/' },
   ]);
-  assert.deepEqual(all.manufacturerLinks.map(link => [link.kind, link.detail]), [['pdf', '2026'], ['online', null], ['site', null]]);
+  assert.deepEqual(all.manufacturerLinks.map(link => [link.kind, link.detail]), [['pdf', 'Edición 2026'], ['online', null], ['site', null]]);
   assert.equal(all.hasCatalog, true);
   assert.equal(linksOf([{ label: ONLINE, url: 'https://fabricante.invalid/catalogos/' }]).hasCatalog, true);
   assert.equal(linksOf([{ label: SITE, url: 'https://fabricante.invalid/' }]).hasCatalog, false);

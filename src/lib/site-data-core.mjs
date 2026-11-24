@@ -69,14 +69,20 @@ const LABEL_LIST = `«${MANUFACTURER_LINK_LABELS.pdf}», «${MANUFACTURER_LINK_L
 /** @param {unknown} value @returns {value is string} */
 const isCleanLine = value => typeof value === 'string' && value.trim() !== '' && cleanQuery(value) === value && !/\p{DI}/u.test(value);
 
+/** Una edición que ya empieza con la palabra «edición» (en cualquier forma de mayúsculas) se escribe como está. */
+const NAMED_EDITION = /^edición(?![\p{L}\p{N}])/iu;
+
 /**
  * Lo que la página imprime junto a un catálogo en PDF: la edición y el tamaño que se conocen, unidos con « · »
- * («2026 v2 · 49 MB», «2026 v2», «49 MB»); `null` sin ninguno de los dos o en otro enlace.
+ * («Edición 2026 v2 · 49 MB», «Edición 2026 v2», «49 MB»); `null` sin ninguno de los dos o en otro enlace. La edición
+ * lleva delante la palabra «Edición» para que se lea qué es el número, salvo si ya empieza con ella («Edición 2026
+ * versión 2.1» queda igual); el tamaño ya lo dice («MB»).
  * @param {{ edition?: string, megabytes?: number }} link
  * @returns {string | null}
  */
 export function manufacturerLinkDetail(link) {
-  const parts = [link.edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(part => part !== undefined);
+  const edition = link.edition === undefined ? undefined : NAMED_EDITION.test(link.edition) ? link.edition : `Edición ${link.edition}`;
+  const parts = [edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(part => part !== undefined);
   return parts.length ? parts.join(' · ') : null;
 }
 

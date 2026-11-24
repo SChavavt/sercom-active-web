@@ -384,16 +384,16 @@ const externalLinks = (html, detailClass) => [...html.matchAll(/<a ([^>]*\btarge
   detail: unescape(inner.match(new RegExp(`<span class="${detailClass} t-small">([^<]*)</span>`))?.[1] ?? '') || null,
   hidden: [...inner.matchAll(/<span class="vh">([^<]*)<\/span>/g)].map(match => unescape(match[1])).join(''),
 }));
-/** Lo que el detalle de un PDF debe decir, de los datos: la edición y el tamaño, si los tiene. */
+/**
+ * Lo que el detalle de un PDF debe decir, de los datos: «Edición {edición}» (la edición tal cual si ya empieza con la
+ * palabra «edición») y el tamaño, unidos con « · », o nada.
+ */
 const expectedDetail = link => {
-  const parts = [link.edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(Boolean);
-  return parts.length ? parts : null;
+  const edition = link.edition === undefined ? undefined : /^edición(?![\p{L}\p{N}])/iu.test(link.edition) ? link.edition : `Edición ${link.edition}`;
+  const parts = [edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(Boolean);
+  return parts.length ? parts.join(' · ') : null;
 };
-const assertDetail = (row, link, where) => {
-  const parts = expectedDetail(link);
-  if (!parts) assert.equal(row.detail, null, `${where}: sin edición ni tamaño, no hay detalle`);
-  else for (const part of parts) assert.ok(row.detail?.includes(part), `${where}: el detalle «${row.detail}» debe decir «${part}»`);
-};
+const assertDetail = (row, link, where) => assert.equal(row.detail, expectedDetail(link), `${where}: el detalle`);
 
 test('la página de cada marca imprime una fila por enlace del fabricante, en el orden de los datos, con su dirección y el detalle del PDF', () => {
   const { files } = builds.norms;
