@@ -321,3 +321,14 @@ test('la revisión del texto reconoce las mismas familias de normas que el escan
   assert.deepEqual(review({ description: 'Cumple NOM 999.' }), [`${at('description')}: R-RULE-04, norma mexicana o nivel de protección: «NOM 999». ${where}`]);
   for (const description of ['Lente CE-200.', 'Serie UL-100.', 'Respirador N95.', 'Guante clase 0.']) assert.deepEqual(review({ description }), [], description);
 });
+
+test('un documento que enlaza una dirección del registro escrita de otra forma se informa igual; una página de producto bajo ella, no', () => {
+  const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url)).url;
+  const message = 'products[0].documents[0].url (guante-ficticio): R-RULE-13, ese enlace es del registro de investigación y no está entre los enlaces del fabricante publicados en brands.json; enlaza la página o la ficha del producto en el sitio del fabricante, o el catálogo que publica su marca.';
+  for (const url of [guides.slice(0, -1), `${guides}#x`, `${guides}?utm_source=boletin`, guides.replace('https://www.', 'https://'), guides.replace('guias', 'GU%49AS')]) {
+    assert.deepEqual(review({ documents: [{ label: 'Guías', url }] }), [message], url);
+  }
+  const image = url => ({ url, width: 800, height: 600, alt: 'Guante ficticio', sourceUrl: SOURCE, usageConfirmed: true });
+  assert.equal(review({ image: image(`${guides}#foto`) }).length, 1);
+  for (const url of [`${guides}guia-de-tallas/`, `${guides.slice(0, -1)}.pdf`]) assert.deepEqual(review({ documents: [{ label: 'Guía', url }] }), [], url);
+});

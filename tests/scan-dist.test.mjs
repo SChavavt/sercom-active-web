@@ -2185,3 +2185,36 @@ test('R-FOTO-02: un punto antes del nombre lo hace otro nombre, con letras ingle
     assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(body) })), ['R-FOTO-02'], body);
   }
 });
+
+// Una dirección del registro de investigación escrita de otra forma es la misma página (src/lib/address-match.mjs).
+
+test('R-RULE-13: una dirección del registro sin publicar falla escrita de cualquier forma de la misma página', async () => {
+  const guides = data.registry.sources.find(source => source.entity_id === 'mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url)).url;
+  const anchor = href => `<a href="${href}" target="_blank" rel="noopener noreferrer">Guías<span class="vh"> (se abre en otra pestaña)</span></a>`;
+  for (const body of [
+    anchor(guides.slice(0, -1)), anchor(guides.replace('www.mcrsafety', 'WWW.MCRSAFETY')), anchor(guides.replace('https:', 'http:')), anchor(guides.replace('www.', '')),
+    anchor(`${guides}#catalogos`), anchor(`${guides}?utm_source=x`), anchor(guides.replace('guias', 'gu%69as')), anchor(`https://example.com/r?u=${encodeURIComponent(guides)}`),
+    `<script>const u="${guides.replaceAll('/', '\\/')}";</script>`, `<p>Ver www.mcrsafety.com.mx/recursos/guias-de-recursos.</p>`,
+  ]) {
+    const result = await scan({ 'marcas/mcr-safety/index.html': page(`<h1>MCR Safety</h1>${body}`) }, { data: emptiedData });
+    assert.deepEqual(failedIds(result), ['R-RULE-13'], body);
+    assert.equal(failures(result)[0].message, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${guides}`, body);
+  }
+});
+
+test('R-RULE-13: las páginas de producto de Golden Eagle pasan; su plantilla del registro con pares de una visita falla', async () => {
+  const template = data.registry.sources.find(source => source.entity_id === 'golden-eagle').resources.find(resource => /\/producto\/$/.test(resource.url)).url;
+  const anchors = ids => ids.map(id => `<a href="${template}?producto=${id}" target="_blank" rel="noopener noreferrer">Ficha ${id}<span class="vh"> (se abre en otra pestaña)</span></a>`).join('');
+  assert.deepEqual(failures(await scan({ 'marcas/golden-eagle/index.html': page(`<h1>Golden Eagle</h1>${anchors([1, 24, 162, 9300])}`) }, { data: emptiedData })), []);
+  for (const href of [`${template}?utm_source=x`, `${template}?`, `${template}#ficha`, template.slice(0, -1)]) {
+    const result = await scan({ 'marcas/golden-eagle/index.html': page(`<h1>Golden Eagle</h1><a href="${href}">Plantilla</a>`) }, { data: emptiedData });
+    assert.deepEqual(failedIds(result), ['R-RULE-13'], href);
+  }
+});
+
+test('R-RULE-13 dice en --rules qué cuenta como la misma página y que la consulta es parte de ella', () => {
+  const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
+  assert.match(doc, /cualquier otra forma de la misma página \(src\/lib\/address-match\.mjs\)/);
+  assert.match(doc, /La consulta sí es parte de la página/);
+  assert.match(doc, /utm_/);
+});
