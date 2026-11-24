@@ -164,7 +164,7 @@ test('crossCheckBrands rechaza enlaces que no son un recurso accesible y publica
       const errors = crossCheckBrands(withReturnedBrand(source.entity_id, brand => { brand.manufacturerLinks = link(resource.url); }), unmarked);
       assert.equal(errors.length === 0, publishable, `${source.entity_id}: ${resource.type} / ${resource.verification}`);
       if (!publishable) {
-        assert.match(errors.join('\n'), / no se publica: en el registro (su verificación no dice «accesible»|es de tipo «[a-z_]+», que nunca se enlaza) \(/);
+        assert.match(errors.join('\n'), / no se publica: en el registro (su verificación no empieza con «accesible», así, en minúsculas|es de tipo «[a-z_]+», que nunca se enlaza) \(/);
         checked += 1;
       }
     }
@@ -288,7 +288,7 @@ test('crossCheckBrands rechaza los catálogos que no se pudieron abrir y la list
   for (const [id, type] of [['espomega', 'pdf'], ['msa', 'catalog_platform']]) {
     const resource = sourceOf(id).resources.find(candidate => candidate.type === type);
     const label = type === 'pdf' ? PDF : ONLINE;
-    assert.match(crossCheckBrands(withBrand(id, brand => { brand.manufacturerLinks = [{ label, url: resource.url }]; }), registry).join('\n'), new RegExp(`${id}: el enlace .* no se publica: en el registro su verificación no dice «accesible» \\(${type}: `), `${id} ${type}`);
+    assert.match(crossCheckBrands(withBrand(id, brand => { brand.manufacturerLinks = [{ label, url: resource.url }]; }), registry).join('\n'), new RegExp(`${id}: el enlace .* no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas \\(${type}: `), `${id} ${type}`);
   }
   // Una página que exige un formulario para descargar el catálogo (gated_landing) no se enlaza aunque se haya abierto:
   // la de una entidad retirada, puesta como recurso de JYRSA en una copia del registro.
@@ -298,7 +298,7 @@ test('crossCheckBrands rechaza los catálogos que no se pudieron abrir y la list
   // La lista de guías de MCR Safety nunca se enlaza.
   const guides = sourceOf('mcr-safety').resources.find(resource => /guias-de-recursos\/$/.test(resource.url));
   for (const label of [ONLINE, SITE]) {
-    assert.match(crossCheckBrands(withBrand('mcr-safety', brand => { brand.manufacturerLinks = [{ label, url: guides.url }]; }), registry).join('\n'), /mcr-safety: el enlace .* no se publica: en el registro su verificación no dice «accesible» \(landing: no enlazar/);
+    assert.match(crossCheckBrands(withBrand('mcr-safety', brand => { brand.manufacturerLinks = [{ label, url: guides.url }]; }), registry).join('\n'), /mcr-safety: el enlace .* no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas \(landing: no enlazar/);
   }
 });
 
@@ -374,12 +374,12 @@ test('un enlace cuya verificación no dice «accesible» no se publica, y el men
   const pdf = sourceOf('infra').resources.find(resource => resource.type === 'pdf');
   assert.match(pdf.verification, /^sin comprobar \(2026-11-23\)/);
   assert.deepEqual(crossCheckBrands(withReturnedBrand('infra', brand => { brand.manufacturerLinks = [{ label: PDF, url: pdf.url }]; }), unmarked), [
-    `infra: el enlace ${pdf.url} no se publica: en el registro su verificación no dice «accesible» (pdf: ${cut80(pdf.verification)}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`,
+    `infra: el enlace ${pdf.url} no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas (pdf: ${cut80(pdf.verification)}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`,
   ]);
   // Una verificación corta va entera.
   const synthetic = { ...registry, sources: [...registry.sources.filter(source => source.entity_id !== 'jyrsa'), { ...sourceOf('jyrsa'), resources: [{ type: 'pdf', url: 'https://jyrsa.com/catalogo-ficticio.pdf', verification: 'sin comprobar' }] }] };
   assert.deepEqual(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: PDF, url: 'https://jyrsa.com/catalogo-ficticio.pdf' }]; }), synthetic), [
-    'jyrsa: el enlace https://jyrsa.com/catalogo-ficticio.pdf no se publica: en el registro su verificación no dice «accesible» (pdf: sin comprobar). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.',
+    'jyrsa: el enlace https://jyrsa.com/catalogo-ficticio.pdf no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas (pdf: sin comprobar). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.',
   ]);
 });
 
@@ -410,7 +410,7 @@ test('la edición de un PDF dice qué tiene mal', () => {
   for (const value of ['', '   ']) assert.deepEqual(pdf(value), [`${where}: está vacío; si el fabricante no imprime una edición, quita la clave.`], JSON.stringify(value));
   for (const value of [2026, null, ['2026'], true]) assert.match(pdf(value).join('\n'), /^brands\[0\] \(ansell\)\.manufacturerLinks\[0\]\.edition: no es un texto/, JSON.stringify(value));
   assert.deepEqual(pdf('2026\u200bv2'), [`${where}: «2026\u200bv2» lleva un carácter invisible (U+200B) después de «2026»; bórralo.`]);
-  assert.deepEqual(pdf('2026\nv2'), [`${where}: «2026\nv2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
+  assert.deepEqual(pdf('2026\nv2'), [`${where}: «2026\\nv2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
   assert.deepEqual(pdf('\u00ad2026'), [`${where}: «\u00ad2026» lleva un carácter invisible (U+00AD) al principio; bórralo.`]);
 });
 
@@ -428,4 +428,29 @@ test('una plataforma de catálogos verificada como accesible se acepta como «Ca
   assert.deepEqual(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: ONLINE, url: platform.url }]; }), synthetic), []);
   // En la etiqueta del PDF, no.
   assert.match(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: PDF, url: platform.url }]; }), synthetic).join('\n'), /pero en el registro es de tipo «catalog_platform»/);
+});
+
+test('un enlace cuya verificación no empieza con «accesible», así, en minúsculas, no se publica, y el mensaje lo dice igual en cada caso', () => {
+  const url = 'https://jyrsa.com/catalogo-ficticio.pdf';
+  const message = verification => `jyrsa: el enlace ${url} no se publica: en el registro su verificación no empieza con «accesible», así, en minúsculas (pdf: ${verification}). Quítalo de brands.json hasta que alguien abra esa dirección y lo anote en el registro, o enlaza otro recurso de la marca.`;
+  for (const verification of ['Accesible (2026-11-23)', ' accesible (2026-11-23)', 'ACCESIBLE', 'no accesible (2026-11-23)', 'sin comprobar']) {
+    const synthetic = { ...registry, sources: [...registry.sources.filter(source => source.entity_id !== 'jyrsa'), { ...sourceOf('jyrsa'), resources: [{ type: 'pdf', url, verification }] }] };
+    assert.deepEqual(crossCheckBrands(withBrand('jyrsa', brand => { brand.manufacturerLinks = [{ label: PDF, url }]; }), synthetic), [message(verification)], verification);
+  }
+});
+
+test('la edición de un PDF hecha solo de caracteres que no se ven dice cuáles, y un salto de línea no parte el mensaje', () => {
+  const where = 'brands[0] (ansell).manufacturerLinks[0].edition';
+  const pdf = edition => withLinks([{ label: PDF, url: 'https://fabricante.invalid/catalogo.pdf', edition }]);
+  const end = '; si el fabricante no imprime una edición, quita la clave.';
+  assert.deepEqual(pdf('\u00a0'), [`${where}: solo lleva un carácter que no se ve (U+00A0)${end}`]);
+  assert.deepEqual(pdf('\u200b'), [`${where}: solo lleva un carácter que no se ve (U+200B)${end}`]);
+  assert.deepEqual(pdf('\t'), [`${where}: solo lleva un carácter que no se ve (U+0009)${end}`]);
+  assert.deepEqual(pdf('\u00a0\u200b\u00a0'), [`${where}: solo lleva caracteres que no se ven (U+00A0, U+200B)${end}`]);
+  assert.deepEqual(pdf(' \u00a0 '), [`${where}: solo lleva caracteres que no se ven (U+00A0)${end}`]);
+  // Un salto de línea dentro de «…» se muestra con su nombre: el mensaje queda en una línea.
+  assert.deepEqual(pdf('2026\r\nv2'), [`${where}: «2026\\r\\nv2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
+  assert.deepEqual(pdf('2026\u2028v2'), [`${where}: «2026U+2028v2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
+  assert.deepEqual(pdf('2026\u2029v2'), [`${where}: «2026U+2029v2» lleva un salto de línea después de «2026»; escríbela en una sola línea.`]);
+  for (const edition of ['2026\nv2', '2026\r\nv2', '2026\u2028v2', '2026\u2029v2', '\n']) assert.doesNotMatch(pdf(edition).join(''), /[\n\r\u2028\u2029]/, JSON.stringify(edition));
 });

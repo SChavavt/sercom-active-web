@@ -25,7 +25,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { addressFinder, samePage } from '../src/lib/address-match.mjs';
+import { addressFinder, addressMatcher, samePage } from '../src/lib/address-match.mjs';
 import { isPublicRetired, isPublishableResource } from '../src/lib/catalog-policy.mjs';
 import { DEVELOPMENT_NOTICE, EXAMPLE_TAG, PREVIEW_NOTICE } from '../src/lib/site-data-core.mjs';
 
@@ -48,18 +48,25 @@ const codePoint = (value, radix) => {
   const number = parseInt(value, radix);
   return Number.isInteger(number) && number >= 0 && number <= 0x10ffff ? String.fromCodePoint(number) : undefined;
 };
-// Entidades con nombre que un texto en español puede llevar; las numéricas se decodifican todas.
+// Entidades con nombre que un texto en español puede llevar, y las de los signos con que se escribe una dirección; las
+// numéricas se decodifican todas. Es una lista corta a propósito: una entidad con nombre que no está aquí («&mfr;»,
+// «&centerdot;») queda como está.
 const NAMED_ENTITIES = {
   nbsp: ' ', quot: '"', apos: "'", lt: '<', gt: '>', shy: '­', zwnj: '‌', zwj: '‍', ZeroWidthSpace: '​', NoBreak: '⁠',
   aacute: 'á', eacute: 'é', iacute: 'í', oacute: 'ó', uacute: 'ú', Aacute: 'Á', Eacute: 'É', Iacute: 'Í', Oacute: 'Ó', Uacute: 'Ú',
   ntilde: 'ñ', Ntilde: 'Ñ', uuml: 'ü', Uuml: 'Ü', iexcl: '¡', iquest: '¿', laquo: '«', raquo: '»', ndash: '–', mdash: '—', hellip: '…',
   middot: '·', bull: '•', copy: '©', reg: '®', trade: '™', deg: '°', dollar: '$', euro: '€', cent: '¢', pound: '£', star: '☆', starf: '★', commat: '@', period: '.', colon: ':', sol: '/', num: '#', percnt: '%',
+  Tab: '\t', NewLine: '\n', NonBreakingSpace: ' ', QUOT: '"', LT: '<', GT: '>', quest: '?', equals: '=', lowbar: '_', UnderBar: '_', bsol: '\\', plus: '+',
+  semi: ';', comma: ',', excl: '!', ast: '*', midast: '*', lpar: '(', rpar: ')', lsqb: '[', lbrack: '[', rsqb: ']', rbrack: ']', lcub: '{', lbrace: '{',
+  rcub: '}', rbrace: '}', vert: '|', verbar: '|', VerticalLine: '|', grave: '`', DiacriticalGrave: '`', Hat: '^',
 };
-const decodeEntities = text => text
-  .replace(/&(?:#(\d+)|#x([0-9a-f]+)|([A-Za-z][A-Za-z0-9]*));/gi, (entity, decimal, hex, name) => {
+// Como el navegador, una referencia numérica se lee también sin su «;» y toma todas las cifras que siguen («&#47recursos»
+// es «/recursos»; «&#x2fa», U+02FA). Una con nombre necesita su «;». «&AMP;» es «&amp;».
+export const decodeEntities = text => text
+  .replace(/&(?:#(\d+);?|#x([0-9a-f]+);?|([A-Za-z][A-Za-z0-9]*);)/gi, (entity, decimal, hex, name) => {
     if (decimal) return codePoint(decimal, 10) ?? entity;
     if (hex) return codePoint(hex, 16) ?? entity;
-    return name === 'amp' ? entity : NAMED_ENTITIES[name] ?? entity;
+    return name === 'amp' || name === 'AMP' ? '&amp;' : NAMED_ENTITIES[name] ?? entity;
   })
   .replace(/&amp;/g, '&');
 const decodePercent = text => text.replace(/(?:%[0-9a-f]{2})+/gi, run => {
@@ -128,7 +135,7 @@ const unescapeCss = text => text.replace(/\\([0-9a-f]{1,6})[ \t\n\f\r]?|\\([^\n0
  * ¿Un atributo style esconde el contenido del elemento? display:none, visibility:hidden o collapse, content-visibility:hidden,
  * con o sin !important, en mayúsculas o minúsculas, con escapes de CSS, y leyendo cada declaración sin sus comentarios
  * (que separan como un espacio: «display:none» seguido de un comentario vacío sigue siendo «display:none»). No resuelve
- * variables de CSS («display:var(--x,none)») ni las entidades con nombre que `decodeEntities` no conoce («&semi;»).
+ * variables de CSS («display:var(--x,none)») ni las entidades con nombre que `decodeEntities` no conoce («&centerdot;»).
  */
 function hiddenByStyle(style) {
   const css = style.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, ' ');
@@ -285,8 +292,9 @@ const comparableText = pieces => oneLine(fold(decodeEntities(pieces.join('')))).
  *     así una página con miles de ellos anidados se lee en un tiempo proporcional a su tamaño, sin agotar la pila;
  *   - ningún atributo cuenta, tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva. Se
  *     acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11);
- *   - de las entidades con nombre solo se decodifican las de NAMED_ENTITIES; un aviso cuyas propias palabras se
- *     escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce.
+ *   - de las entidades con nombre solo se decodifican las de NAMED_ENTITIES, y solo con su «;»; un aviso cuyas propias
+ *     palabras se escriben con otras («Sitio&centerdot;en preparación», «&mfr;») o con una sin su «;» no se reconoce.
+ *     «Sitio&Tab;en preparación» y «&NewLine;» sí.
  */
 function allElementText(html) {
   return comparableText(elementTextPieces(html, [], 0));
@@ -979,8 +987,8 @@ const PRODUCTION_RULES = [
 ];
 
 // Las dos lecturas de los avisos de arriba, como las explica --rules (ver `shownText` y `allElementText`).
-const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS o una entidad con nombre poco común en el style («display:var(--x,none)», «display:none&semi;»), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
-const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta, hasta ocho niveles de esos elementos uno dentro de otro (ninguna envoltura real pasa de tres); más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado, y así una página con miles de ellos anidados se revisa sin detener el escáner; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan: tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva; se acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11). De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…): un aviso cuyas propias palabras se escriben con otras («Sitio&Tab;en preparación», «&NewLine;», «&centerdot;») no se reconoce; escribirlo así es ocultarlo a propósito';
+const SHOWN_TEXT_DOC = 'el texto de los elementos; no cuentan un comentario, también uno falso como «<?…>» o «</ …>», un script, un estilo, un atributo aunque su valor lleve «>», ni el contenido de un elemento que no se ve: <head>, <template>, <textarea>, <noscript>, <iframe>, <noembed>, <noframes>, <datalist>, <video>, <audio>, <canvas>, <rp>, un <object> con data, un <dialog> cerrado, un <details> cerrado salvo su primer <summary>, <title>, <desc> o <metadata> de un SVG, o un elemento con hidden, popover, aria-hidden="true" o display:none, visibility:hidden o collapse o content-visibility:hidden en su style, aunque lleve comentarios o escapes de CSS; un elemento oculto sigue abierto hasta su propia etiqueta de cierre, aunque dentro haya un «</div>» en un <textarea>, un <iframe>, un <template> o un <title> de SVG, y «/>» no cierra un elemento de HTML. El escáner no es un analizador de HTML y no modela: el texto de un SVG o de MathML que no se dibuja (fuera de <title>, <desc>, <metadata> y de lo escondido como en HTML, cuenta todo: también el texto suelto fuera de <text>, una sección CDATA, <annotation>, o un elemento escondido con display="none" o visibility="hidden" como atributos de presentación), una variable de CSS en el style («display:var(--x,none)») o una entidad con nombre que el escáner no decodifica (decodifica las comunes en español y las de los signos, así que «display:none&semi;» sí esconde; «&centerdot;» o una escrita sin su «;» no se leen), ni las reparaciones del analizador del navegador (un elemento de formato oculto que se vuelve a abrir después de cerrarse su bloque, una etiqueta de cierre que se ignora dentro de <select>, el doble escape de <script>); en esos casos un aviso que no se muestra puede contar como mostrado: esconderlo así es ocultarlo a propósito, y contra eso no protege un patrón. Una regla de una hoja de estilo que lo esconda no se ve aquí: la revisa check-markup';
+const ALL_TEXT_DOC = 'en todo el texto de los elementos, oculto o no: también con hidden, aria-hidden="true", display:none, en <template> o en un <details> cerrado; el contenido de <noscript>, <textarea>, <title>, <iframe>, <noembed>, <noframes>, <xmp> y <plaintext> se lee tal cual y además como marcado, así que el aviso envuelto en uno de ellos con sus etiquetas también cuenta, hasta ocho niveles de esos elementos uno dentro de otro (ninguna envoltura real pasa de tres); más hondo, su contenido cuenta solo como el texto que es, sin leerlo como marcado, y así una página con miles de ellos anidados se revisa sin detener el escáner; fuera de esos elementos, un comentario, un script, un estilo o un atributo no cuentan: tampoco el srcdoc de un <iframe>, aunque el navegador dibuje el documento que lleva; se acepta porque sin --in-person cualquier <iframe> ya falla (R-RULE-11). De las entidades con nombre solo se decodifican las comunes en español (&aacute;, &ntilde;, &middot;, &nbsp;…) y las de los signos con que se escribe una dirección (&Tab;, &NewLine;, &sol;, &quest;…), y solo con su «;»: «Sitio&Tab;en preparación» se reconoce, pero un aviso cuyas propias palabras se escriben con otras («Sitio&centerdot;en preparación», «&mfr;») o con una sin su «;» («preparaci&oacuten») no se reconoce; escribirlo así es ocultarlo a propósito';
 
 /** Comprobaciones que no son un patrón de texto. Sirven de documentación y se imprimen con --rules. */
 export const CHECKS = [
@@ -989,7 +997,7 @@ export const CHECKS = [
   ['R-RULE-08', 'Ningún nombre de archivo contiene la marca excluida.'],
   ['R-RULE-12', `Antes del lanzamiento cada página lleva <meta name="robots" content="noindex…">, robots.txt bloquea todo el sitio a todos los buscadores (el grupo «User-agent: *» y cada grupo de un buscador nombrado tienen «Disallow: /» y ningún «Allow»; un grupo también empieza con «useragent» o «user agent», que los buscadores aceptan), no existe un sitemap y cada página de producción muestra a todos el aviso «${DEVELOPMENT_NOTICE}», buscado en el texto que se muestra (${SHOWN_TEXT_DOC}). La vista previa lleva solo su propio aviso: una página suya que lleva el de sitio en preparación falla, también oculto (${ALL_TEXT_DOC}).`],
   ['R-PUB-03', `Con --launch se exige lo contrario de R-RULE-12: ningún grupo de robots.txt bloquea el sitio entero, ninguna página lleva noindex y ninguna lleva el aviso «${DEVELOPMENT_NOTICE}», tampoco oculto: al lanzar el aviso se quita de la página, no se esconde (${ALL_TEXT_DOC}).`],
-  ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los enlaces del fabricante publicados en brands.json (el catálogo en PDF, el catálogo en línea y el sitio de cada marca) y la página de donde viene la foto de una ficha aprobada (image.sourceUrl), solo en la página de esa ficha (productos/<id>/index.html o productos/<id>.html), donde es el crédito de la foto, y solo si el registro la tiene como publicable (su verificación empieza con «accesible» y su tipo no está bloqueado): la misma dirección en otra página, o en la de un retirado, falla, y una página del registro que no se publica («no enlazar», deprecated, gated_landing) falla también en la de su ficha. Un enlace cuenta escrito como esté en el registro o de cualquier otra forma de la misma página (src/lib/address-match.mjs): con http, https o «//»; el servidor con otras mayúsculas, con www. o sin él; la ruta sin las diagonales del final, con otras mayúsculas, con su %XX o con «\\/» (en un script o un JSON); con un fragmento; con pares de la consulta que solo cuentan una visita (utm_…, fbclid, gclid, msclkid, mc_cid, mc_eid, igshid) o con la consulta en otro orden; y codificado entero dentro de otra dirección. La consulta sí es parte de la página: …/producto/?producto=24 es otra página que …/producto/. Lo que continúa la ruta («…/guias/09-catalogo/», «…/producto.html») es otra página, y un servidor escrito sin «//» ni «www.» o una dirección de correo no son una dirección. Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN).'],
+  ['R-RULE-13', 'Ningún enlace del registro de investigación aparece en la salida, salvo los enlaces del fabricante publicados en brands.json (el catálogo en PDF, el catálogo en línea y el sitio de cada marca) y la página de donde viene la foto de una ficha aprobada (image.sourceUrl), solo en la página de esa ficha (productos/<id>/index.html o productos/<id>.html), donde es el crédito de la foto, y solo si el registro la tiene como publicable (su verificación empieza con «accesible» y su tipo no está bloqueado): la misma dirección en otra página, o en la de un retirado, falla, y una página del registro que no se publica («no enlazar», deprecated, gated_landing) falla también en la de su ficha. Un enlace cuenta escrito tal cual, letra por letra, o en una de las formas de la misma página que se dicen aquí, no de cualquier otra forma de la misma página (src/lib/address-match.mjs), como dicen los límites del final. El módulo lee cada dirección con el analizador de direcciones del navegador (URL), y son la misma página: con http, https o «//»; el servidor con otras mayúsculas, con www. o sin él, con un punto al final, con un usuario antes, con el puerto 80 o 443, con una letra que el navegador lee como otra («𝐦», «ſ», una de ancho completo) o con un carácter que no se ve; la ruta con un segmento «.» o «..», con diagonales repetidas o al final, con otras mayúsculas, con su %XX o con «\\/» (en un script o un JSON); con un fragmento; con pares de la consulta que solo cuentan una visita (utm_…, fbclid, gclid, srsltid, _gl y los demás de TRACKING_PARAMETERS) o con la consulta en otro orden; y codificado entero dentro de otra dirección. El HTML se lee con sus referencias decodificadas como las decodifica el navegador (una numérica también sin «;», &Tab;, &NewLine; y las de los signos de una dirección), y el valor de cada atributo, además, entero (el de uno sin comillas, hasta el primer espacio o «>») y sin sus tabuladores ni saltos de línea. La consulta sí es parte de la página: …/producto/?producto=24 es otra página que …/producto/. Lo que continúa la ruta («…/guias/09-catalogo/», «…/producto.html») es otra página, y un servidor escrito sin «//» ni «www.» o una dirección de correo no son una dirección; pero la dirección escrita tal cual y seguida de un signo que no continúa una dirección cuenta: en una lista («a.pdf,…/catalogos.php,b.pdf») y también en «…/catalogos.php.bak» (una falsa alarma que se acepta). Tampoco sus notas internas, ni archivos de research/, docs/ o documentos sueltos (WARN). Límites: no ve una entidad con nombre que no conoce («&mfr;») o escrita sin su «;», una dirección que un script arma con pedazos o escribe con escapes de sus letras, ni la misma página con un par de la consulta que no está en la lista, con index.html o index.php después de la carpeta, con un parámetro dentro de la ruta («/a;x=1/b») o con otro puerto: cada uno es otra dirección. Fuera del valor entero de un atributo (una frase, un srcset, un refresco, una cadena de un script o de un JSON) tampoco ve una dirección cuyo usuario lleva un espacio, unas comillas, «<», «>» o una llave, ni una con un tabulador o un salto de línea escrito tal cual en el texto que se ve o en una cadena de un script que además lleva «<» o «>»: nadie escribe así una dirección por descuido.'],
   ['R-RULE-14', 'Las páginas generadas corresponden a los datos: /categorias/ solo categorías aprobadas (más las de borrador en la vista previa), /productos/ solo fichas aprobadas y productos retirados que fueron públicos (estado retired con aprobación comercial completa: conservan una página informativa), más los ejemplos en la vista previa (también el ejemplo retirado), /marcas/ solo las marcas públicas. Si existe alguna página de categoría o de producto, deben existir las de todos los registros visibles.'],
   ['R-RULE-24', 'Cada destino de WhatsApp (wa.me, api., web. o chat.whatsapp.com, wa.link, whatsapp://, intent://), de correo (mailto: y cualquier dirección escrita) y de teléfono (tel:, sms:) que aparece en la salida, en un enlace, en otro atributo, en un script o en un JSON, también escrito con \\/ o codificado con %XX dentro de otra dirección (aunque sea varias veces: se decodifica hasta que el texto deja de cambiar, ocho veces como máximo), es el de src/data/business.json. Un enlace de correo no lleva to, cc ni bcc, y uno de WhatsApp tiene la forma https://wa.me/<número>. En un atributo, un mailto: sin dirección o un tel: sin número, con letras o con un marcador sin sustituir («{correo}», «${tel}») falla: solo el código de un script puede llevar el principio de un enlace que completa. En el código de un script, «mailto:», «tel:» o «sms:» como clave de un objeto («{whatsapp:e,mailto:t}») o como propiedad leída en una condición («a?t.mailto:t.whatsapp») no es un destino; con una «@» detrás, o con siete cifras o más bajo «tel:» o «sms:», sí falla. Los números con forma de teléfono del texto visible que no son el confirmado se listan (WARN), salvo una aparición de uno de los códigos públicos de las fichas, exacto y entero (el model y cada manufacturerCode de variante de una ficha aprobada, y el model de un retirado que fue público), en cualquier página: un código no es un teléfono. Un número que no es uno de esos códigos se lista igual, también junto a un código. La revisión de los destinos (tel:, wa.me, mailto: en enlaces, scripts y JSON) no tiene esa excepción.'],
   ['R-QUOTE-06', 'El texto de un enlace de WhatsApp va codificado en la URL.'],
@@ -1023,7 +1031,7 @@ export async function loadProjectData(root = ROOT) {
  * Enlaces y notas del registro de investigación que nunca deben publicarse (R-RULE-13): todos sus enlaces, salvo los
  * enlaces del fabricante publicados en brands.json (`manufacturerLinks`: catálogo en PDF, catálogo en línea y sitio). Un
  * enlace del registro que es la misma página que uno publicado (`samePage`, src/lib/address-match.mjs) está publicado,
- * escrito como sea. El validador de fichas usa la misma lista (scripts/catalog-text.mjs).
+ * escrito en una de las formas de la misma página que lee el módulo de direcciones. El validador de fichas usa la misma lista (scripts/catalog-text.mjs).
  * @returns {{ urls: string[], notes: string[] }}
  */
 export function registryLeaks(registry, brands) {
@@ -1054,11 +1062,15 @@ export function registryLeaks(registry, brands) {
 // La búsqueda de cada lista de enlaces de `registryLeaks`, preparada una vez y no en cada página.
 const leakFinders = new WeakMap();
 /**
- * Los enlaces de una lista que aparecen en un texto, de dos formas que se suman: escrito tal cual, seguido de algo que
- * no continúa la dirección (la comparación de siempre, que sigue encontrando todo lo que encontraba), y escrito de
- * cualquier forma de la misma página (`addressFinder`, src/lib/address-match.mjs: sin la diagonal final, con otras
- * mayúsculas, con http, sin www, con un fragmento, con pares de una visita, con su %XX, codificado dentro de otra
- * dirección, con «\/»…).
+ * Los enlaces de una lista que aparecen en un texto, de dos formas que se suman: escrito en una de las formas de la
+ * misma página que lee el módulo de direcciones, con los límites que dice su cabecera y el texto de R-RULE-13
+ * (`addressFinder`, src/lib/address-match.mjs: con http, sin www, sin la diagonal final, con otras mayúsculas,
+ * con un fragmento, con pares de una visita, con su %XX, codificado dentro de otra dirección, con «\/», con un
+ * segmento «.» o «..», con un puerto 443, un usuario o las letras que el navegador lleva a otras…), y escrito tal cual,
+ * letra por letra, cuando lo que sigue no es una letra, una cifra ni uno de «/ _ % ? # = & -» (la comparación de
+ * siempre). La exacta encuentra la dirección dentro de una lista separada por comas («a.pdf,https://…/catalogos.php,b.pdf»),
+ * donde la de la misma página toma el resto de la lista por ruta; a cambio, toma por la dirección del registro otra que
+ * la continúa con un signo («…/catalogos.php.bak», «…/catalogos.php;x=1»): una falsa alarma que se acepta.
  * @param {string[]} urls
  * @returns {(text: string) => string[]}
  */
@@ -1075,9 +1087,46 @@ function leakFinder(urls) {
   return leakFinders.get(urls);
 }
 
+// La comparación de una dirección entera con cada lista de enlaces de `registryLeaks`, preparada una vez.
+const leakMatchers = new WeakMap();
+// El valor de un atributo sin comillas como lo corta el navegador: desde el «=» hasta el primer espacio de HTML o «>»,
+// lleve lo que lleve en medio (una comilla, «<», «=» o «`» ahí son un error de marcado, pero parte del valor).
+// `attributesOf` lo corta en esos signos. Se busca en toda la página: lo que encuentra dentro de un valor entre comillas
+// o de un texto («a=b») solo se compara con las direcciones del registro, y esa página ya se leyó entera.
+const UNQUOTED_VALUE = /=[\t\n\f\r ]*([^\t\n\f\r "'>][^\t\n\f\r >]*)/g;
+/**
+ * Los enlaces de `registryLeaks` que lleva el valor de un atributo de una página, leído como lo recibe el navegador:
+ * entero (`attributesOf`, que respeta las comillas: el valor puede llevar «<», «>» o la otra comilla; y, sin comillas,
+ * `UNQUOTED_VALUE`: hasta el primer espacio o «>»), con sus
+ * referencias decodificadas, sin sus tabuladores ni saltos de línea y sin los espacios ni los caracteres de control de
+ * sus extremos (U+0000 a U+0020), que el navegador también quita. Si el valor
+ * entero es una dirección, se compara como una sola dirección, lleve los caracteres que lleve
+ * («https://a'b@servidor/…»); y se lee como un texto (una dirección dentro de un srcset, de un «content="0; url=…"», de
+ * un style o de un JSON en un atributo data-) cuando quitarle esos caracteres lo cambió: si no, ese texto ya se leyó
+ * en la página entera.
+ * @param {string} html
+ * @param {{ urls: string[] }} leaks
+ * @returns {Set<string>}
+ */
+function attributeLeaks(html, leaks) {
+  if (!leakMatchers.has(leaks.urls)) leakMatchers.set(leaks.urls, addressMatcher(leaks.urls));
+  const matcher = leakMatchers.get(leaks.urls);
+  const found = new Set();
+  const body = withoutScripts(html);
+  const values = attributesOf(body).map(([, value]) => value);
+  for (const unquoted of body.matchAll(UNQUOTED_VALUE)) values.push(decodeEntities(unquoted[1]));
+  for (const value of values) {
+    const clean = value.replace(/[\t\n\r]/g, '').replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
+    if (!clean) continue;
+    for (const url of matcher(clean)) found.add(url);
+    if (clean !== value) for (const url of leakFinder(leaks.urls)(clean)) found.add(url);
+  }
+  return found;
+}
+
 /**
  * Los enlaces y las notas de `registryLeaks` que aparecen en un texto (con sus entidades ya decodificadas): un enlace,
- * escrito tal cual o de cualquier forma de la misma página (`leakFinder`); una nota, en el texto leído en una línea.
+ * escrito tal cual o en una de las formas de la misma página que lee el módulo de direcciones (`leakFinder`); una nota, en el texto leído en una línea.
  * @param {string} text
  * @param {{ urls: string[], notes: string[] }} leaks
  */
@@ -1783,7 +1832,9 @@ export async function scanDist(directory, options = {}) {
     const photoSource = pageId === undefined ? undefined : approvedById.get(pageId)?.image?.sourceUrl;
     const isPhotoCredit = url => typeof photoSource === 'string' && samePage(url, photoSource) && publishablePage(url);
     const registryFound = registryFindings(decoded, leaks);
-    for (const url of registryFound.urls.filter(url => !isPhotoCredit(url))) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
+    // En una página, además, cada valor de un atributo como lo recibe el navegador (`attributeLeaks`).
+    const registryUrls = new Set([...registryFound.urls, ...(isHtml ? attributeLeaks(raw, leaks) : [])]);
+    for (const url of leaks.urls.filter(url => registryUrls.has(url) && !isPhotoCredit(url))) add('FAIL', 'R-RULE-13', file, `enlace del registro de investigación que no es un enlace del fabricante publicado en brands.json: ${url.slice(0, 90)}`);
     for (const note of registryFound.notes) add('FAIL', 'R-RULE-13', file, `nota interna del registro de investigación: «${note.slice(0, 60)}»`);
     // R-RULE-11: la dirección exacta de business.json.
     if (!inPerson && addressNeedle && oneLine(norm).toLowerCase().includes(addressNeedle)) add('FAIL', 'R-RULE-11', file, 'dirección del negocio publicada sin atención presencial confirmada');

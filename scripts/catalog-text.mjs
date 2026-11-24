@@ -17,10 +17,11 @@
 //   - un número con forma de teléfono (la expresión de R-RULE-24 para el texto visible) solo puede ir en `model` y en
 //     `manufacturerCode`: un número largo es un código, no va en el texto;
 //   - una dirección de correo no va en ninguna ficha (R-RULE-24), ni un enlace o una nota del registro de investigación
-//     (R-RULE-13, la misma lista y la misma comparación que usa el escáner: un enlace del registro escrito de otra forma
-//     de la misma página también cuenta, src/lib/address-match.mjs); un documento o una foto por dirección que enlazan el registro
-//     tampoco, salvo un enlace del fabricante publicado en brands.json: un documento puede enlazar el catálogo de su
-//     marca (en PDF o en línea) o su sitio;
+//     (R-RULE-13, la misma lista y la misma comparación que usa el escáner, `registryFindings`: un enlace del registro
+//     cuenta escrito tal cual o en otra de las formas de la misma página que lee el módulo de direcciones, src/lib/address-match.mjs, también dentro
+//     de un texto); un documento o una foto por dirección que enlazan el registro tampoco, salvo un enlace del
+//     fabricante publicado en brands.json, escrito en una de las formas de la misma página que lee el módulo de direcciones: un documento puede enlazar el catálogo de su marca (en PDF
+//     o en línea) o su sitio;
 //   - las direcciones que publica la ficha (cada documento, la foto por dirección y la página de donde viene la foto) no
 //     se revisan como frases: el escáner no las lee así cuando la página las escribe enteras en un atributo, porque son
 //     del fabricante. Sí se revisan con lo que el escáner todavía encuentra en ellas (`addressFindings`: la marca

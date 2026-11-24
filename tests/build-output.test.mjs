@@ -42,7 +42,8 @@ const fixtureTokens = [...new Set(data.examples.flatMap(example => [
 
 // Catálogo sintético de la compilación 4: las categorías del repositorio con «manos» aprobada, una ficha aprobada con
 // tres normas (en un orden que no es el alfabético), otra aprobada sin normas, un retirado que fue público, con una
-// norma en sus datos, y una aprobada con foto (para el crédito). Fichas, códigos, normas y direcciones inventados.
+// norma y una foto en sus datos (su página no imprime ninguna de las dos), y una aprobada con foto (para el crédito).
+// Fichas, códigos, normas y direcciones inventados.
 const NORM_SOURCE = 'https://fabricante.example/ficha-sintetica-normas';
 const NORMS = ['Norma sintética SONDA-C3', 'Norma sintética SONDA-A1', 'Norma sintética SONDA-B2'];
 const RETIRED_NORM = 'Norma sintética SONDA-R9';
@@ -64,7 +65,7 @@ const normsCatalog = {
   products: [
     synthetic('guante-con-normas', { standards: NORMS.map(text => ({ text, sourceUrl: NORM_SOURCE })) }),
     synthetic('guante-sin-normas', { model: 'SONDA-SIN' }),
-    synthetic('guante-retirado-normas', { status: 'retired', model: 'SONDA-RET', standards: [{ text: RETIRED_NORM, sourceUrl: NORM_SOURCE }] }),
+    synthetic('guante-retirado-normas', { status: 'retired', model: 'SONDA-RET', image: PHOTO, standards: [{ text: RETIRED_NORM, sourceUrl: NORM_SOURCE }] }),
     synthetic('guante-con-foto', { model: 'SONDA-FOTO', image: PHOTO }),
   ],
 };
