@@ -552,11 +552,17 @@ const withoutAllowed = text => FOLDED_ALLOWED_SENTENCES.reduce((rest, sentence) 
 //           marcado que escribe se lee también sin sus etiquetas), sin las frases permitidas
 //   prose   la parte de `words` que no es código: el texto visible, los valores de los atributos (también las direcciones), las cadenas
 //           `content:` del CSS y el texto de un SVG o XML (sin las frases permitidas)
+//           En `words` y `prose` no entra un atributo cuyo valor es entero una dirección que publican los datos (los enlaces
+//           del fabricante de una marca y, de una ficha aprobada, sus documentos, la foto por dirección y el origen de la
+//           foto: `publishedAddresses`): es una dirección del fabricante, no una frase del sitio. La misma dirección en el
+//           texto, en un script, en un JSON o junto a otro texto en un atributo sí entra.
 //   raw     contenido tal cual de cada archivo de texto
 //   norm    contenido de cada archivo de texto con entidades y %XX decodificados
 // `level` puede ser una función del modo: los ejemplos nunca deben llevar normas ni certificaciones.
 
 const rule = (id, level, scope, pattern, title, doc) => ({ id, level, scope, pattern, title, doc });
+// Lo que dicen de las direcciones publicadas las reglas que leen `words` y `prose`.
+const PUBLISHED_ADDRESS_DOC = 'Un atributo cuyo valor es entero una dirección que publican los datos (los enlaces del fabricante de una marca de brands.json y, de una ficha aprobada, cada documento, la foto por dirección y la página de donde viene la foto) no se lee aquí: es una dirección del fabricante, no una frase del sitio. Se compara el valor entero, con sus entidades decodificadas, tal cual o con su %XX decodificado; una dirección que solo empieza como esa, que la contiene o que lleva algo más, la misma dirección en el texto, en un script, en un JSON o junto a otro texto en un atributo, y cualquier dirección del sitio se leen como siempre. Las reglas que leen el archivo tal cual o decodificado (la marca excluida, las marcas de los ejemplos, la dirección del negocio, los metadatos internos, las confirmaciones) leen también esas direcciones; el validador revisa antes las de cada ficha.';
 
 const EXCLUDED_BRAND = /\bgisa\b|guantes?[\s._+-]*internacional(?:es)?/i;
 const EXCLUDED_LETTERS = /\bg[\s._-]i[\s._-]s[\s._-]a\b/i;
@@ -853,10 +859,10 @@ const strictInPreview = options => (options.preview ? 'FAIL' : 'WARN');
 export const RULES = [
   rule('R-RULE-01', 'FAIL', 'words', PUBLIC_PRICE,
     'precio, importe o descuento público',
-    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o una palabra y «de» («Precio unitario de 120»), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9»; en estas tres, el nombre de una marca de brands.json que empieza con una cifra, escrito como lo escribe la marca y como palabra completa (hoy solo «3M», con su mayúscula), no es una cifra: «El precio vigente de 3M», «Los precios de 3M se confirman al cotizar», «Precio de 3M: a cotizar» y «Precio de marca 3M» no fallan; cualquier otra cifra pegada a letras sí es un precio, y también la marca seguida de una cifra en la misma frase, con lo que sea en medio: «Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí fallan, también con «por», «para» o «con» («Precio por 3M 350», «Precio para 3M: 350»; «Precio por 3M: a cotizar» no falla), igual que «Precio de 3M desde 350», «Precio de 3M (350)», «Precio de 3M, 350», «Precio de 3M/350», «Precio de 3M$» y «Precio de 35pza»; la frase termina en un «.», «!», «?» o «;», o en varios seguidos que no son puntos suspensivos, cuando les sigue un espacio y una letra (también con «¿», «¡», unas comillas, un paréntesis o un corchete delante de la letra) o el final del texto; unos puntos suspensivos («…» o dos o más puntos seguidos) nunca terminan la frase, ni un signo seguido de otra cosa: «Precio de 3M. 350», «Precio de 3M… 350», «Precio de 3M?! 350», «Precio de 3M. (350)», «Precio de 3M! — 350» y «Los precios de 3M… van desde 350» fallan, «Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.» y «Precio de 3M: a cotizar. Respirador 3M 6200.» no; lo que dice la frase siguiente no se lee: «Precio de 3M. Desde 350» no falla, porque la regla no puede distinguirlo de la frase anterior. Límite de la línea única: el escáner lee el texto de la página como una sola línea, así que un bloque que termina sin signo sigue en el siguiente («<p>Precio de 3M: a cotizar</p><p>Respirador 3M 6200</p>» falla) y una frase que empieza con una cifra justo después del signo es la misma frase («Los precios de 3M se confirman al cotizar. 12 modelos disponibles.» falla): termina la frase con punto y no empieces la siguiente con una cifra; otra mención de la marca en la misma frase también cuenta como cifra: «Precio de 3M: a cotizar, como todo 3M» falla; y el número de un modelo después de la marca también es una cifra: «Pide precio para 3M 6200» y «Solicita precio de 3M 6200» fallan; escribe «Pide el precio del respirador 3M 6200» o «Cotiza el 3M 6200»), una cifra con el IVA: seguida de «+ IVA», «más IVA», «más el IVA», «con IVA», «sin IVA» o «IVA incluido», también escrito «I.V.A.» («Casco 350 + IVA», «25.50 más I.V.A.», «Casco 350 con IVA», «350 IVA incluido»; no un porcentaje: «16% + IVA», «16% con IVA», «IVA 16%»; con «con IVA», «sin IVA» o «IVA incluido», la cifra es un dato y no un importe solo en las formas de una lista cerrada: pegada a una letra o a un guion («CFDI G03», «NOM-017-STPS-2008»); después de un dato del producto o del documento (modelo, talla, tipo, clase, serie, nivel, número, «No.», «Núm.», «Mod.», calibre, norma, versión o CFDI, en singular o en plural), sola o con una marca de número: dos puntos, «#», «N°», «Nº», «No», «N.º», «N.°», «N.o», «Nro.» o «Núm», con punto o sin él, y cualquiera de ellas seguida de dos puntos («Talla: 9», «Modelo #2200», «Modelo N° 2200», «Mod. 2200», «Modelo N.º 2200», «Modelo Nro. 2200», «Modelo No: 2200», «Modelo #: 2200»); con el dato en singular, también la segunda de dos cifras unidas por «y» u «o» («Modelo 2200 y 7500», «Talla 9 o 10»); con el dato en plural, también la última de una lista de cifras separadas por comas, hasta trece, o hasta catorce si las dos últimas van unidas por «y» u «o» («Tallas 8, 9, 10», «Tallas 8, 9 y 10») o de un intervalo con «a», «al» o un guion cuya segunda cifra tiene por lo menos tantas cifras enteras como la primera («Tallas 7 a 10», «Tallas 7 al 10», «Tallas 8 – 10»; «Modelos: 2200 - 350 con IVA» sí falla); después de las siglas de una norma en mayúsculas (EN, ISO, ANSI, ISEA, ASTM, NOM, NRR) o de una marca de brands.json que empieza con una cifra; o después de una cifra con dos puntos, una barra o la barra de fracción pegados (el año de una norma, «EN 388:2016»; una fracción o un intervalo de tallas, «Talla 9 1/2», «Talla 9/10»; el carácter de fracción, que NFKC vuelve «1⁄2»: «Talla 9½», «Talla 9 ½», «Tallas 9½ y 10»): «Emitimos CFDI 4.0 con IVA trasladado», «Uso de CFDI G03 con IVA desglosado», «Guante calibre 15 con IVA desglosado», «Norma EN 388 con IVA», «Talla 9 con IVA», «Modelo 2200 con IVA», «Respirador 3M 6200 con IVA» y el final de una norma, «NOM-017-STPS-2008 con IVA», no fallan; «Casco 350 con IVA», «Casco: 350 con IVA», «Talla 9: 350 con IVA», «Talla 9 a 350 con IVA», «Talla 9, 350 IVA incluido», «Modelos 2200: 350 con IVA», «Modelo #2200: 350 con IVA» y «CFDI 4.0: 350 con IVA» sí. La lista está cerrada: cualquier otra forma de escribir un dato antes de «con IVA», «sin IVA» o «IVA incluido» falla («Talla 9 al 10 con IVA», «Respirador MSA 6200 con IVA»); escribe el dato en una de las formas de la lista («Respirador modelo 6200 con IVA») o no pongas «con IVA» justo después de la cifra. Límite: una cifra justo después de una de esas formas cuenta como dato aunque sea un importe, porque la regla no puede distinguirlos y gana la frase legítima («Tallas 9 a 350 con IVA», «Talla 9 y 350 con IVA», «Talla: 350 con IVA», «Casco 3M 350 con IVA», «Casco 350/400 con IVA», «Casco 350½ con IVA» y «Tallas 8, 9, 10, 350 con IVA» no fallan); «+ IVA» y «más IVA» fallan después de cualquier cifra: «Modelo 2200 + IVA»), «c/u» después de una cifra con dos decimales («25.50 c/u»; con un entero no, porque puede ser una cantidad: «25 c/u», «12 pares c/u») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural, con un espacio o pegada, y sin otra cifra en la misma frase («100 piezas o más», «12 pares», «Costo de 350pzas»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio.'),
+    'El catálogo no muestra precios, costos, descuentos ni importes: la acción es siempre cotizar. Busca símbolos y códigos de moneda junto a cifras («$350», «MX$350», «US$ 25», «350 M.N.», «350 dólares», «＄1,200»), «precio», «costo», «importe», «monto» o «tarifa» seguidos de una cifra (con dos puntos; sin ellos cuando entre la palabra y la cifra no hay una conjunción o preposición, o hay «de» («Precio de 350», salvo un año), o una palabra y «de» («Precio unitario de 120»), o «por», «con», «de» o «para» y una palabra: «Precio por pieza 350.00», salvo un porcentaje o una talla, una serie, un modelo o una norma: «Precio con IVA 16%», «Precio para talla 9»; en estas tres, el nombre de una marca de brands.json que empieza con una cifra, escrito como lo escribe la marca y como palabra completa (hoy solo «3M», con su mayúscula), no es una cifra: «El precio vigente de 3M», «Los precios de 3M se confirman al cotizar», «Precio de 3M: a cotizar» y «Precio de marca 3M» no fallan; cualquier otra cifra pegada a letras sí es un precio, y también la marca seguida de una cifra en la misma frase, con lo que sea en medio: «Precio de 2x1», «Precio de 350k», «Costo de 3m» y «Precio de 3M 350» sí fallan, también con «por», «para» o «con» («Precio por 3M 350», «Precio para 3M: 350»; «Precio por 3M: a cotizar» no falla), igual que «Precio de 3M desde 350», «Precio de 3M (350)», «Precio de 3M, 350», «Precio de 3M/350», «Precio de 3M$» y «Precio de 35pza»; la frase termina en un «.», «!», «?» o «;», o en varios seguidos que no son puntos suspensivos, cuando les sigue un espacio y una letra (también con «¿», «¡», unas comillas, un paréntesis o un corchete delante de la letra) o el final del texto; unos puntos suspensivos («…» o dos o más puntos seguidos) nunca terminan la frase, ni un signo seguido de otra cosa: «Precio de 3M. 350», «Precio de 3M… 350», «Precio de 3M?! 350», «Precio de 3M. (350)», «Precio de 3M! — 350» y «Los precios de 3M… van desde 350» fallan, «Los precios de 3M se confirman al cotizar. Tenemos 12 modelos.» y «Precio de 3M: a cotizar. Respirador 3M 6200.» no; lo que dice la frase siguiente no se lee: «Precio de 3M. Desde 350» no falla, porque la regla no puede distinguirlo de la frase anterior. Límite de la línea única: el escáner lee el texto de la página como una sola línea, así que un bloque que termina sin signo sigue en el siguiente («<p>Precio de 3M: a cotizar</p><p>Respirador 3M 6200</p>» falla) y una frase que empieza con una cifra justo después del signo es la misma frase («Los precios de 3M se confirman al cotizar. 12 modelos disponibles.» falla): termina la frase con punto y no empieces la siguiente con una cifra; otra mención de la marca en la misma frase también cuenta como cifra: «Precio de 3M: a cotizar, como todo 3M» falla; y el número de un modelo después de la marca también es una cifra: «Pide precio para 3M 6200» y «Solicita precio de 3M 6200» fallan; escribe «Pide el precio del respirador 3M 6200» o «Cotiza el 3M 6200»), una cifra con el IVA: seguida de «+ IVA», «más IVA», «más el IVA», «con IVA», «sin IVA» o «IVA incluido», también escrito «I.V.A.» («Casco 350 + IVA», «25.50 más I.V.A.», «Casco 350 con IVA», «350 IVA incluido»; no un porcentaje: «16% + IVA», «16% con IVA», «IVA 16%»; con «con IVA», «sin IVA» o «IVA incluido», la cifra es un dato y no un importe solo en las formas de una lista cerrada: pegada a una letra o a un guion («CFDI G03», «NOM-017-STPS-2008»); después de un dato del producto o del documento (modelo, talla, tipo, clase, serie, nivel, número, «No.», «Núm.», «Mod.», calibre, norma, versión o CFDI, en singular o en plural), sola o con una marca de número: dos puntos, «#», «N°», «Nº», «No», «N.º», «N.°», «N.o», «Nro.» o «Núm», con punto o sin él, y cualquiera de ellas seguida de dos puntos («Talla: 9», «Modelo #2200», «Modelo N° 2200», «Mod. 2200», «Modelo N.º 2200», «Modelo Nro. 2200», «Modelo No: 2200», «Modelo #: 2200»); con el dato en singular, también la segunda de dos cifras unidas por «y» u «o» («Modelo 2200 y 7500», «Talla 9 o 10»); con el dato en plural, también la última de una lista de cifras separadas por comas, hasta trece, o hasta catorce si las dos últimas van unidas por «y» u «o» («Tallas 8, 9, 10», «Tallas 8, 9 y 10») o de un intervalo con «a», «al» o un guion cuya segunda cifra tiene por lo menos tantas cifras enteras como la primera («Tallas 7 a 10», «Tallas 7 al 10», «Tallas 8 – 10»; «Modelos: 2200 - 350 con IVA» sí falla); después de las siglas de una norma en mayúsculas (EN, ISO, ANSI, ISEA, ASTM, NOM, NRR) o de una marca de brands.json que empieza con una cifra; o después de una cifra con dos puntos, una barra o la barra de fracción pegados (el año de una norma, «EN 388:2016»; una fracción o un intervalo de tallas, «Talla 9 1/2», «Talla 9/10»; el carácter de fracción, que NFKC vuelve «1⁄2»: «Talla 9½», «Talla 9 ½», «Tallas 9½ y 10»): «Emitimos CFDI 4.0 con IVA trasladado», «Uso de CFDI G03 con IVA desglosado», «Guante calibre 15 con IVA desglosado», «Norma EN 388 con IVA», «Talla 9 con IVA», «Modelo 2200 con IVA», «Respirador 3M 6200 con IVA» y el final de una norma, «NOM-017-STPS-2008 con IVA», no fallan; «Casco 350 con IVA», «Casco: 350 con IVA», «Talla 9: 350 con IVA», «Talla 9 a 350 con IVA», «Talla 9, 350 IVA incluido», «Modelos 2200: 350 con IVA», «Modelo #2200: 350 con IVA» y «CFDI 4.0: 350 con IVA» sí. La lista está cerrada: cualquier otra forma de escribir un dato antes de «con IVA», «sin IVA» o «IVA incluido» falla («Talla 9 al 10 con IVA», «Respirador MSA 6200 con IVA»); escribe el dato en una de las formas de la lista («Respirador modelo 6200 con IVA») o no pongas «con IVA» justo después de la cifra. Límite: una cifra justo después de una de esas formas cuenta como dato aunque sea un importe, porque la regla no puede distinguirlos y gana la frase legítima («Tallas 9 a 350 con IVA», «Talla 9 y 350 con IVA», «Talla: 350 con IVA», «Casco 3M 350 con IVA», «Casco 350/400 con IVA», «Casco 350½ con IVA» y «Tallas 8, 9, 10, 350 con IVA» no fallan); «+ IVA» y «más IVA» fallan después de cualquier cifra: «Modelo 2200 + IVA»), «c/u» después de una cifra con dos decimales («25.50 c/u»; con un entero no, porque puede ser una cantidad: «25 c/u», «12 pares c/u») y vocabulario de oferta, en el texto, en los atributos, en los scripts (también en el marcado que escriben), en JSON y en las cadenas `content:` del CSS. Una cantidad no es un precio: un número entero seguido de una unidad en plural, con un espacio o pegada, y sin otra cifra en la misma frase («100 piezas o más», «12 pares», «Costo de 350pzas»); «35 pza», «35.50 pieza» o «3 pares por 250» sí lo son. En el código de un script, fuera de las cadenas, un «$» pegado a un identificador («$2», «a$1», «e.$2», «URL$1=…») es código. Una clave de precio en el código público o en un JSON («var o={monto:5}», «{price:10}») falla siempre: el sitio no tiene campos de precio. ' + PUBLISHED_ADDRESS_DOC),
   rule('R-RULE-01', 'FAIL', 'prose', VISIBLE_PRICE,
     'precio en el texto, en un atributo o en el CSS',
-    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS (enteras, aunque lleven «;» o «}») y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto.'),
+    'El mismo patrón sin la excepción del código: en el texto visible, en los valores de los atributos (también las direcciones, con su %XX decodificado: el texto de un borrador de WhatsApp o de correo, «?text=Casco%20(MX%24350)»), en las cadenas `content:` del CSS (enteras, aunque lleven «;» o «}») y en las cadenas de un script o de un JSON, cualquier «$» seguido de una cifra es un precio, lo siga lo que lo siga («MX$350», «Desde MX$ 1,200», «Casco (MX$350)»). Solo la cadena de reemplazo de `.replace(…, "$1")` no es texto. ' + PUBLISHED_ADDRESS_DOC),
   rule('R-RULE-01', 'FAIL', 'joined', VISIBLE_PRICE,
     'precio o descuento partido por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Pro<b>moción</b>» se lee «Promoción».'),
@@ -866,7 +872,7 @@ export const RULES = [
     'Tampoco se publican precios en datos para buscadores (JSON-LD, microdatos), ni campos de precio: una clave «price», «precio», «costo», «importe», «monto» o «tarifa» en un JSON o en el código público (`{"precio": 120}`, `var o={monto:5}`) o un atributo `data-precio` fallan siempre.'),
   rule('R-RULE-02', 'FAIL', 'words', /\bgratis\b|\bgratuit[oa]s?\b/i,
     'producto marcado como gratuito',
-    'Omitir el precio no convierte un producto en gratuito.'),
+    `Omitir el precio no convierte un producto en gratuito. ${PUBLISHED_ADDRESS_DOC}`),
   rule('R-RULE-02', 'FAIL', 'joined', /\bgratis\b|\bgratuit[oa]s?\b/i,
     'gratuito partido por etiquetas en línea',
     'También cuando una etiqueta en línea parte la palabra («gra<b>tis</b>»).'),
@@ -874,12 +880,12 @@ export const RULES = [
     'dato sintético de las pruebas automáticas',
     'Los datos de tests/ son sintéticos y nunca se usan en la web, en ningún modo.'),
   rule('R-RULE-04', strictInPreview, 'text',
-    /\bANSI\b|\bASTM\b|\bOSHA\b|\bNIOSH\b|\bNRR\b|\bEN[\s-]?\d{3,5}\b|\bISO[\s-]?\d{3,5}\b/,
+    /\bANSI\b|\bASTM\b|\bOSHA\b|\bNIOSH\b|\bNRR\b|\bSNR\b|\bNFPA\b|(?<!ANSI\/)\bISEA\b|\bNMX\b|\bLAPEM\b|\bCAN\/CSA\b|(?<!CAN\/)\bCSA[\s-]?Z\d|\bAS\s?\/\s?NZS\b|\bIEC\s?\d{4,5}\b|\bUL\s\d{2,4}[A-Z]?\b|\bNRF-\d{3}-[A-Z]|\b\d{1,3}\s?CFR|\bCFR\s?\d|\b[Mm]arcad[oa]\s+CE\b|\b[Mm]arca\s+CE\b|\bCE[\s/]+EN[\s-]?\d|\bCE\s+[Cc]at(?:egoria|\.)?\s*(?:I{1,3}|[1-3])\b|\bEN[\s-]?\d{3,5}\b|\bISO[\s-]?\d{3,5}\b/,
     'norma o valor técnico',
-    'Una norma solo se muestra si consta en la fuente del producto: se escribe en el campo standards de su ficha, cada una con la página o el documento del fabricante donde consta (sourceUrl), y la ficha la muestra en «Normas». En la página de su ficha aprobada (productos/<id>/index.html o productos/<id>.html), los textos exactos de ese standards se quitan del texto antes de buscar, enteros (no pegados a una letra o una cifra, ni a través de «-», «.», «:», «/», «_» o «+»), así que no dan aviso; cualquier otra mención sí: la misma norma en otra página, otra norma en esa página, una norma en la página de un ejemplo o de un retirado. Producción: WARN para rastrear cada mención hasta su fuente. Vista previa: FAIL, porque un ejemplo nunca lleva normas. Las siglas se buscan en mayúsculas para no confundir «EN 388» con «en 2026».'),
-  rule('R-RULE-04', strictInPreview, 'text', /\bNOM-\d|\bnivel(?:es)? de (?:corte|protecci[oó]n)\b|\bresistencia al corte\b/i,
+    'Una norma solo se muestra si consta en la fuente del producto: se escribe en el campo standards de su ficha, cada una con la página o el documento del fabricante donde consta (sourceUrl), y la ficha la muestra en «Normas». En la página de su ficha aprobada (productos/<id>/index.html o productos/<id>.html), los textos exactos de ese standards se quitan del texto antes de buscar, enteros (no pegados a una letra o una cifra, ni a través de «-», «.», «:», «/», «_» o «+»), así que no dan aviso; cualquier otra mención sí: la misma norma en otra página, otra norma en esa página, una norma en la página de un ejemplo o de un retirado. Producción: WARN para rastrear cada mención hasta su fuente. Vista previa: FAIL, porque un ejemplo nunca lleva normas. Las siglas se buscan en mayúsculas para no confundir «EN 388» con «en 2026». Familias que reconoce: «ANSI», «ASTM», «OSHA», «NIOSH», «NRR», «SNR», «NFPA», «ISEA», «NMX», «LAPEM» y «CAN/CSA» solas; «CSA Z…»; «AS/NZS»; «IEC» con cuatro o cinco cifras («IEC 61234»); «UL» con un espacio y una cifra («UL 1234»); «NRF-» con tres cifras y un organismo («NRF-123-ABC…»); «CFR» con su título o su parte («21 CFR», «42 CFR», «99CFR9», «CFR 1234»); «EN» e «ISO» con su número; el marcado CE («marcado CE», «marca CE», «CE EN 999», «CE categoría III», «CE Cat. II»). Una sigla dentro de un modelo («CE-200», «UL-100», «IEC-200», «CSA-200», «NRF-100») no es una norma, y una familia que no nombra esta lista no da aviso: los nombres de filtro o de clase («N95», «KN95», «FFP2», «clase 0», «tipo I») tampoco, a propósito, porque también describen el producto.'),
+  rule('R-RULE-04', strictInPreview, 'text', /\bNOM-\d|\bNOM\s?\d{3}|\bnivel(?:es)? de (?:corte|protecci[oó]n)\b|\bresistencia al corte\b/i,
     'norma mexicana o nivel de protección',
-    'Igual que la anterior, para las NOM y los niveles de corte o de protección, sin distinguir mayúsculas, con la misma excepción para las normas de la ficha en su propia página.'),
+    'Igual que la anterior, para las NOM («NOM-017…», «NOM 017», «NOM017») y los niveles de corte o de protección, sin distinguir mayúsculas, con la misma excepción para las normas de la ficha en su propia página.'),
   rule('R-RULE-05', 'FAIL', 'text',
     /\brese[ñn]as?\b|\btestimonios?\b|\bopiniones de (?:nuestros )?clientes\b|\bcasos de [eé]xito\b|\bclientes (?:satisfechos|que conf[ií]an)\b|\bnuestros clientes\b|★|⭐|\b\d(?:[.,]\d)?\s?estrellas\b/i,
     'reseña, testimonio o cliente',
@@ -894,13 +900,13 @@ export const RULES = [
   rule('R-RULE-07', 'FAIL', 'words',
     /\boficial(?:es|mente)?\b|\bautorizad[oa]s?\b|\bdistribuidor(?:a|es|as)?\b|\bsucursal(?:es)?\b|\brepresentante(?:s)?\b/i,
     '«oficial», «autorizado», distribuidor, sucursal o representante',
-    'La atención en Puebla no se presenta como oficial, autorizada, distribuidora, sucursal ni representante de una marca. La palabra «representante» (y «representantes») falla siempre, también en «Habla con un representante de ventas»: se escribe «la persona de ventas» o «escríbenos». El enlace de una marca se llama «Sitio del fabricante».'),
+    'La atención en Puebla no se presenta como oficial, autorizada, distribuidora, sucursal ni representante de una marca. La palabra «representante» (y «representantes») falla siempre, también en «Habla con un representante de ventas»: se escribe «la persona de ventas» o «escríbenos». El enlace de una marca se llama «Sitio del fabricante». ' + PUBLISHED_ADDRESS_DOC),
   rule('R-RULE-08', 'FAIL', 'norm', EXCLUDED_BRAND,
     'marca excluida',
     'La marca excluida no aparece en ningún archivo, con o sin espacios, guiones, acentos, mayúsculas, caracteres invisibles, ancho completo o codificación de URL.'),
   rule('R-RULE-08', 'FAIL', 'words', EXCLUDED_BRAND,
     'marca excluida en el texto o en un script',
-    'También cuando una etiqueta separa las palabras («<strong>Guantes</strong> …») o un script une la marca a partir de piezas.'),
+    `También cuando una etiqueta separa las palabras («<strong>Guantes</strong> …») o un script une la marca a partir de piezas. ${PUBLISHED_ADDRESS_DOC}`),
   rule('R-RULE-08', 'FAIL', 'joined', new RegExp(`${EXCLUDED_BRAND.source}|${EXCLUDED_LETTERS.source}`, 'i'),
     'marca excluida partida por etiquetas en línea',
     'Texto visible con las etiquetas en línea retiradas: «GI<span>SA</span>» se lee «GISA».'),
@@ -916,7 +922,7 @@ export const RULES = [
     'La disponibilidad y el tiempo de entrega se confirman al cotizar; el sitio no los promete.'),
   rule('R-RULE-10', 'FAIL', 'words', FALSE_CONFIRMATION,
     'confirmación falsa de recepción o folio',
-    `Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud», «Ya tenemos tu solicitud», también con mensaje, pedido o lista), folios ni promesas de respuesta. Promesas que fallan sin plazo: «te» o «le» con responder, contestar, contactar, escribir, llamar o mandar en primera persona del plural, en presente o en futuro, o con «enviaremos» («Te respondemos», «Te contestaremos», «Te mandaremos»), o con «responderá», «contactará», «escribirá» o «llamará» («Le escribirá»); «te», «le» o «les» con «daremos respuesta» o «damos respuesta» («te damos respuesta», «Les daremos respuesta»); «daremos», «damos», «daré» o «doy» con «pronta», «rápida» o «inmediata» antes de «respuesta», que es su propio plazo, con «te», «le» o «les» o sin ellos («Te daremos pronta respuesta», «Daremos pronta respuesta a tu solicitud», «Te daré pronta respuesta»); «Nos pondremos en contacto», «Me pondré en contacto», «Nos comunicaremos» y «Me comunicaré»; «Estaremos en contacto», «Estaré en contacto», «Me pongo en contacto» y «Nos ponemos en contacto» con «contigo», «con usted» o «con ustedes» («Estaremos en contacto contigo», «Me pongo en contacto contigo»; «Nos ponemos en contacto con el fabricante» y «Estamos en contacto con los fabricantes» no fallan); «Un asesor se comunicará contigo», «se pondrá en contacto». Promesas que fallan con un plazo: un verbo seguido, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio, de un plazo, o el plazo antes del verbo, con cifra o sin ella y con una coma o sin ella («En breve recibirás tu cotización», «A la brevedad, te respondo»). Los verbos: recibir dirigido al lector («recibirás», «recibes», «recibirá», «recibe», «reciba», «reciban»: «Recibirás tu cotización en 24 horas», «Recibe tu cotización el mismo día»); en primera persona del plural, «respondemos», «contestamos», «contestaremos», «cotizamos», «enviamos», «mandamos» y «mandaremos», con «te» o sin él, «contactamos», «llamamos» y «atendemos» solo con «te», y «daremos respuesta» y «damos respuesta» sin «te» («Te cotizamos en 24 hrs», «Respondemos el mismo día», «Daremos respuesta a tu solicitud en 24 horas»); con el plazo antes del verbo también «responderemos», «cotizaremos», «enviaremos», «escribimos», «escribiremos», «contactamos», «contactaremos», «llamamos», «llamaremos», «atendemos» y «atenderemos» («En 24 horas cotizaremos tu lista»); en primera persona del singular, la voz del contacto de ventas: presente y futuro de responder, contestar, escribir, cotizar y atender, futuro de enviar, mandar, contactar y llamar, «doy respuesta» y «daré respuesta», con «te», «le» o «les» o sin ellos, y «envío», «mando», «contacto» y «llamo» solo con «te», «le» o «les» delante, porque también son sustantivos o tienen otro sentido («Te respondo a la brevedad», «Te cotizo hoy mismo», «Te atiendo de inmediato», «Te contacto a la brevedad», «Te llamo en breve», «Te doy respuesta hoy mismo», «Ahorita te respondo»; «Mi contacto directo es WhatsApp» y «Llamo a esto calibre» no fallan). Las tres perífrasis de futuro en primera persona, «estar» en futuro con gerundio («Te estaremos contactando», «Estaré respondiendo»), «ir a» con infinitivo («Te vamos a contestar», «Voy a responder») e «ir a estar» con gerundio («Te vamos a estar contactando», «Te voy a estar escribiendo»), con el pronombre delante o pegado al final («Vamos a contestarte»), se leen como la forma simple del mismo verbo y la misma persona, en presente o en futuro: fallan sin plazo donde ella falla sin plazo («Te estaremos enviando tu cotización», «Te vamos a responder», «Vamos a contactarte», «Te vamos a estar contactando») y con un plazo donde ella lo necesita («Te voy a responder a la brevedad», «Vamos a responder a la brevedad», «En breve te estaremos contactando», «Te voy a estar escribiendo en breve»); «Me pondré en contacto» como «Nos pondremos en contacto». Los plazos: con una cifra, «en» o «dentro de» con una cifra, «un» o «una» y minutos, «min», horas, «hrs», «h» o días, también hábiles, con «menos de», «máximo» o «un máximo de» o sin ellos («en 24 horas», «dentro de 48 horas», «en menos de 2 horas», «en un día hábil»), pero no una duración de uso («en 8 horas de turno», «de uso», «de jornada»); un plazo sin cifra: ${SOON_EXPRESSIONS.map(expression => `«${expression}»`).join(', ')}. Sin verbo, la respuesta o la cotización nombradas con su plazo: «respuesta» seguida de «inmediata» o de un plazo con cifra o sin ella («Respuesta inmediata», «Respuesta en 24 horas», «Respuesta el mismo día», «Respuesta en minutos»), «tiempo de respuesta» con dos puntos, «de» o nada y un plazo o «inmediato» («Tiempo de respuesta: 24 horas», «Tiempo de respuesta de 24 horas»), y «cotización» o «cotizaciones» seguidas de «en» o «dentro de» con una cifra y horas o días, o de «el mismo día» («Cotización en 24 horas», «Tu cotización en 1 día hábil», «Cotización el mismo día»), salvo después de «no», «sin», «nunca», «ni», «nadie», «nada» o «tampoco» en la misma frase, a 150 caracteres como máximo («Sin respuesta inmediata», «No prometo una respuesta inmediata»). La respuesta de un producto no es una respuesta nombrada: después de «de» o «con», «respuesta» y «tiempo de respuesta» son parte del nombre de otra cosa y solo cuentan con un plazo en horas o días o «el mismo día», como la cotización («Compromiso de respuesta en 24 horas» y «Cotiza con respuesta en 24 horas» fallan; «Botiquín de respuesta inmediata», «Detector de gas con respuesta inmediata», «Sensor con tiempo de respuesta inmediato» y «Detector con respuesta en 2 minutos» no); «inmediata» o «inmediato» seguidos de «del», «de la», «de los», «de las», «al», «ante» o «a» (salvo «a tu», «a tus», «a su» o «a sus») son los del producto («Respuesta inmediata del sensor en menos de 30 segundos», «Lámpara con respuesta inmediata al encender» no fallan; «Respuesta inmediata a tu solicitud» sí); y «en menos de» solo es un plazo de la respuesta nombrada con una cifra y minutos, horas o días («Respuesta en menos de 1 hora» falla; «Detector con respuesta en menos de 10 segundos» no). No fallan, por ejemplo: «Te respondo dudas sobre tallas por WhatsApp», «Escríbeme por WhatsApp y te respondo», «Envíame tu lista y te cotizo», «Envíame tu lista cuanto antes y te cotizo», «Cotizo de lunes a viernes de 9:00 a 18:00», «Te atiendo en horario de atención», «Mando la ficha técnica si el fabricante la publica», «Recibe asesoría para elegir la talla», «Solicita tu cotización hoy mismo», «Arma tu cotización en minutos», «Respuesta en horario de atención», «El mismo día puedes enviar tu lista por WhatsApp», «Voy a responder aquí las preguntas frecuentes», «Te voy a pedir la talla»; y el plazo antes de un sustantivo: «un pronto envío» y «de inmediato mando a cero» no fallan. Límites, cada uno comprobado con el escáner (no fallan): «mañana» también es «por la mañana» («Te respondo mañana»), y «al momento», «en un momento», «a primera hora», «sin demora» y «rápido» no son plazos para la regla («Te respondo al momento», «Te respondo rápido»); «rápida» después de «respuesta» y «Atención inmediata» no cuentan («Respuesta rápida por WhatsApp», «Atención inmediata por WhatsApp»), ni «Pronta respuesta» sin verbo; «marcar» también es marcar una prenda («Te marcamos a la brevedad»); «lo» y «la» como objeto formal no cuentan («Lo estaremos contactando»), ni el pronombre pegado a un imperativo («Recíbela en 24 horas»); otras perífrasis no se reconocen («Te estamos contactando en breve», «Te iremos respondiendo»); la respuesta del vendedor escrita como la de un producto no cuenta («Garantía de respuesta inmediata», «Cotiza con respuesta inmediata», «Respuesta inmediata del equipo de ventas»); «les» solo cuenta con «daremos respuesta» y con la primera persona del singular («Les vamos a responder», como «Les responderemos», no falla); en primera persona del plural sin «te», el futuro de responder, enviar y cotizar y el presente y el futuro de escribir, contactar, llamar y atender solo cuentan con el plazo antes del verbo («Responderemos a la brevedad», «Escribimos en 24 horas» y «Cotizaremos en 24 horas» no fallan; «A la brevedad responderemos» sí); una negación en cualquier lugar de la frase anterior, a 150 caracteres como máximo, quita la promesa a la respuesta nombrada («Si no encuentras tu talla, escríbeme: respuesta en 24 horas» no falla); una más lejana no cuenta. «Solicita tu cotización en 24 horas» falla: la cotización con un plazo en horas no se distingue de «Tu cotización en 24 horas»; se escribe sin el plazo. El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»).`),
+    `Abrir WhatsApp o el correo no es un envío: ninguna página ni script muestra confirmaciones («Solicitud enviada», «Hemos enviado tu solicitud», «Ya tenemos tu solicitud», también con mensaje, pedido o lista), folios ni promesas de respuesta. Promesas que fallan sin plazo: «te» o «le» con responder, contestar, contactar, escribir, llamar o mandar en primera persona del plural, en presente o en futuro, o con «enviaremos» («Te respondemos», «Te contestaremos», «Te mandaremos»), o con «responderá», «contactará», «escribirá» o «llamará» («Le escribirá»); «te», «le» o «les» con «daremos respuesta» o «damos respuesta» («te damos respuesta», «Les daremos respuesta»); «daremos», «damos», «daré» o «doy» con «pronta», «rápida» o «inmediata» antes de «respuesta», que es su propio plazo, con «te», «le» o «les» o sin ellos («Te daremos pronta respuesta», «Daremos pronta respuesta a tu solicitud», «Te daré pronta respuesta»); «Nos pondremos en contacto», «Me pondré en contacto», «Nos comunicaremos» y «Me comunicaré»; «Estaremos en contacto», «Estaré en contacto», «Me pongo en contacto» y «Nos ponemos en contacto» con «contigo», «con usted» o «con ustedes» («Estaremos en contacto contigo», «Me pongo en contacto contigo»; «Nos ponemos en contacto con el fabricante» y «Estamos en contacto con los fabricantes» no fallan); «Un asesor se comunicará contigo», «se pondrá en contacto». Promesas que fallan con un plazo: un verbo seguido, a seis palabras como máximo, sin fin de frase y sin «que», «y», «para» ni una coma en medio, de un plazo, o el plazo antes del verbo, con cifra o sin ella y con una coma o sin ella («En breve recibirás tu cotización», «A la brevedad, te respondo»). Los verbos: recibir dirigido al lector («recibirás», «recibes», «recibirá», «recibe», «reciba», «reciban»: «Recibirás tu cotización en 24 horas», «Recibe tu cotización el mismo día»); en primera persona del plural, «respondemos», «contestamos», «contestaremos», «cotizamos», «enviamos», «mandamos» y «mandaremos», con «te» o sin él, «contactamos», «llamamos» y «atendemos» solo con «te», y «daremos respuesta» y «damos respuesta» sin «te» («Te cotizamos en 24 hrs», «Respondemos el mismo día», «Daremos respuesta a tu solicitud en 24 horas»); con el plazo antes del verbo también «responderemos», «cotizaremos», «enviaremos», «escribimos», «escribiremos», «contactamos», «contactaremos», «llamamos», «llamaremos», «atendemos» y «atenderemos» («En 24 horas cotizaremos tu lista»); en primera persona del singular, la voz del contacto de ventas: presente y futuro de responder, contestar, escribir, cotizar y atender, futuro de enviar, mandar, contactar y llamar, «doy respuesta» y «daré respuesta», con «te», «le» o «les» o sin ellos, y «envío», «mando», «contacto» y «llamo» solo con «te», «le» o «les» delante, porque también son sustantivos o tienen otro sentido («Te respondo a la brevedad», «Te cotizo hoy mismo», «Te atiendo de inmediato», «Te contacto a la brevedad», «Te llamo en breve», «Te doy respuesta hoy mismo», «Ahorita te respondo»; «Mi contacto directo es WhatsApp» y «Llamo a esto calibre» no fallan). Las tres perífrasis de futuro en primera persona, «estar» en futuro con gerundio («Te estaremos contactando», «Estaré respondiendo»), «ir a» con infinitivo («Te vamos a contestar», «Voy a responder») e «ir a estar» con gerundio («Te vamos a estar contactando», «Te voy a estar escribiendo»), con el pronombre delante o pegado al final («Vamos a contestarte»), se leen como la forma simple del mismo verbo y la misma persona, en presente o en futuro: fallan sin plazo donde ella falla sin plazo («Te estaremos enviando tu cotización», «Te vamos a responder», «Vamos a contactarte», «Te vamos a estar contactando») y con un plazo donde ella lo necesita («Te voy a responder a la brevedad», «Vamos a responder a la brevedad», «En breve te estaremos contactando», «Te voy a estar escribiendo en breve»); «Me pondré en contacto» como «Nos pondremos en contacto». Los plazos: con una cifra, «en» o «dentro de» con una cifra, «un» o «una» y minutos, «min», horas, «hrs», «h» o días, también hábiles, con «menos de», «máximo» o «un máximo de» o sin ellos («en 24 horas», «dentro de 48 horas», «en menos de 2 horas», «en un día hábil»), pero no una duración de uso («en 8 horas de turno», «de uso», «de jornada»); un plazo sin cifra: ${SOON_EXPRESSIONS.map(expression => `«${expression}»`).join(', ')}. Sin verbo, la respuesta o la cotización nombradas con su plazo: «respuesta» seguida de «inmediata» o de un plazo con cifra o sin ella («Respuesta inmediata», «Respuesta en 24 horas», «Respuesta el mismo día», «Respuesta en minutos»), «tiempo de respuesta» con dos puntos, «de» o nada y un plazo o «inmediato» («Tiempo de respuesta: 24 horas», «Tiempo de respuesta de 24 horas»), y «cotización» o «cotizaciones» seguidas de «en» o «dentro de» con una cifra y horas o días, o de «el mismo día» («Cotización en 24 horas», «Tu cotización en 1 día hábil», «Cotización el mismo día»), salvo después de «no», «sin», «nunca», «ni», «nadie», «nada» o «tampoco» en la misma frase, a 150 caracteres como máximo («Sin respuesta inmediata», «No prometo una respuesta inmediata»). La respuesta de un producto no es una respuesta nombrada: después de «de» o «con», «respuesta» y «tiempo de respuesta» son parte del nombre de otra cosa y solo cuentan con un plazo en horas o días o «el mismo día», como la cotización («Compromiso de respuesta en 24 horas» y «Cotiza con respuesta en 24 horas» fallan; «Botiquín de respuesta inmediata», «Detector de gas con respuesta inmediata», «Sensor con tiempo de respuesta inmediato» y «Detector con respuesta en 2 minutos» no); «inmediata» o «inmediato» seguidos de «del», «de la», «de los», «de las», «al», «ante» o «a» (salvo «a tu», «a tus», «a su» o «a sus») son los del producto («Respuesta inmediata del sensor en menos de 30 segundos», «Lámpara con respuesta inmediata al encender» no fallan; «Respuesta inmediata a tu solicitud» sí); y «en menos de» solo es un plazo de la respuesta nombrada con una cifra y minutos, horas o días («Respuesta en menos de 1 hora» falla; «Detector con respuesta en menos de 10 segundos» no). No fallan, por ejemplo: «Te respondo dudas sobre tallas por WhatsApp», «Escríbeme por WhatsApp y te respondo», «Envíame tu lista y te cotizo», «Envíame tu lista cuanto antes y te cotizo», «Cotizo de lunes a viernes de 9:00 a 18:00», «Te atiendo en horario de atención», «Mando la ficha técnica si el fabricante la publica», «Recibe asesoría para elegir la talla», «Solicita tu cotización hoy mismo», «Arma tu cotización en minutos», «Respuesta en horario de atención», «El mismo día puedes enviar tu lista por WhatsApp», «Voy a responder aquí las preguntas frecuentes», «Te voy a pedir la talla»; y el plazo antes de un sustantivo: «un pronto envío» y «de inmediato mando a cero» no fallan. Límites, cada uno comprobado con el escáner (no fallan): «mañana» también es «por la mañana» («Te respondo mañana»), y «al momento», «en un momento», «a primera hora», «sin demora» y «rápido» no son plazos para la regla («Te respondo al momento», «Te respondo rápido»); «rápida» después de «respuesta» y «Atención inmediata» no cuentan («Respuesta rápida por WhatsApp», «Atención inmediata por WhatsApp»), ni «Pronta respuesta» sin verbo; «marcar» también es marcar una prenda («Te marcamos a la brevedad»); «lo» y «la» como objeto formal no cuentan («Lo estaremos contactando»), ni el pronombre pegado a un imperativo («Recíbela en 24 horas»); otras perífrasis no se reconocen («Te estamos contactando en breve», «Te iremos respondiendo»); la respuesta del vendedor escrita como la de un producto no cuenta («Garantía de respuesta inmediata», «Cotiza con respuesta inmediata», «Respuesta inmediata del equipo de ventas»); «les» solo cuenta con «daremos respuesta» y con la primera persona del singular («Les vamos a responder», como «Les responderemos», no falla); en primera persona del plural sin «te», el futuro de responder, enviar y cotizar y el presente y el futuro de escribir, contactar, llamar y atender solo cuentan con el plazo antes del verbo («Responderemos a la brevedad», «Escribimos en 24 horas» y «Cotizaremos en 24 horas» no fallan; «A la brevedad responderemos» sí); una negación en cualquier lugar de la frase anterior, a 150 caracteres como máximo, quita la promesa a la respuesta nombrada («Si no encuentras tu talla, escríbeme: respuesta en 24 horas» no falla); una más lejana no cuenta. «Solicita tu cotización en 24 horas» falla: la cotización con un plazo en horas no se distingue de «Tu cotización en 24 horas»; se escribe sin el plazo. El sustantivo y el participio pueden llevar entre ellos una preposición y una o dos palabras («Mensaje de WhatsApp enviado», «¡Tu solicitud a Sercom Active enviada!», «Solicitud por correo electrónico enviada»), nunca un verbo, o un auxiliar («Su solicitud ha quedado registrada»); con un artículo, la frase que termina ahí también falla, sola o con su destino («La solicitud enviada.», «La solicitud enviada a Sercom.»), y solo el participio que sigue como adjetivo («Revisa la lista enviada por WhatsApp», «al correo registrado») no cuenta. Una negación o una condición antes del sustantivo («Ningún mensaje queda registrado», «Sin correo registrado», «Cuando tu solicitud queda enviada…») tampoco. Busca en el texto, en los atributos (también en el marcado que guardan) y en las cadenas que escribe un script, también cuando escribe marcado («Solicitud <b>enviada</b>»). ${PUBLISHED_ADDRESS_DOC}`),
   rule('R-RULE-10', 'FAIL', 'joined', FALSE_CONFIRMATION,
     'confirmación falsa partida por etiquetas en línea',
     'El mismo patrón en el texto visible con las etiquetas en línea retiradas: «Solicitud envi<span>ada</span>».'),
@@ -1090,8 +1096,69 @@ function withoutStandards(text, standards) {
   const needles = [...new Set(standards.map(standard => oneLine(fold(standard))).filter(Boolean))].sort((a, b) => b.length - a.length);
   return needles.reduce((rest, needle) => rest.replace(whole(needle), ' '), text);
 }
-/** Dónde aparece entero cada código en un texto: [inicio, fin) de cada aparición. */
-const codeSpans = (text, codes) => codes.flatMap(code => [...text.matchAll(whole(code))].map(match => [match.index ?? 0, (match.index ?? 0) + match[0].length]));
+// R-FOTO-02: un nombre de archivo entero es un tramo de letras inglesas, cifras, «_», «.» y «-» que no sigue ni va
+// seguido de otro de esos signos: «suelta.A1.png» está en «/_astro/suelta.A1.png?v=1», no en «otra-suelta.A1.png» ni en
+// «suelta.A1.png.bak».
+const FILE_NAME_RUN = /[\w.-]+/g;
+// Solo se guardan los que terminan como un archivo de imagen: los únicos que se buscan.
+const IMAGE_NAME = /\.(?:jpe?g|png|webp|avif|gif|svg)$/i;
+// Lo mismo que `whole`, mirado en una posición dada sin compilar una expresión por código: el carácter de antes y el de
+// después (por punto de código, como la bandera «u») no son una letra o una cifra, ni un signo de `JOINER` pegado a una.
+const LETTER_OR_DIGIT = /^[\p{L}\p{N}]$/u;
+const JOINER_CHARACTER = new RegExp(`^${JOINER}$`);
+function characterBefore(text, index) {
+  if (index <= 0) return '';
+  const low = text.charCodeAt(index - 1);
+  const high = index >= 2 ? text.charCodeAt(index - 2) : 0;
+  return low >= 0xdc00 && low <= 0xdfff && high >= 0xd800 && high <= 0xdbff ? text.slice(index - 2, index) : text[index - 1];
+}
+const characterAfter = (text, index) => (index >= text.length ? '' : String.fromCodePoint(text.codePointAt(index)));
+function isWholeAt(text, from, length) {
+  const before = characterBefore(text, from);
+  if (LETTER_OR_DIGIT.test(before) || (JOINER_CHARACTER.test(before) && LETTER_OR_DIGIT.test(characterBefore(text, from - 1)))) return false;
+  const after = characterAfter(text, from + length);
+  return !(LETTER_OR_DIGIT.test(after) || (JOINER_CHARACTER.test(after) && LETTER_OR_DIGIT.test(characterAfter(text, from + length + 1))));
+}
+/**
+ * Si un número con forma de teléfono de un texto es, entero, parte de una aparición entera (como `whole`) de un código
+ * público. Solo pueden serlo los códigos que contienen el número tal como está escrito (`containing`, que guarda para
+ * cada número escrito los códigos que lo contienen y se calcula una vez por escaneo), y de cada uno solo se miran las
+ * posiciones donde, empezando ahí, cubriría el número: una página sin números con forma de teléfono no busca ningún
+ * código, y una con uno no recorre la página por cada código.
+ */
+function insidePublicCode(text, match, containing) {
+  const start = match.index ?? 0;
+  const end = start + match[0].length;
+  return containing(match[0]).some(code => {
+    for (let from = Math.max(0, end - code.length); from <= start; from += 1) {
+      if (text.startsWith(code, from) && isWholeAt(text, from, code.length)) return true;
+    }
+    return false;
+  });
+}
+
+/**
+ * Las direcciones externas que publican los datos: los enlaces del fabricante de cada marca (`manufacturerLinks[].url`
+ * de brands.json: su catálogo en PDF, su catálogo en línea y su sitio) y, de cada ficha aprobada, cada `documents[].url`, `image.url` e `image.sourceUrl`. Son direcciones
+ * del fabricante, no frases del sitio: un atributo cuyo valor es exactamente una de ellas no se lee en los ámbitos
+ * `words` y `prose` (ver `isPublishedAddress`). Cada una se guarda como la escriben los datos y con su %XX decodificado.
+ * @returns {Set<string>}
+ */
+function publishedAddresses(catalog, brands) {
+  const addresses = (Array.isArray(brands) ? brands : []).flatMap(brand => (Array.isArray(brand?.manufacturerLinks) ? brand.manufacturerLinks : []).map(link => link?.url));
+  for (const product of Array.isArray(catalog?.products) ? catalog.products : []) {
+    if (product?.status !== 'approved') continue;
+    for (const document of Array.isArray(product.documents) ? product.documents : []) addresses.push(document?.url);
+    addresses.push(product.image?.url, product.image?.sourceUrl);
+  }
+  return new Set(addresses.filter(isFilled).flatMap(address => [address, decodePercent(address)]));
+}
+/**
+ * ¿El valor de un atributo (con sus entidades ya decodificadas) es entero una dirección publicada? Se compara el valor
+ * entero, nunca un principio ni una parte, tal como está y con su %XX decodificado: el escáner lee una dirección con su
+ * %XX decodificado, así que dos escrituras que se decodifican igual son la misma dirección y dirían lo mismo.
+ */
+const isPublishedAddress = (value, published) => published.size > 0 && (published.has(value) || published.has(decodePercent(value)));
 
 /** Las reglas de patrón de una página de producción mientras la atención presencial no está confirmada. */
 const PRODUCTION_PATTERN_RULES = [...RULES, ...IN_PERSON_RULES, ...PRODUCTION_RULES];
@@ -1126,6 +1193,36 @@ function foldedWithOrigin(value) {
   return { folded, start, end };
 }
 
+// Lo que forma una palabra al citar un hallazgo: letras, cifras y marcas (el acento de una letra descompuesta). Un signo
+// que une partes de una designación (`JOINER`) también, cuando va entre dos de ellas: «NOM-113-STPS-2009», «EJ-200».
+const WORD_PIECE = /^[\p{L}\p{N}\p{M}]$/u;
+const JOINER_PIECE = /^[-.:/_+]$/;
+/**
+ * Extiende [from, to) de un texto hasta los límites de las palabras que corta: un hallazgo como «NOM-1» se cita
+ * «NOM-113-STPS-2009». Un borde que no corta una palabra (el hallazgo termina en un espacio o en un signo) no se mueve.
+ */
+function wholeWordsAround(text, from, to, joiner = JOINER_PIECE) {
+  const before = index => (index > 0 ? String.fromCodePoint(text.codePointAt(index - (index > 1 && /[\udc00-\udfff]/.test(text[index - 1]) ? 2 : 1))) : '');
+  const at = index => (index < text.length ? String.fromCodePoint(text.codePointAt(index)) : '');
+  const isWord = piece => WORD_PIECE.test(piece);
+  // Cada paso toma una pieza de palabra, o un signo de unión con la pieza que lo sigue, mientras el borde sea palabra.
+  let start = from;
+  while (isWord(at(start))) {
+    const piece = before(start);
+    if (isWord(piece)) start -= piece.length;
+    else if (joiner.test(piece) && isWord(before(start - 1))) start -= 1 + before(start - 1).length;
+    else break;
+  }
+  let stop = to;
+  while (isWord(before(stop))) {
+    const piece = at(stop);
+    if (isWord(piece)) stop += piece.length;
+    else if (joiner.test(piece) && isWord(at(stop + 1))) stop += 1 + at(stop + 1).length;
+    else break;
+  }
+  return text.slice(start, stop);
+}
+
 /**
  * Aplica a un texto suelto, como el campo de una ficha, las reglas de patrón con que se revisa una página de
  * producción (las comunes, las que valen mientras la atención presencial no está confirmada y las de producción), cada
@@ -1134,7 +1231,8 @@ function foldedWithOrigin(value) {
  * reglas que no se aplican (las normas de `standards` no pasan por R-RULE-04). Cada regla y texto encontrado, una vez.
  * @param {unknown} value
  * @param {{ skip?: string[] }} [options]
- * @returns {{ id: string, level: 'FAIL' | 'WARN', title: string, found: string }[]} `found`: lo encontrado, como está escrito
+ * @returns {{ id: string, level: 'FAIL' | 'WARN', title: string, found: string }[]} `found`: lo encontrado, como está
+ *   escrito y entero: extendido hasta los límites de las palabras que corta («NOM-1» se cita «NOM-113-STPS-2009»)
  */
 export function textFindings(value, { skip = [] } = {}) {
   if (typeof value !== 'string') return [];
@@ -1153,7 +1251,9 @@ export function textFindings(value, { skip = [] } = {}) {
       if (seen.has(key)) continue;
       seen.add(key);
       const index = match.index ?? 0;
-      const found = haystack === folded ? value.slice(start[index], end[index + match[0].length - 1]) : match[0];
+      const found = haystack === folded
+        ? wholeWordsAround(value, start[index], end[index + match[0].length - 1])
+        : wholeWordsAround(haystack, index, index + match[0].length);
       findings.push({ id, level: typeof level === 'function' ? level({ preview: false }) : level, title, found: oneLine(found) });
     }
   }
@@ -1289,6 +1389,57 @@ function contactProblemsDecoded(source, contact, options = {}) {
     text = decoded;
   }
   return problems;
+}
+
+// Los destinos de contacto que busca R-RULE-24: WhatsApp en cualquiera de sus formas, un correo y un teléfono.
+const CONTACT_SHAPES = [WHATSAPP_LINK, WHATSAPP_OTHER, MAILTO, PHONE_LINK, EMAIL_SHAPE];
+// En una dirección, una palabra se une a la siguiente por un guion o un guion bajo («ficha-EJ-1001»), no por «/» ni «.».
+const ADDRESS_JOINER = /^[-_]$/;
+/**
+ * Lo que el escáner sigue encontrando en una dirección que publican los datos (`publishedAddresses`) cuando una página
+ * de producción la escribe en un atributo, como la escribe la compilación («&» como «&amp;»). Las reglas de `words` y
+ * `prose` no la leen; sí las que leen el archivo tal cual (`raw`) o decodificado (`norm`), los códigos de los ejemplos
+ * escritos de otra forma (R-RULE-03) y la revisión de los destinos de contacto (R-RULE-24), que aquí no acepta ninguno,
+ * ni el del negocio: una ficha no lleva datos de contacto. La usa el validador (scripts/catalog-text.mjs) para decirlo
+ * antes de compilar, con la ficha y el campo. `skip`: identificadores de reglas que no se revisan. Cada regla y texto
+ * encontrado, una vez, citado entero.
+ * @param {unknown} address
+ * @param {{ examples?: unknown, skip?: string[] }} [options] `examples`: el archivo de ejemplos
+ * @returns {{ id: string, title: string, found: string }[]}
+ */
+export function addressFindings(address, { examples = [], skip = [] } = {}) {
+  if (typeof address !== 'string') return [];
+  const raw = address.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const norm = normalizeContent(raw);
+  const findings = [];
+  const seen = new Set();
+  const found = (id, title, text) => {
+    const key = `${id}\u0000${text.toLowerCase()}`;
+    if (skip.includes(id) || seen.has(key)) return;
+    seen.add(key);
+    findings.push({ id, title, found: text });
+  };
+  for (const { id, scope, pattern, title } of PRODUCTION_PATTERN_RULES) {
+    if (scope !== 'raw' && scope !== 'norm') continue;
+    const haystack = scope === 'raw' ? raw : norm;
+    for (const match of haystack.matchAll(globalPattern(pattern))) {
+      if (match[0]) found(id, title, wholeWordsAround(haystack, match.index ?? 0, (match.index ?? 0) + match[0].length, ADDRESS_JOINER));
+    }
+  }
+  const folded = fold(decodeEntities(raw));
+  for (const [code, pattern] of exampleCodePatterns(examples)) {
+    // Como en el escaneo: «ej.» en minúsculas seguido de un espacio es la abreviatura de «ejemplo».
+    const match = [...folded.matchAll(globalPattern(pattern))].find(candidate => !/^ej\.\s/.test(candidate[0]));
+    if (match && !raw.includes(code)) found('R-RULE-03', 'marca de producto de ejemplo en producción', wholeWordsAround(folded, match.index ?? 0, (match.index ?? 0) + match[0].length, ADDRESS_JOINER));
+  }
+  let text = address.replace(/\p{Cf}/gu, '');
+  for (let pass = 0; pass <= PERCENT_PASSES; pass += 1) {
+    for (const shape of CONTACT_SHAPES) for (const match of text.matchAll(shape)) found('R-RULE-24', 'destino de contacto en una dirección', match[0]);
+    const decoded = decodePercent(text);
+    if (decoded === text) break;
+    text = decoded;
+  }
+  return findings;
 }
 
 // Un <script> con código: sin type, o de tipo módulo o JavaScript. Los de datos (JSON-LD, application/json) se leen como texto.
@@ -1444,6 +1595,10 @@ async function walk(directory) {
 const CODE_SEPARATOR = '[\\s._/\\-\u2010-\u2015\u2212]*';
 const context = (text, index, length) => oneLine(text.slice(Math.max(0, index - 40), index + length + 40));
 const globalPattern = pattern => new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+/** Los códigos de los ejemplos con cualquier separador (o ninguno) entre sus partes: [código, patrón]. */
+const exampleCodePatterns = examples => [...new Set((Array.isArray(examples) ? examples : []).flatMap(example => [example?.code, ...(example?.variants ?? []).map(variant => variant?.code)]))]
+  .filter(code => typeof code === 'string' && /[a-z]/i.test(code) && /\d/.test(code))
+  .map(code => [code, new RegExp(`(?<![a-z0-9])${code.match(/[a-z]+|\d+/gi).map(escapeRegExp).join(CODE_SEPARATOR)}(?![0-9])`, 'i')]);
 
 /**
  * Revisa una carpeta compilada.
@@ -1466,10 +1621,7 @@ export async function scanDist(directory, options = {}) {
   const leaks = registryLeaks(data.registry, data.brands);
   const exampleTokens = [...new Set(examples.flatMap(example => [example.id, example.code, example.name, example.summary, ...(example.characteristics ?? []), ...(example.variants ?? []).map(variant => variant.code)]))]
     .filter(token => typeof token === 'string' && token.length >= 6);
-  // Códigos de los ejemplos con cualquier separador (o ninguno) entre sus partes.
-  const exampleCodes = [...new Set(examples.flatMap(example => [example.code, ...(example.variants ?? []).map(variant => variant.code)]))]
-    .filter(code => typeof code === 'string' && /[a-z]/i.test(code) && /\d/.test(code))
-    .map(code => [code, new RegExp(`(?<![a-z0-9])${code.match(/[a-z]+|\d+/gi).map(escapeRegExp).join(CODE_SEPARATOR)}(?![0-9])`, 'i')]);
+  const exampleCodes = exampleCodePatterns(examples);
   const digits = String(business.whatsappDigits ?? '');
   const email = String(business.email ?? '').toLowerCase();
   const localNumber = digits.slice(-10);
@@ -1485,8 +1637,24 @@ export async function scanDist(directory, options = {}) {
   const catalogProducts = Array.isArray(data.catalog?.products) ? data.catalog.products : [];
   const ownStandards = new Map(catalogProducts.filter(product => product?.status === 'approved').map(product => [product.id, standardTexts(product)]));
   const publicCodes = publicProductCodes(catalogProducts);
-  // R-FOTO-02: el texto de las páginas y de las hojas de estilo, donde se nombra cada imagen que se usa.
+  // Un número con forma de teléfono termina en cuatro cifras que no sigue una letra, una cifra ni «_»: si está dentro de
+  // un código, el código tiene esas cuatro cifras así. Los códigos se agrupan por esas terminaciones, y para cada número
+  // escrito solo se miran los de su grupo.
+  const codesByEnding = new Map();
+  for (const code of publicCodes) {
+    for (const [ending] of code.matchAll(/\d{4}(?!\w)/g)) codesByEnding.set(ending, new Set([...(codesByEnding.get(ending) ?? []), code]));
+  }
+  const codesWith = new Map();
+  const containing = written => {
+    if (!codesWith.has(written)) codesWith.set(written, [...(codesByEnding.get(written.slice(-4)) ?? [])].filter(code => code.includes(written)));
+    return codesWith.get(written);
+  };
+  // Las direcciones externas que publican los datos: un atributo que es entero una de ellas no se lee como frase.
+  const published = publishedAddresses(data.catalog, data.brands);
+  // R-FOTO-02: el texto de las páginas y de las hojas de estilo, donde se nombra cada imagen que se usa, y cada nombre
+  // de archivo entero que nombran (`FILE_NAME_RUN`), juntados en una pasada para buscar cada imagen una sola vez.
   const referencing = [];
+  const namedFiles = new Set();
 
   for (const file of files) {
     const path = name(file);
@@ -1502,7 +1670,10 @@ export async function scanDist(directory, options = {}) {
     const isText = TEXT_EXTENSIONS.has(extname(file).toLowerCase());
     const isHtml = /\.html?$/i.test(file);
     const raw = (await readFile(file)).toString('utf8');
-    if (/\.(?:html?|css)$/i.test(file)) referencing.push(raw);
+    if (/\.(?:html?|css)$/i.test(file)) {
+      referencing.push(raw);
+      for (const [run] of raw.matchAll(FILE_NAME_RUN)) if (IMAGE_NAME.test(run)) namedFiles.add(run);
+    }
 
     // R-RULE-03, producción: los textos del archivo de ejemplos no aparecen en ningún archivo, tampoco en binarios.
     if (!preview) {
@@ -1529,7 +1700,8 @@ export async function scanDist(directory, options = {}) {
     let visible;
     if (isHtml) {
       const markup = withoutScripts(raw);
-      const otherAttributes = attributesOf(markup).filter(([name]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name)).map(([, value]) => decodePercent(value));
+      // Sin los atributos cuyo valor es entero una dirección que publican los datos (`publishedAddresses`).
+      const otherAttributes = attributesOf(markup).filter(([name, value]) => !TEXT_ATTRIBUTES.test(name) && !NON_TEXT_ATTRIBUTES.test(name) && !isPublishedAddress(value, published)).map(([, value]) => decodePercent(value));
       const styles = [inlineStyles(raw), ...attributesOf(markup).filter(([name]) => /^style$/i.test(name)).map(([, value]) => `x{${value}}`)].join('\n');
       const scripts = scriptText(inlineScripts(raw));
       // Un atributo que guarda marcado («data-msg="Solicitud &lt;b&gt;enviada&lt;/b&gt;"») se lee también sin sus etiquetas.
@@ -1648,12 +1820,9 @@ export async function scanDist(directory, options = {}) {
     }
     // Un número con forma de teléfono que no es el confirmado, salvo cuando es, entero, una aparición de un código
     // público de las fichas: un código no es un teléfono.
-    const codes = codeSpans(shown, publicCodes);
     for (const match of phoneShapedNumbers(shown)) {
       const number = match[0].replace(/\D/g, '');
-      const start = match.index ?? 0;
-      const insideCode = codes.some(([from, to]) => from <= start && start + match[0].length <= to);
-      if (!knownNumbers.has(number) && !insideCode) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
+      if (!knownNumbers.has(number) && !insidePublicCode(shown, match, containing)) add('WARN', 'R-RULE-24', file, `número con forma de teléfono distinto del confirmado: ${match[0].trim()}`);
     }
 
     // R-RULE-28, R-A11Y-06 y R-A11Y-07.
@@ -1703,8 +1872,13 @@ export async function scanDist(directory, options = {}) {
   for (const file of files) {
     const path = name(file);
     if (!/^_astro\/[^/]+\.(?:jpe?g|png|webp|avif|gif|svg)$/i.test(path)) continue;
-    const used = new RegExp(`(?<![\\w.-])${escapeRegExp(path.slice('_astro/'.length))}(?![\\w.-])`);
-    if (!referencing.some(text => used.test(text))) add('FAIL', 'R-FOTO-02', file, 'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta');
+    const image = path.slice('_astro/'.length);
+    // Un nombre hecho solo de letras inglesas, cifras, «_», «.» y «-» se busca entre los nombres enteros que se juntaron;
+    // otro nombre («guante-ñandú.A1.png»), con la misma regla en el texto de cada página y hoja de estilo.
+    const used = /^[\w.-]+$/.test(image)
+      ? namedFiles.has(image)
+      : referencing.some(text => new RegExp(`(?<![\\w.-])${escapeRegExp(image)}(?![\\w.-])`).test(text));
+    if (!used) add('FAIL', 'R-FOTO-02', file, 'imagen que ninguna página ni hoja de estilo usa: la compilación copia todo lo que hay en src/assets/productos/. Quita de esa carpeta lo que no sea la foto de una ficha aprobada y compila con npm run build, que antes revisa la carpeta');
   }
 
   // R-RULE-14: las páginas generadas corresponden a registros que pueden mostrarse.

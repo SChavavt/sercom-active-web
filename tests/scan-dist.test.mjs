@@ -1962,3 +1962,194 @@ test('R-RULE-13 dice en --rules que el crédito de la foto pasa solo en la pági
   const doc = CHECKS.filter(([id]) => id === 'R-RULE-13').map(([, text]) => text).join('\n');
   assert.match(doc, /la página de donde viene la foto de una ficha aprobada \(image\.sourceUrl\), solo en la página de esa ficha/);
 });
+
+// Revisión del texto y escáner listos para miles de fichas: lo que deja pasar cada excepción, fijado caso por caso.
+
+test('R-RULE-24: un número que solo toca un código público, o que lo contiene, sigue dando el aviso; el código entero no', async () => {
+  const code = '7000123456';
+  const withCode = catalogWith({ id: 'guante-codigo-largo', status: 'approved', model: code });
+  const pages = body => ({
+    'productos/guante-codigo-largo/index.html': page(`<h1>Guante</h1><p>Código ${code}</p>`),
+    'catalogo/index.html': page(`<h1>Catálogo</h1>${body}`),
+  });
+  // El código solo, y escrito dos veces, no es un teléfono.
+  for (const body of [`<p>${code}</p>`, `<p>${code} ${code}</p>`, `<p>Códigos ${code} y ${code}</p>`]) {
+    assert.deepEqual((await scan(pages(body), { data: withCode })).findings, [], body);
+  }
+  // Junto al código, un número que lo toca o que lo contiene es otro número.
+  for (const body of [`<p>+52 ${code}</p>`, `<p>1 ${code}</p>`, `<p>1${code}</p>`, `<p>${code}7</p>`, `<p>${code}-1</p>`, `<p>A-${code}</p>`]) {
+    const result = await scan(pages(body), { data: withCode });
+    assert.deepEqual([failedIds(result), warnedIds(result), result.findings.map(finding => finding.file)], [[], ['R-RULE-24'], ['catalogo/index.html']], body);
+  }
+});
+
+test('R-RULE-04: las normas de la ficha en su propia página solo se descuentan para R-RULE-04; una palabra de otra regla en ellas sigue contando', async () => {
+  const norms = ['Certificado EN 166', 'EN 388:2016 100 % probado'];
+  const withNorms = catalogWith({ id: 'lente-certificado', status: 'approved', standards: standardsOf(...norms) });
+  const body = `<h1>Lente sintético</h1>${normsList(norms)}`;
+  const production = await scan({ 'productos/lente-certificado/index.html': page(body) }, { data: withNorms });
+  assert.deepEqual([failedIds(production), warnedIds(production)], [[], ['R-RULE-06']]);
+  assert.deepEqual(production.findings.map(finding => finding.message.split(' … ')[0]).sort(), ['certificación o distintivo: «100 %»', 'certificación o distintivo: «Certificado»']);
+  const preview = await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), ...examplePages, 'productos/lente-certificado/index.html': previewPage(body) }, { preview: true, data: withNorms });
+  assert.deepEqual(failures(preview).map(finding => [finding.id, finding.file]), [['R-RULE-06', 'productos/lente-certificado/index.html'], ['R-RULE-06', 'productos/lente-certificado/index.html']]);
+});
+
+// Las direcciones que publican los datos (el «Sitio del fabricante» de cada marca y, de cada ficha aprobada, sus
+// documentos, la foto por dirección y la página de donde viene la foto) no son frases del sitio: un atributo cuyo valor
+// es exactamente una de ellas no se lee en los ámbitos `words` y `prose`. Todo lo demás se lee como siempre.
+const WORDING_ADDRESSES = [
+  ['https://fabricante.example/distribuidores-autorizados/ficha-guante.pdf', 'R-RULE-07'],
+  ['https://fabricante.example/es/tienda-oficial/guante-100', 'R-RULE-07'],
+  ['https://fabricante.example/promociones/guante-100.pdf', 'R-RULE-01'],
+  ['https://fabricante.example/gratis/guante-100.pdf', 'R-RULE-02'],
+];
+/** Una ficha aprobada que publica `address` en el campo dado. */
+const publishing = (field, address) => {
+  const image = { url: 'https://fotos.fabricante.example/guante.jpg', width: 800, height: 800, alt: 'Guante', sourceUrl: 'https://fabricante.example/guante', usageConfirmed: true };
+  if (field === 'documents[].url') return { id: 'guante-enlaces', status: 'approved', documents: [{ label: 'Hoja de datos', url: address }], image };
+  if (field === 'image.url') return { id: 'guante-enlaces', status: 'approved', image: { ...image, url: address } };
+  return { id: 'guante-enlaces', status: 'approved', image: { ...image, sourceUrl: address } };
+};
+/** Cómo imprime la página cada campo: el documento y el origen de la foto como enlace, la foto como imagen. */
+const linking = (field, written) => (field === 'image.url'
+  ? `<img src="${written}" alt="Guante" width="800" height="800" referrerpolicy="no-referrer">`
+  : `<a href="${written}" target="_blank" rel="noopener noreferrer">${field === 'documents[].url' ? 'Hoja de datos' : 'Origen de la foto'}</a>`);
+const ADDRESS_FIELDS = ['documents[].url', 'image.url', 'image.sourceUrl'];
+
+test('una dirección que publican los datos no se lee como frase en el atributo que la lleva entera; sin publicarla, sí', async () => {
+  for (const field of ADDRESS_FIELDS) {
+    for (const [address, id] of WORDING_ADDRESSES) {
+      const files = { 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) };
+      assert.deepEqual((await scan(files, { data: catalogWith(publishing(field, address)) })).findings, [], `${field} ${address}`);
+      // En la vista previa también.
+      assert.deepEqual(failures(await scan({ 'index.html': previewPage('<h1>Inicio</h1>'), 'pagina/index.html': previewPage(`<h1>Guante</h1>${linking(field, address)}`) }, { preview: true, data: catalogWith(publishing(field, address)) })), [], `vista previa ${field} ${address}`);
+      // La misma dirección sin estar en los datos, o en los de un borrador, se lee como hoy.
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith() })), [id], `sin publicar: ${field} ${address}`);
+      assert.deepEqual(failedIds(await scan(files, { data: catalogWith({ ...publishing(field, address), status: 'draft' }) })), [id], `borrador: ${field} ${address}`);
+    }
+  }
+  // El «Sitio del fabricante» de una marca también es una dirección publicada.
+  const brandAddress = 'https://fabricante.example/es/tienda-oficial/';
+  const brands = [{ ...data.brands[0], manufacturerLinks: [{ label: 'Sitio del fabricante', url: brandAddress }] }, ...data.brands.slice(1)];
+  const brandPage = { 'pagina/index.html': page(`<h1>Marca</h1><a href="${brandAddress}" rel="noopener">Sitio del fabricante</a>`) };
+  assert.deepEqual((await scan(brandPage, { data: { ...catalogWith(), brands } })).findings, []);
+  assert.deepEqual(failedIds(await scan(brandPage, { data: catalogWith() })), ['R-RULE-07']);
+});
+
+test('una dirección publicada se compara entera, con las entidades decodificadas y con su %XX decodificado de los dos lados', async () => {
+  const address = 'https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&idioma=es';
+  const data = catalogWith(publishing('documents[].url', address));
+  // Escrita como la escribe la compilación (con &amp;) o con sus caracteres codificados: es la misma dirección.
+  for (const written of ['https://fabricante.example/tienda-oficial/guía.pdf?modelo=100&amp;idioma=es', 'https://fabricante.example/tienda-oficial/gu%C3%ADa.pdf?modelo=100&#38;idioma=es']) {
+    assert.deepEqual((await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })).findings, [], written);
+  }
+  // Lo que solo empieza como ella, la contiene o lleva algo más ya no es ella.
+  for (const written of [
+    'https://fabricante.example/tienda-oficial/', `${address}#ficha`, `${address}&amp;x=1`, ` ${address}`,
+    'https://fabricante.example/tienda-oficial/guía.pdf', `https://otro.example/?ir=${encodeURIComponent(address)}`,
+  ]) {
+    assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page(linking('documents[].url', written)) }, { data })), ['R-RULE-07'], written);
+  }
+});
+
+test('una dirección publicada se sigue leyendo como texto visible, en un script, en un JSON, junto a otro texto en un atributo y en el borrador de un enlace', async () => {
+  const [address] = WORDING_ADDRESSES[1];
+  const data = catalogWith(publishing('documents[].url', address));
+  for (const files of [
+    { 'pagina/index.html': page(`<h1>Guante</h1><p>${address}</p>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${address}">${address}</a>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><script>const ficha = "${address}";</script>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><div data-ficha="Ficha: ${address}">Ficha</div>`) },
+    { 'pagina/index.html': page(`<h1>Guante</h1><a href="${WHATSAPP}?text=${encodeURIComponent(`Hola, vi ${address}`)}">Cotizar</a>`) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), 'datos.json': JSON.stringify({ ficha: address }) },
+    { 'pagina/index.html': page('<h1>Guante</h1>'), '_astro/ficha.js': `const ficha="${address}";` },
+  ]) {
+    assert.deepEqual(failedIds(await scan(files, { data })), ['R-RULE-07'], JSON.stringify(files));
+  }
+  // Una dirección del propio sitio nunca es una dirección publicada por los datos.
+  assert.deepEqual(failedIds(await scan({ 'pagina/index.html': page('<h1>Guante</h1><a href="/catalogo/?q=tienda-oficial">Buscar</a>') }, { data })), ['R-RULE-07']);
+});
+
+test('una dirección publicada sigue revisándose con las reglas que leen el archivo tal cual o decodificado', async () => {
+  const [, shortName] = data.registry.scope.excluded_entities;
+  for (const [address, id] of [
+    [`https://fabricante.example/${shortName.toLowerCase()}/ficha.pdf`, 'R-RULE-08'],
+    ['https://fabricante.example/fichas/72090.pdf', 'R-RULE-11'],
+    ['https://fabricante.example/fichas/EJ-1001.pdf', 'R-RULE-03'],
+    ['https://fabricante.example/fichas/Solicitud%20enviada.pdf', 'R-RULE-10'],
+  ]) {
+    for (const field of ADDRESS_FIELDS) {
+      const result = await scan({ 'pagina/index.html': page(`<h1>Guante</h1>${linking(field, address)}`) }, { data: catalogWith(publishing(field, address)) });
+      assert.ok(failedIds(result).includes(id), `${field} ${address}: ${failedIds(result)}`);
+    }
+  }
+});
+
+test('--rules dice que una dirección publicada por los datos no se lee como frase, y que las reglas del archivo sí la leen', () => {
+  const words = RULES.filter(rule => rule.id === 'R-RULE-07').map(rule => rule.doc).join('\n');
+  assert.match(words, /direcci[oó]n que publican los datos/);
+  const prices = RULES.filter(rule => rule.id === 'R-RULE-01' && rule.scope === 'prose').map(rule => rule.doc).join('\n');
+  assert.match(prices, /direcci[oó]n que publican los datos/);
+});
+
+// Las familias de normas que imprimen los fabricantes, con designaciones sintéticas: cada una da el aviso escrita
+// como la imprimen. Una sigla suelta dentro de un modelo, o un nombre de filtro o de clase, no es una norma.
+const NORM_FAMILIES = [
+  ['NFPA', 'Cumple NFPA 9999'], ['ISEA', 'Según ISEA 999'], ['CSA', 'Cumple CSA Z99.9'], ['CAN/CSA', 'Cumple CAN/CSA Z99.9-99'],
+  ['NMX', 'Cumple NMX-S-999-SCFI-2099'], ['AS/NZS', 'Cumple AS/NZS 9999:2099'], ['IEC', 'Cumple IEC 69999'], ['UL', 'Cumple UL 9999'],
+  ['NRF', 'Cumple NRF-999-PEMEX-2099'], ['CFR (FDA)', 'Cumple FDA 99 CFR 999.9999'], ['CFR', 'Aprobado según 99 CFR parte 99'], ['CFR pegado', 'Aprobado según 99CFR99'],
+  ['LAPEM', 'Aprobado por LAPEM K9999-999/2099'], ['SNR', 'SNR 99 dB'], ['NOM con espacio', 'Cumple NOM 999'], ['NOM sin guion', 'Cumple NOM999'],
+  ['marcado CE', 'Con marcado CE'], ['CE con norma', 'CE EN999'], ['CE con categoría', 'CE categoría III'], ['CE con categoría abreviada', 'CE Cat. II'],
+];
+const HONEST_NOT_NORMS = [
+  'Lente CE-200', 'Serie UL-100', 'Modelo IEC-200', 'Casco CSA-200', 'Kit NRF-100', 'Tela de Nomex', 'Línea CE', 'Azul UL', 'Modelo AS-100',
+  'Respirador N95', 'Mascarilla KN95', 'Filtro FFP2', 'Guante clase 0', 'Casco tipo I', 'Talla CE', 'Con 99 piezas', 'Marca registrada',
+];
+
+test('R-RULE-04: cada familia de normas da el aviso escrita como la imprime el fabricante; una sigla dentro de un modelo no', async () => {
+  for (const [family, phrase] of NORM_FAMILIES) {
+    const result = await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) });
+    assert.deepEqual([failedIds(result), warnedIds(result)], [[], ['R-RULE-04']], `${family}: ${phrase}`);
+  }
+  for (const phrase of HONEST_NOT_NORMS) {
+    assert.deepEqual((await scan({ 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${phrase}</p>`) })).findings, [], phrase);
+  }
+});
+
+test('R-RULE-04: una norma de una familia nueva en las normas de la ficha no da aviso en su propia página, y en otra página sí', async () => {
+  const norms = ['NFPA 9999', 'CAN/CSA Z99.9-99', 'FDA 99 CFR 999.9999', 'NOM 999', 'CE categoría III'];
+  const withNorms = catalogWith({ id: 'guante-familias', status: 'approved', standards: standardsOf(...norms) });
+  const own = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`) }, { data: withNorms });
+  assert.deepEqual(own.findings, []);
+  for (const norm of norms) {
+    const other = await scan({ 'productos/guante-familias/index.html': page(`<h1>Guante</h1>${normsList(norms)}`), 'catalogo/index.html': page(`<h1>Catálogo</h1><p>${norm}</p>`) }, { data: withNorms });
+    assert.deepEqual(other.findings.map(finding => [finding.level, finding.id, finding.file]), [['WARN', 'R-RULE-04', 'catalogo/index.html']], norm);
+  }
+});
+
+test('--rules nombra las familias de normas que reconoce R-RULE-04 y dice que una familia que no nombra no da aviso', () => {
+  const doc = RULES.filter(rule => rule.id === 'R-RULE-04').map(rule => rule.doc).join('\n');
+  for (const family of ['ANSI', 'ISEA', 'NFPA', 'CSA', 'NMX', 'AS/NZS', 'IEC', 'UL', 'NRF', 'CFR', 'LAPEM', 'SNR', 'NOM', 'CE']) assert.match(doc, new RegExp(`«[^»]*${family.replace('/', '\\/')}`), family);
+  assert.match(doc, /no da aviso/);
+});
+
+test('R-FOTO-02: el nombre de una imagen cuenta solo entero, entre signos que no forman parte de un nombre de archivo', async () => {
+  const name = 'suelta.A1.png';
+  const named = async (body, extra = {}) => failedIds(await scan({ [`_astro/${name}`]: 'imagen', 'pagina/index.html': page(body), ...extra }));
+  // Entero, después de «/» y antes de comillas, un paréntesis, un espacio, una coma, «?» o «#»: la usa.
+  for (const body of [`<img src="/_astro/${name}" alt="A">`, `<img src='/_astro/${name}' alt="A">`, `<img srcset="/_astro/${name} 320w, /_astro/otra.B2.png 640w" alt="A">`,
+    `<div style="background:url(/_astro/${name})"></div>`, `<img src="/_astro/${name}?v=1" alt="A">`, `<img src="/_astro/${name}#x" alt="A">`, `<p>${name}</p>`]) {
+    assert.deepEqual(await named(body), [], body);
+  }
+  // Como final de otro nombre, como principio de otro, o seguido de «.bak»: no la usa.
+  for (const body of [`<img src="/_astro/x${name}" alt="A">`, `<img src="/_astro/x_${name}" alt="A">`, `<img src="/_astro/x.${name}" alt="A">`, `<img src="/_astro/x-${name}" alt="A">`,
+    `<img src="/_astro/${name}x" alt="A">`, `<img src="/_astro/${name}_2" alt="A">`, `<img src="/_astro/${name}-2" alt="A">`, `<p>/_astro/${name}.bak</p>`]) {
+    assert.deepEqual(await named(body), ['R-FOTO-02'], body);
+  }
+  // Un nombre con letras fuera del alfabeto inglés también cuenta entero.
+  const accented = 'guante-ñandú.A1.png';
+  assert.deepEqual(failures(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/${accented}" alt="A">`) })), []);
+  assert.deepEqual(failedIds(await scan({ [`_astro/${accented}`]: 'imagen', 'pagina/index.html': page(`<img src="/_astro/x-${accented}" alt="A">`) })), ['R-FOTO-02']);
+  // Varias páginas y hojas de estilo: basta con que una la nombre.
+  assert.deepEqual(failures(await scan({ [`_astro/${name}`]: 'imagen', 'a/index.html': page('<p>Nada</p>'), 'b/index.html': page('<p>Nada</p>'), '_astro/sitio.C3.css': `.f{background:url(./${name})}` })), []);
+});

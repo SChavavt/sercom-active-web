@@ -4,16 +4,20 @@
 // scripts de navegador) con la configuración real del proyecto, en carpetas temporales:
 //   1. producción, sin la bandera y con un archivo .env que intenta activarla;
 //   2. producción, con un valor no reconocido en la bandera;
-//   3. vista previa, con el mismo lanzador que usa `npm run build:preview`.
+//   3. vista previa, con el mismo lanzador que usa `npm run build:preview`;
+//   4. el sitio real, en producción, con un catálogo sintético en lugar de src/data/catalog.json (una configuración
+//      temporal que importa la del proyecto y solo cambia ese archivo): la única forma de compilar la ficha real
+//      (src/pages/productos/[id].astro) con normas mientras el catálogo del repositorio no tiene productos.
 // La vista previa sirve de control: los mismos archivos sí contienen los ejemplos cuando la bandera está activa.
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { join, relative } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { scanDist } from '../scripts/scan-dist.mjs';
+import { validateCatalog } from '../src/lib/catalog-policy.mjs';
 import { matchesSearchText, SEARCH_PARAM } from '../src/lib/search.mjs';
 import { listFiles, loadProjectData, publicCatalog, ROOT } from './helpers.mjs';
 
@@ -35,6 +39,32 @@ const retiredExamples = data.examples.filter(example => example.retired === true
 const fixtureTokens = [...new Set(data.examples.flatMap(example => [
   example.id, example.name, example.code, example.summary, ...example.characteristics, ...example.variants.map(variant => variant.code),
 ]))];
+
+// Catálogo sintético de la compilación 4: las categorías del repositorio con «manos» aprobada, una ficha aprobada con
+// tres normas (en un orden que no es el alfabético), otra aprobada sin normas y un retirado que fue público, con una
+// norma en sus datos. Fichas, códigos y normas inventados.
+const NORM_SOURCE = 'https://fabricante.example/ficha-sintetica-normas';
+const NORMS = ['Norma sintética SONDA-C3', 'Norma sintética SONDA-A1', 'Norma sintética SONDA-B2'];
+const RETIRED_NORM = 'Norma sintética SONDA-R9';
+const synthetic = (id, change) => ({
+  id, brandId: data.brands[0].id, model: `SONDA-${id.length}`, name: `Guante sintético ${id}`, categoryIds: ['manos'], status: 'approved',
+  description: 'Guante sintético que solo existe en la prueba de la ficha.', saleUnit: 'par',
+  characteristics: ['Dato sintético uno', 'Dato sintético dos', 'Dato sintético tres'],
+  variants: [{ id: 'talla-8', label: 'Talla 8' }, { id: 'talla-9', label: 'Talla 9' }],
+  documents: [{ label: 'Hoja de datos sintética', url: 'https://fabricante.example/hoja-sintetica' }],
+  source: { url: 'https://fabricante.example/origen-sintetico', checkedOn: '2026-11-23' },
+  approval: { by: 'Prueba de compilación', on: '2026-11-23', supplyConfirmed: true },
+  ...change,
+});
+const normsCatalog = {
+  ...data.catalog,
+  categories: data.catalog.categories.map(category => (category.id === 'manos' ? { ...category, status: 'approved' } : category)),
+  products: [
+    synthetic('guante-con-normas', { standards: NORMS.map(text => ({ text, sourceUrl: NORM_SOURCE })) }),
+    synthetic('guante-sin-normas', { model: 'SONDA-SIN' }),
+    synthetic('guante-retirado-normas', { status: 'retired', model: 'SONDA-RET', standards: [{ text: RETIRED_NORM, sourceUrl: NORM_SOURCE }] }),
+  ],
+};
 
 const astroPackage = new URL('../node_modules/astro/package.json', import.meta.url);
 const { bin } = JSON.parse(await readFile(astroPackage, 'utf8'));
@@ -74,14 +104,33 @@ before(async () => {
     ['malformed', [astroBin, 'build', ...PROBE_ARGS], 'si'],
     ['preview', ['scripts/catalog-preview.mjs', 'build', ...PROBE_ARGS], undefined],
   ];
-  // Una tras otra: las tres escriben en las mismas carpetas de trabajo de la sonda.
+  // 4: la configuración del proyecto, con src/data/catalog.json resuelto al catálogo sintético.
+  assert.deepEqual(validateCatalog(normsCatalog, data.registry), [], 'el catálogo sintético debe ser válido');
+  const catalogFile = join(ROOT, 'src', 'data', 'catalog.json');
+  const syntheticFile = join(temporary, 'catalogo-sintetico.json');
+  await writeFile(syntheticFile, JSON.stringify(normsCatalog));
+  const config = join(temporary, 'astro.config.normas.mjs');
+  await writeFile(config, [
+    "import { dirname, resolve } from 'node:path';",
+    `import base from ${JSON.stringify(pathToFileURL(join(ROOT, 'astro.config.mjs')).href)};`,
+    `const catalog = ${JSON.stringify(catalogFile)};`,
+    'const swap = {',
+    "  name: 'prueba:catalogo-sintetico', enforce: 'pre',",
+    "  resolveId(source, importer) { return importer && resolve(dirname(importer.split('?')[0]), source.split('?')[0]) === catalog ? " + `${JSON.stringify(syntheticFile)} : null; },`,
+    '};',
+    'export default { ...base, vite: { ...base.vite, plugins: [...(base.vite?.plugins ?? []), swap] } };',
+    '',
+  ].join('\n'));
+  // --config se resuelve desde la carpeta del proyecto, también cuando es una ruta absoluta: va relativa.
+  plan.push(['norms', [astroBin, 'build', '--config', relative(ROOT, config)], undefined]);
+  // Una tras otra: las tres primeras escriben en las mismas carpetas de trabajo de la sonda, y nunca dos a la vez.
   for (const [name, args, flag] of plan) {
     const directory = join(temporary, name);
     const result = await run([...args, '--outDir', directory], flag);
     assert.equal(result.code, 0, `la compilación «${name}» falló:\n${result.output}`);
     builds[name] = { directory, output: result.output, files: await readOutput(directory) };
   }
-}, { timeout: 180_000 });
+}, { timeout: 300_000 });
 
 after(async () => {
   await Promise.all([
@@ -286,3 +335,33 @@ test('vista previa (control): el escáner en modo producción detecta los ejempl
   assert.ok(leaked.has('datos.json'));
   assert.ok([...leaked].some(path => path.endsWith('.js')));
 });
+
+test('la ficha real muestra sus normas en «Normas», después de «Características» y antes de «Variantes», y en ningún otro lugar', () => {
+  const { files } = builds.norms;
+  const page = files.get('productos/guante-con-normas/index.html');
+  assert.ok(page, 'la ficha con normas debe compilarse');
+  const heading = title => page.indexOf(`>${title}</h2>`);
+  assert.ok(heading('Características') > 0 && heading('Características') < heading('Normas') && heading('Normas') < heading('Variantes'), 'orden de los bloques');
+  // Una fila por norma, con su texto y en el orden de los datos, y la nota debajo.
+  const block = page.match(/<section[^>]*aria-labelledby="normas-title"[^>]*>([\s\S]*?)<\/section>/)?.[1] ?? '';
+  const list = block.match(/<ul class="producto__norms"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? '';
+  assert.deepEqual([...list.matchAll(/<li class="producto__norm"[^>]*>([^<]*)<\/li>/g)].map(match => match[1]), NORMS);
+  assert.ok(block.indexOf('Según la información publicada por el fabricante.') > block.indexOf('</ul>'), 'la nota va debajo de la lista');
+  assert.ok(!block.includes(NORM_SOURCE) && !page.includes(NORM_SOURCE), 'la dirección de la norma no se publica');
+  // Fuera de su lista, ninguna norma: ni en el título, ni en la descripción, ni en el índice de «Mi cotización», ni en
+  // ninguna otra página (tarjetas, data-search del catálogo, la página del retirado), ni en un script o un JSON.
+  // Se busca la parte inventada de cada norma sin distinguir mayúsculas: el texto de búsqueda va en minúsculas y sin acentos.
+  const anyNorm = /SONDA-(?:C3|A1|B2|R9)/i;
+  assert.doesNotMatch(page.replace(list, ''), anyNorm, 'la ficha muestra una norma fuera de «Normas»');
+  for (const [path, content] of files) if (path !== 'productos/guante-con-normas/index.html') assert.doesNotMatch(content, anyNorm, path);
+  for (const part of [/<title>[^<]*<\/title>/, /<meta name="description"[^>]*>/, /<script type="application\/json" data-quote-index[^>]*>[^<]*<\/script>/]) {
+    assert.match(page, part);
+    assert.ok(!NORMS.some(norm => page.match(part)[0].includes(norm)), String(part));
+  }
+  // Lo que se revisa existe: la tarjeta del catálogo con su texto de búsqueda, la otra ficha y la página del retirado.
+  assert.ok((files.get('catalogo/index.html').match(/ data-search="/g) ?? []).length >= 2, 'el catálogo muestra las dos fichas con su texto de búsqueda');
+  assert.ok(files.get('productos/guante-sin-normas/index.html').includes('guante-con-normas'), 'la otra ficha muestra la tarjeta de la ficha con normas');
+  const retired = files.get('productos/guante-retirado-normas/index.html');
+  assert.ok(retired && !retired.includes('normas-title'), 'la página del retirado no lleva «Normas»');
+});
+
