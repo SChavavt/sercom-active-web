@@ -41,11 +41,13 @@ const fixtureTokens = [...new Set(data.examples.flatMap(example => [
 ]))];
 
 // Catálogo sintético de la compilación 4: las categorías del repositorio con «manos» aprobada, una ficha aprobada con
-// tres normas (en un orden que no es el alfabético), otra aprobada sin normas y un retirado que fue público, con una
-// norma en sus datos. Fichas, códigos y normas inventados.
+// tres normas (en un orden que no es el alfabético), otra aprobada sin normas, un retirado que fue público, con una
+// norma en sus datos, y una aprobada con foto (para el crédito). Fichas, códigos, normas y direcciones inventados.
 const NORM_SOURCE = 'https://fabricante.example/ficha-sintetica-normas';
 const NORMS = ['Norma sintética SONDA-C3', 'Norma sintética SONDA-A1', 'Norma sintética SONDA-B2'];
 const RETIRED_NORM = 'Norma sintética SONDA-R9';
+// Una ficha aprobada con foto: uno de los archivos de src/assets/productos/ y una página de origen inventada.
+const PHOTO = { file: 'msa-v-gard-cachucha.jpg', alt: 'Foto sintética de la prueba de compilación.', sourceUrl: 'https://fabricante.example/ficha-sintetica-foto', usageConfirmed: true };
 const synthetic = (id, change) => ({
   id, brandId: data.brands[0].id, model: `SONDA-${id.length}`, name: `Guante sintético ${id}`, categoryIds: ['manos'], status: 'approved',
   description: 'Guante sintético que solo existe en la prueba de la ficha.', saleUnit: 'par',
@@ -63,6 +65,7 @@ const normsCatalog = {
     synthetic('guante-con-normas', { standards: NORMS.map(text => ({ text, sourceUrl: NORM_SOURCE })) }),
     synthetic('guante-sin-normas', { model: 'SONDA-SIN' }),
     synthetic('guante-retirado-normas', { status: 'retired', model: 'SONDA-RET', standards: [{ text: RETIRED_NORM, sourceUrl: NORM_SOURCE }] }),
+    synthetic('guante-con-foto', { model: 'SONDA-FOTO', image: PHOTO }),
   ],
 };
 
@@ -365,3 +368,100 @@ test('la ficha real muestra sus normas en «Normas», después de «Característ
   assert.ok(retired && !retired.includes('normas-title'), 'la página del retirado no lleva «Normas»');
 });
 
+// Las páginas de las marcas, la sección de catálogos de /marcas/, la banda del catálogo y el crédito de la foto, en la
+// compilación del sitio real (la 4). Lo esperado se lee aquí de src/data/brands.json y del catálogo sintético, sin las
+// funciones ni los componentes que se revisan.
+const SITE_LABEL = 'Sitio del fabricante';
+const unescape = text => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#39;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+/** Los enlaces que abren otra pestaña de un trozo de HTML, en orden: destino, texto que se ve, detalle y texto oculto. */
+const externalLinks = (html, detailClass) => [...html.matchAll(/<a ([^>]*\btarget="_blank"[^>]*)>([\s\S]*?)<\/a>/g)].map(([, attributes, inner]) => ({
+  href: unescape(attributes.match(/\bhref="([^"]*)"/)?.[1] ?? ''),
+  label: unescape(inner.replace(/^<span>/, '').split('<')[0]),
+  detail: unescape(inner.match(new RegExp(`<span class="${detailClass} t-small">([^<]*)</span>`))?.[1] ?? '') || null,
+  hidden: [...inner.matchAll(/<span class="vh">([^<]*)<\/span>/g)].map(match => unescape(match[1])).join(''),
+}));
+/** Lo que el detalle de un PDF debe decir, de los datos: la edición y el tamaño, si los tiene. */
+const expectedDetail = link => {
+  const parts = [link.edition, link.megabytes === undefined ? undefined : `${link.megabytes} MB`].filter(Boolean);
+  return parts.length ? parts : null;
+};
+const assertDetail = (row, link, where) => {
+  const parts = expectedDetail(link);
+  if (!parts) assert.equal(row.detail, null, `${where}: sin edición ni tamaño, no hay detalle`);
+  else for (const part of parts) assert.ok(row.detail?.includes(part), `${where}: el detalle «${row.detail}» debe decir «${part}»`);
+};
+
+test('la página de cada marca imprime una fila por enlace del fabricante, en el orden de los datos, con su dirección y el detalle del PDF', () => {
+  const { files } = builds.norms;
+  let withDetail = 0;
+  for (const brand of data.brands) {
+    const page = files.get(`marcas/${brand.id}/index.html`);
+    assert.ok(page, `la página de ${brand.id} debe compilarse`);
+    const rows = externalLinks(page, 'catalog-brand__detail');
+    assert.deepEqual(rows.map(row => [row.label, row.href]), brand.manufacturerLinks.map(link => [link.label, link.url]), brand.id);
+    brand.manufacturerLinks.forEach((link, index) => {
+      assertDetail(rows[index], link, `${brand.id} ${link.label}`);
+      assert.match(rows[index].hidden, /\(se abre en otra pestaña\)/, `${brand.id} ${link.label}`);
+      if (expectedDetail(link)) withDetail += 1;
+    });
+  }
+  assert.ok(withDetail >= 1, 'algún PDF de los datos debe llevar edición o tamaño para que esta prueba tenga sentido');
+});
+
+test('/marcas/#catalogos lista exactamente las marcas con un catálogo en PDF o en línea, en el orden de los datos, sin «Sitio del fabricante»', () => {
+  const page = builds.norms.files.get('marcas/index.html');
+  const section = page.match(/<section[^>]*\bid="catalogos"[^>]*>([\s\S]*?)<\/section>/)?.[1] ?? '';
+  assert.ok(section, 'la sección #catalogos debe existir');
+  const expected = data.brands.map(brand => ({ brand, links: brand.manufacturerLinks.filter(link => link.label !== SITE_LABEL) })).filter(entry => entry.links.length > 0);
+  assert.ok(expected.length >= 2, 'los datos deben tener varias marcas con catálogo para que esta prueba tenga sentido');
+  const rows = section.split(/<li class="catalog-sources__row\b/).slice(1);
+  assert.deepEqual(rows.map(row => {
+    const [, href, name] = row.match(/class="catalog-sources__name" href="([^"]*)">([^<]*)<\/a>/) ?? [];
+    return [unescape(name ?? ''), href];
+  }), expected.map(({ brand }) => [brand.name, `/marcas/${brand.id}/`]));
+  rows.forEach((row, index) => {
+    const { brand, links } = expected[index];
+    // Cada enlace va en su párrafo, con el detalle del PDF al lado (fuera del enlace).
+    const found = row.split('<p class="catalog-sources__link">').slice(1).map(paragraph => ({
+      ...externalLinks(paragraph, 'ninguno')[0],
+      detail: unescape(paragraph.match(/<span class="catalog-sources__detail t-small">([^<]*)<\/span>/)?.[1] ?? '') || null,
+    }));
+    assert.deepEqual(found.map(link => [link.label, link.href]), links.map(link => [link.label, link.url]), brand.id);
+    links.forEach((link, position) => assertDetail(found[position], link, `/marcas/ ${brand.id} ${link.label}`));
+  });
+  assert.ok(!section.includes(SITE_LABEL), 'la sección no lista el sitio del fabricante');
+});
+
+test('la banda del catálogo enlaza /marcas/#catalogos en /catalogo/ y en una categoría; /marcas/ no imprime ese enlace', () => {
+  const { files } = builds.norms;
+  assert.ok(data.brands.some(brand => brand.manufacturerLinks.some(link => link.label !== SITE_LABEL)), 'alguna marca tiene catálogo');
+  const bandLink = /<a class="band__link" href="\/marcas\/#catalogos">/;
+  for (const path of ['catalogo/index.html', 'categorias/manos/index.html']) {
+    assert.ok(files.get(path), `${path} debe compilarse`);
+    assert.match(files.get(path), bandLink, path);
+  }
+  assert.doesNotMatch(files.get('marcas/index.html'), /class="band__link"/);
+});
+
+test('una ficha aprobada con foto imprime el crédito hacia su página de origen; sin foto, retirada o en una tarjeta, no hay crédito', () => {
+  const { files } = builds.norms;
+  const page = files.get('productos/guante-con-foto/index.html');
+  assert.ok(page, 'la ficha con foto debe compilarse');
+  const credit = page.match(/<figcaption class="producto__credit[^"]*">([\s\S]*?)<\/figcaption>/)?.[1] ?? '';
+  const [link] = externalLinks(credit, 'ninguno');
+  assert.ok(link, 'el crédito lleva un enlace que abre otra pestaña');
+  assert.equal(link.href, PHOTO.sourceUrl);
+  const tag = credit.match(/<a [^>]*>/)[0];
+  assert.match(tag, /\btarget="_blank"/);
+  assert.ok((tag.match(/\brel="([^"]*)"/)?.[1] ?? '').split(/\s+/).includes('noopener'), tag);
+  assert.match(link.hidden, /\(se abre en otra pestaña\)/);
+  // Sin foto (el pictograma de la categoría), retirada, o en una tarjeta: ni el crédito ni la dirección.
+  for (const path of ['productos/guante-con-normas/index.html', 'productos/guante-sin-normas/index.html', 'productos/guante-retirado-normas/index.html', 'catalogo/index.html', 'categorias/manos/index.html']) {
+    const other = files.get(path);
+    assert.ok(other, `${path} debe compilarse`);
+    assert.doesNotMatch(other, /producto__credit/, path);
+    assert.ok(!other.includes(PHOTO.sourceUrl), path);
+  }
+  assert.ok(files.get('productos/guante-con-normas/index.html').includes('producto__plate'), 'la ficha sin foto muestra el pictograma');
+  assert.ok(files.get('catalogo/index.html').includes('guante-con-foto'), 'el catálogo muestra la tarjeta de la ficha con foto');
+});
